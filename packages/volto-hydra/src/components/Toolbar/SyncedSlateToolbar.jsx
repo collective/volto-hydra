@@ -1404,14 +1404,16 @@ const SyncedSlateToolbar = ({
           </div>
         );
 
-        // The lock/unlock toggle shows for the template's fixed "chrome" (🔒, tap to
-        // edit) and for ANY block while its template is unlocked (🔓, tap to lock &
-        // save). Editable slot content in a LOCKED template is just normal movable
-        // content — it keeps the drag handle (below), no toggle.
+        // The lock/unlock toggle shows for ANY block belonging to an editable
+        // template instance — the SAME availability as the settings-sidebar
+        // template toggle (unlock is one action; it shouldn't depend on which
+        // surface renders it, nor on whether the selected member is fixed chrome
+        // or editable slot content). Locked → 🔒 (tap to edit); unlocked → 🔓 (tap
+        // to lock & save). Editable members keep their drag handle (below) too.
         const isPositionLocked = isBlockPositionLocked(block, templateEditMode);
         const canToggleTemplate =
           !!instanceId && !!onToggleTemplateEditMode && canEditToolbarTemplate;
-        if (canToggleTemplate && (isPositionLocked || isEditingToolbarTemplate)) {
+        if (canToggleTemplate) {
           const editing = isEditingToolbarTemplate;
           const toggle = (
             <button
