@@ -2051,8 +2051,11 @@ test.describe('Template Edit Mode v2 - multi-unlock, no page lock, lock-to-commi
     await helper.waitForBlockEditable(headerBlockId);
 
     // Lock again WITHOUT editing → no decision modal (v2: don't prompt when the
-    // template hasn't changed), it just re-locks, and nothing is written.
-    const toggle = page.locator('.sidebar-section-header[data-is-current="true"] .edit-template-toggle');
+    // template hasn't changed), it just re-locks, and nothing is written. Drive the
+    // quanta toolbar toggle (the same surface unlock used), not the sidebar toggle.
+    await helper.clickBlockInIframe(headerBlockId);
+    const toggle = page.locator('.quanta-toolbar .template-lock-toggle');
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
     await toggle.click();
     await expect(page.locator('.template-lock-modal')).toHaveCount(0);
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
