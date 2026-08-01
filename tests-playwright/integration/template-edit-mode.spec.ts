@@ -325,6 +325,15 @@ test.describe('Template Creation', () => {
     await helper.unlockTemplate(headerBlockId);
     await helper.waitForBlockEditable(headerBlockId);
 
+    // Make a template change so re-locking PROMPTS the decision modal — an UNCHANGED
+    // template locks silently (see "locking an unchanged template does not prompt").
+    // Delete the fixed footer (a structural template edit); the event path is
+    // viewport-independent, so it's the same signal on mobile as on desktop.
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
+    await page.evaluate((id) => {
+      document.dispatchEvent(new CustomEvent('hydra-delete-blocks', { detail: { blockIds: [id] } }));
+    }, footerBlockId);
+
     // unlock dismissed the sheet, so the canvas is reachable again.
     await expect(page.locator('.sidebar-container.collapsed')).toBeAttached({ timeout: 5000 });
 
@@ -2082,7 +2091,9 @@ test.describe('Template Edit Mode v2 - multi-unlock, no page lock, lock-to-commi
     await expect(iframe.locator(`[data-block-uid="${PAGE_BOTTOM}"]`)).toHaveCount(0, { timeout: 5000 });
 
     // Lock → Reset changes.
-    await helper.lockTemplate(I1_CONTENT, 'reset');
+    // Lock via the fixed chrome header too — once the template re-locks, the toggle
+    // lives on fixed chrome, not on the editable member (matters on slower frontends).
+    await helper.lockTemplate(i1Header, 'reset');
 
     // The template block comes back (template reverted to saved version)...
     await expect(iframe.locator(`[data-block-uid]`).filter({ hasText: I1_FOOTER })).toBeVisible({ timeout: 5000 });
@@ -2108,8 +2119,9 @@ test.describe('Template Edit Mode v2 - multi-unlock, no page lock, lock-to-commi
       templateWrites.push(`${m} ${req.url()}`);
     });
 
+    const { blockId: i1Header } = await helper.waitForBlockByContent(I1_HEADER);
     const { blockId: i1Footer } = await helper.waitForBlockByContent(I1_FOOTER);
-    await helper.unlockTemplate(i1Footer);
+    await helper.unlockTemplate(i1Header);
 
     // Make a template edit.
     await helper.clickBlockInIframe(i1Footer);
@@ -2119,8 +2131,8 @@ test.describe('Template Edit Mode v2 - multi-unlock, no page lock, lock-to-commi
     }, i1Footer);
 
     // Locking with "Change on all pages" writes the template document now —
-    // before (and independently of) any page save.
-    await helper.lockTemplate(I1_CONTENT, 'commit');
+    // before (and independently of) any page save. Lock via the fixed chrome header.
+    await helper.lockTemplate(i1Header, 'commit');
     await expect.poll(() => templateWrites.length, { timeout: 5000 }).toBeGreaterThanOrEqual(1);
   });
 
