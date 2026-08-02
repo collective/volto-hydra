@@ -409,6 +409,25 @@ const UNDECLARED_EXEMPT = new Set([
   '_linkableAnchors',
 ]);
 
+// Block-level slate STYLES a person can actually choose from the editor's style
+// menu (Volto's slate styleName plugin). There is no slate style menu yet, so
+// this is EMPTY: any `styleName` on a slate node is content a person cannot
+// author — it was hand-injected — and block-sanity must flag it. When a style
+// menu is added, list its style values here (or derive from the slate config).
+const AUTHORABLE_SLATE_STYLES = new Set([]);
+
+// Recursively collect any `styleName` on a slate value's nodes that isn't an
+// authorable style. Catches hand-injected styles a person can't reproduce.
+function unauthorableSlateStyles(nodes, seen = new Set()) {
+  for (const n of Array.isArray(nodes) ? nodes : []) {
+    if (n && typeof n === 'object') {
+      if (n.styleName && !AUTHORABLE_SLATE_STYLES.has(n.styleName)) seen.add(n.styleName);
+      if (Array.isArray(n.children)) unauthorableSlateStyles(n.children, seen);
+    }
+  }
+  return seen;
+}
+
 function collectWidgetShapeIssues(
   blockData, blockSchema, pagePath, blockId, out, blockType, undeclaredFields, blockConfig,
 ) {
@@ -519,14 +538,50 @@ function collectWidgetShapeIssues(
       issues.push(
         `field "${field}": image content must use \`widget: 'image'\`, not \`widget: 'file'\`.`,
       );
-    } else if (widget === 'select' || widget === 'choice' || def?.factory === 'Choice') {
-      const choices = def.choices || [];
-      const allowed = choices.map(c => (Array.isArray(c) ? c[0] : c));
+    } else if (
+      widget === 'select' || widget === 'choice' || def?.factory === 'Choice' ||
+      Array.isArray(def?.actions) || widget === 'blockTypeSelect'
+    ) {
+      // A constrained-value widget: the stored value must be one the editor can
+      // actually pick. Options come from `choices` (select/Choice), `actions`
+      // (button-bar widgets like size/align — the array of button values), or —
+      // for a blockTypeSelect — the sibling region's `allowedBlocks` (the
+      // container's addable item types). Without this, a size:"xxl" or a
+      // variation:"card" on a tags block would render as junk and never be
+      // reproducible by hand.
+      let allowed;
+      if (Array.isArray(def.actions)) {
+        allowed = def.actions;
+      } else if (widget === 'blockTypeSelect') {
+        const region = Object.values(props).find((p) => p && p.itemTypeField === field);
+        allowed = region?.allowedBlocks || [];
+      } else {
+        allowed = (def.choices || []).map((c) => (Array.isArray(c) ? c[0] : c));
+      }
       if (allowed.length && !allowed.includes(value)) {
-        issues.push(`field "${field}": value ${JSON.stringify(value)} not in declared choices ${JSON.stringify(allowed)}`);
+        issues.push(
+          `field "${field}": value ${JSON.stringify(value)} is not one of the allowed ` +
+            `values ${JSON.stringify(allowed)} — the editor can't produce it.`,
+        );
       }
     } else if (widget === 'slate') {
-      if (!Array.isArray(value)) issues.push(describe('slate array', value));
+      if (!Array.isArray(value)) {
+        issues.push(describe('slate array', value));
+      } else {
+        // The value being an array isn't enough: a slate node's block-level
+        // `styleName` must be a style the editor's style menu can apply. Any
+        // other styleName is content nobody can author — hand-injected to fake a
+        // rendering. Flag each one (this is what caught a fabricated nsw-intro).
+        const bad = unauthorableSlateStyles(value);
+        for (const s of bad) {
+          issues.push(
+            `field "${field}": slate node styleName ${JSON.stringify(s)} is not an ` +
+              `authorable style — no such option exists in the editor's style menu, so ` +
+              `this content can't be reproduced by hand. Register the style (add it to ` +
+              `the slate style menu) or remove it.`,
+          );
+        }
+      }
     } else if (widget === 'object_list') {
       // object_list stores an array of items; an idField (default '@id')
       // identifies each. If data is nested (dataPath), value may be an
@@ -566,6 +621,33 @@ function collectWidgetShapeIssues(
       if (typeof value !== 'number') issues.push(describe(type, value));
     } else if (type === 'string') {
       if (typeof value !== 'string') issues.push(describe('string', value));
+    }
+  }
+
+  // Synced container: a container with an `itemTypeField` (a blockTypeSelect —
+  // grid, tags, …) fixes ONE item type, so every child must be that type. A
+  // `listing` child is the one structural exception (it expands into the synced
+  // type). allowedBlocks permits several types at once, so THIS is the check that
+  // catches a MIXED synced container — e.g. a tags variation="link" holding a
+  // textItem — which allowedBlocks alone can't.
+  const regionEntry = Object.entries(props).find(([, p]) => p && p.itemTypeField);
+  if (regionEntry) {
+    const variation = blockData[regionEntry[1].itemTypeField];
+    const kids =
+      blockData.blocks && typeof blockData.blocks === 'object'
+        ? Object.values(blockData.blocks)
+        : [];
+    if (typeof variation === 'string' && variation && variation !== 'default') {
+      for (const kid of kids) {
+        const kt = kid && kid['@type'];
+        if (kt && kt !== variation && kt !== 'listing') {
+          issues.push(
+            `synced container item type is ${JSON.stringify(variation)} but it holds a ` +
+              `${JSON.stringify(kt)} child — a synced container can't mix types; every child ` +
+              `must be ${JSON.stringify(variation)} (or a structural "listing").`,
+          );
+        }
+      }
     }
   }
 
