@@ -1228,7 +1228,7 @@ describe('nextSlotId and childSlotIds on fixed blocks', () => {
   // Same as above, but the container's slot lives in an OBJECT_LIST region (a slider's `slides`),
   // not blocks_layout. The childSlotIds add-path anchor was computed via blocksLayoutRegions only,
   // so an object_list slot container got no anchor. It must be keyed by the field name (`slides`),
-  // matching schemaInheritance's parentBlock.childSlotIds[field] lookup.
+  // matching blockSync's parentBlock.childSlotIds[field] lookup.
   test('childSlotIds set on a fixed container whose slot lives in an object_list region (slider slides)', async () => {
     const pageData = { blocks: {}, blocks_layout: { items: [] } };
 

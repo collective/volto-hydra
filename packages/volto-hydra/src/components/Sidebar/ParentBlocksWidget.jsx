@@ -38,7 +38,7 @@ import DropdownMenu from '../Toolbar/DropdownMenu';
 import ReadOnlyForm from './ReadOnlyForm';
 import { getBlockById, updateBlockById, getResolvedSchema, getCommonAncestor } from '../../utils/blockPath';
 import { HydraSchemaProvider } from '../../context';
-import { getConvertibleTypes, convertBlockType, findTypeField } from '../../utils/schemaInheritance';
+import { getConvertibleTypes, convertBlockType, findTypeField } from '../../utils/blockSync';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import { isBlockReadonly } from '@volto-hydra/helpers';
 import { flattenToAppURL } from '@plone/volto/helpers';
@@ -245,7 +245,7 @@ const ParentBlockSection = ({
   // Get schema for fallback rendering (when no Edit component or disableCustomSidebarEditForm)
   const schema = !BlockEdit ? getFilteredBlockSchema(blockType, intl, blockPathMap, blockId, blockData) : null;
 
-  // Compute a key suffix that changes when parent's schema inheritance state changes.
+  // Compute a key suffix that changes when parent's block sync state changes.
   // This forces BlockEdit to remount when parent's typeField changes, ensuring child gets fresh schema.
   // Without this, Volto's BlockEdit caches its internal form and doesn't re-render with new schema.
   const parentSchemaKey = React.useMemo(() => {
@@ -434,7 +434,7 @@ const ParentBlockSection = ({
         <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef, onChangeBlock }}>
           <SidebarPortalTargetContext.Provider value={targetId}>
             {/* Hidden container - Edit component's center content is hidden, only sidebar renders */}
-            {/* Key includes parentSchemaKey to force remount when parent's schema inheritance changes */}
+            {/* Key includes parentSchemaKey to force remount when parent's block sync changes */}
             <div key={`${blockId}${parentSchemaKey}`} style={{ display: 'none' }}>
               <BlockEdit
                 type={blockType}

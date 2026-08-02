@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 
 // HydraSchemaContext.js is JSX inside a .js file (the admin build uses babel;
-// vitest/vite can't transform JSX in .js). copyFromTarget → schemaInheritance
-// imports '../context', so stub it — same convention as schemaInheritance.test.js.
+// vitest/vite can't transform JSX in .js). copyFromTarget → blockSync
+// imports '../context', so stub it — same convention as blockSync.test.js.
 vi.mock('../context', () => ({
   getHydraSchemaContext: () => ({}),
   setHydraSchemaContext: () => {},
@@ -25,7 +25,7 @@ import {
   pullLinkedFields,
   COPY_FROM_TARGET_WIDGET,
 } from './copyFromTarget';
-import { createSchemaEnhancerFromRecipe } from './schemaInheritance';
+import { createSchemaEnhancerFromRecipe } from './blockSync';
 
 // A teaser-like block: `href` is the link/url field carrying the target
 // snapshot (selectedItemAttrs), and fieldMappings['@target'] maps target

@@ -94,5 +94,5 @@ The test-frontend should track carousel state and restore it after re-renders.
 
 - `packages/hydra-js/hydra.js` - `tryMakeBlockVisible`, `isElementHidden`, FORM_DATA handling
 - `packages/volto-hydra/src/components/Iframe/View.jsx` - FORM_DATA sync, `formDataContentEqual` check
-- `packages/volto-hydra/src/utils/schemaInheritance.js` - `applySchemaDefaultsToFormData`
+- `packages/volto-hydra/src/utils/blockSync.js` - `applySchemaDefaultsToFormData`
 - `tests-playwright/fixtures/test-frontend/renderer.js` - Slider rendering, slide transitions
