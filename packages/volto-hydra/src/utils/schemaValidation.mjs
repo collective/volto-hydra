@@ -2,12 +2,12 @@
  * Schema Validation Utilities — pure, dependency-free.
  *
  * These mirror the per-block validation Hydra runs in
- * `applySchemaDefaultsToFormData` (schemaInheritance.js). Extracted here as
+ * `applySchemaDefaultsToFormData` (blockSync.js). Extracted here as
  * pure functions so they can be reused from test runners, CI gates, and any
  * other tool that needs to know "would Hydra strip this value on load?"
  * without pulling in Volto's registry / React contexts / blockPath helpers.
  *
- * Originally lived inline in `./schemaInheritance.js`; that module now
+ * Originally lived inline in `./blockSync.js`; that module now
  * re-exports from here. Single source of truth.
  *
  * NO imports. Keep it that way — that's the whole point.

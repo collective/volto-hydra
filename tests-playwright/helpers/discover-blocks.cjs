@@ -422,8 +422,21 @@ const AUTHORABLE_SLATE_STYLES = new Set([]);
 // via dynamic import (it's ESM but dependency-free by design) in discoverBlocks.
 let isValidValueFn = null;
 
+// Hydra's REAL schema resolver, run offline. resolveEffectiveBlockSchema(blockId,
+// pageFormData, blockPathMap, blocksConfig, intl) returns a block's schema with
+// its schemaEnhancer applied — so `.required` is the DYNAMIC required set (a
+// card's `image` is required only when its grid enables it). blockSync.js /
+// blockPath.js are idiomatic Volto source (JSX, lodash CJS, extensionless imports)
+// that bare Node can't load, so we esbuild-bundle the offline API once (see
+// loadOfflineBlockSyncApi). null until loaded.
+let resolveEffectiveSchemaFn = null;
+
+// Offline stub intl: block schemas call intl.formatMessage for titles; we only
+// need field NAMES/required, not translations.
+const STUB_INTL = { formatMessage: (m) => (m && (m.defaultMessage || m.id)) || '' };
+
 // Evaluate one `when` operator against a resolved surface value. Mirrors the
-// operators our schemaEnhancer.fieldRules use (see volto-hydra schemaInheritance).
+// operators our schemaEnhancer.fieldRules use (see volto-hydra blockSync).
 function condMatches(cond, val) {
   if (cond && typeof cond === 'object' && !Array.isArray(cond)) {
     if ('gte' in cond && !(val >= cond.gte)) return false;
@@ -477,7 +490,8 @@ function unauthorableSlateStyles(nodes, seen = new Set()) {
 }
 
 function collectWidgetShapeIssues(
-  blockData, blockSchema, pagePath, blockId, out, blockType, undeclaredFields, blockConfig,
+  blockData, blockSchema, pagePath, blockId, out, blockType, undeclaredFields, blockConfig, blocksConfig,
+  effectiveRequired,
 ) {
   const props = blockSchema?.properties;
   if (!props || !blockData || typeof blockData !== 'object') return;
@@ -600,11 +614,36 @@ function collectWidgetShapeIssues(
       const eff = resolveFieldDef(field, def, blockData, blockConfig, props);
       if (eff !== false) {
         let checkDef = eff;
+        let skip = false;
         if (widget === 'blockTypeSelect') {
+          // A blockTypeSelect's valid values are the container's addable item
+          // types — hydra resolves them in getBlockTypeChoices, which needs the
+          // bridge's blockPathMap/registry and can't run offline. Mirror only the
+          // two OFFLINE-decidable forms:
+          //   • region-synced (grid / tags): a sibling region field carries
+          //     itemTypeField===field, so its `allowedBlocks` is the set.
+          //   • region-less convertible (listing): the field declares
+          //     `filterConvertibleFrom`, and the set is every block type whose
+          //     config has `fieldMappings[that source]` — the SAME filter
+          //     getBlockTypeChoices applies.
+          // Any other form (parent `allowedSiblingTypes`, blocksField '..') needs
+          // the pathMap — skip rather than guess (guessing choices=[] was flagging
+          // every valid listing variation).
           const region = Object.values(props).find((p) => p && p.itemTypeField === field);
-          checkDef = { ...eff, choices: region?.allowedBlocks || [] };
+          if (region) {
+            checkDef = { ...eff, choices: region.allowedBlocks || [] };
+          } else if (eff.filterConvertibleFrom && blocksConfig) {
+            checkDef = {
+              ...eff,
+              choices: Object.keys(blocksConfig).filter(
+                (t) => blocksConfig[t]?.fieldMappings?.[eff.filterConvertibleFrom],
+              ),
+            };
+          } else {
+            skip = true; // unresolvable offline
+          }
         }
-        if (isValidValueFn && !isValidValueFn(value, checkDef)) {
+        if (!skip && isValidValueFn && !isValidValueFn(value, checkDef)) {
           issues.push(
             `field "${field}": value ${JSON.stringify(value)} is not an allowed value — the ` +
               `editor can't produce it (Hydra would strip it on load).`,
@@ -671,6 +710,40 @@ function collectWidgetShapeIssues(
     }
   }
 
+  // Required fields: a `required` field must hold a value — the editor blocks
+  // saving a block with an empty required field, so content that omits one is
+  // data nobody could have authored (an untitled card, a link with no href).
+  //
+  // `required` is DYNAMIC: hydra drops hidden fields from it, so a card's `image`
+  // is required only when its grid enables the image element (its `fieldRules`
+  // read the parent grid's `../itemDefaults_elements` with `contains`). We resolve
+  // that with Hydra's REAL evaluator offline: `effectiveRequired` is the resolved
+  // set (hidden fields already dropped), so we check it directly — no guessing.
+  // Fallback (resolver unavailable): enforce only fields with NO fieldRules entry,
+  // never a conditional one (under-enforce, never false-flag).
+  const usingResolved = Array.isArray(effectiveRequired);
+  const requiredFields = usingResolved
+    ? effectiveRequired
+    : Array.isArray(blockSchema.required)
+      ? blockSchema.required
+      : [];
+  const fieldRules = blockConfig?.schemaEnhancer?.fieldRules || {};
+  const isEmptyRequired = (v) =>
+    v == null ||
+    (typeof v === 'string' && v.trim() === '') ||
+    (Array.isArray(v) && v.length === 0) ||
+    (typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0);
+  for (const field of requiredFields) {
+    if (!props[field]) continue; // required names an undeclared field — a schema bug, not a value issue
+    if (!usingResolved && field in fieldRules) continue; // no resolver: defer conditional fields
+    if (isEmptyRequired(blockData[field])) {
+      issues.push(
+        `field "${field}": required but empty — the editor won't let a block save without ` +
+          `it, so this content can't be authored. Provide a value, or drop the field from \`required\`.`,
+      );
+    }
+  }
+
   // Synced container: a container with an `itemTypeField` (a blockTypeSelect —
   // grid, tags, …) fixes ONE item type, so every child must be that type. A
   // `listing` child is the one structural exception (it expands into the synced
@@ -732,6 +805,55 @@ function collectWidgetShapeIssues(
   }
 }
 
+// blocksConfig objects whose child-block enhancers have already been installed
+// (installChildBlockEnhancers mutates each block's schemaEnhancer, so guard
+// against double-composing on a second discoverBlocks call).
+const _enhancersInstalledFor = new WeakSet();
+let _offlineApiModule = null;
+
+// esbuild-bundle Hydra's offline block-sync API once and wire it up: idiomatic
+// Volto source (JSX, lodash CJS, extensionless imports) can't load in bare Node,
+// so esbuild transpiles the small entry into one self-contained ESM module. Then
+// inject blocksConfig + install the child-block enhancers, exactly as the addon's
+// applyConfig does at init, so resolveEffectiveBlockSchema resolves dynamic
+// `required` (fieldRules / hideParentOwnedFields) the same way the editor does.
+async function loadOfflineBlockSyncApi(blocksConfig) {
+  if (!_offlineApiModule) {
+    const path = require('path');
+    const os = require('os');
+    const { pathToFileURL } = require('url');
+    const esbuild = require('esbuild');
+    const entry = path.resolve(
+      __dirname,
+      '../../packages/volto-hydra/src/utils/offlineBlockSyncApi.js',
+    );
+    const outfile = path.join(
+      os.tmpdir(),
+      `hydra-offline-block-sync-${process.pid}.mjs`,
+    );
+    esbuild.buildSync({
+      entryPoints: [entry],
+      bundle: true,
+      format: 'esm',
+      platform: 'node',
+      outfile,
+      loader: { '.js': 'jsx' },
+      logLevel: 'silent',
+    });
+    _offlineApiModule = await import(pathToFileURL(outfile).href);
+  }
+  const api = _offlineApiModule;
+  // Inject blocksConfig (the seam blockSync.js reads instead of @plone/volto/registry).
+  api.setInjectedVoltoConfig({ getBlocksConfig: () => blocksConfig });
+  if (!_enhancersInstalledFor.has(blocksConfig)) {
+    api.populateTypeSchemaCache?.(blocksConfig, STUB_INTL);
+    api.installVariationFieldEnhancers?.(blocksConfig);
+    api.installChildBlockEnhancers?.(blocksConfig);
+    _enhancersInstalledFor.add(blocksConfig);
+  }
+  resolveEffectiveSchemaFn = api.resolveEffectiveBlockSchema;
+}
+
 async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, frontendKeys = []) {
   // Use hydra's canonical buildBlockPathMap to walk content — it knows
   // the schema-defined container fields (blocks_layout, object_list,
@@ -744,6 +866,11 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   ({ isValidValue: isValidValueFn } = await import(
     '../../packages/volto-hydra/src/utils/schemaValidation.mjs'
   ));
+
+  // Load Hydra's real schema resolver offline (esbuild-bundled) and install the
+  // child-block enhancers + inject blocksConfig, exactly as the addon does at
+  // init. After this, resolveEffectiveSchemaFn gives the dynamic required set.
+  await loadOfflineBlockSyncApi(blocksConfig);
 
   const seen = new Map();
   const slateIssues = [];
@@ -873,9 +1000,24 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         }
 
         collectSlateIssues(blockData, pagePath, blockId, slateIssues, blockType);
+        // Effective (dynamic) required set from Hydra's REAL resolver — fieldRules
+        // + hideParentOwnedFields applied, so a conditionally-hidden field (a
+        // card's `image` when its grid disables the image element) is correctly
+        // dropped. Per-block try/catch: one odd block must not abort discovery;
+        // on failure the shape check falls back to unconditional-required only.
+        let effectiveRequired = null;
+        if (resolveEffectiveSchemaFn) {
+          try {
+            effectiveRequired =
+              resolveEffectiveSchemaFn(blockId, content, pathMap, blocksConfig, STUB_INTL)
+                ?.required || null;
+          } catch {
+            effectiveRequired = null;
+          }
+        }
         collectWidgetShapeIssues(
           blockData, schema, pagePath, blockId, shapeIssues, blockType, undeclaredFields,
-          blockType ? blocksConfig[blockType] : undefined,
+          blockType ? blocksConfig[blockType] : undefined, blocksConfig, effectiveRequired,
         );
 
         // Unregistered block type: any real @type the frontend can't render is

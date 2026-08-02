@@ -9,6 +9,11 @@
  * updated synchronously when forms change (before React state propagates).
  */
 import React from 'react';
+// Static import (not a lazy `require`) so this module loads under bare-Node ESM —
+// block-sanity's offline discovery reuses getLiveBlockData for `../` parent
+// lookups in the fieldRules evaluator. No cycle: blockPath.js does not import
+// this context module.
+import { getBlockById } from '../utils/blockPath.js';
 
 const HydraSchemaContext = React.createContext(null);
 
@@ -85,14 +90,12 @@ export const getLiveBlockData = (blockId, fallback) => {
 
     // Fall back to formData (page-level state)
     if (formData && blockPathMap) {
-      const { getBlockById } = require('../utils/blockPath');
       return getBlockById(formData, blockPathMap, blockId);
     }
   }
 
   // Last resort: caller-provided formData + blockPathMap (no React context)
   if (fallback?.formData && fallback?.blockPathMap) {
-    const { getBlockById } = require('../utils/blockPath');
     return getBlockById(fallback.formData, fallback.blockPathMap, blockId);
   }
 

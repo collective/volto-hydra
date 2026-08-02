@@ -27,7 +27,7 @@
  * The enhancer that installs it on every block and the `copyFromTargetField`
  * wrapper widget build on these.
  */
-import { getMappingTarget, getFieldType, widgetToTargetType } from './schemaInheritance';
+import { getMappingTarget, getFieldType, widgetToTargetType } from './blockSync';
 import { convertFieldValue, normalizeCatalogImage } from '@volto-hydra/helpers';
 import { isInternalURL } from '@plone/volto/helpers/Url/Url';
 

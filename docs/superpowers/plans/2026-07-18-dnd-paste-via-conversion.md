@@ -20,8 +20,8 @@
 - `tests-playwright/integration/dnd-convert.spec.ts` — integration coverage.
 
 **Modify:**
-- `packages/volto-hydra/src/utils/schemaInheritance.js` — add `getConversionMap(blocksConfig)` next to `getConvertibleTypes` (~2012).
-- `packages/volto-hydra/src/utils/schemaInheritance.test.js` (or the existing vitest file) — unit test `getConversionMap`.
+- `packages/volto-hydra/src/utils/blockSync.js` — add `getConversionMap(blocksConfig)` next to `getConvertibleTypes` (~2012).
+- `packages/volto-hydra/src/utils/blockSync.test.js` (or the existing vitest file) — unit test `getConversionMap`.
 - `packages/hydra-js/hydra.src.js` — store `this.conversionMap` from `INITIAL_DATA` (~3776); use `acceptableAt` at the drag gate (~9073).
 - `packages/volto-hydra/src/components/Iframe/View.jsx` — send `conversionMap` on the three `INITIAL_DATA` posts (~2021/3696/3784); extract `convertBlockInPlace` helper from `commitChooser` (~4236-4255); convert-on-drop in `MOVE_BLOCKS` (~2799); convert-on-paste in `handlePaste` (~951); add `pendingMove` handling to `commitChooser` (~4224).
 - `tests-playwright/fixtures/shared-block-schemas.js` — a small conversion graph + a container restricted to a convert-target.
@@ -34,13 +34,13 @@
 ## Task 1: `getConversionMap` (admin, pure)
 
 **Files:**
-- Modify: `packages/volto-hydra/src/utils/schemaInheritance.js` (add export near `getConvertibleTypes:2012`)
-- Test: `packages/volto-hydra/src/utils/schemaInheritance.test.js`
+- Modify: `packages/volto-hydra/src/utils/blockSync.js` (add export near `getConvertibleTypes:2012`)
+- Test: `packages/volto-hydra/src/utils/blockSync.test.js`
 
 - [ ] **Step 1: Write the failing test** (append to the vitest file)
 
 ```js
-import { getConversionMap } from './schemaInheritance';
+import { getConversionMap } from './blockSync';
 
 describe('getConversionMap', () => {
   const cfg = {
@@ -64,10 +64,10 @@ describe('getConversionMap', () => {
 
 - [ ] **Step 2: Run — expect FAIL** (`getConversionMap` undefined)
 
-Run: `pnpm exec vitest run packages/volto-hydra/src/utils/schemaInheritance.test.js -t getConversionMap`
+Run: `pnpm exec vitest run packages/volto-hydra/src/utils/blockSync.test.js -t getConversionMap`
 Expected: FAIL (not exported).
 
-- [ ] **Step 3: Implement** (in `schemaInheritance.js`, after `getConvertibleTypes`)
+- [ ] **Step 3: Implement** (in `blockSync.js`, after `getConvertibleTypes`)
 
 ```js
 /**
@@ -88,13 +88,13 @@ export function getConversionMap(blocksConfig) {
 
 - [ ] **Step 4: Run — expect PASS**
 
-Run: `pnpm exec vitest run packages/volto-hydra/src/utils/schemaInheritance.test.js -t getConversionMap`
+Run: `pnpm exec vitest run packages/volto-hydra/src/utils/blockSync.test.js -t getConversionMap`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/volto-hydra/src/utils/schemaInheritance.js packages/volto-hydra/src/utils/schemaInheritance.test.js
+git add packages/volto-hydra/src/utils/blockSync.js packages/volto-hydra/src/utils/blockSync.test.js
 git commit -m "feat(conversion): getConversionMap — static reachable-type map from fieldMappings"
 ```
 
@@ -206,7 +206,7 @@ const conversionMap = useMemo(
 );
 ```
 
-Add `getConversionMap` to the `schemaInheritance` import. On EACH of the three `type: 'INITIAL_DATA'` postMessages (~2021, ~3696, ~3784), add `conversionMap,` to the message object.
+Add `getConversionMap` to the `blockSync` import. On EACH of the three `type: 'INITIAL_DATA'` postMessages (~2021, ~3696, ~3784), add `conversionMap,` to the message object.
 
 - [ ] **Step 2: Iframe — store it.** In `hydra.src.js` constructor (~246) add `this.conversionMap = {};`. In the `INITIAL_DATA` handler (~3776, alongside `setFormDataFromAdmin(...)`):
 
@@ -504,7 +504,7 @@ Expected: PASS (esp. `:461`, `:496`, `:26`).
 
 - [ ] **Step 2: Unit suites**
 
-Run: `cd packages/hydra-js && NODE_OPTIONS='--experimental-vm-modules' npx jest conversionMap` and `pnpm exec vitest run packages/volto-hydra/src/utils/schemaInheritance.test.js`
+Run: `cd packages/hydra-js && NODE_OPTIONS='--experimental-vm-modules' npx jest conversionMap` and `pnpm exec vitest run packages/volto-hydra/src/utils/blockSync.test.js`
 Expected: PASS.
 
 - [ ] **Step 3: Rebuild the distributable bundle** (for bridge/react/nuxt CI which loads built `hydra.js`):
@@ -539,7 +539,7 @@ git commit -m "docs(conversion): DnD/paste offer convert-reachable destinations"
 ## Verification (whole feature)
 
 1. `cd packages/hydra-js && NODE_OPTIONS='--experimental-vm-modules' npx jest conversionMap` — green.
-2. `pnpm exec vitest run packages/volto-hydra/src/utils/schemaInheritance.test.js` — green.
+2. `pnpm exec vitest run packages/volto-hydra/src/utils/blockSync.test.js` — green.
 3. `pnpm exec playwright test tests-playwright/integration/dnd-convert.spec.ts --project=admin-mock` — all green.
 4. `pnpm exec playwright test tests-playwright/integration/drag-and-drop.spec.ts --project=admin-mock` — no regression.
 5. Bundle rebuilt; push branch, open PR (separate from #256). Full suite on CI (don't run large suites locally — memory `feedback_ci_for_large_suites`).

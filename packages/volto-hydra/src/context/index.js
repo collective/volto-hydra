@@ -4,4 +4,4 @@ export {
   getHydraSchemaContext,
   setHydraSchemaContext,
   getLiveBlockData,
-} from './HydraSchemaContext';
+} from './HydraSchemaContext.js';

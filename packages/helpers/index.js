@@ -3579,7 +3579,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
       // covers blocks_layout regions AND object_list array fields, so an object_list slot
       // container (a slider's `slides`) gets an anchor too — not just blocks_layout containers.
       // Keyed by the consumer's `field`: the shared 'blocks' dict for blocks_layout, or the
-      // object_list field name (e.g. 'slides') — schemaInheritance reads childSlotIds[field].
+      // object_list field name (e.g. 'slides') — blockSync reads childSlotIds[field].
       let childSlotIds = undefined;
       for (const field of getChildFields(tplBlock)) {
         const key = field.isObjectList
