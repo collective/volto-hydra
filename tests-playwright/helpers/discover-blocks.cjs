@@ -416,6 +416,54 @@ const UNDECLARED_EXEMPT = new Set([
 // menu is added, list its style values here (or derive from the slate config).
 const AUTHORABLE_SLATE_STYLES = new Set([]);
 
+// Hydra's own value validator (packages/volto-hydra/.../schemaValidation.mjs) —
+// the SAME `isValidValue` Hydra runs to strip un-authorable values on load, so
+// block-sanity and the editor agree on "is this a valid value?". Loaded lazily
+// via dynamic import (it's ESM but dependency-free by design) in discoverBlocks.
+let isValidValueFn = null;
+
+// Evaluate one `when` operator against a resolved surface value. Mirrors the
+// operators our schemaEnhancer.fieldRules use (see volto-hydra schemaInheritance).
+function condMatches(cond, val) {
+  if (cond && typeof cond === 'object' && !Array.isArray(cond)) {
+    if ('gte' in cond && !(val >= cond.gte)) return false;
+    if ('gt' in cond && !(val > cond.gt)) return false;
+    if ('lte' in cond && !(val <= cond.lte)) return false;
+    if ('lt' in cond && !(val < cond.lt)) return false;
+    if ('isSet' in cond && (cond.isSet ? val == null : val != null)) return false;
+    if ('isNot' in cond && val === cond.isNot) return false;
+    if ('eq' in cond && val !== cond.eq) return false;
+    return true;
+  }
+  return val === cond;
+}
+
+// Resolve a field def against a block's data when it's driven by
+// `schemaEnhancer.fieldRules` — so we validate against the ACTUAL option set the
+// editor would show (e.g. columns `layout` gains "wide-middle" at 3+ columns via
+// `{ when: { items: { gte: 3 } }, set: columnsLayoutField(3) }`). The `set` values
+// are pre-computed defs in the served config, so we only need to pick the first
+// matching rule. Region operators (a blocks_layout field in `when`) compare the
+// region's child count. Returns the resolved def, or `false` if the field is
+// hidden (no validation), or the base def when no rule applies.
+function resolveFieldDef(field, def, blockData, blockConfig, props) {
+  const rules = blockConfig?.schemaEnhancer?.fieldRules?.[field];
+  if (!rules) return def;
+  const childCount =
+    (Array.isArray(blockData?.blocks_layout?.items) && blockData.blocks_layout.items.length) ||
+    (blockData?.blocks && typeof blockData.blocks === 'object' ? Object.keys(blockData.blocks).length : 0);
+  const surface = (name) =>
+    props?.[name]?.widget === 'blocks_layout' ? childCount : blockData?.[name];
+  const list = Array.isArray(rules) ? rules : [rules];
+  for (const r of list) {
+    if (r === false) return false;
+    const when = r && r.when;
+    const ok = !when || Object.entries(when).every(([n, c]) => condMatches(c, surface(n)));
+    if (ok) return 'set' in r ? r.set : def;
+  }
+  return def;
+}
+
 // Recursively collect any `styleName` on a slate value's nodes that isn't an
 // authorable style. Catches hand-injected styles a person can't reproduce.
 function unauthorableSlateStyles(nodes, seen = new Set()) {
@@ -542,27 +590,26 @@ function collectWidgetShapeIssues(
       widget === 'select' || widget === 'choice' || def?.factory === 'Choice' ||
       Array.isArray(def?.actions) || widget === 'blockTypeSelect'
     ) {
-      // A constrained-value widget: the stored value must be one the editor can
-      // actually pick. Options come from `choices` (select/Choice), `actions`
-      // (button-bar widgets like size/align — the array of button values), or —
-      // for a blockTypeSelect — the sibling region's `allowedBlocks` (the
-      // container's addable item types). Without this, a size:"xxl" or a
-      // variation:"card" on a tags block would render as junk and never be
-      // reproducible by hand.
-      let allowed;
-      if (Array.isArray(def.actions)) {
-        allowed = def.actions;
-      } else if (widget === 'blockTypeSelect') {
-        const region = Object.values(props).find((p) => p && p.itemTypeField === field);
-        allowed = region?.allowedBlocks || [];
-      } else {
-        allowed = (def.choices || []).map((c) => (Array.isArray(c) ? c[0] : c));
-      }
-      if (allowed.length && !allowed.includes(value)) {
-        issues.push(
-          `field "${field}": value ${JSON.stringify(value)} is not one of the allowed ` +
-            `values ${JSON.stringify(allowed)} — the editor can't produce it.`,
-        );
+      // Resolve the field against this block's data first, so a fieldRules-driven
+      // field (columns `layout`, which gains "wide-middle" at 3+ columns) is
+      // checked against its ACTUAL option set. Then reuse Hydra's `isValidValue`
+      // — the SAME check Hydra strips content with — so block-sanity flags exactly
+      // what the editor can't produce (a size:"xxl", a tags variation:"card").
+      // blockTypeSelect derives its options from the container's `allowedBlocks`,
+      // so hand isValidValue an explicit `choices` set for it.
+      const eff = resolveFieldDef(field, def, blockData, blockConfig, props);
+      if (eff !== false) {
+        let checkDef = eff;
+        if (widget === 'blockTypeSelect') {
+          const region = Object.values(props).find((p) => p && p.itemTypeField === field);
+          checkDef = { ...eff, choices: region?.allowedBlocks || [] };
+        }
+        if (isValidValueFn && !isValidValueFn(value, checkDef)) {
+          issues.push(
+            `field "${field}": value ${JSON.stringify(value)} is not an allowed value — the ` +
+              `editor can't produce it (Hydra would strip it on load).`,
+          );
+        }
       }
     } else if (widget === 'slate') {
       if (!Array.isArray(value)) {
@@ -691,6 +738,12 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   // columns, …) and distinguishes real blocks from inline sub-items.
   // Dynamically imported because the module is ESM and this helper is CJS.
   const { buildBlockPathMap } = await import('../../packages/hydra-js/buildBlockPathMap.js');
+  // Reuse Hydra's canonical value validator (choices/enum/actions) — same check
+  // it strips content with, so block-sanity flags exactly what the editor can't
+  // produce. Dependency-free ESM.
+  ({ isValidValue: isValidValueFn } = await import(
+    '../../packages/volto-hydra/src/utils/schemaValidation.mjs'
+  ));
 
   const seen = new Map();
   const slateIssues = [];

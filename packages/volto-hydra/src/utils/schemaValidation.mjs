@@ -36,6 +36,13 @@ export function isValidValue(value, fieldDef) {
     return validValues.has(value);
   }
 
+  // Button-bar widgets (ButtonsWidget: size/align/layout) declare their options
+  // in `actions` (the array of button values). Same contract as `choices` — the
+  // editor only offers these, so a stored value outside them can't be authored.
+  if (Array.isArray(fieldDef.actions)) {
+    return fieldDef.actions.includes(value);
+  }
+
   // For enum fields (JSON Schema style)
   if (fieldDef.enum) {
     return fieldDef.enum.includes(value);
