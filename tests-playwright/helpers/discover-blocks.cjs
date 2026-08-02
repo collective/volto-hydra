@@ -806,9 +806,15 @@ function collectWidgetShapeIssues(
 }
 
 // blocksConfig objects whose child-block enhancers have already been installed
-// (installChildBlockEnhancers mutates each block's schemaEnhancer, so guard
-// against double-composing on a second discoverBlocks call).
-const _enhancersInstalledFor = new WeakSet();
+// Maps the pristine discovery blocksConfig -> an enhanced CLONE. installChild
+// BlockEnhancers composes hideParentOwnedFields into each container-child's
+// schemaEnhancer; running it on the discovery's OWN blocksConfig would make
+// buildBlockPathMap resolve child schemas with parent-owned fields DROPPED, so
+// the undeclared-field check would then flag those legit parent-owned fields
+// (contentBlock's imagePosition/imageIsIcon/showViewMoreLink) as stray. So the
+// enhancers go on a copy — only the required check (resolveEffectiveBlockSchema)
+// uses it; buildBlockPathMap + every other check keep the pristine config.
+const _enhancedConfigFor = new WeakMap();
 let _offlineApiModule = null;
 
 // esbuild-bundle Hydra's offline block-sync API once and wire it up: idiomatic
@@ -843,15 +849,27 @@ async function loadOfflineBlockSyncApi(blocksConfig) {
     _offlineApiModule = await import(pathToFileURL(outfile).href);
   }
   const api = _offlineApiModule;
-  // Inject blocksConfig (the seam blockSync.js reads instead of @plone/volto/registry).
-  api.setInjectedVoltoConfig({ getBlocksConfig: () => blocksConfig });
-  if (!_enhancersInstalledFor.has(blocksConfig)) {
-    api.populateTypeSchemaCache?.(blocksConfig, STUB_INTL);
-    api.installVariationFieldEnhancers?.(blocksConfig);
-    api.installChildBlockEnhancers?.(blocksConfig);
-    _enhancersInstalledFor.add(blocksConfig);
+  let enhanced = _enhancedConfigFor.get(blocksConfig);
+  if (!enhanced) {
+    // Shallow-per-block clone: installChildBlockEnhancers sets each block's
+    // `schemaEnhancer`, so copy the block config objects (shared functions like
+    // blockSchema are referenced, never mutated). Enhancers + the injected
+    // getBlocksConfig all point at the clone, so hideParentOwnedFields resolves
+    // consistently against it — while the discovery's blocksConfig stays pristine.
+    enhanced = {};
+    for (const [k, v] of Object.entries(blocksConfig)) {
+      enhanced[k] = v && typeof v === 'object' && !Array.isArray(v) ? { ...v } : v;
+    }
+    api.setInjectedVoltoConfig({ getBlocksConfig: () => enhanced });
+    api.populateTypeSchemaCache?.(enhanced, STUB_INTL);
+    api.installVariationFieldEnhancers?.(enhanced);
+    api.installChildBlockEnhancers?.(enhanced);
+    _enhancedConfigFor.set(blocksConfig, enhanced);
   }
-  resolveEffectiveSchemaFn = api.resolveEffectiveBlockSchema;
+  // Resolve required against the enhanced clone (fieldRules + hideParentOwnedFields),
+  // ignoring the caller's blocksConfig arg so the pristine config never leaks in.
+  resolveEffectiveSchemaFn = (blockId, formData, pathMap, _bc, intl) =>
+    api.resolveEffectiveBlockSchema(blockId, formData, pathMap, enhanced, intl);
 }
 
 async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, frontendKeys = []) {
