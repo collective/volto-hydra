@@ -1861,7 +1861,15 @@ function resolveWhenField(fieldPath, formData, args) {
   // surface's numeric ops, which COUNT a region's children. A non-object_list
   // block (path with no numeric tail) yields an unset number, so comparisons are
   // false rather than throwing.
-  if (fieldName === '@index') {
+  //
+  // `../@index` can still carry its leading `../` here when there was no
+  // blockPathMap to resolve them — e.g. buildBlockPathMap PASS 1 computes a
+  // GENERIC schema (no blockId/blockPathMap), so `resolveFieldPath` returns the
+  // path verbatim. In that case the position is simply unknown → an UNSET number
+  // (every comparison false), never a throw. Pass 2 re-runs the enhancer WITH the
+  // blockPathMap, where `../@index` resolves to the parent block and this reads
+  // its real index. So strip any unresolved leading `../` before matching.
+  if (fieldName === '@index' || fieldName.replace(/^(?:\.\.\/)+/, '') === '@index') {
     const p = blockPathMap?.[targetBlockId]?.path;
     const last = Array.isArray(p) && p.length ? p[p.length - 1] : undefined;
     return {
