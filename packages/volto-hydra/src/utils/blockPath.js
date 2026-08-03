@@ -5,8 +5,10 @@
 
 import { produce } from 'immer';
 import { get } from 'lodash';
-import { applyBlockDefaults } from '@plone/volto/helpers';
-import config from '@plone/volto/registry';
+import {
+  getApplyBlockDefaults,
+  getDefaultBlockType,
+} from './injectedVoltoConfig.js';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import {
   isBlockReadonly,
@@ -655,7 +657,7 @@ export function getAllContainerFields(
   // restrict types). Without this a generic section would auto-fill its
   // empty state with the 'empty' picker placeholder, even though the
   // container is happy to accept the page's typing-friendly default.
-  const pageDefaultBlockType = config.settings.defaultBlockType || null;
+  const pageDefaultBlockType = getDefaultBlockType();
 
   // Helper to get current count for a container field
   const getFieldCount = (region, isObjectList = false, regionPath = []) => {
@@ -1837,7 +1839,7 @@ function getPageDefaults(blocksConfig, formData) {
     allowedBlocks: getPageAllowedBlocksFromRestricted(blocksConfig, {
       properties: formData,
     }),
-    defaultBlockType: config.settings.defaultBlockType || null,
+    defaultBlockType: getDefaultBlockType(),
   };
 }
 
@@ -2003,7 +2005,7 @@ export function ensureEmptyBlockIfEmpty(
       const emptyId = uuidGenerator();
       let emptyBlock = { '@type': 'empty' };
       if (intl && blocksConfig) {
-        emptyBlock = applyBlockDefaults(
+        emptyBlock = getApplyBlockDefaults()(
           { data: emptyBlock, intl, metadata, properties },
           blocksConfig,
         );
@@ -2309,7 +2311,7 @@ function seedTemplateChild(
   // in a template being edited directly, where inheriting readOnly would freeze inline editing.
   const { intl, metadata, properties, inheritFixed } = options;
   if (intl) {
-    childData = applyBlockDefaults(
+    childData = getApplyBlockDefaults()(
       { data: childData, intl, metadata, properties },
       blocksConfig,
     );

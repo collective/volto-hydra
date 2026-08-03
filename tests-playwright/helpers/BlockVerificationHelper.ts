@@ -596,25 +596,20 @@ export async function verifyBlockRendering(
   }
   await expect(block.first()).toBeVisible({ timeout: 15000 });
 
-  // A data-block-uid may match several elements. That is legitimate for a
-  // listing/container block whose expanded items carry the parent uid
-  // (expandListingBlocks — see listing-links.tsx), but ONLY when the matches are
-  // contiguous: the container element contains all the rest. The same block
-  // rendered twice in separate DOM subtrees is a real bug. Discovery flags the
-  // literal `listing` type (handled above); this covers the container blocks
-  // that hold one (footer/tags/linkList, search results).
+  // A data-block-uid may legitimately match several elements, in two shapes that
+  // hydra both supports:
+  //  - NESTED: a listing/container block whose expanded items carry the parent
+  //    uid (expandListingBlocks — see listing-links.tsx), the items inside it; and
+  //  - SIBLING: a multi-element block whose uid rides more than one peer element
+  //    (e.g. accordion/tabs: the panel uid is on both the header and its content
+  //    panel), which hydra's selection unions into one outline — see
+  //    tests-playwright/integration/multi-element-blocks.spec.ts.
+  // We don't assert DOM shape (nested vs sibling): both are intended, and the DOM
+  // alone can't tell an intentional multi-element block from an accidental
+  // duplicate anyway. Verify the block renders + carries its edit annotations via
+  // the first match, then return — the assertions below use the multi-match
+  // `block` locator and would trip Playwright strict mode on >1 element.
   if ((await block.count()) > 1) {
-    const contiguous = await block.first().evaluate(
-      (first, uid) =>
-        Array.from(document.querySelectorAll(`[data-block-uid="${uid}"]`)).every(
-          (el) => el === first || first.contains(el),
-        ),
-      blockId,
-    );
-    expect(
-      contiguous,
-      `data-block-uid="${blockId}" appears on unrelated elements (a block rendered twice); a shared uid is only valid for a listing/container whose items nest inside it`,
-    ).toBe(true);
     await checkEditAnnotations(block.first(), blockData);
     return;
   }
@@ -670,6 +665,25 @@ export async function verifyBlockRendering(
     for (const { id, data } of subBlocks) {
       const loc = iframe.locator(`[data-block-uid="${id}"]`).first();
       await expect(loc).toBeAttached({ timeout: 5000 });
+      // Content gated behind a reveal control — an accordion header, a tab, a
+      // carousel nav — is display:none until revealed. That's by design: the
+      // editor reveals it when the admin selects the nested block, and hydra.js
+      // does so by clicking the element whose [data-block-selector] references
+      // that block's uid. Mirror that here so a legitimately-collapsed block is
+      // verified in its revealed state instead of being falsely failed for being
+      // hidden by design. (data-block-selector holds a space-separated uid list,
+      // hence the ~= match.)
+      if (!(await loc.isVisible())) {
+        const revealer = iframe
+          .locator(`[data-block-selector~="${id}"]`)
+          .first();
+        if ((await revealer.count()) > 0) {
+          await revealer.click();
+          await loc
+            .waitFor({ state: 'visible', timeout: 2000 })
+            .catch(() => {});
+        }
+      }
       if (await loc.isVisible()) {
         anyVisible = true;
         await checkEditAnnotations(loc, data);
