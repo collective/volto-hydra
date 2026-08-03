@@ -760,7 +760,10 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
       blocksConfig[virtualType] = {
         id: virtualType,
         blockSchema: itemSchema,
-        ...(typeof itemSchema.schemaEnhancer === 'function'
+        // Carry the inline schemaEnhancer AS-IS — a function OR a recipe object.
+        // pass 2 (below) runs only functions; resolveEffectiveBlockSchema converts
+        // a recipe on the fly, the same contract every recipe-based block relies on.
+        ...(itemSchema.schemaEnhancer
           ? { schemaEnhancer: itemSchema.schemaEnhancer }
           : {}),
       };

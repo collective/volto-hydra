@@ -20,11 +20,14 @@ import { describe, test, expect, vi } from 'vitest';
 // The pathmap/enhancer path doesn't touch the live schema context, so stub it.
 vi.mock('../context', () => ({
   getHydraSchemaContext: () => ({}),
-  setHydraSchemaContext: () => {},
+  setHydraSchemaContext: () => () => {}, // returns a no-op restore fn
   getLiveBlockData: () => undefined,
 }));
 
-import { createSchemaEnhancerFromRecipe } from './blockSync.js';
+import {
+  createSchemaEnhancerFromRecipe,
+  resolveEffectiveBlockSchema,
+} from './blockSync.js';
 import {
   buildBlockPathMap,
   getResolvedSchema,
@@ -128,5 +131,31 @@ describe('object_list item fieldRules — applied per position (@index) for type
     // so `../@index` resolves and caps only the header row.
     expect(getResolvedSchema(map['c0'], map)?.properties?.blocks?.maxLength).toBe(1); // row 0 → capped
     expect(getResolvedSchema(map['c1'], map)?.properties?.blocks?.maxLength).toBeUndefined(); // row 1
+  });
+
+  test('INLINE cell with a RAW RECIPE enhancer: resolveEffectiveBlockSchema converts + applies it', () => {
+    // The real frontend config declares the cell rule as a RECIPE (not a
+    // pre-built function). buildBlockPathMap carries it as-is on the virtual type;
+    // resolveEffectiveBlockSchema (the schema block-sanity + the editor use)
+    // converts the recipe on the fly and applies it per position.
+    const form = makeForm('tblRecipe');
+    const cfg = {
+      ...basecfg(),
+      tblRecipe: tableSchema('tblRecipe', {
+        widget: 'object_list',
+        idField: 'key',
+        schema: {
+          schemaEnhancer: headerCapRecipe, // RAW recipe object, not a function
+          fieldsets: [{ id: 'default', title: 'Cell', fields: ['blocks'] }],
+          properties: { blocks: { title: 'Content', widget: 'object_list', allowedBlocks: ['slate'] } },
+        },
+      }),
+    };
+
+    const map = buildBlockPathMap(form, cfg, intl);
+    const header = resolveEffectiveBlockSchema('c0', form, map, cfg, intl);
+    const body = resolveEffectiveBlockSchema('c1', form, map, cfg, intl);
+    expect(header?.properties?.blocks?.maxLength).toBe(1); // row 0 → capped
+    expect(body?.properties?.blocks?.maxLength).toBeUndefined(); // row 1
   });
 });
