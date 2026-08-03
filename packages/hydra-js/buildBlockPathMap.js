@@ -743,6 +743,29 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
     const parentType = parentPathInfo?.blockType || parent['@type'];
     const virtualType = `${parentType}:${fieldName}`;
 
+    // Register the virtual type as a first-class blocksConfig entry, so every
+    // TYPED code path — getBlockTypeSchema (+ its cache), pass 2's schemaEnhancer
+    // re-run, allowedBlocks, conversion — resolves this inline-schema item by its
+    // virtual name, rather than special-casing "no blocksConfig entry". A block
+    // type's virtual sub-types are stable (one schema per name) so this is
+    // idempotent. The inline schema's schemaEnhancer must already be a function
+    // (config registration converts recipes) to be applied per instance in pass 2.
+    if (
+      !typeField &&
+      !hasAllowedBlocks &&
+      itemSchema &&
+      blocksConfig &&
+      !blocksConfig[virtualType]
+    ) {
+      blocksConfig[virtualType] = {
+        id: virtualType,
+        blockSchema: itemSchema,
+        ...(typeof itemSchema.schemaEnhancer === 'function'
+          ? { schemaEnhancer: itemSchema.schemaEnhancer }
+          : {}),
+      };
+    }
+
     // Track addMode for table-aware behavior
     // addMode comes from block config (e.g., blocksConfig.slateTable.addMode = 'table')
     // or from the field definition (e.g., fieldDef.addMode = 'table' on rows field)
@@ -909,7 +932,10 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
 
     const { blockType } = pathInfo;
     const blockConfig = blocksConfig?.[blockType];
-    // No config or no enhancer → nothing to re-do.
+    // No config or no enhancer → nothing to re-do. A non-typed object_list item's
+    // virtual type is REGISTERED into blocksConfig at mint time (see
+    // registerVirtualType), so its inline schemaEnhancer is found here by name —
+    // the same path as a real typed block.
     if (!blockConfig || typeof blockConfig.schemaEnhancer !== 'function') continue;
 
     // Look up block data via path
@@ -925,9 +951,9 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
       intl,
       blocksConfig,
       blockData,
-      formData,      // pageFormData
-      blockId,       // NEW: blockId in enhancer args
-      pathMap,       // NEW: full pathMap in enhancer args
+      formData, // pageFormData
+      blockId, // blockId in enhancer args
+      pathMap, // full pathMap in enhancer args
     );
     if (!enhancedSchema) continue;
 
