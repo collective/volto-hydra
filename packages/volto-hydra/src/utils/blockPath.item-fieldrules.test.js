@@ -3,12 +3,15 @@
  * context (`@index` / `../@index`)?
  *
  * This is the load-bearing question for a container table's header rule: a cell
- * that caps its `blocks` region at one when it is in the first row. A non-typed
- * object_list item's virtual type (`table:rows:cells`) is REGISTERED as a
- * first-class blocksConfig entry at mint time, so pass 2 re-runs its inline
- * schemaEnhancer with { blockId, blockPathMap } — the same path as a real typed
- * block — and `../@index` resolves. These tests pin it for a typed cell and an
- * inline (virtual-typed) cell.
+ * that caps its `blocks` region at one when it is in the first row.
+ *
+ * A TYPED item (a registered block type) is enhanced by buildBlockPathMap pass 2.
+ * A NON-typed item (virtual blockType, inline `schema`) has no blocksConfig entry,
+ * so `resolveEffectiveBlockSchema` — the schema block-sanity and the editor
+ * sidebar use — resolves it from the inline `itemSchema` the pathMap records and
+ * runs its enhancer with { blockId, blockPathMap }, so `../@index` resolves. We do
+ * NOT register virtual types into the shared blocksConfig (that pollutes block
+ * discovery / the chooser).
  *
  * NOTE: each test uses a DISTINCT block-type name — `getBlockTypeSchema` memoises
  * generic schemas by type name in a module-level cache, so two tests defining the
@@ -126,11 +129,13 @@ describe('object_list item fieldRules — applied per position (@index) for type
       }),
     };
 
-    const map = buildBlockPathMap(makeForm('tblInline'), cfg, intl);
-    // pass 2 runs the virtual-typed item's inline enhancer with blockId+pathMap,
-    // so `../@index` resolves and caps only the header row.
-    expect(getResolvedSchema(map['c0'], map)?.properties?.blocks?.maxLength).toBe(1); // row 0 → capped
-    expect(getResolvedSchema(map['c1'], map)?.properties?.blocks?.maxLength).toBeUndefined(); // row 1
+    const form = makeForm('tblInline');
+    const map = buildBlockPathMap(form, cfg, intl);
+    // resolveEffectiveBlockSchema resolves the virtual-typed item from its inline
+    // itemSchema (recorded on the pathMap) and runs its enhancer with
+    // blockId+pathMap, so `../@index` resolves and caps only the header row.
+    expect(resolveEffectiveBlockSchema('c0', form, map, cfg, intl)?.properties?.blocks?.maxLength).toBe(1); // row 0
+    expect(resolveEffectiveBlockSchema('c1', form, map, cfg, intl)?.properties?.blocks?.maxLength).toBeUndefined(); // row 1
   });
 
   test('INLINE cell with a RAW RECIPE enhancer: resolveEffectiveBlockSchema converts + applies it', () => {

@@ -743,32 +743,6 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
     const parentType = parentPathInfo?.blockType || parent['@type'];
     const virtualType = `${parentType}:${fieldName}`;
 
-    // Register the virtual type as a first-class blocksConfig entry, so every
-    // TYPED code path — getBlockTypeSchema (+ its cache), pass 2's schemaEnhancer
-    // re-run, allowedBlocks, conversion — resolves this inline-schema item by its
-    // virtual name, rather than special-casing "no blocksConfig entry". A block
-    // type's virtual sub-types are stable (one schema per name) so this is
-    // idempotent. The inline schema's schemaEnhancer must already be a function
-    // (config registration converts recipes) to be applied per instance in pass 2.
-    if (
-      !typeField &&
-      !hasAllowedBlocks &&
-      itemSchema &&
-      blocksConfig &&
-      !blocksConfig[virtualType]
-    ) {
-      blocksConfig[virtualType] = {
-        id: virtualType,
-        blockSchema: itemSchema,
-        // Carry the inline schemaEnhancer AS-IS — a function OR a recipe object.
-        // pass 2 (below) runs only functions; resolveEffectiveBlockSchema converts
-        // a recipe on the fly, the same contract every recipe-based block relies on.
-        ...(itemSchema.schemaEnhancer
-          ? { schemaEnhancer: itemSchema.schemaEnhancer }
-          : {}),
-      };
-    }
-
     // Track addMode for table-aware behavior
     // addMode comes from block config (e.g., blocksConfig.slateTable.addMode = 'table')
     // or from the field definition (e.g., fieldDef.addMode = 'table' on rows field)

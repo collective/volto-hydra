@@ -1322,26 +1322,40 @@ export function resolveEffectiveBlockSchema(blockId, formData, blockPathMap, blo
   if (!blockType) return null;
 
   const blockConfig = blocksConfig?.[blockType];
-  if (!blockConfig) return null;
 
-  // Get base schema
+  // Base schema + enhancer come from the registered block config OR — for a
+  // non-typed object_list item (virtual blockType, no blocksConfig entry) — from
+  // the inline `itemSchema` the pathMap recorded. This resolves an inline
+  // object_list item's schema (e.g. a table cell's fieldRules) WITHOUT registering
+  // virtual types into the shared blocksConfig, which would pollute block
+  // discovery and the chooser.
+  const itemSchema = blockPathMap?.[blockId]?.itemSchema;
+  if (!blockConfig && !itemSchema) return null;
+
+  // Get base schema + its enhancer from whichever source applies.
   let schema = null;
-  if (typeof blockConfig.blockSchema === 'function') {
-    schema = blockConfig.blockSchema({ formData: blockData, intl });
-  } else if (blockConfig.blockSchema) {
-    schema = blockConfig.blockSchema;
-  } else if (typeof blockConfig.schema === 'function') {
-    schema = blockConfig.schema({ formData: blockData, intl });
-  } else if (blockConfig.schema) {
-    schema = blockConfig.schema;
+  let enhancer = null;
+  if (blockConfig) {
+    if (typeof blockConfig.blockSchema === 'function') {
+      schema = blockConfig.blockSchema({ formData: blockData, intl });
+    } else if (blockConfig.blockSchema) {
+      schema = blockConfig.blockSchema;
+    } else if (typeof blockConfig.schema === 'function') {
+      schema = blockConfig.schema({ formData: blockData, intl });
+    } else if (blockConfig.schema) {
+      schema = blockConfig.schema;
+    }
+    enhancer = blockConfig.schemaEnhancer;
+  } else {
+    schema = itemSchema;
+    enhancer = itemSchema.schemaEnhancer;
   }
 
   if (!schema) return null;
 
   // Apply schemaEnhancer if present (fieldRules/hideParentOwnedFields/inheritSchemaFrom).
-  if (blockConfig.schemaEnhancer) {
+  if (enhancer) {
     // schemaEnhancer can be a function or a recipe object
-    let enhancer = blockConfig.schemaEnhancer;
     if (typeof enhancer !== 'function') {
       // It's a recipe object - create enhancer from it
       enhancer = createSchemaEnhancerFromRecipe(enhancer);
