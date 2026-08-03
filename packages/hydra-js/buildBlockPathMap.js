@@ -909,7 +909,10 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
 
     const { blockType } = pathInfo;
     const blockConfig = blocksConfig?.[blockType];
-    // No config or no enhancer → nothing to re-do.
+    // No config or no enhancer → nothing to re-do. A non-typed object_list item's
+    // virtual type is REGISTERED into blocksConfig at mint time (see
+    // registerVirtualType), so its inline schemaEnhancer is found here by name —
+    // the same path as a real typed block.
     if (!blockConfig || typeof blockConfig.schemaEnhancer !== 'function') continue;
 
     // Look up block data via path
@@ -925,9 +928,9 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
       intl,
       blocksConfig,
       blockData,
-      formData,      // pageFormData
-      blockId,       // NEW: blockId in enhancer args
-      pathMap,       // NEW: full pathMap in enhancer args
+      formData, // pageFormData
+      blockId, // blockId in enhancer args
+      pathMap, // full pathMap in enhancer args
     );
     if (!enhancedSchema) continue;
 
