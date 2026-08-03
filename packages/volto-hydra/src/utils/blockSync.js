@@ -1828,6 +1828,13 @@ function evaluateFieldRule(rule, formData, args) {
  *                   ordered list of its child block TYPES (`getBlockType`, so
  *                   `contains: 'image'` means "has an image block").
  *
+ * The virtual field `@index` is special: instead of field data it reads the
+ * block's ordinal POSITION within its parent object_list region (from the
+ * blockPathMap path) as a `'number'` surface — so `{ '@index': { lt: 1 } }` is
+ * "first in my region" and `../@index` is the parent block's index. Distinct
+ * from the region surface's numeric ops (which COUNT children); a non-object_list
+ * block yields an unset number (comparisons false, never a throw).
+ *
  * Only the current block carries a schema here (`args.schema`); a `../`/`/` ref
  * has none, so its non-region value defaults to the string surface.
  * @private
@@ -1842,6 +1849,27 @@ function resolveWhenField(fieldPath, formData, args) {
     curBlockId,
     blockPathMap,
   );
+
+  // Position surface — `@index` is a block's ordinal index within its parent
+  // object_list region, sourced from the blockPathMap PATH (its last element is
+  // the numeric array index for an object_list item), NOT from field data. It
+  // composes with the block-step grammar, so `../@index` is the parent block's
+  // index (a cell reading its row's position). This is what lets a rule key off
+  // POSITION rather than a field value — e.g. a table cell that is a header when
+  // its row is first (`../@index` < 1) or it is first in its row (`@index` < 1).
+  // It's a number surface, distinct from (and non-colliding with) the region
+  // surface's numeric ops, which COUNT a region's children. A non-object_list
+  // block (path with no numeric tail) yields an unset number, so comparisons are
+  // false rather than throwing.
+  if (fieldName === '@index') {
+    const p = blockPathMap?.[targetBlockId]?.path;
+    const last = Array.isArray(p) && p.length ? p[p.length - 1] : undefined;
+    return {
+      kind: 'number',
+      value: typeof last === 'number' ? last : undefined,
+      fieldPath,
+    };
+  }
 
   // Which block owns the field, and (only for the current block) its schema.
   let block;
