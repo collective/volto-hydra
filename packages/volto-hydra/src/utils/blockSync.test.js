@@ -665,6 +665,77 @@ describe('fieldRules — number surface', () => {
   });
 });
 
+describe('fieldRules — @index position surface', () => {
+  // `@index` is a block's ordinal index within its parent object_list region,
+  // sourced from the blockPathMap path (its last element is the numeric array
+  // index for an object_list item), NOT from field data. `../@index` steps up to
+  // the parent block first. This is what lets a rule key off POSITION — e.g. a
+  // table cell that becomes a header when its row is first (`../@index` < 1) or
+  // when it is the first cell in its row (`@index` < 1).
+  //
+  // A cell at rows[0].cells[2] and its neighbours; each object_list item's path
+  // ends in the numeric index (buildBlockPathMap builds it that way).
+  const map = {
+    'cell-0':  { path: ['tbl', 'table', 'rows', 0, 'cells', 0], parentId: 'row-0', region: 'cells' },
+    'cell-2':  { path: ['tbl', 'table', 'rows', 0, 'cells', 2], parentId: 'row-0', region: 'cells' },
+    'cell-r1': { path: ['tbl', 'table', 'rows', 1, 'cells', 0], parentId: 'row-1', region: 'cells' },
+    'row-0':   { path: ['tbl', 'table', 'rows', 0], parentId: 'tbl', region: 'rows' },
+    'row-1':   { path: ['tbl', 'table', 'rows', 1], parentId: 'tbl', region: 'rows' },
+  };
+  const runPos = (blockId, when) => {
+    const recipe = { fieldRules: { target: { when, else: false } } };
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const schema = {
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['target'] }],
+      properties: { target: { title: 'Target' } },
+      required: [],
+    };
+    return (
+      enhancer({ schema, formData: {}, blockId, blockPathMap: map }).properties
+        .target !== undefined
+    );
+  };
+
+  test('@index — the block’s own index in its parent region (numeric ops)', () => {
+    expect(runPos('cell-0', { '@index': { lt: 1 } })).toBe(true); // first column
+    expect(runPos('cell-2', { '@index': { lt: 1 } })).toBe(false); // third column
+    expect(runPos('cell-2', { '@index': { gte: 2 } })).toBe(true);
+    expect(runPos('cell-0', { '@index': { is: 0 } })).toBe(true);
+  });
+
+  test('../@index — the parent block’s index (row position, read from a cell)', () => {
+    expect(runPos('cell-0', { '../@index': { lt: 1 } })).toBe(true); // row 0
+    expect(runPos('cell-r1', { '../@index': { lt: 1 } })).toBe(false); // row 1
+  });
+
+  test('compound AND — own column AND parent row position together', () => {
+    // first cell of the first row (the header corner)
+    const corner = { '@index': { lt: 1 }, '../@index': { lt: 1 } };
+    expect(runPos('cell-0', corner)).toBe(true);
+    expect(runPos('cell-2', corner)).toBe(false); // right column
+    expect(runPos('cell-r1', corner)).toBe(false); // second row
+  });
+
+  test('@index is a number surface (unset when the path has no numeric tail)', () => {
+    // A block-only pathMap entry (no numeric index) yields an unset number → all
+    // comparisons false, never a throw.
+    const recipe = { fieldRules: { target: { when: { '@index': { gte: 0 } }, else: false } } };
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const schema = {
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['target'] }],
+      properties: { target: { title: 'Target' } },
+      required: [],
+    };
+    const out = enhancer({
+      schema,
+      formData: {},
+      blockId: 'x',
+      blockPathMap: { x: { path: ['x'], parentId: null } },
+    });
+    expect(out.properties.target).toBeUndefined(); // gte:0 false → hidden
+  });
+});
+
 describe('fieldRules — boolean surface', () => {
   const run = (value, when) => runField({ type: 'boolean' }, value, when);
 

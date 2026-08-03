@@ -243,7 +243,24 @@ schemaEnhancer: {
 }
 ```
 
-Field paths: `../field` for the parent block's field, `/field` for a page metadata field.
+To condition on a block's **position** rather than a field value, use the virtual field **`@index`** — a block's ordinal index within its parent `object_list` region (a `number` surface). It composes with the block-step grammar, so `../@index` is the parent block's index. Unlike the region's numeric ops (which *count* children), `@index` is *where this block sits*:
+
+```javascript
+schemaEnhancer: {
+    fieldRules: {
+        // a table cell's blocks region: cap at one block when this cell is in the
+        // first row (a header row) — `../@index` is the cell's ROW index
+        blocks: [
+            { when: { '../../headerMode': { oneOf: ['row', 'both'] }, '../@index': { lt: 1 } }, set: { maxLength: 1 } },
+            { when: { '../../headerMode': { oneOf: ['col', 'both'] }, '@index':    { lt: 1 } }, set: { maxLength: 1 } },
+        ],
+    },
+}
+```
+
+A block that isn't an `object_list` item yields an unset `@index`, so comparisons are simply false (never an error). `lt: 1` is "first"; `lt: 2` is "first two", etc.
+
+Field paths: `../field` for the parent block's field (and `@index` / `../@index` for position), `/field` for a page metadata field.
 
 ## Block Conversion & fieldMappings
 
