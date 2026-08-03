@@ -1,7 +1,12 @@
 /**
- * Schema Inheritance Utilities
+ * Block Sync Utilities
  *
- * Helpers for blocks that reference other block types and inherit their schemas.
+ * How a container block SYNCS schema + data with its child blocks: a grid/listing
+ * fixing its children's item type, inheriting shared defaults, hiding the fields
+ * the parent owns, and gating a child's fields on the parent's settings
+ * (`fieldRules`). Formerly "schemaInheritance" — the through-line is keeping
+ * parent and child blocks in sync, not inheritance per se.
+ *
  * Used by listing blocks, grid blocks, and other containers that need to show
  * editable fields from a referenced block type.
  *
@@ -32,8 +37,8 @@
  * inject `blockId` into the args at every Volto call site, the `hydraContext`
  * branch can be removed — until then, both branches are load-bearing.
  */
-import config from '@plone/volto/registry';
-import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField } from './blockPath';
+import { getInjectedBlocksConfig } from './injectedVoltoConfig.js';
+import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField } from './blockPath.js';
 import { addableSiblingTypes } from '../../../hydra-js/buildBlockPathMap.js';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import {
@@ -47,7 +52,7 @@ import {
   isSlateFieldType,
   slateNodesText,
 } from '@volto-hydra/helpers';
-import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '../context';
+import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '../context/index.js';
 // Pure validation/default-application logic lives in schemaValidation.js
 // (no dependencies — safe to import from CI scripts and test runners).
 // Re-exported here for backward compat; schemaValidation.js is the SSOT.
@@ -597,7 +602,8 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
   return (args) => {
     let { formData, schema, intl } = args;
 
-    const blocksConfig = config.blocks.blocksConfig;
+    const blocksConfig =
+      getHydraSchemaContext?.()?.blocksConfig || getInjectedBlocksConfig();
 
     // Read typeField from block-level config if not provided directly.
     // Uses the standard lookup (recipe → schema walk).
@@ -964,7 +970,7 @@ export function hideParentOwnedFields() {
     const hydraContext = getHydraSchemaContext();
     const blockPathMap = passedBlockPathMap || hydraContext?.blockPathMap;
     const blockId = passedBlockId ?? hydraContext?.currentBlockId;
-    const blocksConfig = hydraContext?.blocksConfig || config.blocks.blocksConfig;
+    const blocksConfig = hydraContext?.blocksConfig || getInjectedBlocksConfig();
     // For getLiveBlockData below: pageFormData + pathMap let getBlockById
     // resolve siblings/parents during buildBlockPathMap pass 2 (no React).
     const liveFallback = { formData: args.pageFormData, blockPathMap };
@@ -1289,6 +1295,86 @@ export function computeSmartDefaults(sourceFields, targetSchema, declaredMapping
  * @param {Object} intl - React Intl object for translations
  * @returns {Object} - FormData with defaults applied to blocks (or original if no changes)
  */
+/**
+ * Resolve a block's EFFECTIVE schema — the base schema with its schemaEnhancer
+ * applied (fieldRules visibility, hideParentOwnedFields, inheritSchemaFrom). This
+ * is the schema the editor actually renders and validates against, so its
+ * `required` is the DYNAMIC required set: a field hidden by a `when` rule (a
+ * card's `image`, shown only when the grid enables it) is dropped from `required`.
+ *
+ * Recipe-object enhancers ARE converted here (via createSchemaEnhancerFromRecipe),
+ * unlike buildBlockPathMap's pass which skips them — so callers get the fully
+ * resolved schema for recipe-based blocks too. Enhancers that compose
+ * `hideParentOwnedFields` must already be installed (installChildBlockEnhancers).
+ *
+ * Extracted from applySchemaDefaultsToFormData (its per-block resolution) so
+ * block-sanity's offline required check can reuse the exact same resolution.
+ *
+ * @returns {Object|null} the enhanced schema, or null if the block has no schema.
+ */
+export function resolveEffectiveBlockSchema(blockId, formData, blockPathMap, blocksConfig, intl) {
+  const blockData = getBlockById(formData, blockPathMap, blockId);
+  if (!blockData) return null;
+
+  // Use blockPathMap for type lookup (single source of truth).
+  // Don't use blockData['@type'] as object_list items don't store @type.
+  const blockType = blockPathMap?.[blockId]?.blockType;
+  if (!blockType) return null;
+
+  const blockConfig = blocksConfig?.[blockType];
+  if (!blockConfig) return null;
+
+  // Get base schema
+  let schema = null;
+  if (typeof blockConfig.blockSchema === 'function') {
+    schema = blockConfig.blockSchema({ formData: blockData, intl });
+  } else if (blockConfig.blockSchema) {
+    schema = blockConfig.blockSchema;
+  } else if (typeof blockConfig.schema === 'function') {
+    schema = blockConfig.schema({ formData: blockData, intl });
+  } else if (blockConfig.schema) {
+    schema = blockConfig.schema;
+  }
+
+  if (!schema) return null;
+
+  // Apply schemaEnhancer if present (fieldRules/hideParentOwnedFields/inheritSchemaFrom).
+  if (blockConfig.schemaEnhancer) {
+    // schemaEnhancer can be a function or a recipe object
+    let enhancer = blockConfig.schemaEnhancer;
+    if (typeof enhancer !== 'function') {
+      // It's a recipe object - create enhancer from it
+      enhancer = createSchemaEnhancerFromRecipe(enhancer);
+    }
+    if (enhancer) {
+      // Set context so schemaEnhancer can access currentBlockId and blockPathMap
+      // (Volto HOC call sites that pass only {schema,formData,intl}); also pass
+      // them in args (the buildBlockPathMap contract) so `../` lookups resolve
+      // even without an active context.
+      const restoreContext = setHydraSchemaContext({
+        blockPathMap,
+        currentBlockId: blockId,
+        blocksConfig,
+        formData,
+      });
+      try {
+        schema = enhancer({
+          formData: blockData,
+          schema: { ...schema, properties: { ...schema.properties } },
+          intl,
+          pageFormData: formData,
+          blockId,
+          blockPathMap,
+        });
+      } finally {
+        restoreContext();
+      }
+    }
+  }
+
+  return schema;
+}
+
 export function applySchemaDefaultsToFormData(formData, blockPathMap, blocksConfig, intl) {
   if (!blockPathMap) return formData;
 
@@ -1299,55 +1385,14 @@ export function applySchemaDefaultsToFormData(formData, blockPathMap, blocksConf
     const blockData = getBlockById(result, blockPathMap, blockId);
     if (!blockData) continue;
 
-    // Use blockPathMap for type lookup (single source of truth)
-    // Don't use blockData['@type'] as object_list items don't store @type
-    const blockType = blockPathMap[blockId]?.blockType;
-    if (!blockType) continue;
-
-    const blockConfig = blocksConfig?.[blockType];
-    if (!blockConfig) continue;
-
-    // Get base schema
-    let schema = null;
-    if (typeof blockConfig.blockSchema === 'function') {
-      schema = blockConfig.blockSchema({ formData: blockData, intl });
-    } else if (blockConfig.blockSchema) {
-      schema = blockConfig.blockSchema;
-    } else if (typeof blockConfig.schema === 'function') {
-      schema = blockConfig.schema({ formData: blockData, intl });
-    } else if (blockConfig.schema) {
-      schema = blockConfig.schema;
-    }
-
+    const schema = resolveEffectiveBlockSchema(
+      blockId,
+      result,
+      blockPathMap,
+      blocksConfig,
+      intl,
+    );
     if (!schema) continue;
-
-    // Apply schemaEnhancer if present (this sets the `default` values)
-    if (blockConfig.schemaEnhancer) {
-      // schemaEnhancer can be a function or a recipe object
-      let enhancer = blockConfig.schemaEnhancer;
-      if (typeof enhancer !== 'function') {
-        // It's a recipe object - create enhancer from it
-        enhancer = createSchemaEnhancerFromRecipe(enhancer);
-      }
-      if (enhancer) {
-        // Set context so schemaEnhancer can access currentBlockId and blockPathMap
-        const restoreContext = setHydraSchemaContext({
-          blockPathMap,
-          currentBlockId: blockId,
-          blocksConfig,
-          formData: result,
-        });
-        try {
-          schema = enhancer({
-            formData: blockData,
-            schema: { ...schema, properties: { ...schema.properties } },
-            intl,
-          });
-        } finally {
-          restoreContext();
-        }
-      }
-    }
 
     // Apply defaults from enhanced schema
     const updatedBlock = applySchemaDefaultsToBlock(blockData, schema);

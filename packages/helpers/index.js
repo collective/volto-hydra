@@ -1540,6 +1540,35 @@ function generateUUID() {
 }
 
 /**
+ * Deterministic UUID-format id derived from a seed string: the same seed always
+ * yields the same id. Used to mint a template instance id from a stable data key
+ * (the region's first block id) so a server render and the client hydration agree
+ * on `${instanceId}::${tplChildId}` block uids — a random id would differ between
+ * the two passes and trigger a React hydration mismatch (and, because that id is
+ * the block's edit identity, confuse block selection). xfnv1a hash → mulberry32
+ * PRNG, so it's pure/deterministic (no Math.random, no crypto).
+ * @param {string} seed
+ * @returns {string} UUID v4 format string
+ */
+function deterministicUUID(seed) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+  }
+  const rand = () => {
+    h = (h + 0x6d2b79f5) | 0;
+    let t = Math.imul(h ^ (h >>> 15), 1 | h);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    const r = (rand() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/**
  * Extract content field values from a block to use as fieldPlaceholders.
  * Skips system/template fields. Only includes fields with actual content.
  * @param {Object} block - The block data
@@ -3314,7 +3343,12 @@ export function expandTemplatesSync(inputItems, options = {}) {
     if (idemKey && templateState.generatedInstanceIds?.[idemKey]) {
       instanceId = templateState.generatedInstanceIds[idemKey];
     } else {
-      instanceId = generateUUID();
+      // Derive the id deterministically from the region's first block id so the
+      // server render and the client hydration mint the SAME instance id (and so
+      // the same `${instanceId}::tplChildId` block uids) — a random id differs
+      // between the two passes and causes a hydration mismatch. Fall back to a
+      // random id only when there's no stable seed (an empty forced layout).
+      instanceId = idemKey ? deterministicUUID(idemKey) : generateUUID();
       if (idemKey) {
         if (!templateState.generatedInstanceIds)
           templateState.generatedInstanceIds = {};
@@ -3545,7 +3579,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
       // covers blocks_layout regions AND object_list array fields, so an object_list slot
       // container (a slider's `slides`) gets an anchor too — not just blocks_layout containers.
       // Keyed by the consumer's `field`: the shared 'blocks' dict for blocks_layout, or the
-      // object_list field name (e.g. 'slides') — schemaInheritance reads childSlotIds[field].
+      // object_list field name (e.g. 'slides') — blockSync reads childSlotIds[field].
       let childSlotIds = undefined;
       for (const field of getChildFields(tplBlock)) {
         const key = field.isObjectList

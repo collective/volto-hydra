@@ -15,7 +15,7 @@ import {
   getConversionMap,
   validateFieldMappings,
   getBlockTypeChoices,
-} from './schemaInheritance';
+} from './blockSync';
 import config from '@plone/volto/registry';
 
 describe('validateFieldMappings — @default accepts any search-metadata field', () => {

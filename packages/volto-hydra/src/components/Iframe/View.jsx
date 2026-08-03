@@ -274,7 +274,7 @@ import {
   getConversionMap,
   convertBlockType,
   validateFieldMappings,
-} from '../../utils/schemaInheritance';
+} from '../../utils/blockSync';
 import {
   installCopyFromTargetEnhancers,
   markEditedLinkedFieldsCustom,
@@ -3413,7 +3413,7 @@ const Iframe = (props) => {
           installVariationFieldEnhancers(config.blocks.blocksConfig);
 
           // 1d.1. Auto-apply hideParentOwnedFields to every block. Any block can
-          // be a child of a parent that uses schema inheritance (typeField +
+          // be a child of a parent that uses block sync (typeField +
           // mappingField); installing this enhancer for all blocks makes
           // parent-owned fields automatically hide on the child sidebar form
           // when the parent has a type selected. Blocks don't need to opt in

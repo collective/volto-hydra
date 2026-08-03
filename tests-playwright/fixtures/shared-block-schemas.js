@@ -584,12 +584,12 @@ export const sharedBlocksConfig = {
             required: [],
         },
     },
-    // Grid block: schema inheritance recipe
+    // Grid block: block sync recipe
     // variation field is created by inheritSchemaFrom with computed choices
     // allowedBlocks on config controls what children can be added
     // blocksField: 'blocks_layout' tells inheritSchemaFrom to derive choices from it
     // When variation is set, BlockChooser only shows that type
-    // Listing block: schema inheritance for item types (summary, default, teaser)
+    // Listing block: block sync for item types (summary, default, teaser)
     // filterConvertibleFrom: '@default' means only show types whose fieldMappings
     // include @default as a source (i.e., can convert from catalog brain fields)
     listing: {
