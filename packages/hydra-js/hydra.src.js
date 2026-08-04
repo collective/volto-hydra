@@ -9107,34 +9107,83 @@ export class Bridge {
            draggedBlockUids.includes(closestBlock.getAttribute('data-block-uid')));
         if (isSelfOrGhost) closestBlock = null;
 
-        // Handle overshoot - find nearest block when cursor isn't over any block
-        if (!closestBlock) {
-          const allBlocks = Array.from(document.querySelectorAll('[data-block-uid]'))
-            .filter(el => el !== draggedBlock && !draggedBlockUids.includes(el.getAttribute('data-block-uid')));
+        // Dragged block types — needed both to pick the nearest DROPPABLE edge below
+        // and by the acceptance walk-up further down.
+        const draggedBlockTypes = draggedBlockUids.map(uid => this.getBlockType(uid)).filter(Boolean);
+        const isMultiDrag = draggedBlockTypes.length > 1;
+        const uidOf = (el) => el && el.getAttribute('data-block-uid');
+        const directChildBlocks = (containerEl) =>
+          Array.from(containerEl.querySelectorAll('[data-block-uid]')).filter(
+            (el) =>
+              el.parentElement?.closest('[data-block-uid]') === containerEl &&
+              !draggedBlockUids.includes(uidOf(el)),
+          );
+        // Can the dragged blocks drop as a sibling of `el` (into el's parent container)?
+        // Allowed natively, or reachable via the conversionMap (single: any option;
+        // multi: exactly one — auto-only). Mirrors the walk-up's acceptance test.
+        const isDroppableBeside = (el) =>
+          draggedBlockTypes.every((t) =>
+            acceptableAt(t, this.blockPathMap?.[uidOf(el)]?.allowedSiblingTypes, isMultiDrag, this.conversionMap),
+          );
 
-          // Find nearest block by vertical distance to cursor
-          let nearest = { el: null, dist: Infinity, above: false };
-          for (const el of allBlocks) {
+        // NEAREST DROPPABLE EDGE — the single resolution for "the cursor isn't on a
+        // droppable leaf": either over NOTHING (the old overshoot) or over a
+        // CONTAINER's own chrome (its padding / the gap between children, where
+        // elementFromPoint resolves to the container, not a child). Both used to be
+        // handled separately and wrongly: over-nothing picked the nearest block
+        // without checking it accepts the drop, and on-a-container the walk-up saw
+        // only the container's OUTER sibling level and dropped the blocks BESIDE it
+        // (for a convert-drop, skipping the conversion — because these blocks are
+        // usually allowed at the outer level too, the walk-up stopped there and never
+        // descended). Instead, scan every candidate block, measure its nearest edge to
+        // the cursor, and take the nearest edge the dragged blocks can actually drop at
+        // (native, or via the conversionMap). "Drop at the nearest place it can go":
+        // deep inside a container a child edge wins (drop in); at its outer border a
+        // sibling edge wins (drop beside). A leaf the cursor sits directly on is left
+        // alone. Enable HYDRA_DEBUG to trace each candidate.
+        if (!closestBlock || directChildBlocks(closestBlock).length > 0) {
+          const candidates = Array.from(document.querySelectorAll('[data-block-uid]'))
+            .filter(el => el !== draggedBlock && !draggedBlockUids.includes(uidOf(el)));
+          // For each candidate, measure BOTH insert edges along the axis its siblings
+          // are laid out on — a horizontal row (columns / data-block-add="right") uses
+          // the left/right edges + clientX, a vertical stack uses top/bottom + clientY
+          // (the same axis the drop indicator is drawn on downstream, getAddDirection) —
+          // and take the nearer: the leading edge inserts BEFORE (insertAt 0), the
+          // trailing edge inserts AFTER (insertAt 1). Measuring both edges per block
+          // (rather than only the add edge) keeps a dense set of candidates so the
+          // nearest inside edge reliably wins near a container boundary.
+          let bestEdge = null;
+          for (const el of candidates) {
             const rect = el.getBoundingClientRect();
-            const aboveDist = rect.top - e.clientY; // positive if cursor above block
-            const belowDist = e.clientY - rect.bottom; // positive if cursor below block
-            if (aboveDist > 0 && aboveDist < nearest.dist) {
-              nearest = { el, dist: aboveDist, above: true };
-            } else if (belowDist > 0 && belowDist < nearest.dist) {
-              nearest = { el, dist: belowDist, above: false };
+            const horizontal = this.getAddDirection(el) === 'right';
+            const cursorPos = horizontal ? e.clientX : e.clientY;
+            const dStart = Math.abs(cursorPos - (horizontal ? rect.left : rect.top));
+            const dEnd = Math.abs(cursorPos - (horizontal ? rect.right : rect.bottom));
+            const at = dStart <= dEnd ? 0 : 1; // 0 = before (top/left), 1 = after (bottom/right)
+            const dist = Math.min(dStart, dEnd);
+            const droppable = isDroppableBeside(el);
+            log('[drag-edge] candidate', uidOf(el), horizontal ? 'H' : 'V', 'insertAt', at, 'dist', Math.round(dist), 'droppable', droppable);
+            if (droppable && (!bestEdge || dist < bestEdge.dist)) {
+              bestEdge = { el, at, dist };
             }
           }
-          if (nearest.el) {
-            closestBlock = nearest.el;
-            insertAt = nearest.above ? 0 : 1;
+          if (bestEdge) {
+            log('[drag-edge] nearest droppable edge ->', uidOf(bestEdge.el), 'insertAt', bestEdge.at);
+            closestBlock = bestEdge.el;
+            insertAt = bestEdge.at;
+          } else {
+            // Nothing anywhere accepts these blocks — no valid drop.
+            closestBlock = null;
           }
         }
 
         if (closestBlock) {
-          // Check if the dragged block type(s) are allowed in the target container
-          // If not, walk up the parent chain to find a valid drop target
-          // For template instances, check all child block types are allowed
-          const draggedBlockTypes = draggedBlockUids.map(uid => this.getBlockType(uid)).filter(Boolean);
+          // Walk up the parent chain to the first level that accepts the dragged
+          // block type(s) — natively or via conversion. When the cursor was over a
+          // container's chrome or over nothing, closestBlock is already the nearest
+          // DROPPABLE edge resolved above, so this normally accepts immediately; it
+          // still runs so a directly-hovered leaf that can't take the drop escapes to
+          // an ancestor that can.
 
           // Find a valid drop target by walking up the parent chain
           let validDropTarget = closestBlock;
@@ -9151,6 +9200,18 @@ export class Bridge {
             const allTypesAllowed = draggedBlockTypes.length === 0 ||
               draggedBlockTypes.every(type =>
                 acceptableAt(type, allowedSiblingTypes, isMulti, this.conversionMap));
+            // Trace WHY this level did/didn't accept — native fit vs conversion vs
+            // no-fit — so a mis-resolved drop is diagnosable from the log alone
+            // (enable HYDRA_DEBUG). A line like `level box-1 ACCEPT convSource:native`
+            // means it matched at the container's OUTER sibling level natively and
+            // never descended; `convert(convTargetA)` means it descended + converts.
+            log('[drag-walk] level', validDropTargetUid, allTypesAllowed ? 'ACCEPT' : 'escape->parent',
+              draggedBlockTypes.map((t) => {
+                if (!allowedSiblingTypes) return t + ':any';
+                if (allowedSiblingTypes.includes(t)) return t + ':native';
+                const opts = ((this.conversionMap && this.conversionMap[t]) || []).filter((x) => allowedSiblingTypes.includes(x));
+                return t + ':' + (opts.length === 0 ? 'no-fit' : opts.length === 1 ? 'convert(' + opts[0] + ')' : 'convert-choose');
+              }).join(','));
             if (allTypesAllowed) {
               // Drop is allowed at this level
               break;
