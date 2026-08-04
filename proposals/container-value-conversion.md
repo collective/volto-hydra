@@ -79,31 +79,49 @@ bridge uses `items/slate/value`, not `items/*/value`.
 scalar field, collapse the source region into it; when it's a region path, expand
 the source scalar into it. The region-funnel for same-named regions is unchanged.
 
-## Table application (motivating case — separate follow-up)
+### 6. The `@type` RULE — position drives an item's type
 
-Two cell types: `tableHeaderCell` (`value: slate`) and `tableCell` (`blocks`
-region). The bridge above lets a cell convert between them. Wiring it into table
-editing needs two more small pieces, reusing what already exists:
+The bridge converts on demand; a **rule** decides *when*. A typed `object_list`
+field may carry a `typeRule`: a `when`-based fieldRule (the same grammar as a schema
+fieldRule — `@index`, `../@index`, `../../<field>`, `oneOf`, `lt`, …) whose `set` is
+a block-**type name** rather than a field definition:
 
-- **Position rule declares the target type** — the `headerMode` + `@index`
-  fieldRule outputs a cell's target `@type` per position.
-- **Normalize on mutation** — DnD/paste conversion (getConversionMap /
-  convertBlockInPlace, View.jsx) already converts a block to fit the container it
-  lands in. Position-driven changes (a cell whose *row* moved to index 0) aren't
-  block-into-container events, so a "normalize cell types" pass runs at the
-  row-level mutation points (reorder / add-remove row-column / `headerMode` change),
-  re-running the position rule and `convertBlockInPlace`-ing any cell whose target
-  type changed.
+```js
+cells: {
+  widget: 'object_list',
+  typeField: '@type',
+  allowedBlocks: ['tableCell', 'tableHeaderCell'],
+  typeRule: [
+    { when: { '../../headerMode': { oneOf: ['row', 'both'] }, '../@index': { lt: 1 } }, set: 'tableHeaderCell' },
+    { when: { '../../headerMode': { oneOf: ['col', 'both'] }, '@index': { lt: 1 } },     set: 'tableHeaderCell' },
+    { set: 'tableCell' },
+  ],
+}
+```
 
-Both reuse the existing conversion engine; this proposal delivers the reusable core
-(the bridge + path syntax), which the table wiring then calls.
+**No new resolver, no new editor plumbing, no public API.** The rule is evaluated in
+`applySchemaDefaultsToFormData` — the pass that *already* walks every block on each
+mutation, resolves its schema (running the rules), and writes back what changed.
+buildBlockPathMap carries the field's `typeRule` onto each typed item's pathMap
+entry; the pass re-resolves the target `@type` and, when it differs from the stored
+one, calls `convertValueContainer` and writes the converted block back. Because the
+target type re-resolves to itself once the item is in place, it settles in one pass —
+no oscillation. This is literally "run the rules, see what changed, write it back",
+the same mechanism as defaults.
+
+This subsumes the earlier ideas of a `maxLength:1` cap (a header cell is a *different
+type* with a single `value`, not a container capped at one) and a bespoke
+"normalize cell types" sweep (the generic pass already visits every item). A DnD/paste
+of a foreign block still rides the existing membership convert (getConversionMap /
+convertBlockInPlace); the `typeRule` covers the position-driven case (a cell whose
+*row* moved) that isn't a block-into-container event.
 
 ## Scope of this PR
 
 The reusable core: the `<region>/<type|*>/<field>` path resolution, the
-`fieldMappings` region-path collapse/expand in `convertContainerBlock`, the slate
-merge on collapse, tests, and `docs/custom-blocks.md`. The table wiring (position
-rule output + normalize-on-mutation) is a follow-up that calls this.
+`fieldMappings` region-path collapse/expand, the slate merge on collapse, the
+`@type` `typeRule` (carried by buildBlockPathMap, enforced in
+`applySchemaDefaultsToFormData`), tests, and `docs/custom-blocks.md`.
 
 ## Tests
 

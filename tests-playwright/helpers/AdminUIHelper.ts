@@ -4342,6 +4342,28 @@ export class AdminUIHelper {
   }
 
   /**
+   * Click "Convert" on the "Convert blocks?" confirm that a drop/paste opens when
+   * it would change any block's @type (the trial-then-confirm gate). Waits for the
+   * dialog, then commits.
+   */
+  async confirmConvert(): Promise<void> {
+    const btn = this.page.locator('.ui.modal .actions button.primary');
+    await expect(btn).toBeVisible({ timeout: 5000 });
+    await btn.click();
+    await expect(this.page.locator('.ui.modal')).toBeHidden({ timeout: 5000 });
+  }
+
+  /**
+   * Drag a block after another and, because the drop converts its type, click
+   * through the "Convert blocks?" confirm. Releases without asserting a reorder
+   * (the move waits on the confirm), then commits via {@link confirmConvert}.
+   */
+  async dragBlockAfterConfirmConvert(sourceBlockId: string, targetBlockId: string): Promise<void> {
+    await this.dragBlockAfterNoReorderAssert(sourceBlockId, targetBlockId);
+    await this.confirmConvert();
+  }
+
+  /**
    * Drag a block before another block by their IDs.
    * First selects the source block, then drags it before the target block.
    * @param sourceBlockId - The block ID to drag

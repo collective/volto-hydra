@@ -242,7 +242,7 @@ import './styles.css';
 import { useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
 import { BlockChooser, Icon, Toast } from '@plone/volto/components';
-import { Menu, Dimmer, Loader } from 'semantic-ui-react';
+import { Menu, Dimmer, Loader, Confirm } from 'semantic-ui-react';
 import { createPortal, flushSync } from 'react-dom';
 import { usePopper } from 'react-popper';
 import { useSelector, useDispatch } from 'react-redux';
@@ -264,6 +264,7 @@ import { canContainAll, getChildBlockEntries, setBlockType, clearBlockType } fro
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
   applySchemaDefaultsToFormData,
+  previewSchemaDefaultConversions,
   applyBlockDefaultsWithContext,
   createSchemaEnhancerFromRecipe,
   installVariationFieldEnhancers,
@@ -716,6 +717,11 @@ const Iframe = (props) => {
   //   { kind: 'wrap', blockIds: string[], allowedBlocks: string[] }
   //   { kind: 'convert', blockId: string, allowedBlocks: string[] }
   const [chooser, setChooser] = useState(null);
+  // "This drop/paste will convert some blocks — OK?" gate. A drop/paste is TRIALLED
+  // (applied to a candidate formData + normalised) BEFORE committing; if any block's
+  // @type changed, we surface it here and wait for a confirm.
+  //   { conversions: [{ blockId, from, to }], onConfirm: () => void }
+  const [convertConfirm, setConvertConfirm] = useState(null);
   const multiSelectedRef = useRef(multiSelected);
   multiSelectedRef.current = multiSelected;
 
@@ -980,6 +986,7 @@ const Iframe = (props) => {
       // or convertible (auto when one target type; a single pasted block with
       // several options opens the chooser — ask-first). Multi-paste is auto-only.
       let pasteBlocks = cloneWithIds;
+      const membershipConversions = []; // {blockId, from, to} — surfaced in the confirm
       if (allowedTypes?.length > 0) {
         const singlePaste = cloneWithIds.length === 1;
         const resolved = [];
@@ -992,6 +999,7 @@ const Iframe = (props) => {
           const options = getConvertibleTypes(bType, blocksConfig, allowedTypes).map((t) => t.type);
           if (options.length === 1) {
             resolved.push([newId, convertBlockType(blockData, options[0], blocksConfig, '@type', intl)]);
+            membershipConversions.push({ blockId: newId, from: bType, to: options[0] });
             continue;
           }
           if (options.length > 1 && singlePaste) {
@@ -1019,8 +1027,24 @@ const Iframe = (props) => {
         lastId = newId;
       }
 
-      if (!keepClipboard) dispatch(resetBlocksClipboard());
-      onChangeFormData(newFormData);
+      const commitPaste = (fd) => {
+        if (!keepClipboard) dispatch(resetBlocksClipboard());
+        onChangeFormData(fd);
+      };
+      // Trial the paste (same as a drop): normalise the candidate, diff @types, and
+      // confirm if anything converted — membership fits + any rule-driven change.
+      const trialBpm = buildBlockPathMap(newFormData, blocksConfig, intl);
+      const { formData: normalizedFd, conversions: ruleConversions } =
+        previewSchemaDefaultConversions(newFormData, trialBpm, blocksConfig, intl);
+      const allConversions = [...membershipConversions, ...ruleConversions];
+      if (allConversions.length > 0) {
+        setConvertConfirm({
+          conversions: allConversions,
+          onConfirm: () => commitPaste(normalizedFd),
+        });
+      } else {
+        commitPaste(newFormData);
+      }
     };
 
     const handleExitSelectionMode = () => {
@@ -2907,6 +2931,7 @@ const Iframe = (props) => {
           const targetContainerCfg = getContainerFieldConfig(targetBlockId, currentBlockPathMap, currentFormData, blocksConfig, intl);
           const targetAllowedTypes = targetContainerCfg?.allowedBlocks;
           const dropConversions = {}; // bid -> type to convert to before moving
+          const membershipConversions = []; // {blockId, from, to} — surfaced in the confirm
           let rejectMove = false;
           let deferredToChooser = false;
           if (targetAllowedTypes?.length > 0) {
@@ -2916,7 +2941,8 @@ const Iframe = (props) => {
               if (targetAllowedTypes.includes(bType)) continue; // native fit
               const options = getConvertibleTypes(bType, blocksConfig, targetAllowedTypes).map((t) => t.type);
               if (options.length === 1) {
-                dropConversions[bid] = options[0]; // auto-convert
+                dropConversions[bid] = options[0]; // single target → convert to fit
+                membershipConversions.push({ blockId: bid, from: bType, to: options[0] });
                 continue;
               }
               if (options.length > 1 && singleDrag) {
@@ -3052,29 +3078,43 @@ const Iframe = (props) => {
               }
             }
 
-            // Set pendingSelectBlockUid so the moved block stays selected after re-render
-            // Rebuild blockPathMap to reflect the new block positions
-            // Use flushSync to ensure state is committed before Redux update triggers useEffect
-            // Do NOT set formData here - let the useEffect update it after sending FORM_DATA
-            const newBlockPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
-            flushSync(() => {
-              setIframeSyncState(prev => ({
-                ...prev,
-                blockPathMap: newBlockPathMap,
-                // selectAfterMove lets the sender pin selection on a specific
-                // block (e.g. edge-drag wants to stay on the container, not
-                // jump to the absorbed sibling). Defaults to the first moved
-                // block to match the legacy DnD behaviour.
-                pendingSelectBlockUid: selectAfterMove || blocksToMove[0],
-              }));
-            });
-            // Debug: Log column contents after move
-            const col1AfterMove = newFormData?.blocks?.['columns-1']?.columns?.['col-1'];
-            const col2AfterMove = newFormData?.blocks?.['columns-1']?.columns?.['col-2'];
-            log('MOVE_BLOCKS: col-1 blocks_layout after move:', col1AfterMove?.blocks_layout?.items);
-            log('MOVE_BLOCKS: col-2 blocks_layout after move:', col2AfterMove?.blocks_layout?.items);
-            log('MOVE_BLOCKS: calling onChangeFormData');
-            onChangeFormData(newFormData);
+            // Commit + keep the moved block selected. Rebuild the pathMap for the
+            // new positions and flushSync so state is committed before the Redux
+            // update triggers the useEffect. Do NOT set formData here — the
+            // useEffect sends FORM_DATA. selectAfterMove pins selection on a
+            // specific block (edge-drag stays on the container); default = the
+            // first moved block (legacy DnD behaviour).
+            const selectUid = selectAfterMove || blocksToMove[0];
+            const commitMove = (fd) => {
+              const newBlockPathMap = buildBlockPathMap(fd, config.blocks.blocksConfig, intl);
+              flushSync(() => {
+                setIframeSyncState(prev => ({
+                  ...prev,
+                  blockPathMap: newBlockPathMap,
+                  pendingSelectBlockUid: selectUid,
+                }));
+              });
+              onChangeFormData(fd);
+            };
+
+            // Trial the drop before committing: normalise the candidate (applies
+            // field defaults AND `@type` rules via the container⇄value bridge) and
+            // diff the @types. If ANY block converted — for any reason, any rule —
+            // confirm first. `membershipConversions` (single-target drops converted
+            // to fit the container above) are surfaced in the same confirm. Nothing
+            // converted → commit the raw move unchanged (no behaviour change).
+            const trialBpm = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
+            const { formData: normalizedFd, conversions: ruleConversions } =
+              previewSchemaDefaultConversions(newFormData, trialBpm, blocksConfig, intl);
+            const allConversions = [...membershipConversions, ...ruleConversions];
+            if (allConversions.length > 0) {
+              setConvertConfirm({
+                conversions: allConversions,
+                onConfirm: () => commitMove(normalizedFd),
+              });
+            } else {
+              commitMove(newFormData);
+            }
           }
           break;
         }
@@ -4413,8 +4453,13 @@ const Iframe = (props) => {
         const pp = chooser.pendingPaste;
         const converted = convertBlockType(pp.blockData, newType, blocksConfig, '@type', intl);
         const cfg = getContainerFieldConfig(pp.afterBlockId, bpm, properties, blocksConfig, intl);
-        const updatedProperties = insertBlockInContainer(
+        let updatedProperties = insertBlockInContainer(
           properties, bpm, pp.afterBlockId, pp.newId, converted, cfg, 'after',
+        );
+        // The pick placed the block; run `@type` rules in case the position re-types
+        // it or a sibling. No second confirm — the pick itself was the ask.
+        updatedProperties = applySchemaDefaultsToFormData(
+          updatedProperties, buildBlockPathMap(updatedProperties, blocksConfig, intl), blocksConfig, intl,
         );
         onChangeFormData(updatedProperties);
         setIframeSyncState(prev => ({
@@ -4451,6 +4496,11 @@ const Iframe = (props) => {
               }
             }
           }
+          // The pick placed the block; run `@type` rules in case its new position
+          // re-types it or a sibling. No second confirm — the pick was the ask.
+          updatedProperties = applySchemaDefaultsToFormData(
+            updatedProperties, buildBlockPathMap(updatedProperties, blocksConfig, intl), blocksConfig, intl,
+          );
           onChangeFormData(updatedProperties);
           const newBlockPathMap = buildBlockPathMap(updatedProperties, blocksConfig, intl);
           setIframeSyncState(prev => ({
@@ -4835,6 +4885,38 @@ const Iframe = (props) => {
           </div>,
           document.body,
         )}
+      {/* "This drop/paste will convert some blocks — OK?" gate. A drop/paste is
+       * trialled before committing; if any block's @type changed, confirm here. */}
+      <Confirm
+        open={!!convertConfirm}
+        header="Convert blocks?"
+        content={
+          convertConfirm ? (
+            <div className="content" data-testid="convert-confirm">
+              <p>
+                This drop will change the type of{' '}
+                {convertConfirm.conversions.length} block
+                {convertConfirm.conversions.length === 1 ? '' : 's'}:
+              </p>
+              <ul>
+                {convertConfirm.conversions.map((c) => (
+                  <li key={c.blockId}>
+                    {c.from} → {c.to}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null
+        }
+        confirmButton="Convert"
+        cancelButton="Cancel"
+        onCancel={() => setConvertConfirm(null)}
+        onConfirm={() => {
+          const cb = convertConfirm?.onConfirm;
+          setConvertConfirm(null);
+          if (cb) cb();
+        }}
+      />
       {/* Slash menu — appears under the field in the iframe where "/" was typed */}
       {slashMenu && referenceElement && slashMenu.fieldRect &&
         createPortal(

@@ -12,11 +12,7 @@ vi.mock('../context', () => ({
   getLiveBlockData: () => undefined,
 }));
 
-import {
-  convertValueContainer,
-  parseRegionPath,
-  normalizeItemTypes,
-} from './blockPath.js';
+import { convertValueContainer, parseRegionPath } from './blockPath.js';
 
 const intl = { formatMessage: (m) => m?.defaultMessage || m?.id || '' };
 const slate = (text) => [{ type: 'p', children: [{ text }] }];
@@ -117,59 +113,5 @@ describe('convertValueContainer — container <-> value bridge', () => {
     expect(
       convertValueContainer({ '@type': 'slate' }, 'slate', 'image', cfg, intl),
     ).toBeNull();
-  });
-});
-
-describe('normalizeItemTypes — position drives cell type (the reorder → type flow)', () => {
-  const cellsRegion = {
-    isObjectList: true,
-    region: 'cells',
-    idField: 'key',
-    typeField: '@type',
-  };
-  const containerCell = (key, text) => ({
-    '@type': 'tableCell',
-    key,
-    blocks: [{ '@type': 'slate', '@id': `${key}-s`, value: slate(text) }],
-  });
-  // "the first cell is a header" — the position rule, reduced.
-  const headerAtZero = (item, i) => (i === 0 ? 'tableHeaderCell' : 'tableCell');
-
-  test('cell at the header index converts to the value type; others stay container', () => {
-    const row = { key: 'r0', cells: [containerCell('c0', 'A'), containerCell('c1', 'B')] };
-    const out = normalizeItemTypes(row, cellsRegion, headerAtZero, cfg, intl);
-    expect(out.cells[0]['@type']).toBe('tableHeaderCell');
-    expect(JSON.stringify(out.cells[0].value)).toContain('A'); // collapsed to a value
-    expect(out.cells[1]['@type']).toBe('tableCell'); // unchanged
-    expect(out.cells[1].blocks).toHaveLength(1);
-  });
-
-  test('reordering flips types: the new first cell becomes a header, the old one reverts (text round-trips)', () => {
-    // normalised: c0 = header value, c1 = body container
-    let row = normalizeItemTypes(
-      { key: 'r0', cells: [containerCell('c0', 'A'), containerCell('c1', 'B')] },
-      cellsRegion,
-      headerAtZero,
-      cfg,
-      intl,
-    );
-    expect(row.cells[0]['@type']).toBe('tableHeaderCell');
-    // simulate a DnD reorder: swap the two cells
-    row = { ...row, cells: [row.cells[1], row.cells[0]] };
-    // re-normalise for the new positions
-    row = normalizeItemTypes(row, cellsRegion, headerAtZero, cfg, intl);
-    // the block now at index 0 (was the container c1) is a header value
-    expect(row.cells[0]['@type']).toBe('tableHeaderCell');
-    expect(JSON.stringify(row.cells[0].value)).toContain('B');
-    // the block now at index 1 (was the header value c0) reverts to a container,
-    // and its text survives the value -> container round-trip
-    expect(row.cells[1]['@type']).toBe('tableCell');
-    expect(row.cells[1].blocks).toHaveLength(1);
-    expect(JSON.stringify(row.cells[1].blocks[0].value)).toContain('A');
-  });
-
-  test('no change -> same reference (no spurious write)', () => {
-    const row = { key: 'r0', cells: [containerCell('c0', 'A')] };
-    expect(normalizeItemTypes(row, cellsRegion, () => 'tableCell', cfg, intl)).toBe(row);
   });
 });

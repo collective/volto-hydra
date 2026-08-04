@@ -377,6 +377,36 @@ Non-region scalar fields (`key`, `width`, …) carry over unchanged. This is the
 `convertValueContainer` helper; DnD/paste and the block chooser reuse it via the
 same `fieldMappings` graph. See `proposals/container-value-conversion.md`.
 
+#### `typeRule` — position picks a typed item's `@type`
+
+The bridge converts on demand; a **`@type` rule** on a typed `object_list` field
+decides *when*, by **position**. It is an ordinary `when`-based fieldRule (same
+grammar — `@index`, `../@index`, `../../<field>`, `oneOf`, `lt`, …) whose `set` is a
+block-**type name** instead of a field definition:
+
+<!-- codeExample: javascript -->
+```javascript
+cells: {
+    widget: 'object_list', typeField: '@type',
+    allowedBlocks: ['tableCell', 'tableHeaderCell'],
+    typeRule: [
+        // header row OR header column → the value form
+        { when: { '../../headerMode': { oneOf: ['row', 'both'] }, '../@index': { lt: 1 } }, set: 'tableHeaderCell' },
+        { when: { '../../headerMode': { oneOf: ['col', 'both'] }, '@index': { lt: 1 } },     set: 'tableHeaderCell' },
+        { set: 'tableCell' },                                // otherwise the container form
+    ],
+},
+```
+
+The rule is evaluated in the same pass that applies field defaults (run on every
+edit): each typed item's target `@type` is re-resolved, and when it differs from the
+stored `@type` the item is **converted in place** via the bridge above. So moving a
+row to/from row 0 flips its cells between `tableHeaderCell` (a slate `value`) and
+`tableCell` (a `blocks` container), losslessly — no imperative "re-type the cells"
+code. Only meaningful on a **typed** object_list (a `typeField` item has an `@type`
+to rewrite); it settles in one pass (the target type re-resolves to itself once the
+item is in place).
+
 Each field's value is converted to the shape its destination widget expects
 (derived from the widget): strings copy across, an image field is assembled from
 the target's `image_scales` / `image_field`, multi-value fields (e.g. `Subject` →

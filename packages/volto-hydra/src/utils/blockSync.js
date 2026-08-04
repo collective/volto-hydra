@@ -38,7 +38,7 @@
  * branch can be removed — until then, both branches are load-bearing.
  */
 import { getInjectedBlocksConfig } from './injectedVoltoConfig.js';
-import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField } from './blockPath.js';
+import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField, convertValueContainer } from './blockPath.js';
 import { addableSiblingTypes } from '../../../hydra-js/buildBlockPathMap.js';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import {
@@ -1413,9 +1413,82 @@ export function applySchemaDefaultsToFormData(formData, blockPathMap, blocksConf
     if (updatedBlock !== blockData) {
       result = updateBlockById(result, blockPathMap, blockId, updatedBlock);
     }
+
+    // `@type` RULE — a position-driven type. When a typed object_list item carries
+    // a `typeRule` (a `when`-based fieldRule whose `set` is a block-TYPE name),
+    // re-resolve the type the item SHOULD have at its current position and, if it
+    // differs from the stored `@type`, convert the item in place. This is the same
+    // "run the rules, see what changed, write it back" pass that applies defaults —
+    // no separate resolver, no editor plumbing. It's how a table cell flips between
+    // `tableHeaderCell` (a slate value) and `tableCell` (a blocks container) when
+    // its row moves to/from a header position. Deterministic by position, so it
+    // settles (the target type re-resolves to itself next pass — no oscillation).
+    const typeRule = blockPathMap[blockId]?.typeRule;
+    if (typeRule) {
+      const current = getBlockById(result, blockPathMap, blockId);
+      const currentType = current?.['@type'] || blockPathMap[blockId]?.blockType;
+      const targetType = evaluateFieldRule(typeRule, current, {
+        blockId,
+        blockPathMap,
+        pageFormData: result,
+      });
+      if (typeof targetType === 'string' && targetType !== currentType) {
+        const converted = convertValueContainer(
+          current,
+          currentType,
+          targetType,
+          blocksConfig,
+          intl,
+        );
+        // null → no bridge for this pair; leave the item as-is (fail visibly by
+        // simply not converting rather than corrupting it).
+        if (converted) {
+          result = updateBlockById(result, blockPathMap, blockId, converted);
+        }
+      }
+    }
   }
 
   return result;
+}
+
+/**
+ * TRIAL a would-be state (a candidate drop/paste result) and report every block
+ * whose `@type` the rules would CHANGE — so the caller can ask before committing.
+ *
+ * This is the generic "sandbox the drop, see what converts" detector: it runs the
+ * SAME normalization pass that commits use (`applySchemaDefaultsToFormData`, which
+ * applies defaults AND `@type` rules via the container⇄value bridge) against a
+ * candidate formData, then diffs each block's `@type` before vs after. A type
+ * changes for ANY reason a rule fires — position (`typeRule`), a field condition,
+ * anything — not just tables. The caller (DnD/paste) trials the post-move formData,
+ * and if `conversions` is non-empty, confirms with the user, then commits the
+ * returned `formData` (already converted); an empty list commits silently.
+ *
+ * Blocks REMOVED by a conversion (e.g. a container's children collapsed into a
+ * value) are not "type changes" and are not reported — only surviving blocks whose
+ * `@type` differs. `blockPathMap` is the candidate's map; `getBlockById` is
+ * path-based, so it still resolves a converted block (same position, new `@type`).
+ *
+ * @returns {{ formData: object, conversions: Array<{blockId, from, to}> }}
+ */
+export function previewSchemaDefaultConversions(formData, blockPathMap, blocksConfig, intl) {
+  const before = {};
+  if (blockPathMap) {
+    for (const blockId of Object.keys(blockPathMap)) {
+      const b = getBlockById(formData, blockPathMap, blockId);
+      if (b) before[blockId] = b['@type'];
+    }
+  }
+  const normalized = applySchemaDefaultsToFormData(formData, blockPathMap, blocksConfig, intl);
+  const conversions = [];
+  for (const blockId of Object.keys(before)) {
+    const b = getBlockById(normalized, blockPathMap, blockId);
+    if (b && b['@type'] !== before[blockId]) {
+      conversions.push({ blockId, from: before[blockId], to: b['@type'] });
+    }
+  }
+  return { formData: normalized, conversions };
 }
 
 /**
