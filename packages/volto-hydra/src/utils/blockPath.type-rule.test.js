@@ -252,6 +252,16 @@ describe('filterAddableTypesByRule — position rule filters the add options', (
       'tableHeaderCell',
     ]);
   });
+
+  test('a region with NO typeRule short-circuits — all allowed types returned', () => {
+    // A tableCell's `blocks` region (slate/image/video) has no typeRule, so the
+    // filter must return the list unchanged without the per-type sandbox.
+    const { f, map } = build();
+    const inner = ['slate', 'image', 'video'];
+    const cc = getContainerFieldConfig('c2-s', map, f, cfg, intl); // the cell's blocks region
+    expect(map['c2-s']?.typeRule).toBeUndefined(); // no rule carried here
+    expect(filterAddableTypesByRule(inner, f, map, 'c2-s', cc, cfg, intl)).toEqual(inner);
+  });
 });
 
 // The generic "sandbox the drop, see what converts" detector the DnD/paste path

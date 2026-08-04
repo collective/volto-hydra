@@ -1517,6 +1517,12 @@ export function filterAddableTypesByRule(
   intl,
 ) {
   if (!Array.isArray(allowedBlocks) || allowedBlocks.length <= 1) return allowedBlocks;
+  // No position `@type` rule governs this region → nothing can re-type the new
+  // item, so every allowed type is addable as-is. Skip the per-type sandbox
+  // entirely (the common case — only a typeRule container needs filtering). The
+  // region's `typeRule` is carried onto each typed item's pathMap entry, so the
+  // ref sibling carries it when the region has one.
+  if (!blockPathMap?.[refBlockId]?.typeRule) return allowedBlocks;
   const idField = containerConfig?.idField || '@id';
   const filtered = allowedBlocks.filter((type) => {
     const probeId = `__probe_${type}__`;
