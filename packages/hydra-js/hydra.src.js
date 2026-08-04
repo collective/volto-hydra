@@ -9156,9 +9156,27 @@ export class Bridge {
           for (const el of candidates) {
             const rect = el.getBoundingClientRect();
             const horizontal = this.getAddDirection(el) === 'right';
-            const cursorPos = horizontal ? e.clientX : e.clientY;
-            const dStart = Math.abs(cursorPos - (horizontal ? rect.left : rect.top));
-            const dEnd = Math.abs(cursorPos - (horizontal ? rect.right : rect.bottom));
+            // True 2D distance from the cursor to each insert-edge LINE SEGMENT, not
+            // just the perpendicular axis — otherwise blocks that share the insertion
+            // axis but sit at a different offset on the other axis (e.g. children of
+            // DIFFERENT columns at the same Y) are indistinguishable and the wrong one
+            // can win. The edge is a segment along the block's span on the OTHER axis;
+            // `over` is how far the cursor is outside that span (0 when within it, so a
+            // vertical stack the cursor is over reduces to the plain perpendicular dy).
+            let dStart, dEnd;
+            if (horizontal) {
+              // vertical insert edges (left/right); segment spans rect.top..rect.bottom
+              const over = e.clientY < rect.top ? rect.top - e.clientY
+                : e.clientY > rect.bottom ? e.clientY - rect.bottom : 0;
+              dStart = Math.hypot(e.clientX - rect.left, over);
+              dEnd = Math.hypot(e.clientX - rect.right, over);
+            } else {
+              // horizontal insert edges (top/bottom); segment spans rect.left..rect.right
+              const over = e.clientX < rect.left ? rect.left - e.clientX
+                : e.clientX > rect.right ? e.clientX - rect.right : 0;
+              dStart = Math.hypot(over, e.clientY - rect.top);
+              dEnd = Math.hypot(over, e.clientY - rect.bottom);
+            }
             const at = dStart <= dEnd ? 0 : 1; // 0 = before (top/left), 1 = after (bottom/right)
             const dist = Math.min(dStart, dEnd);
             const droppable = isDroppableBeside(el);
@@ -9414,6 +9432,8 @@ export class Bridge {
             });
           }
           dropIndicatorVisible = true;
+          // TODO(scroll-into-view): if the resolved edge is off-screen, scroll it into
+          // view — deferred; scrolling mid-drag fights a held cursor, needs its own design.
         } else {
           // No valid drop target - hide indicator and mark as not droppable
           const existingIndicator = document.querySelector('.volto-hydra-drop-indicator');
