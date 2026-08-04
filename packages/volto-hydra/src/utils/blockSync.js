@@ -38,8 +38,8 @@
  * branch can be removed — until then, both branches are load-bearing.
  */
 import { getInjectedBlocksConfig } from './injectedVoltoConfig.js';
-import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField } from './blockPath.js';
-import { addableSiblingTypes } from '../../../hydra-js/buildBlockPathMap.js';
+import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField, convertValueContainer, insertBlockInContainer } from './blockPath.js';
+import { addableSiblingTypes, buildBlockPathMap } from '../../../hydra-js/buildBlockPathMap.js';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import {
   convertFieldValue,
@@ -1413,9 +1413,140 @@ export function applySchemaDefaultsToFormData(formData, blockPathMap, blocksConf
     if (updatedBlock !== blockData) {
       result = updateBlockById(result, blockPathMap, blockId, updatedBlock);
     }
+
+    // `@type` RULE — a position-driven type. When a typed object_list item carries
+    // a `typeRule` (a `when`-based fieldRule whose `set` is a block-TYPE name),
+    // re-resolve the type the item SHOULD have at its current position and, if it
+    // differs from the stored `@type`, convert the item in place. This is the same
+    // "run the rules, see what changed, write it back" pass that applies defaults —
+    // no separate resolver, no editor plumbing. It's how a table cell flips between
+    // `tableHeaderCell` (a slate value) and `tableCell` (a blocks container) when
+    // its row moves to/from a header position. Deterministic by position, so it
+    // settles (the target type re-resolves to itself next pass — no oscillation).
+    const typeRule = blockPathMap[blockId]?.typeRule;
+    if (typeRule) {
+      const current = getBlockById(result, blockPathMap, blockId);
+      const currentType = current?.['@type'] || blockPathMap[blockId]?.blockType;
+      const targetType = evaluateFieldRule(typeRule, current, {
+        blockId,
+        blockPathMap,
+        pageFormData: result,
+      });
+      if (typeof targetType === 'string' && targetType !== currentType) {
+        const converted = convertValueContainer(
+          current,
+          currentType,
+          targetType,
+          blocksConfig,
+          intl,
+        );
+        // null → no bridge for this pair; leave the item as-is (fail visibly by
+        // simply not converting rather than corrupting it).
+        if (converted) {
+          result = updateBlockById(result, blockPathMap, blockId, converted);
+        }
+      }
+    }
   }
 
   return result;
+}
+
+/**
+ * TRIAL a would-be state (a candidate drop/paste result) and report every block
+ * whose `@type` the rules would CHANGE — so the caller can ask before committing.
+ *
+ * This is the generic "sandbox the drop, see what converts" detector: it runs the
+ * SAME normalization pass that commits use (`applySchemaDefaultsToFormData`, which
+ * applies defaults AND `@type` rules via the container⇄value bridge) against a
+ * candidate formData, then diffs each block's `@type` before vs after. A type
+ * changes for ANY reason a rule fires — position (`typeRule`), a field condition,
+ * anything — not just tables. The caller (DnD/paste) trials the post-move formData,
+ * and if `conversions` is non-empty, confirms with the user, then commits the
+ * returned `formData` (already converted); an empty list commits silently.
+ *
+ * Blocks REMOVED by a conversion (e.g. a container's children collapsed into a
+ * value) are not "type changes" and are not reported — only surviving blocks whose
+ * `@type` differs. `blockPathMap` is the candidate's map; `getBlockById` is
+ * path-based, so it still resolves a converted block (same position, new `@type`).
+ *
+ * @returns {{ formData: object, conversions: Array<{blockId, from, to}> }}
+ */
+export function previewSchemaDefaultConversions(formData, blockPathMap, blocksConfig, intl) {
+  const before = {};
+  if (blockPathMap) {
+    for (const blockId of Object.keys(blockPathMap)) {
+      const b = getBlockById(formData, blockPathMap, blockId);
+      if (b) before[blockId] = b['@type'];
+    }
+  }
+  const normalized = applySchemaDefaultsToFormData(formData, blockPathMap, blocksConfig, intl);
+  const conversions = [];
+  for (const blockId of Object.keys(before)) {
+    const b = getBlockById(normalized, blockPathMap, blockId);
+    if (b && b['@type'] !== before[blockId]) {
+      conversions.push({ blockId, from: before[blockId], to: b['@type'] });
+    }
+  }
+  return { formData: normalized, conversions };
+}
+
+/**
+ * Filter a container's `allowedBlocks` down to the types that are actually ADDABLE
+ * at a given position, when a position `@type` rule (typeRule) governs the region.
+ *
+ * For each allowed type, TRIAL it: probe-insert a minimal item of that type after
+ * `refBlockId`, run the schema-default pass (which applies the typeRule), and keep
+ * the type only if the rule did NOT change it. A type the rule immediately rewrites
+ * (e.g. `tableCell` dropped where the position forces `tableHeaderCell`) is not a
+ * real choice at that spot, so it's dropped from the menu — a typeRule-driven
+ * container thus offers only the rule-consistent type(s). Usually one survives, so
+ * the caller's "single allowed type → add directly (no chooser)" path fires.
+ *
+ * Returns the filtered list (never empty — falls back to the input if the trial
+ * would drop everything, so a mis-authored rule can't strand the add). A container
+ * with ≤1 allowed type, or one whose items are all left unchanged, is returned as-is.
+ */
+export function filterAddableTypesByRule(
+  allowedBlocks,
+  formData,
+  blockPathMap,
+  refBlockId,
+  containerConfig,
+  blocksConfig,
+  intl,
+) {
+  if (!Array.isArray(allowedBlocks) || allowedBlocks.length <= 1) return allowedBlocks;
+  // No position `@type` rule governs this region → nothing can re-type the new
+  // item, so every allowed type is addable as-is. Skip the per-type sandbox
+  // entirely (the common case — only a typeRule container needs filtering). The
+  // region's `typeRule` is carried onto each typed item's pathMap entry, so the
+  // ref sibling carries it when the region has one.
+  if (!blockPathMap?.[refBlockId]?.typeRule) return allowedBlocks;
+  const idField = containerConfig?.idField || '@id';
+  const filtered = allowedBlocks.filter((type) => {
+    const probeId = `__probe_${type}__`;
+    let sandbox;
+    try {
+      sandbox = insertBlockInContainer(
+        formData,
+        blockPathMap,
+        refBlockId,
+        probeId,
+        { '@type': type, [idField]: probeId },
+        containerConfig,
+        'after',
+      );
+    } catch {
+      return true; // couldn't probe this type → don't drop it
+    }
+    const map = buildBlockPathMap(sandbox, blocksConfig, intl);
+    const normalized = applySchemaDefaultsToFormData(sandbox, map, blocksConfig, intl);
+    const after = getBlockById(normalized, map, probeId);
+    // Keep only if the position rule left this type unchanged (addable as-is).
+    return !after || after['@type'] === type;
+  });
+  return filtered.length ? filtered : allowedBlocks;
 }
 
 /**

@@ -28,6 +28,9 @@ import {
   getResolvedSchema,
   buildIdFieldMap,
 } from '../../../hydra-js/buildBlockPathMap.js';
+// From the dep-free slateMerge (NOT slateTransforms) so the offline block-path
+// evaluator's esbuild bundle stays free of @plone/volto-slate / registry.
+import { mergeBlockValues } from './slateMerge.js';
 
 /**
  * Extract text content from a React element (JSX).
@@ -1240,6 +1243,121 @@ export function convertContainerBlock(
   }
 
   return updateBlockById(formData, blockPathMap, blockId, newBlock);
+}
+
+/**
+ * A region-crossing path `<region>/<type|*>/<field>` — targets the `<field>` of a
+ * container region's children. Returns { region, type, field } (type null for `*`,
+ * i.e. any child that exposes the field), or null for a plain scalar / object path.
+ * @private
+ */
+export function parseRegionPath(path) {
+  if (typeof path !== 'string') return null;
+  const parts = path.split('/');
+  if (parts.length !== 3) return null; // <region>/<type|*>/<field>
+  const [region, type, field] = parts;
+  if (!region || !type || !field) return null;
+  return { region, type: type === '*' ? null : type, field };
+}
+
+// Fold slate values left-to-right into one (lossless join via core-Volto's merge).
+function mergeSlateValues(values) {
+  return values.reduce(
+    (acc, v) =>
+      acc == null ? v : v == null ? acc : mergeBlockValues(acc, v).mergedValue,
+    null,
+  );
+}
+
+/**
+ * Convert a block between a CONTAINER shape (a region of child blocks) and a VALUE
+ * shape (a scalar field) via a region-crossing `fieldMappings` path.
+ *
+ * The bridge is declared ONCE on the VALUE block and serves BOTH directions:
+ *   tableHeaderCell: { fieldMappings: { tableCell: { value: 'items/slate/value' } } }
+ *   - container -> value (COLLAPSE): gather the region's matching children's <field>,
+ *     merge (slate) into the value field.
+ *   - value -> container (EXPAND): wrap the value in ONE child of <type> in the region.
+ *
+ * Returns the converted block, or null when no such bridge applies (the caller then
+ * falls back to convertContainerBlock's region funnel).
+ */
+export function convertValueContainer(
+  sourceBlock,
+  sourceType,
+  targetType,
+  blocksConfig,
+  intl,
+) {
+  const findBridge = (valueType, containerType) => {
+    const m = blocksConfig?.[valueType]?.fieldMappings?.[containerType];
+    for (const [valueField, path] of Object.entries(m || {})) {
+      const rp = parseRegionPath(path);
+      if (rp) return { valueField, rp };
+    }
+    return null;
+  };
+
+  // container -> value: the TARGET is the value block. value -> container: the SOURCE is.
+  let bridge = findBridge(targetType, sourceType);
+  let mode = 'collapse';
+  if (!bridge) {
+    bridge = findBridge(sourceType, targetType);
+    mode = 'expand';
+  }
+  if (!bridge) return null;
+  const { valueField, rp } = bridge;
+
+  if (mode === 'collapse') {
+    const descriptors = getContainerRegionDescriptors(
+      sourceType,
+      blocksConfig,
+      intl,
+      sourceBlock,
+    );
+    const region = descriptors.find((r) => r.region === rp.region);
+    if (!region) return null;
+    // Carry over scalar fields (key, width, …); drop the region storage.
+    const newBlock = { ...sourceBlock, '@type': targetType };
+    delete newBlock.blocks;
+    delete newBlock.blocks_layout;
+    for (const r of descriptors) if (r.isObjectList) delete newBlock[r.region];
+
+    const values = getChildBlockEntries(sourceBlock, region)
+      .filter(
+        (e) => !rp.type || getBlockType(e.block, region.typeField) === rp.type,
+      )
+      .map((e) => e.block?.[rp.field])
+      .filter((v) => v != null);
+    const allSlate = values.length > 0 && values.every((v) => Array.isArray(v));
+    if (allSlate) {
+      newBlock[valueField] = mergeSlateValues(values);
+    } else {
+      newBlock[valueField] = values[0];
+      if (values.length > 1) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[HYDRA] convertValueContainer: collapse dropped ${values.length - 1} non-slate value(s) for "${valueField}"`,
+        );
+      }
+    }
+    return newBlock;
+  }
+
+  // expand: the value block is the source.
+  const descriptors = getContainerRegionDescriptors(
+    targetType,
+    blocksConfig,
+    intl,
+  );
+  const region = descriptors.find((r) => r.region === rp.region);
+  if (!region) return null;
+  const newBlock = { ...sourceBlock, '@type': targetType };
+  delete newBlock[valueField];
+  const childType = rp.type || region.allowedBlocks?.[0] || 'slate';
+  const child = { '@type': childType, [rp.field]: sourceBlock[valueField] };
+  setChildBlockEntries(newBlock, region, [{ id: child['@id'], block: child }]);
+  return newBlock;
 }
 
 /**
