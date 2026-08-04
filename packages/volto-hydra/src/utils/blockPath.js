@@ -1359,6 +1359,43 @@ export function convertValueContainer(
 }
 
 /**
+ * Re-type a container region's items after a structural change (reorder, add/remove,
+ * a mode toggle) so each item's TYPE follows its POSITION.
+ *
+ * `targetTypeFor(item, index, entries)` returns the `@type` an item should have at its
+ * current position (or null/undefined to leave it). Any item whose type differs is
+ * converted in place via `convertValueContainer` (value ⇄ container) — the round-trip
+ * that lets a table cell flip between `tableHeaderCell` (a slate value) and `tableCell`
+ * (a blocks container) when its row moves to/from a header position.
+ *
+ * Returns the updated container block, or the SAME reference when nothing changed
+ * (so callers can skip a no-op write). Pure — no formData / pathMap needed.
+ */
+export function normalizeItemTypes(
+  containerBlock,
+  region,
+  targetTypeFor,
+  blocksConfig,
+  intl,
+) {
+  const entries = getChildBlockEntries(containerBlock, region);
+  let changed = false;
+  const out = entries.map((e, i) => {
+    const cur = getBlockType(e.block, region.typeField) || e.block?.['@type'];
+    const target = targetTypeFor(e.block, i, entries);
+    if (!target || target === cur) return e;
+    const conv = convertValueContainer(e.block, cur, target, blocksConfig, intl);
+    if (!conv) return e; // no bridge for this pair → leave untouched
+    changed = true;
+    return { id: e.id, block: conv };
+  });
+  if (!changed) return containerBlock;
+  const next = { ...containerBlock };
+  setChildBlockEntries(next, region, out);
+  return next;
+}
+
+/**
  * ALL child regions of a container, in schema order — the storage-agnostic unit for every
  * container op. Storage (object_list vs blocks_layout) is a property of each REGION, not the
  * container: one container may mix object_list and blocks_layout regions. Returns a LIST of
