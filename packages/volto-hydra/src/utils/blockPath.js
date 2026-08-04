@@ -28,7 +28,9 @@ import {
   getResolvedSchema,
   buildIdFieldMap,
 } from '../../../hydra-js/buildBlockPathMap.js';
-import { mergeBlockValues } from './slateTransforms.js';
+// From the dep-free slateMerge (NOT slateTransforms) so the offline block-path
+// evaluator's esbuild bundle stays free of @plone/volto-slate / registry.
+import { mergeBlockValues } from './slateMerge.js';
 
 /**
  * Extract text content from a React element (JSX).
