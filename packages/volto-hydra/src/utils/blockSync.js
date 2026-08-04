@@ -38,8 +38,8 @@
  * branch can be removed — until then, both branches are load-bearing.
  */
 import { getInjectedBlocksConfig } from './injectedVoltoConfig.js';
-import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField, convertValueContainer } from './blockPath.js';
-import { addableSiblingTypes } from '../../../hydra-js/buildBlockPathMap.js';
+import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField, convertValueContainer, insertBlockInContainer } from './blockPath.js';
+import { addableSiblingTypes, buildBlockPathMap } from '../../../hydra-js/buildBlockPathMap.js';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import {
   convertFieldValue,
@@ -1489,6 +1489,58 @@ export function previewSchemaDefaultConversions(formData, blockPathMap, blocksCo
     }
   }
   return { formData: normalized, conversions };
+}
+
+/**
+ * Filter a container's `allowedBlocks` down to the types that are actually ADDABLE
+ * at a given position, when a position `@type` rule (typeRule) governs the region.
+ *
+ * For each allowed type, TRIAL it: probe-insert a minimal item of that type after
+ * `refBlockId`, run the schema-default pass (which applies the typeRule), and keep
+ * the type only if the rule did NOT change it. A type the rule immediately rewrites
+ * (e.g. `tableCell` dropped where the position forces `tableHeaderCell`) is not a
+ * real choice at that spot, so it's dropped from the menu — a typeRule-driven
+ * container thus offers only the rule-consistent type(s). Usually one survives, so
+ * the caller's "single allowed type → add directly (no chooser)" path fires.
+ *
+ * Returns the filtered list (never empty — falls back to the input if the trial
+ * would drop everything, so a mis-authored rule can't strand the add). A container
+ * with ≤1 allowed type, or one whose items are all left unchanged, is returned as-is.
+ */
+export function filterAddableTypesByRule(
+  allowedBlocks,
+  formData,
+  blockPathMap,
+  refBlockId,
+  containerConfig,
+  blocksConfig,
+  intl,
+) {
+  if (!Array.isArray(allowedBlocks) || allowedBlocks.length <= 1) return allowedBlocks;
+  const idField = containerConfig?.idField || '@id';
+  const filtered = allowedBlocks.filter((type) => {
+    const probeId = `__probe_${type}__`;
+    let sandbox;
+    try {
+      sandbox = insertBlockInContainer(
+        formData,
+        blockPathMap,
+        refBlockId,
+        probeId,
+        { '@type': type, [idField]: probeId },
+        containerConfig,
+        'after',
+      );
+    } catch {
+      return true; // couldn't probe this type → don't drop it
+    }
+    const map = buildBlockPathMap(sandbox, blocksConfig, intl);
+    const normalized = applySchemaDefaultsToFormData(sandbox, map, blocksConfig, intl);
+    const after = getBlockById(normalized, map, probeId);
+    // Keep only if the position rule left this type unchanged (addable as-is).
+    return !after || after['@type'] === type;
+  });
+  return filtered.length ? filtered : allowedBlocks;
 }
 
 /**

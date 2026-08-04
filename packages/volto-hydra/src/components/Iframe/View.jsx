@@ -265,6 +265,7 @@ import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
   applySchemaDefaultsToFormData,
   previewSchemaDefaultConversions,
+  filterAddableTypesByRule,
   applyBlockDefaultsWithContext,
   createSchemaEnhancerFromRecipe,
   installVariationFieldEnhancers,
@@ -4426,13 +4427,21 @@ const Iframe = (props) => {
 
   // Handle iframe add - inserts AFTER the selected block (as sibling)
   const handleIframeAdd = useCallback(() => {
-    if (iframeAllowedBlocks?.length === 1) {
-      insertAndSelectBlock(selectedBlock, iframeAllowedBlocks[0], 'after');
+    // Filter the options by a position `@type` rule: a typeRule-driven container
+    // (e.g. table cells) offers only the type(s) the rule wouldn't immediately
+    // re-type at this spot — usually one, so we skip the chooser and add directly.
+    const bpm = iframeSyncState.blockPathMap;
+    const containerConfig = getContainerFieldConfig(selectedBlock, bpm, properties, blocksConfig, intl);
+    const allowed = filterAddableTypesByRule(
+      iframeAllowedBlocks, properties, bpm, selectedBlock, containerConfig, blocksConfig, intl,
+    );
+    if (allowed?.length === 1) {
+      insertAndSelectBlock(selectedBlock, allowed[0], 'after');
     } else {
-      setPendingAdd({ mode: 'iframe', afterBlockId: selectedBlock });
+      setPendingAdd({ mode: 'iframe', afterBlockId: selectedBlock, allowedBlocks: allowed });
       setAddNewBlockOpened(true);
     }
-  }, [iframeAllowedBlocks, selectedBlock, insertAndSelectBlock]);
+  }, [iframeAllowedBlocks, selectedBlock, insertAndSelectBlock, iframeSyncState.blockPathMap, properties, blocksConfig, intl]);
 
   // Convert a block to newType IN PLACE (container-aware), returning new formData.
   // Container blocks (any region with children) go through convertContainerBlock

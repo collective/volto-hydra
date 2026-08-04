@@ -21,8 +21,13 @@ vi.mock('../context', () => ({
 import {
   applySchemaDefaultsToFormData,
   previewSchemaDefaultConversions,
+  filterAddableTypesByRule,
 } from './blockSync.js';
-import { getBlockById, insertTableColumn } from './blockPath.js';
+import {
+  getBlockById,
+  insertTableColumn,
+  getContainerFieldConfig,
+} from './blockPath.js';
 import { buildBlockPathMap } from '../../../hydra-js/buildBlockPathMap.js';
 
 const intl = { formatMessage: (m) => m?.defaultMessage || m?.id || '' };
@@ -213,6 +218,39 @@ describe('table add-column with typed cells + typeRule', () => {
     // tableCell — the typeRule re-typed each by its position.
     expect(rows[0].cells[1]['@type']).toBe('tableHeaderCell');
     expect(rows[1].cells[1]['@type']).toBe('tableCell');
+  });
+});
+
+// Adding into a typeRule-driven container: the position rule filters the add
+// options to the type(s) it wouldn't immediately rewrite — so the menu offers the
+// right cell type (usually one → the caller adds it directly, no chooser).
+describe('filterAddableTypesByRule — position rule filters the add options', () => {
+  const build = () => {
+    const form = makeForm([
+      { key: 'r0', cells: [containerCell('c0', 'A'), containerCell('c1', 'B')] },
+      { key: 'r1', cells: [containerCell('c2', 'X'), containerCell('c3', 'Y')] },
+    ]);
+    let map = buildBlockPathMap(form, cfg, intl);
+    const f = applySchemaDefaultsToFormData(form, map, cfg, intl);
+    map = buildBlockPathMap(f, cfg, intl);
+    return { f, map };
+  };
+  const opts = ['tableCell', 'tableHeaderCell'];
+
+  test('at a BODY cell only tableCell survives (tableHeaderCell would be re-typed away)', () => {
+    const { f, map } = build();
+    const cc = getContainerFieldConfig('c2', map, f, cfg, intl);
+    expect(filterAddableTypesByRule(opts, f, map, 'c2', cc, cfg, intl)).toEqual([
+      'tableCell',
+    ]);
+  });
+
+  test('at a HEADER cell only tableHeaderCell survives', () => {
+    const { f, map } = build();
+    const cc = getContainerFieldConfig('c0', map, f, cfg, intl);
+    expect(filterAddableTypesByRule(opts, f, map, 'c0', cc, cfg, intl)).toEqual([
+      'tableHeaderCell',
+    ]);
   });
 });
 
