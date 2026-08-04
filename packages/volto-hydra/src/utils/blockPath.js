@@ -3,8 +3,6 @@
  * Supports container blocks where blocks can be nested inside other blocks.
  */
 
-import { produce } from 'immer';
-import { get } from 'lodash';
 import {
   getApplyBlockDefaults,
   getDefaultBlockType,
@@ -312,13 +310,26 @@ export function setBlockByPath(formData, path, value) {
   // Empty path means replace root - return value directly
   if (!path || path.length === 0) return value;
 
-  return produce(formData, (draft) => {
-    let current = draft;
-    for (const key of path.slice(0, -1)) {
-      current = current[key];
+  // Immutable deep-set with structural sharing (dep-free — no immer): clone each
+  // node along the path (so the tree keeps referential identity everywhere the
+  // update didn't touch) and assign the leaf. Intermediate nodes are expected to
+  // exist (paths come from blockPathMap); a missing one surfaces loudly.
+  const root = Array.isArray(formData) ? [...formData] : { ...formData };
+  let current = root;
+  for (const key of path.slice(0, -1)) {
+    const next = current[key];
+    if (next === undefined || next === null) {
+      // Same failure immer's produce raised implicitly (set-on-undefined) — a
+      // path from blockPathMap should always exist; surface the bad path.
+      throw new Error(
+        `[HYDRA] setBlockByPath: missing intermediate '${key}' in path ${path.join('.')}`,
+      );
     }
-    current[path[path.length - 1]] = value;
-  });
+    current[key] = Array.isArray(next) ? [...next] : { ...next };
+    current = current[key];
+  }
+  current[path[path.length - 1]] = value;
+  return root;
 }
 
 /**
@@ -1603,12 +1614,11 @@ export function removeTemplateInstance(
 
   // Get current layout for the instance's region. Blocks are in shared
   // parent.blocks; the layout list lives at blocks_layout[region]. (Template
-  // instances are always blocks-layout containers.)
-  const layoutPath = `blocks_layout.${region}`;
-  const blocksPath = 'blocks';
-
-  const layout = get(parentBlock, layoutPath, []);
-  const blocks = get(parentBlock, blocksPath, {});
+  // instances are always blocks-layout containers.) Dep-free direct access — no
+  // lodash `get`: the offline evaluator bundles this module, so it must not pull
+  // heavy deps (see the DI-refactor).
+  const layout = parentBlock.blocks_layout?.[region] ?? [];
+  const blocks = parentBlock.blocks ?? {};
 
   // Separate blocks into: fixed (to delete), slot (to keep but strip), and unrelated
   const newLayout = [];
