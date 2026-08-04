@@ -1681,12 +1681,21 @@ const Iframe = (props) => {
 
     // Table mode: adding a cell adds a column (to ALL rows)
     if (isTableCell && action !== 'inside') {
-      // Create cell template with defaults
-      const virtualType = blockPathMap[blockId]?.blockType; // e.g., 'slateTable:rows:cells'
-      let cellData = { '@type': virtualType };
+      // Create cell template with defaults. `cellType` is the item's type from the
+      // pathMap: a VIRTUAL type (e.g. 'slateTable:rows:cells') for a non-typed
+      // object_list, or a REAL registered type (e.g. 'tableCell') for a typed one.
+      const cellType = blockPathMap[blockId]?.blockType;
+      const isTypedCell = !!mergedBlocksConfig[cellType];
+      let cellData = { '@type': cellType };
       cellData = applyBlockDefaults({ data: cellData, formData: cellData, intl, metadata, properties }, mergedBlocksConfig);
-      cellData = initializeContainerBlock(cellData, mergedBlocksConfig, uuid, { intl, metadata, properties, blockType: virtualType });
-      cellData = clearBlockType(cellData);
+      cellData = initializeContainerBlock(cellData, mergedBlocksConfig, uuid, { intl, metadata, properties, blockType: cellType });
+      // A TYPED cells region must KEEP the new cell's @type so it stays a real block
+      // and the position typeRule can re-type it per row (header row →
+      // tableHeaderCell). Only the OLD virtual-type cells (no blocksConfig entry,
+      // no @type stored) clear it.
+      if (!isTypedCell) {
+        cellData = clearBlockType(cellData);
+      }
 
       const result = insertTableColumn(
         formData,
@@ -1702,7 +1711,15 @@ const Iframe = (props) => {
         return null;
       }
 
-      onChangeFormData(result.formData);
+      // Typed cells: re-run the schema-default pass so the position `@type` rule
+      // re-types the uniform new cells per row (the header-row cell → its value
+      // form). Virtual-cell tables have no typeRule, so skip the extra pass.
+      let committedFormData = result.formData;
+      if (isTypedCell) {
+        const cbpm = buildBlockPathMap(result.formData, mergedBlocksConfig, intl);
+        committedFormData = applySchemaDefaultsToFormData(result.formData, cbpm, mergedBlocksConfig, intl);
+      }
+      onChangeFormData(committedFormData);
       flushSync(() => {
         setIframeSyncState((prev) => ({
           ...prev,

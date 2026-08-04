@@ -22,7 +22,7 @@ import {
   applySchemaDefaultsToFormData,
   previewSchemaDefaultConversions,
 } from './blockSync.js';
-import { getBlockById } from './blockPath.js';
+import { getBlockById, insertTableColumn } from './blockPath.js';
 import { buildBlockPathMap } from '../../../hydra-js/buildBlockPathMap.js';
 
 const intl = { formatMessage: (m) => m?.defaultMessage || m?.id || '' };
@@ -165,6 +165,54 @@ describe('@type rule — position converts a cell between container and value', 
     const out = applySchemaDefaultsToFormData(form, map, cfg, intl);
     expect(getBlockById(out, map, 'c0')['@type']).toBe('tableHeaderCell'); // already right
     expect(getBlockById(out, map, 'c1')['@type']).toBe('tableCell');
+  });
+});
+
+// Adding a column to a TABLE of typed cells: insertTableColumn splices a uniform
+// template cell into every row, then the position typeRule re-types each new cell.
+// The template MUST keep a valid @type (a typed object_list item) — clearing it (as
+// the old virtual-cell path did) leaves an untyped cell the typeRule can't recover.
+describe('table add-column with typed cells + typeRule', () => {
+  test('a new column is spliced into every row and each new cell is typed by position', () => {
+    const form = makeForm([
+      { key: 'r0', cells: [containerCell('c0', 'A'), containerCell('c1', 'B')] },
+      { key: 'r1', cells: [containerCell('c2', 'X'), containerCell('c3', 'Y')] },
+    ]);
+    // Settle the initial types (r0 = header cells, r1 = body cells).
+    let map = buildBlockPathMap(form, cfg, intl);
+    let f = applySchemaDefaultsToFormData(form, map, cfg, intl);
+    map = buildBlockPathMap(f, cfg, intl);
+    expect(getBlockById(f, map, 'c0')['@type']).toBe('tableHeaderCell');
+    expect(getBlockById(f, map, 'c2')['@type']).toBe('tableCell');
+
+    // Replicate the editor's cell template for a TYPED cell — keep the @type (the
+    // fix): a real registered type, not a stripped/virtual one.
+    const refCell = 'c2'; // body cell, row 1, index 0 → insert 'after' at index 1
+    const cellType = map[refCell].blockType;
+    expect(cellType).toBe('tableCell');
+    let n = 0;
+    const uuidGen = () => `new-${n++}`;
+    const { formData: added } = insertTableColumn(
+      f,
+      map,
+      refCell,
+      { '@type': cellType, blocks: [] },
+      'after',
+      uuidGen,
+    );
+
+    // Re-run the pass so the position typeRule types the new cells.
+    map = buildBlockPathMap(added, cfg, intl);
+    const out = applySchemaDefaultsToFormData(added, map, cfg, intl);
+    const rows = out.blocks.t1.table.rows;
+
+    // Every row grew by one cell (uniform columns).
+    expect(rows[0].cells).toHaveLength(3);
+    expect(rows[1].cells).toHaveLength(3);
+    // The new cell in the HEADER row is a tableHeaderCell; in the body row a
+    // tableCell — the typeRule re-typed each by its position.
+    expect(rows[0].cells[1]['@type']).toBe('tableHeaderCell');
+    expect(rows[1].cells[1]['@type']).toBe('tableCell');
   });
 });
 
