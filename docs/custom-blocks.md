@@ -212,6 +212,11 @@ Each operator is driven by the field's **declared type**, never the value shape.
 
 `oneOf` (scalar value ∈ set) and `containsAny` (array shares any with a set) differ only on the field side — `oneOf` is for a single-valued field, `containsAny` for a multiselect; `oneOf` on an array throws (use `containsAny`).
 
+Two extras drive **position-** and **type-**aware rules:
+
+- The virtual field **`@index`** reads a block's ordinal position within its parent `object_list` region (a `number` surface) — `{ '@index': { lt: 1 } }` means "first in my region", and `../@index` is the parent block's index. Distinct from a region's `count` (which counts children).
+- A rule whose **`set` is a block-type NAME** (a string) rather than a field definition is a **`@type` rule** — it changes the item's *type* by position, not a field. Declared as `typeRule` on a typed `object_list`; see [`typeRule` — position picks a typed item's `@type`](#typerule--position-picks-a-typed-items-type). The retype is applied by CONVERSION (a schema enhancer can't rewrite stored `@type`), which brings up the confirm described under [Drag / paste via conversion](#drag--paste-via-conversion).
+
 ```javascript
 schemaEnhancer: {
     fieldRules: {
@@ -435,7 +440,11 @@ OpenGraph is a future enhancement.)
 
 ### Drag / paste via conversion
 
-The same conversion graph gives drag-and-drop (and paste) more valid destinations: a block can be dropped or pasted into a container whose `allowedBlocks` only admits a type the block can *convert* to. On drop it's converted automatically when exactly one target type is reachable, or a chooser popup appears when several are (single-block only — the block moves only once you pick, so cancelling leaves it untouched). Multi-block selections and paste are auto-convert only. On mobile, conversion happens via cut → paste (drag/chevron move stays native-only). External-link and other type restrictions are unaffected; only the container's `allowedBlocks` gate is relaxed to "allowed or convertible".
+The same conversion graph gives drag-and-drop (and paste) more valid destinations: a block can be dropped or pasted into a container whose `allowedBlocks` only admits a type the block can *convert* to.
+
+**Every drop/paste is TRIALLED before it commits.** The candidate result is normalised (the same pass that applies field defaults and evaluates [`@type` rules](#typerule--position-picks-a-typed-items-type)), then each block's `@type` is diffed against what was dropped. If **anything** converted — because the dropped block had to convert to fit the container, **or** because a rule re-typed a block by its new position (e.g. a table row moved to row 0 turns its cells into header cells) — a **"Convert blocks?"** confirm lists each `from → to` and waits: **Convert** commits the already-converted result, **Cancel** aborts the whole drop. Nothing converted → it commits silently.
+
+The chooser popup survives only for the genuinely ambiguous case: a single block reachable to *several* target types, where you pick which one (cancelling leaves it untouched). Zero reachable types rejects the drop; multi-block selections are auto-only (every member must reach exactly one type). On mobile, conversion happens via cut → paste (drag/chevron move stays native-only). External-link and other type restrictions are unaffected; only the container's `allowedBlocks` gate is relaxed to "allowed or convertible".
 
 ### Mapping value format
 
