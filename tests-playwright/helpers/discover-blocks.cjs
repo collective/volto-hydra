@@ -491,7 +491,7 @@ function unauthorableSlateStyles(nodes, seen = new Set()) {
 
 function collectWidgetShapeIssues(
   blockData, blockSchema, pagePath, blockId, out, blockType, undeclaredFields, blockConfig, blocksConfig,
-  effectiveRequired,
+  effectiveRequired, pathInfo,
 ) {
   const props = blockSchema?.properties;
   if (!props || !blockData || typeof blockData !== 'object') return;
@@ -789,9 +789,16 @@ function collectWidgetShapeIssues(
     blockConfig.schemaEnhancer.inheritSchemaFrom &&
     blockConfig.schemaEnhancer.inheritSchemaFrom.defaultsField;
   const defaultsPrefix = defaultsField ? (defaultsField + '_') : null;
+  // A typed / keyed object_list item carries STRUCTURAL keys that are not schema
+  // properties: the container's idField (its own uid, e.g. `key`) and typeField
+  // (e.g. `@type` — already `@`-exempt, but a custom typeField like `variation`
+  // is not). They're set by the container, not sidebar-authored, so exempt them.
+  const idField = pathInfo?.idField;
+  const typeField = pathInfo?.typeField;
   if (blockType) {
     for (const key of Object.keys(blockData)) {
       if (key.startsWith('@') || UNDECLARED_EXEMPT.has(key) || props[key]) continue;
+      if (key === idField || key === typeField) continue;
       if (defaultsPrefix && key.startsWith(defaultsPrefix)) continue;
       const dedupeKey = `${blockType} ${key}`;
       if (!undeclaredFields.has(dedupeKey)) {
@@ -1036,6 +1043,7 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         collectWidgetShapeIssues(
           blockData, schema, pagePath, blockId, shapeIssues, blockType, undeclaredFields,
           blockType ? blocksConfig[blockType] : undefined, blocksConfig, effectiveRequired,
+          pathMap?.[blockId],
         );
 
         // Unregistered block type: any real @type the frontend can't render is
