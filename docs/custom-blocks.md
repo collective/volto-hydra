@@ -341,6 +341,42 @@ mapped field then shows a small **🔗 pull from linked** toggle in the sidebar
   re-ticking re-pulls the target value. Custom fields are recorded in the block's
   `_customFields` array (absence ⇒ linked), so the state persists with the block.
 
+### Container ⇄ value (region-crossing paths)
+
+A `fieldMappings` value is usually a sibling **field name**. It may instead be a
+**region-crossing path** `<region>/<type|*>/<field>`, which reaches the `<field>`
+of a container region's children — the one place the path grammar crosses a region
+boundary. This bridges a **container** block (a region of child blocks) and a
+**value** block (a scalar field), so a block can convert between the two shapes:
+
+<!-- codeExample: javascript -->
+```javascript
+tableHeaderCell: {                                   // the value form: one slate
+    blockSchema: { properties: { value: { widget: 'slate' } } },
+    // Declared ONCE on the value block; works both directions.
+    fieldMappings: { tableCell: { value: 'blocks/slate/value' } },
+},
+tableCell: {                                         // the container form
+    blockSchema: { properties: {
+        blocks: { widget: 'object_list', typeField: '@type',
+                  allowedBlocks: ['slate', 'image', 'video'] },
+    } },
+},
+```
+
+- **container → value (collapse)** — gather the region's matching children's
+  `<field>`; slate values are **merged** into one (lossless), not truncated.
+- **value → container (expand)** — wrap the value in **one** child of `<type>` in
+  the region.
+- `<type>` selects a child type; `*` = any child that exposes `<field>` (siblings
+  without it — an `image` for a `value` path — are skipped). A **concrete** type
+  (`blocks/slate/value`) makes expand unambiguous, so use it for a two-way bridge;
+  `*` suits read-only cross-region reads (e.g. a `when` condition).
+
+Non-region scalar fields (`key`, `width`, …) carry over unchanged. This is the
+`convertValueContainer` helper; DnD/paste and the block chooser reuse it via the
+same `fieldMappings` graph. See `proposals/container-value-conversion.md`.
+
 Each field's value is converted to the shape its destination widget expects
 (derived from the widget): strings copy across, an image field is assembled from
 the target's `image_scales` / `image_field`, multi-value fields (e.g. `Subject` →
