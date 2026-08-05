@@ -9150,6 +9150,13 @@ export class Bridge {
           // (rather than only the add edge) keeps a dense set of candidates so the
           // nearest inside edge reliably wins near a container boundary.
           let bestEdge = null;
+          // Accumulate a compact per-candidate trace and emit it as ONE log line per
+          // move (below), not one line PER candidate: with HYDRA_DEBUG on in tests the
+          // scan runs every mousemove, and a log() per candidate floods the CDP console
+          // channel enough to starve mouse.move/boundingBox (60s timeouts). Batching to
+          // a single message per move keeps the "why each candidate didn't match" trace
+          // the design calls for at ~1/30th the message volume.
+          const edgeTrace = (debugEnabled || window.HYDRA_DEBUG) ? [] : null;
           for (const el of candidates) {
             const rect = el.getBoundingClientRect();
             const horizontal = this.getAddDirection(el) === 'right';
@@ -9177,11 +9184,12 @@ export class Bridge {
             const at = dStart <= dEnd ? 0 : 1; // 0 = before (top/left), 1 = after (bottom/right)
             const dist = Math.min(dStart, dEnd);
             const droppable = isDroppableBeside(el);
-            log('[drag-edge] candidate', uidOf(el), horizontal ? 'H' : 'V', 'insertAt', at, 'dist', Math.round(dist), 'droppable', droppable);
+            if (edgeTrace) edgeTrace.push(`${uidOf(el)}${horizontal ? 'H' : 'V'}@${at}d${Math.round(dist)}${droppable ? 'ok' : 'x'}`);
             if (droppable && (!bestEdge || dist < bestEdge.dist)) {
               bestEdge = { el, at, dist };
             }
           }
+          if (edgeTrace) log('[drag-edge] candidates', edgeTrace.join(' '));
           if (bestEdge) {
             log('[drag-edge] nearest droppable edge ->', uidOf(bestEdge.el), 'insertAt', bestEdge.at);
             closestBlock = bestEdge.el;
