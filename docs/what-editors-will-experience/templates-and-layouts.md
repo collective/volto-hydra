@@ -52,6 +52,18 @@ You **can't** insert a new block between two adjacent fixed/readonly template bl
 
 If you need to add content there, you may need to switch to a different layout (one whose structure has a slot in that position) or talk to whoever maintains the templates.
 
+## Moving content in and out of slots
+
+A block belongs to whichever **slot it currently sits in** — and you change that just by moving it. A block always takes on the slot it *lands* in; it never keeps the slot it came from.
+
+- **Drag a block into a slot** — drop it inside a slot region (next to other slot content, or into an empty slot placeholder) and it becomes part of that slot. If you later switch layouts, it travels with that slot.
+- **Drag a block out of the template** — drop it in the ordinary page area *around* the template (above it, below it, between it and other page content) and it **leaves the template**: it turns back into a normal block with no slot, freely editable and movable like any other page content.
+- **Move a block between slots** — drop it into a different slot and it simply joins the new one.
+
+A template is anchored by its fixed blocks at the top and/or bottom, with its slots in between. Wherever an end has **no** fixed block, that edge is open — you can drag content in there (it joins the edge slot) or drag your content out past it (it leaves the template). Where a fixed block sits at the very edge, there's nothing to drop past, so blocks stay inside.
+
+Locked and fixed template blocks are the exception: they can't be moved at all (unless you're editing the template itself), so they never change slots.
+
 ## Switching the layout
 
 When `allowedLayouts` is configured for a page (or a region), the sidebar shows a **Layout** dropdown. Pick a different layout and:

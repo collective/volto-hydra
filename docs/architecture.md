@@ -61,6 +61,26 @@ When the editor types in a slate field, the frontend doesn't compute the new sla
 
 This is why every slate node needs a `data-node-id` attribute on its rendered HTML — without one, the admin can't track the cursor across re-renders. See [Visual Editing › Renderer Node-ID Rules](visual-editing.md#renderer-node-id-rules).
 
+## Template membership (edit-side slot assignment)
+
+A block's template membership — `templateId`, `templateInstanceId`, `slotId`, `fixed`, `readOnly` — is not intrinsic to the block; it's a function of **where the block sits**. The [merge](templates.md#how-the-merge-works) reads these fields to place content at render time; the admin **assigns** them at edit time, and the rule is: *a block takes on the membership of wherever it lands and carries nothing from where it came from.* Drag direction is irrelevant — a given drop position always yields the same membership.
+
+**Deriving membership from position** — `getTemplateInfoFromNeighbors` in `blockSync.js` (reached via `applyBlockDefaultsWithContext`). Given a position in a container region it inspects the immediate neighbours and asks whether a slot *faces this gap*:
+
+- a **non-fixed slot neighbour** on either side → join its `slotId`;
+- a **fixed anchor** whose slot region faces the gap — the block *before* the gap via its `nextSlotId` (a trailing slot), or the block *after* it via its `prevSlotId` (a leading slot). `nextSlotId`/`prevSlotId` are an anchor's record of an *empty* adjacent slot (when the slot has content, the non-fixed neighbour above already covers it); they are mirror images, for top- vs bottom-anchored layouts;
+- otherwise, if the **container itself is a template instance** (e.g. a `columns` block carrying a `templateId`), the block joins that instance and is given a freshly generated `slotId`.
+
+If none apply, the position is **outside every template** and the function returns `undefined` — plain page content. A slot member is never fixed, so membership derived this way is always `fixed: false`.
+
+**Applying it on a move or paste** — the `MOVE_BLOCKS` handler and the add/paste helper in `View.jsx`. Three things make "take the destination's membership" actually happen:
+
+1. **Strip the source membership first.** A dragged/pasted non-fixed block has its `templateId` / `templateInstanceId` / `slotId` / `readOnly` deleted *before* the recompute, so `applyBlockDefaultsWithContext` can only refill them from the destination. Without this the recompute *prefers the block's existing `slotId`*, so the block keeps its old slot wherever it lands and "drag out of the template" never exits. **Fixed** template blocks are the exception — they are only movable in template edit mode and their slot/`fixed` identity *is* the template, so their membership is preserved.
+2. **Exclude the block from its own neighbour scan.** On a move the block already sits in the layout at its new index, so a naïve `getNeighborData(position)` returns the block itself — it would offer its own stale slot back to itself. The recompute filters the moved block out and treats `position` as the insertion gap between its real prev/next neighbours.
+3. **Write back against the original.** The update guard compares the recompute result to the *originally stored* block, not the stripped copy — otherwise a block whose stripped recompute is a structural no-op is never written back and the stale membership survives.
+
+The net effect matches the merge's own placement rules (a top/bottom slot outside a fixed anchor): dropping a block past a **free** edge flows it into that slot; dropping it past a **both-anchored** edge exits it to the surrounding page region. The drag scan that decides the drop position lives in `hydra.js` and, on a distance tie between coincident edges, prefers the deeper (inner) edge so a reorder inside a container isn't ejected to the outer level.
+
 ## URL flattening and `publicURL`
 
 Volto's stock URL helpers (`flattenToAppURL`, `isInternalURL`, `toPublicURL`) assume there's one "public URL" — usually the same origin the admin runs on, configured via `RAZZLE_PUBLIC_URL`. In Hydra the admin and the published frontend(s) live on different origins, and the editor switches between published frontends at will, so there is no single public URL.
