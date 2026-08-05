@@ -4124,6 +4124,73 @@ export class AdminUIHelper {
     }).toPass({ timeout: 2000, intervals: [100, 200, 300, 500] });
   }
 
+  /**
+   * Press-drag the mouse to a position relative to a target that may MOVE
+   * because of hydra's auto-scroll, retargeting until the target stops drifting.
+   *
+   * Generalises the block-DnD retarget loop (moveToDropPosition, which recomputes
+   * the drop point from the target's live box each pass) so it isn't tied to the
+   * drag-shadow / insertAfter flow: any press-drag whose target auto-scrolls can
+   * reuse it — e.g. a container edge-handle drag whose child slides up under the
+   * cursor. The naive alternative (compute one target Y before the drag, move in
+   * fixed steps) loses the target the moment auto-scroll engages.
+   *
+   * Each pass reads the target's LIVE page-coord box, moves the cursor to
+   * `cursorFor(box)`, and settles once the box's Y has stopped changing for a few
+   * passes (auto-scroll has either stopped or pinned the target at the viewport
+   * edge). The mouse must already be pressed; the caller releases.
+   *
+   * @param target    element the cursor must reach a position relative to
+   * @param cursorFor given the target's current page box, the {x,y} to move to
+   * @param maxPasses attempts before giving up
+   */
+  async dragCursorToMovingTarget(
+    target: Locator,
+    cursorFor: (box: { x: number; y: number; width: number; height: number }) => { x: number; y: number },
+    maxPasses: number = 40,
+  ): Promise<void> {
+    // hydra auto-scrolls when the cursor is within ~80px of the iframe viewport
+    // edges. Compute a slightly larger safe band in page coords: a cursor inside
+    // it is provably NOT triggering auto-scroll, so a stable target there is
+    // genuinely settled — not merely paused by a load hiccup mid-scroll.
+    const iframeBox = await this.page.locator('#previewIframe').boundingBox();
+    if (!iframeBox) throw new Error('dragCursorToMovingTarget: no iframe bounding box');
+    const ZONE = 90;
+    const inSafeBand = (p: { x: number; y: number }) =>
+      p.x >= iframeBox.x + ZONE && p.x <= iframeBox.x + iframeBox.width - ZONE &&
+      p.y >= iframeBox.y + ZONE && p.y <= iframeBox.y + iframeBox.height - ZONE;
+
+    let lastX: number | null = null;
+    let lastY: number | null = null;
+    let stablePasses = 0;
+    for (let pass = 0; pass < maxPasses; pass++) {
+      const box = await target.boundingBox();
+      if (!box) throw new Error('dragCursorToMovingTarget: target has no bounding box');
+      const pos = cursorFor(box);
+      await this.page.mouse.move(pos.x, pos.y, { steps: 3 });
+      await this.page.waitForTimeout(50);
+      // Target stopped drifting on BOTH axes (axis-agnostic: vertical and
+      // horizontal edge drags share this path).
+      const stable = lastX !== null && Math.abs(box.x - lastX) < 2 && Math.abs(box.y - lastY!) < 2;
+      // Settle when stable AND the cursor is clear of the auto-scroll zone (so
+      // releasing here won't drift) — OR, as a fallback for a target pinned in
+      // the zone at the scroll limit (can't be brought further in), when it has
+      // been fully stable for a longer window. If stable-but-in-zone and NOT yet
+      // at the limit, that's a load pause: keep going, don't settle early.
+      if (stable && (inSafeBand(pos) ? ++stablePasses >= 3 : ++stablePasses >= 10)) {
+        const settledBox = await target.boundingBox();
+        if (!settledBox) throw new Error('dragCursorToMovingTarget: target vanished while settling');
+        const settledPos = cursorFor(settledBox);
+        await this.page.mouse.move(settledPos.x, settledPos.y, { steps: 3 });
+        return;
+      }
+      if (!stable) stablePasses = 0;
+      lastX = box.x;
+      lastY = box.y;
+    }
+    throw new Error(`dragCursorToMovingTarget: target still drifting after ${maxPasses} passes`);
+  }
+
   // ============================================================================
   // DRAG AND DROP HELPER - STEP 3: MOVE TO DROP POSITION
   // ============================================================================

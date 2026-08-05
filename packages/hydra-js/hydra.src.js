@@ -1201,6 +1201,12 @@ export class Bridge {
       }
     };
     if (!this._edgeHandles) return;
+    // While an edge-handle drag is in progress the container's absorb/expel
+    // capability cannot change — only which children the cursor has crossed.
+    // Re-probing here (triggered by autoscroll's scroll events) is pure churn
+    // and would yank the invisible handle out from under the active drag, so
+    // freeze: keep the capability flags computed at mousedown.
+    if (this._edgeDragActive) return;
     const uid = this.selectedBlockUid;
     if (!uid || uid === PAGE_BLOCK_UID) { hide(); return; }
     const info = this.blockPathMap?.[uid];
@@ -1389,7 +1395,9 @@ export class Bridge {
     let candidates;
     let accepts;
     if (mode === 'absorb') {
-      accepts = (t) => !childAllowed || (t && childAllowed.includes(t));
+      // Same drop-acceptance the DnD scan uses (native OR conversion via conversionMap),
+      // NOT a bare allowed-types `.includes` — keep edge-drag and drag consistent (DRY).
+      accepts = (t) => acceptableAt(t, childAllowed, false, this.conversionMap);
       candidates = new Set();
       for (const [uid, info] of Object.entries(this.blockPathMap)) {
         if (!uid || uid === containerUid) continue;
@@ -1405,7 +1413,7 @@ export class Bridge {
         if (outwardOfEdge && inwardOfCursor) candidates.add(uid);
       }
     } else {
-      accepts = (t) => !parentAllowed || (t && parentAllowed.includes(t));
+      accepts = (t) => acceptableAt(t, parentAllowed, false, this.conversionMap);
       candidates = new Set();
       for (const [uid, info] of Object.entries(this.blockPathMap)) {
         if (!uid || uid === containerUid) continue;
@@ -1593,6 +1601,10 @@ export class Bridge {
       e.preventDefault();
       e.stopPropagation();
       dragging = true;
+      // Capability (canAbsorb/canExpel) was computed when the container was
+      // selected and is fixed for the duration of this drag; freeze
+      // _positionEdgeHandles so autoscroll's scroll events don't re-probe.
+      this._edgeDragActive = true;
       lastX = e.clientX;
       lastY = e.clientY;
       autoScroller = this._createAutoScroller();
@@ -1624,6 +1636,7 @@ export class Bridge {
     document.addEventListener('mouseup', () => {
       if (!dragging) return;
       dragging = false;
+      this._edgeDragActive = false;
       autoScroller?.stop();
       autoScroller = null;
 
@@ -9083,6 +9096,32 @@ export class Bridge {
       // re-runs even while the cursor is held stationary at an edge.
       const scroller = this._createAutoScroller();
 
+      // Droppability is FIXED for the whole drag: the dragged block types are
+      // set at drag start and each container's allowedSiblingTypes is stable
+      // while dragging (the pathmap doesn't mutate mid-drag). So resolve "can
+      // the dragged blocks drop beside block X" ONCE per container and memoize —
+      // only the nearest-edge GEOMETRY in onMouseMove needs the cursor. This
+      // avoids re-running the acceptance walk on every mousemove/scroll tick,
+      // which is exactly when the drag needs to stay responsive.
+      const draggedBlockUids = allElements.map(el => el.getAttribute('data-block-uid'));
+      const draggedBlockTypes = draggedBlockUids.map(uid => this.getBlockType(uid)).filter(Boolean);
+      const isMultiDrag = draggedBlockTypes.length > 1;
+      const uidOf = (el) => el && el.getAttribute('data-block-uid');
+      const _dropAcceptById = new Map();
+      // Can the dragged blocks drop as a sibling of `el` (into el's parent)?
+      // Allowed natively, or reachable via the conversionMap (single: any option;
+      // multi: exactly one — auto-only). Mirrors the walk-up's acceptance test.
+      const isDroppableBeside = (el) => {
+        const id = uidOf(el);
+        if (!id) return false;
+        if (_dropAcceptById.has(id)) return _dropAcceptById.get(id);
+        const ok = draggedBlockTypes.every((t) =>
+          acceptableAt(t, this.blockPathMap?.[id]?.allowedSiblingTypes, isMultiDrag, this.conversionMap),
+        );
+        _dropAcceptById.set(id, ok);
+        return ok;
+      };
+
       // Handle mouse movement
       const onMouseMove = (e) => {
         scroller.onMouseMove(e);
@@ -9101,24 +9140,14 @@ export class Bridge {
 
         // Exclude the dragged block(s) and ghost from being drop targets
         // For multi-element blocks (listings, template instances), exclude all elements
-        const draggedBlockUids = allElements.map(el => el.getAttribute('data-block-uid'));
         const isSelfOrGhost = closestBlock &&
           (closestBlock === draggedBlock || allElements.includes(closestBlock) ||
            draggedBlockUids.includes(closestBlock.getAttribute('data-block-uid')));
         if (isSelfOrGhost) closestBlock = null;
 
-        // Dragged block types — needed both to pick the nearest DROPPABLE edge below
-        // and by the acceptance walk-up further down.
-        const draggedBlockTypes = draggedBlockUids.map(uid => this.getBlockType(uid)).filter(Boolean);
-        const isMultiDrag = draggedBlockTypes.length > 1;
-        const uidOf = (el) => el && el.getAttribute('data-block-uid');
-        // Can the dragged blocks drop as a sibling of `el` (into el's parent container)?
-        // Allowed natively, or reachable via the conversionMap (single: any option;
-        // multi: exactly one — auto-only). Mirrors the walk-up's acceptance test.
-        const isDroppableBeside = (el) =>
-          draggedBlockTypes.every((t) =>
-            acceptableAt(t, this.blockPathMap?.[uidOf(el)]?.allowedSiblingTypes, isMultiDrag, this.conversionMap),
-          );
+        // draggedBlockTypes / isMultiDrag / uidOf / isDroppableBeside are
+        // computed ONCE at drag start (above) — droppability can't change
+        // mid-drag, only which edge is nearest the cursor.
 
         // NEAREST DROPPABLE EDGE — the single resolution for "the cursor isn't on a
         // droppable leaf": either over NOTHING (the old overshoot) or over a
