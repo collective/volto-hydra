@@ -2124,13 +2124,7 @@ export function ensureEmptyBlockIfEmpty(
     const blocksObj = parentBlock.blocks || {};
     let newItems = null;
     let newBlocks = null;
-    for (let i = 0; i < items.length; i++) {
-      const cur = blocksObj[items[i]];
-      const slot = cur?.nextSlotId;
-      if (!slot) continue;
-      const next = blocksObj[items[i + 1]];
-      if (next?.slotId === slot) continue; // slot already filled
-      const emptyId = uuidGenerator();
+    const seedEmpty = (anchor, slot) => {
       let emptyBlock = { '@type': 'empty' };
       if (intl && blocksConfig) {
         emptyBlock = getApplyBlockDefaults()(
@@ -2138,14 +2132,31 @@ export function ensureEmptyBlockIfEmpty(
           blocksConfig,
         );
       }
-      emptyBlock = {
-        ...inheritTemplateMembership(emptyBlock, cur),
-        slotId: slot,
-      };
-      newItems = newItems || [...items];
-      newBlocks = newBlocks || { ...blocksObj };
-      newItems.splice(newItems.indexOf(items[i]) + 1, 0, emptyId);
-      newBlocks[emptyId] = emptyBlock;
+      return { ...inheritTemplateMembership(emptyBlock, anchor), slotId: slot };
+    };
+    for (let i = 0; i < items.length; i++) {
+      const cur = blocksObj[items[i]];
+      // Trailing slot: a fixed block's `nextSlotId` names the slot region AFTER it. If
+      // the block after it isn't in that slot, the slot is empty — seed a placeholder.
+      const nextSlot = cur?.nextSlotId;
+      if (nextSlot && blocksObj[items[i + 1]]?.slotId !== nextSlot) {
+        const emptyId = uuidGenerator();
+        newItems = newItems || [...items];
+        newBlocks = newBlocks || { ...blocksObj };
+        newItems.splice(newItems.indexOf(items[i]) + 1, 0, emptyId);
+        newBlocks[emptyId] = seedEmpty(cur, nextSlot);
+      }
+      // Leading slot (mirror): a fixed block's `prevSlotId` names the slot region BEFORE
+      // it — a bottom-anchored layout (slots above a fixed footer). If the block before it
+      // isn't in that slot, the leading slot is empty — seed a placeholder in front of it.
+      const prevSlot = cur?.prevSlotId;
+      if (prevSlot && blocksObj[items[i - 1]]?.slotId !== prevSlot) {
+        const emptyId = uuidGenerator();
+        newItems = newItems || [...items];
+        newBlocks = newBlocks || { ...blocksObj };
+        newItems.splice(newItems.indexOf(items[i]), 0, emptyId);
+        newBlocks[emptyId] = seedEmpty(cur, prevSlot);
+      }
     }
     if (newItems) {
       const updated = setContainerItems(

@@ -9184,9 +9184,32 @@ export class Bridge {
             const at = dStart <= dEnd ? 0 : 1; // 0 = before (top/left), 1 = after (bottom/right)
             const dist = Math.min(dStart, dEnd);
             const droppable = isDroppableBeside(el);
+            // Nesting depth (block ancestors). A container's insert edge ~coincides with
+            // its last/first child's edge, so at an exact-or-near distance tie a pure
+            // `dist <` picks whichever comes FIRST in DOM order — the ANCESTOR container —
+            // and a reorder meant to stay inside the container ejects the block to the
+            // outer level. Depth breaks that tie toward the INNER (deeper) edge so the
+            // block reorders within the container the cursor is over. (object-blocks:213:
+            // ob-1 and child-2 both at d6 → without this, ob-1 wins and child-1 ejects.)
+            let depth = 0;
+            for (let p = el.parentElement; p; p = p.parentElement) {
+              if (p.hasAttribute && p.hasAttribute('data-block-uid')) depth++;
+            }
             if (edgeTrace) edgeTrace.push(`${uidOf(el)}${horizontal ? 'H' : 'V'}@${at}d${Math.round(dist)}${droppable ? 'ok' : 'x'}`);
-            if (droppable && (!bestEdge || dist < bestEdge.dist)) {
-              bestEdge = { el, at, dist };
+            if (droppable) {
+              const NEST_EPS = 8; // px within which two edges count as coincident
+              let better = false;
+              if (!bestEdge) {
+                better = true;
+              } else if (dist < bestEdge.dist - NEST_EPS) {
+                better = true; // clearly closer — cursor is genuinely nearer this edge
+              } else if (dist <= bestEdge.dist + NEST_EPS) {
+                // near-coincident: prefer the deeper (inner) edge; tie at equal depth → closer
+                better =
+                  depth > bestEdge.depth ||
+                  (depth === bestEdge.depth && dist < bestEdge.dist);
+              }
+              if (better) bestEdge = { el, at, dist, depth };
             }
           }
           if (edgeTrace) log('[drag-edge] candidates', edgeTrace.join(' '));

@@ -310,6 +310,58 @@ describe('ensureEmptyBlockIfEmpty — auto-content joins the template instance',
   });
 });
 
+describe('ensureEmptyBlockIfEmpty — empty slot placeholders at fixed-anchor edges (next/prevSlotId)', () => {
+  // A fixed anchor names its adjacent slot region even when that region is empty:
+  //   nextSlotId → the slot AFTER it  (top-anchored layout / trailing slot)
+  //   prevSlotId → the slot BEFORE it (bottom-anchored layout / leading slot)
+  // Each empty region gets a seeded, editable placeholder carrying the slot membership so
+  // it is clickable/droppable. The two cases are mirror images.
+  const anchor = (extra) => ({
+    '@type': 'slate',
+    fixed: true,
+    readOnly: true,
+    templateId: 'resolveuid/x',
+    templateInstanceId: 'inst-1',
+    ...extra,
+  });
+
+  test('nextSlotId: an empty trailing slot after a fixed header seeds a placeholder AFTER it', () => {
+    const form = {
+      '@type': 'Document',
+      blocks: { header: anchor({ slotId: 'header', nextSlotId: 'primary' }) },
+      blocks_layout: { items: ['header'] },
+    };
+    const map = buildBlockPathMap(form, blocksConfig, intl);
+    let n = 0;
+    const result = ensureEmptyBlockIfEmpty(form, { parentId: PAGE }, map, () => `seed-${++n}`, blocksConfig, { intl });
+    const items = result.blocks_layout.items;
+    expect(items[0]).toBe('header');
+    expect(items.length).toBe(2);
+    const trailing = result.blocks[items[1]];
+    expect(trailing.slotId).toBe('primary');
+    expect(trailing.templateInstanceId).toBe('inst-1');
+    expect(trailing.fixed).toBeFalsy();
+  });
+
+  test('prevSlotId: an empty leading slot before a fixed footer seeds a placeholder BEFORE it', () => {
+    const form = {
+      '@type': 'Document',
+      blocks: { footer: anchor({ slotId: 'footer', prevSlotId: 'primary' }) },
+      blocks_layout: { items: ['footer'] },
+    };
+    const map = buildBlockPathMap(form, blocksConfig, intl);
+    let n = 0;
+    const result = ensureEmptyBlockIfEmpty(form, { parentId: PAGE }, map, () => `seed-${++n}`, blocksConfig, { intl });
+    const items = result.blocks_layout.items;
+    expect(items[items.length - 1]).toBe('footer');
+    expect(items.length).toBe(2);
+    const leading = result.blocks[items[0]];
+    expect(leading.slotId).toBe('primary');
+    expect(leading.templateInstanceId).toBe('inst-1');
+    expect(leading.fixed).toBeFalsy();
+  });
+});
+
 describe('insertBlockInContainer — add-after joins the template instance', () => {
   // Adding a block after a template-instance sibling must stamp it into the same instance
   // (centralized via inheritTemplateMembership) — else the added block renders read-only

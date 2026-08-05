@@ -743,9 +743,15 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     await expect(slotIdFieldAfter).not.toBeVisible();
   });
 
-  test('moving slot block before first fixed block keeps it in template', async ({ page }) => {
-    // Placeholders at template edges must be allowed - needed for layout switching
-    // where content needs to be tracked even at edges
+  test('dropping a slot block before the first fixed anchor exits the template (position-based, not drag direction)', async ({ page }) => {
+    // template-test-page is anchored at BOTH ends (fixed header on top, fixed slider +
+    // footer at the bottom), so its slots are fully enclosed — there is NO slot before the
+    // header. Dropping user-content-1 before the header therefore lands it OUTSIDE the top
+    // anchor, in the page region: it EXITS the template (loses its slotId, stays an
+    // editable page block). This is the SAME position, and so the SAME outcome, as dragging
+    // it AFTER the standalone page block (test 691) — membership is decided by POSITION, not
+    // by which way you dragged. (Regression guard: a prior direction-based rule inherited the
+    // fixed header's membership here, producing an in-template, slot-less, read-only block.)
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -778,17 +784,16 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     const headerIndex = blockIds.indexOf(headerBlockId);
     expect(movedIndex).toBeLessThan(headerIndex);
 
-    // Verify block is still IN the template - it should still be editable in template edit mode
-    // (blocks outside the template are readonly in edit mode)
+    // The block EXITED the template (it's before the top anchor, in the page region):
+    // no slotId field, but still a fully editable page block.
     await helper.clickBlockInIframe(USER_CONTENT_1);
     await helper.waitForSidebarOpen();
 
-    // Placeholder field should still be visible (block is still in template)
+    // Placeholder field should NOT be visible (block is no longer in the template)
     const slotIdFieldAfter = page.locator('.field-wrapper-slotId input');
-    await expect(slotIdFieldAfter).toBeVisible({ timeout: 5000 });
-    await helper.expectTemplateSettingsCount(1);
+    await expect(slotIdFieldAfter).not.toBeVisible();
 
-    // Block should be editable (not readonly, since it's in the template being edited)
+    // Block should be editable (a plain page block, not a read-only template block)
     const editor = helper.getSlateField(iframe.locator(`[data-block-uid="${USER_CONTENT_1}"]`));
     const isEditable = await editor.getAttribute('contenteditable');
     expect(isEditable).toBe('true');
