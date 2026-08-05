@@ -9112,12 +9112,6 @@ export class Bridge {
         const draggedBlockTypes = draggedBlockUids.map(uid => this.getBlockType(uid)).filter(Boolean);
         const isMultiDrag = draggedBlockTypes.length > 1;
         const uidOf = (el) => el && el.getAttribute('data-block-uid');
-        const directChildBlocks = (containerEl) =>
-          Array.from(containerEl.querySelectorAll('[data-block-uid]')).filter(
-            (el) =>
-              el.parentElement?.closest('[data-block-uid]') === containerEl &&
-              !draggedBlockUids.includes(uidOf(el)),
-          );
         // Can the dragged blocks drop as a sibling of `el` (into el's parent container)?
         // Allowed natively, or reachable via the conversionMap (single: any option;
         // multi: exactly one — auto-only). Mirrors the walk-up's acceptance test.
@@ -9139,9 +9133,12 @@ export class Bridge {
         // the cursor, and take the nearest edge the dragged blocks can actually drop at
         // (native, or via the conversionMap). "Drop at the nearest place it can go":
         // deep inside a container a child edge wins (drop in); at its outer border a
-        // sibling edge wins (drop beside). A leaf the cursor sits directly on is left
-        // alone. Enable HYDRA_DEBUG to trace each candidate.
-        if (!closestBlock || directChildBlocks(closestBlock).length > 0) {
+        // sibling edge wins (drop beside); a leaf the cursor is on picks that leaf's own
+        // nearest edge. This ONE scan is the sole resolver — it replaces BOTH the old
+        // up-only walk-up and the over-nothing overshoot, and it ALWAYS runs, so
+        // resolution is uniform for every cursor position (it effectively walks both up
+        // and down and takes the nearest droppable edge). Enable HYDRA_DEBUG to trace.
+        {
           const candidates = Array.from(document.querySelectorAll('[data-block-uid]'))
             .filter(el => el !== draggedBlock && !draggedBlockUids.includes(uidOf(el)));
           // For each candidate, measure BOTH insert edges along the axis its siblings

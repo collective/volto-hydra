@@ -2331,7 +2331,7 @@ test.describe('Container Block Drag and Drop', () => {
     expect(columnsRowUids).not.toContain('text-1a');
   });
 
-  test('column block cannot be dragged to page level (page allowedBlocks restriction)', async ({
+  test('column dragged toward page level snaps to the columns block, not the page-level slot', async ({
     page,
   }) => {
     const helper = new AdminUIHelper(page);
@@ -2375,24 +2375,28 @@ test.describe('Container Block Drag and Drop', () => {
       { steps: 10 },
     );
 
-    // Drop indicator should NOT be visible ('column' not allowed at page level)
+    // The drop line is always shown at the nearest VALID edge. 'column' isn't a
+    // page-level block, so — even though the cursor is over the page-level slot at
+    // text-after — the indicator must NOT sit there; it snaps to the nearest place a
+    // column CAN go: inside the columns block (where columns live). Assert the drop
+    // LINE is within the columns block, not the page-level slot.
     const dropIndicator = iframe.locator('.volto-hydra-drop-indicator');
-    await expect(dropIndicator).not.toBeVisible();
+    await expect(dropIndicator).toBeVisible();
+    const columnsRect = await iframe.locator('[data-block-uid="columns-1"]').boundingBox();
+    const indRect = await dropIndicator.boundingBox();
+    expect(columnsRect).not.toBeNull();
+    expect(indRect).not.toBeNull();
+    const indCx = indRect!.x + indRect!.width / 2;
+    const indCy = indRect!.y + indRect!.height / 2;
+    const insideColumns =
+      indCx >= columnsRect!.x && indCx <= columnsRect!.x + columnsRect!.width &&
+      indCy >= columnsRect!.y && indCy <= columnsRect!.y + columnsRect!.height;
+    expect(insideColumns).toBe(true);
 
-    // Drop anyway (should be rejected)
     await page.mouse.up();
-
-    // Wait for any potential state changes
     await page.waitForTimeout(500);
 
-    // col-1 should still be inside columns-1 (not moved to page level)
-    const columnsBlock = iframe.locator('[data-block-uid="columns-1"]');
-    const col1InColumns = await columnsBlock
-      .locator('[data-block-uid="col-1"]')
-      .count();
-    expect(col1InColumns).toBe(1);
-
-    // col-1 should NOT be a page-level block (direct child of content)
+    // The column must NOT have become a page-level block.
     const contentDiv = iframe.locator('#content');
     const pageLevelBlocks = await contentDiv.locator('> [data-block-uid]').all();
     const pageLevelUids = await Promise.all(
