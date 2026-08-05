@@ -3042,22 +3042,6 @@ const Iframe = (props) => {
             for (const moveBlockId of blocksToMove) {
               const originalBlockData = getBlockById(newFormData, updatedPathMap, moveBlockId);
               if (!originalBlockData) continue;
-              let blockData = originalBlockData;
-
-              // A dragged (or pasted) block takes on the membership of wherever it LANDS — it
-              // must not carry its source template/slot with it. Strip the source membership
-              // so the recompute below derives everything from the new position: a slot it
-              // lands in, a template-instance container, or NOTHING if it lands in plain page
-              // content (that's how "drag out of the template" exits). Fixed template blocks
-              // are only movable while editing their template, and their slot/fixed identity
-              // IS the template — those keep their membership.
-              if (!blockData.fixed) {
-                blockData = { ...blockData };
-                delete blockData.templateId;
-                delete blockData.templateInstanceId;
-                delete blockData.slotId;
-                delete blockData.readOnly;
-              }
 
               // Get container info for the new position
               const targetContainerConfig = getContainerFieldConfig(moveBlockId, updatedPathMap, newFormData, blocksConfig, intl);
@@ -3076,8 +3060,38 @@ const Iframe = (props) => {
               const position = fullLayout.indexOf(moveBlockId);
               const layoutItems = fullLayout.filter((id) => id !== moveBlockId);
 
+              // Membership on a move is GATED ON EDIT MODE (see architecture.md »
+              // "Template membership"):
+              //  - normal mode → a moved block takes on the membership of wherever it lands,
+              //    so we strip its source membership and re-derive from the destination
+              //    (a slot, a template-instance container, or NOTHING → plain page content);
+              //  - template edit mode → the author's slotId is EXPLICIT (you rename slots,
+              //    you don't change them by dragging), so a move that stays INSIDE the
+              //    template keeps its slotId. A move OUT of the template still strips (drag
+              //    out exits, even while editing).
+              // Fixed template blocks always keep their identity (their slot/fixed IS the
+              // template). "Inside the template" = a same-instance block sits both before AND
+              // after the landing gap.
+              const instId = originalBlockData.templateInstanceId;
+              const editingThisTemplate =
+                !!instId && (templateEditModeRef.current || []).includes(instId);
+              const inSameInstance = (id) =>
+                id && newFormData.blocks[id]?.templateInstanceId === instId;
+              const insideTemplate =
+                editingThisTemplate &&
+                layoutItems.slice(0, position).some(inSameInstance) &&
+                layoutItems.slice(position).some(inSameInstance);
+
+              let blockData = originalBlockData;
+              if (!originalBlockData.fixed && !insideTemplate) {
+                blockData = { ...blockData };
+                delete blockData.templateId;
+                delete blockData.templateInstanceId;
+                delete blockData.slotId;
+                delete blockData.readOnly;
+              }
+
               // Apply defaults with context - this derives template fields from neighbors
-              // insertAfter determines which neighbor's template membership to inherit
               const updatedBlockData = applyBlockDefaultsWithContext(blockData, {
                 containerId,
                 field: containerRegion,

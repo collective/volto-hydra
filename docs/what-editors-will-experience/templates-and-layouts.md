@@ -64,6 +64,10 @@ A template is anchored by its fixed blocks at the top and/or bottom, with its sl
 
 Locked and fixed template blocks are the exception: they can't be moved at all (unless you're editing the template itself), so they never change slots.
 
+```{note}
+This is how it works when you're **filling** a template — the normal case. When you're **editing the template itself** (unlocked, see below), it's the opposite: dragging a block **keeps** its slot, because you set slots deliberately there. To move a block to a different slot while editing the template, change its **slot name** in the sidebar rather than relying on where you drop it.
+```
+
 ## Switching the layout
 
 When `allowedLayouts` is configured for a page (or a region), the sidebar shows a **Layout** dropdown. Pick a different layout and:

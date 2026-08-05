@@ -1,0 +1,77 @@
+{
+  "@id": "/template-two-slots-page",
+  "@type": "Document",
+  "id": "template-two-slots-page",
+  "title": "Template Two Slots Page",
+  "description": "A template with TWO user slots ('primary' and 'secondary') separated by a fixed block. Used to prove that, while editing the template, dragging a block from one slot region into the other KEEPS its authored slotId (renaming — not dragging — changes a slot).",
+  "blocks": {
+    "ts-header": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "value": [{ "type": "h1", "children": [{ "text": "Template Header - From Template" }] }],
+      "plaintext": "Template Header - From Template",
+      "templateId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "tpl-instance-two",
+      "slotId": "header"
+    },
+    "ts-p1": {
+      "@type": "slate",
+      "value": [{ "type": "p", "children": [{ "text": "Primary content one" }] }],
+      "plaintext": "Primary content one",
+      "templateId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "tpl-instance-two",
+      "slotId": "primary"
+    },
+    "ts-p2": {
+      "@type": "slate",
+      "value": [{ "type": "p", "children": [{ "text": "Primary content two" }] }],
+      "plaintext": "Primary content two",
+      "templateId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "tpl-instance-two",
+      "slotId": "primary"
+    },
+    "ts-mid": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "value": [{ "type": "p", "children": [{ "text": "Fixed divider between the slots" }] }],
+      "plaintext": "Fixed divider between the slots",
+      "templateId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "tpl-instance-two",
+      "slotId": "mid"
+    },
+    "ts-s1": {
+      "@type": "slate",
+      "value": [{ "type": "p", "children": [{ "text": "Secondary content one" }] }],
+      "plaintext": "Secondary content one",
+      "templateId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "tpl-instance-two",
+      "slotId": "secondary"
+    },
+    "ts-footer": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "value": [{ "type": "p", "children": [{ "text": "Template Footer - From Template" }] }],
+      "plaintext": "Template Footer - From Template",
+      "templateId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "tpl-instance-two",
+      "slotId": "footer"
+    }
+  },
+  "blocks_layout": {
+    "items": ["ts-header", "ts-p1", "ts-p2", "ts-mid", "ts-s1", "ts-footer"]
+  },
+  "@components": {
+    "actions": {
+      "@id": "/template-two-slots-page/@actions",
+      "object": [{ "@id": "/template-two-slots-page/edit", "id": "edit", "title": "Edit" }],
+      "object_buttons": []
+    },
+    "breadcrumbs": {
+      "@id": "/template-two-slots-page/@breadcrumbs",
+      "items": [{ "@id": "/template-two-slots-page", "title": "Template Two Slots Page" }]
+    }
+  }
+}
