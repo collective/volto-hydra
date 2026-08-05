@@ -179,17 +179,15 @@ test.describe('Container UX: Edge-drag', () => {
     expect(handleBox).not.toBeNull();
     const startX = handleBox!.x + handleBox!.width / 2;
     const startY = handleBox!.y + handleBox!.height / 2;
-    // Target Y = 5px past slate-after's midpoint in viewport coords.
-    // iframe boundingBox y values are already in page-absolute coords via Playwright.
-    const endY = slateAfterRect!.y + slateAfterRect!.height / 2 + 5;
 
     await page.mouse.move(startX, startY);
     await page.mouse.down();
-    // Stepped mousemove so the drag handler gets intermediate events.
-    for (let step = 1; step <= 8; step++) {
-      await page.mouse.move(startX, startY + (endY - startY) * (step / 8));
-      await page.waitForTimeout(20);
-    }
+    // Retarget on slate-after's LIVE box (drag can auto-scroll it) — aim 5px past
+    // its midpoint going down so the absorb boundary crosses it once scroll settles.
+    await helper.dragCursorToMovingTarget(
+      iframe.locator('[data-block-uid="slate-after"]'),
+      (box) => ({ x: startX, y: box.y + box.height / 2 + 5 }),
+    );
     await page.mouse.up();
 
     // After release: slate-after is now a child of section-1.
@@ -288,14 +286,14 @@ test.describe('Container UX: Edge-drag', () => {
     expect(handleBox).not.toBeNull();
     const startX = handleBox!.x + handleBox!.width / 2;
     const startY = handleBox!.y + handleBox!.height / 2;
-    const endY = slateBeforeRect!.y + slateBeforeRect!.height / 2 - 5; // past midpoint going UP
 
     await page.mouse.move(startX, startY);
     await page.mouse.down();
-    for (let s = 1; s <= 8; s++) {
-      await page.mouse.move(startX, startY + (endY - startY) * (s / 8));
-      await page.waitForTimeout(20);
-    }
+    // Retarget on slate-before's LIVE box — aim 5px past its midpoint going UP.
+    await helper.dragCursorToMovingTarget(
+      iframe.locator('[data-block-uid="slate-before"]'),
+      (box) => ({ x: startX, y: box.y + box.height / 2 - 5 }),
+    );
     await page.mouse.up();
 
     await expect.poll(async () =>
@@ -334,14 +332,17 @@ test.describe('Container UX: Edge-drag', () => {
     expect(handleBox).not.toBeNull();
     const startX = handleBox!.x + handleBox!.width / 2;
     const startY = handleBox!.y + handleBox!.height / 2;
-    const endY = childRect!.y + childRect!.height / 2 - 5; // upward past child midpoint
 
     await page.mouse.move(startX, startY);
     await page.mouse.down();
-    for (let s = 1; s <= 8; s++) {
-      await page.mouse.move(startX, startY + (endY - startY) * (s / 8));
-      await page.waitForTimeout(20);
-    }
+    // Dragging the bottom handle UP can push the child into the top auto-scroll
+    // zone, sliding it up under the cursor. Retarget on the child's LIVE box each
+    // pass (just past its midpoint) so we actually cross it once scroll settles,
+    // rather than aiming at a pre-drag Y the child has since moved away from.
+    await helper.dragCursorToMovingTarget(
+      iframe.locator('[data-block-uid="section-child-1"]'),
+      (box) => ({ x: startX, y: box.y + box.height / 2 - 5 }),
+    );
     await page.mouse.up();
 
     // section-child-1 is now at page level (no [data-block-uid] ancestor).
@@ -375,14 +376,14 @@ test.describe('Container UX: Edge-drag', () => {
     expect(handleBox).not.toBeNull();
     const startX = handleBox!.x + handleBox!.width / 2;
     const startY = handleBox!.y + handleBox!.height / 2;
-    const endX = text2aRect!.x + text2aRect!.width / 2 + 5;
 
     await page.mouse.move(startX, startY);
     await page.mouse.down();
-    for (let s = 1; s <= 8; s++) {
-      await page.mouse.move(startX + (endX - startX) * (s / 8), startY);
-      await page.waitForTimeout(20);
-    }
+    // Retarget on text-2a's LIVE box — aim 5px past its X-midpoint going RIGHT.
+    await helper.dragCursorToMovingTarget(
+      iframe.locator('[data-block-uid="text-2a"]'),
+      (box) => ({ x: box.x + box.width / 2 + 5, y: startY }),
+    );
     await page.mouse.up();
 
     // text-2a's only sibling chain (col-2 → text-2a) gets fully covered, so
@@ -428,14 +429,14 @@ test.describe('Container UX: Edge-drag', () => {
     expect(handleBox).not.toBeNull();
     const startX = handleBox!.x + handleBox!.width / 2;
     const startY = handleBox!.y + handleBox!.height / 2;
-    const endY = childRect!.y + childRect!.height / 2 + 5; // downward past child midpoint
 
     await page.mouse.move(startX, startY);
     await page.mouse.down();
-    for (let s = 1; s <= 8; s++) {
-      await page.mouse.move(startX, startY + (endY - startY) * (s / 8));
-      await page.waitForTimeout(20);
-    }
+    // Retarget on section-child-1's LIVE box — aim 5px past its midpoint going DOWN.
+    await helper.dragCursorToMovingTarget(
+      iframe.locator('[data-block-uid="section-child-1"]'),
+      (box) => ({ x: startX, y: box.y + box.height / 2 + 5 }),
+    );
     await page.mouse.up();
 
     // section-child-1 is now at page level (expelled out the top means it
@@ -470,14 +471,14 @@ test.describe('Container UX: Edge-drag', () => {
     expect(handleBox).not.toBeNull();
     const startX = handleBox!.x + handleBox!.width / 2;
     const startY = handleBox!.y + handleBox!.height / 2;
-    const endX = text1bRect!.x + text1bRect!.width / 2 - 5;
 
     await page.mouse.move(startX, startY);
     await page.mouse.down();
-    for (let s = 1; s <= 8; s++) {
-      await page.mouse.move(startX + (endX - startX) * (s / 8), startY);
-      await page.waitForTimeout(20);
-    }
+    // Retarget on text-1b's LIVE box — aim 5px past its X-midpoint going LEFT.
+    await helper.dragCursorToMovingTarget(
+      iframe.locator('[data-block-uid="text-1b"]'),
+      (box) => ({ x: box.x + box.width / 2 - 5, y: startY }),
+    );
     await page.mouse.up();
 
     // col-1 has [text-1a, text-1b] — text-1b's midpoint is crossed; full sibling
@@ -531,14 +532,15 @@ test.describe('Container UX: Edge-drag', () => {
     expect(handleBox).not.toBeNull();
     const startX = handleBox!.x + handleBox!.width / 2;
     const startY = handleBox!.y + handleBox!.height / 2;
-    const endY = grid4Rect!.y + grid4Rect!.height + 10;
 
     await page.mouse.move(startX, startY);
     await page.mouse.down();
-    for (let s = 1; s <= 8; s++) {
-      await page.mouse.move(startX, startY + (endY - startY) * (s / 8));
-      await page.waitForTimeout(20);
-    }
+    // Retarget on grid-cell-4's LIVE box — aim 10px past its BOTTOM so the
+    // absorb boundary clears grid-2's last teaser once scroll settles.
+    await helper.dragCursorToMovingTarget(
+      iframe.locator('[data-block-uid="grid-cell-4"]').first(),
+      (box) => ({ x: startX, y: box.y + box.height + 10 }),
+    );
     await page.mouse.up();
 
     // Both teasers should now live inside grid-1.
@@ -581,14 +583,14 @@ test.describe('Container UX: Edge-drag', () => {
     expect(handleBox).not.toBeNull();
     const startX = handleBox!.x + handleBox!.width / 2;
     const startY = handleBox!.y + handleBox!.height / 2;
-    const endX = childRect!.x + childRect!.width / 2 - 5; // leftward past child X-midpoint
 
     await page.mouse.move(startX, startY);
     await page.mouse.down();
-    for (let s = 1; s <= 8; s++) {
-      await page.mouse.move(startX + (endX - startX) * (s / 8), startY);
-      await page.waitForTimeout(20);
-    }
+    // Retarget on section-child-1's LIVE box — aim 5px past its X-midpoint going LEFT.
+    await helper.dragCursorToMovingTarget(
+      iframe.locator('[data-block-uid="section-child-1"]'),
+      (box) => ({ x: box.x + box.width / 2 - 5, y: startY }),
+    );
     await page.mouse.up();
 
     await expect.poll(async () =>

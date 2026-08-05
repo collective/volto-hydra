@@ -743,9 +743,15 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     await expect(slotIdFieldAfter).not.toBeVisible();
   });
 
-  test('moving slot block before first fixed block keeps it in template', async ({ page }) => {
-    // Placeholders at template edges must be allowed - needed for layout switching
-    // where content needs to be tracked even at edges
+  test('dropping a slot block before the first fixed anchor exits the template (position-based, not drag direction)', async ({ page }) => {
+    // template-test-page is anchored at BOTH ends (fixed header on top, fixed slider +
+    // footer at the bottom), so its slots are fully enclosed — there is NO slot before the
+    // header. Dropping user-content-1 before the header therefore lands it OUTSIDE the top
+    // anchor, in the page region: it EXITS the template (loses its slotId, stays an
+    // editable page block). This is the SAME position, and so the SAME outcome, as dragging
+    // it AFTER the standalone page block (test 691) — membership is decided by POSITION, not
+    // by which way you dragged. (Regression guard: a prior direction-based rule inherited the
+    // fixed header's membership here, producing an in-template, slot-less, read-only block.)
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -778,17 +784,16 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     const headerIndex = blockIds.indexOf(headerBlockId);
     expect(movedIndex).toBeLessThan(headerIndex);
 
-    // Verify block is still IN the template - it should still be editable in template edit mode
-    // (blocks outside the template are readonly in edit mode)
+    // The block EXITED the template (it's before the top anchor, in the page region):
+    // no slotId field, but still a fully editable page block.
     await helper.clickBlockInIframe(USER_CONTENT_1);
     await helper.waitForSidebarOpen();
 
-    // Placeholder field should still be visible (block is still in template)
+    // Placeholder field should NOT be visible (block is no longer in the template)
     const slotIdFieldAfter = page.locator('.field-wrapper-slotId input');
-    await expect(slotIdFieldAfter).toBeVisible({ timeout: 5000 });
-    await helper.expectTemplateSettingsCount(1);
+    await expect(slotIdFieldAfter).not.toBeVisible();
 
-    // Block should be editable (not readonly, since it's in the template being edited)
+    // Block should be editable (a plain page block, not a read-only template block)
     const editor = helper.getSlateField(iframe.locator(`[data-block-uid="${USER_CONTENT_1}"]`));
     const isEditable = await editor.getAttribute('contenteditable');
     expect(isEditable).toBe('true');
@@ -880,36 +885,34 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
 
 test.describe('Template Edit Mode - Validation', () => {
   test('non-contiguous slot groups prevent exit from edit mode', async ({ page }) => {
-    // Rule: All blocks with the same slotId must be adjacent.
-    // Having two separate groups with the same name is invalid.
+    // Rule: all blocks with the same slotId must be adjacent.
+    //   Valid:   [header] [primary] [primary] [primary] [footer]
+    //   Invalid: [header] [primary] [secondary] [primary] [footer]  <- "primary" split in two
     //
-    // Valid:   [header] [content] [content] [footer]
-    // Invalid: [header] [content] [footer] [content]  <- "content" is split
+    // A block dragged out of a slot now EXITS the template (it can't be left as a stranded
+    // "primary" separated by the footer), so the split is created the way editing still can —
+    // re-slot the MIDDLE of three primary blocks. The validation must refuse the lock. (The
+    // fixture starts with three CONTIGUOUS primary blocks, valid on load.)
 
     const helper = new AdminUIHelper(page);
 
     await helper.login();
-    await helper.navigateToEdit('/template-test-page');
+    await helper.navigateToEdit('/template-split-slot-page');
 
     const iframe = helper.getIframe();
 
-    // Find template blocks by content
     const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
-    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
-    const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
-
-    // Enter template edit mode
-    await expect(iframe.locator(`[data-block-uid="${USER_CONTENT_1}"]`)).toBeVisible({ timeout: 15000 });
+    await expect(iframe.locator('[data-block-uid="ss-content-2"]')).toBeVisible({ timeout: 15000 });
     await helper.unlockTemplate(headerBlockId);
 
-    // Create invalid structure: move user-content-2 after footer
-    // This splits the "primary" slot group:
-    // Before: [header] [content-1] [content-2] [footer]  <- valid, "primary" blocks adjacent
-    // After:  [header] [content-1] [footer] [content-2]  <- invalid, "primary" blocks separated
-    await helper.dragBlockAfter(USER_CONTENT_2, footerBlockId);
+    // Split the contiguous "primary" group by re-slotting the MIDDLE block to "secondary":
+    // [primary] [secondary] [primary] — "primary" is no longer contiguous.
+    await helper.clickBlockInIframe('ss-content-2');
+    await helper.waitForSidebarOpen();
+    await page.locator('.field-wrapper-slotId input').fill('secondary');
 
-    // Try to LOCK (Change on all pages) — validation must block the commit and keep
-    // the template unlocked so the user can fix the structure.
+    // Try to LOCK (Change on all pages) — validation must block the commit and keep the
+    // template unlocked so the structure can be fixed.
     await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
     await helper.escapeToParent();
@@ -970,6 +973,34 @@ test.describe('Template Edit Mode - Validation', () => {
 
     // Still unlocked — the commit was refused.
     await expect(editToggle).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('while editing a template, dragging a block to a different slot region keeps its slotId', async ({ page }) => {
+    // In template edit mode the slotId is EXPLICIT — you rename slots, you don't change them
+    // by dragging. Dragging ts-p2 ("primary") into the "secondary" region (still inside the
+    // template) must KEEP it "primary" — NOT silently re-slot it to "secondary". (The author
+    // now has an invalid arrangement to fix, or save-time validation catches it.) This is the
+    // template-edit half of the edit-mode-gated membership rule; the normal-mode half (content
+    // takes the slot it lands in / exits) is covered by template-edit-mode:691 and :746.
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-two-slots-page');
+
+    const iframe = helper.getIframe();
+
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await expect(iframe.locator('[data-block-uid="ts-p2"]')).toBeVisible({ timeout: 15000 });
+    await helper.unlockTemplate(headerBlockId);
+
+    // Drag ts-p2 (primary) into the secondary region: after ts-s1 (secondary), still inside
+    // the template (between it and the fixed footer).
+    await helper.dragBlockAfter('ts-p2', 'ts-s1');
+
+    // It moved into the secondary region but KEPT its authored slotId "primary".
+    await helper.clickBlockInIframe('ts-p2');
+    await helper.waitForSidebarOpen();
+    await expect(page.locator('.field-wrapper-slotId input')).toHaveValue('primary');
   });
 
   test('saved template changes persist and appear on other pages using the template', async ({ page }) => {

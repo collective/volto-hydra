@@ -382,7 +382,7 @@ function getNeighborData(index, context) {
 }
 
 function getTemplateInfoFromNeighbors(context) {
-  const { position, layoutItems, allBlocks, insertAfter, containerId, field, items } = context;
+  const { position, layoutItems, allBlocks, containerId, field, items } = context;
   const containerLength = items ? items.length : layoutItems?.length || 0;
 
   if (containerLength === 0) {
@@ -408,60 +408,71 @@ function getTemplateInfoFromNeighbors(context) {
     return undefined;
   }
 
-  // Determine the primary neighbor based on insertion direction
-  // insertAfter=true: we're inserting AFTER the block at position-1, so inherit from it
-  // insertAfter=false: we're inserting BEFORE the block at position, so inherit from it
+  // Position-based membership: examine BOTH neighbors and see whether a slot region
+  // reaches this insertion gap. Drag DIRECTION is irrelevant — the same position always
+  // yields the same membership. (The old `insertAfter ? prev : next` "inherit from the
+  // target block" rule made one position mean two different things and, before the first
+  // fixed anchor, inherited templateId + fixed:true from the fixed block while finding no
+  // slot — an in-template, slot-less, read-only corrupt half-membership.)
+  //
+  // A neighbor "offers" this position into a slot when a slot region touches the gap:
+  //   - a non-fixed slot block on EITHER side (the slot continues into the gap) → its slotId
+  //   - the block BEFORE the gap, if fixed, via its `nextSlotId` (slot region AFTER it)
+  //   - the block AFTER  the gap, if fixed, via its `prevSlotId` (slot region BEFORE it)
+  // `prevSlotId` mirrors `nextSlotId` so a leading slot (bottom-anchored layout: slots
+  // above a fixed footer) is reachable, symmetric with a trailing slot. No offer from
+  // either side → outside every template. A block that joins a slot is a real slot
+  // member: never fixed, never readOnly.
   const prevNeighbor = getNeighborData(position - 1, context);
   const nextNeighbor = getNeighborData(position, context);
 
-  // The "target" block determines template membership
-  const primaryNeighbor = insertAfter ? prevNeighbor : nextNeighbor;
-
-  // If the primary neighbor (target of insertion) is not in a template, stay outside
-  if (!primaryNeighbor?.templateId) {
-    return undefined;
-  }
-
-  // Primary neighbor is in a template - inherit template info
-  const templateInfo = {
-    templateId: primaryNeighbor.templateId,
-    templateInstanceId: primaryNeighbor.templateInstanceId,
-    fixed: primaryNeighbor.fixed || false,
-    readOnly: primaryNeighbor.readOnly || false,
+  const slotOffer = (neighbor, fixedSlotField) => {
+    if (!neighbor?.templateId) return null;
+    const slotId =
+      !neighbor.fixed && neighbor.slotId
+        ? neighbor.slotId
+        : neighbor.fixed && neighbor[fixedSlotField]
+          ? neighbor[fixedSlotField]
+          : null;
+    if (!slotId) return null;
+    return {
+      templateId: neighbor.templateId,
+      templateInstanceId: neighbor.templateInstanceId,
+      slotId,
+    };
   };
 
-  // Inherit slotId from the primary neighbor if it's not fixed
-  // For slotId inheritance, also check the secondary neighbor
-  let inheritedSlotId = null;
-  const secondaryNeighbor = insertAfter ? nextNeighbor : prevNeighbor;
-
-  let fromNextPlaceholder = false;
-  for (const neighbor of [primaryNeighbor, secondaryNeighbor].filter(Boolean)) {
-    if (neighbor?.templateId === templateInfo.templateId) {
-      // Same template - can inherit slotId
-      if (!neighbor.fixed && neighbor.slotId && !inheritedSlotId) {
-        inheritedSlotId = neighbor.slotId;
-      }
-      // Fixed blocks with nextSlotId indicate an adjacent slot region.
-      // This preserves slot info even when all slot blocks are deleted.
-      if (neighbor.fixed && neighbor.nextSlotId && !inheritedSlotId) {
-        inheritedSlotId = neighbor.nextSlotId;
-        fromNextPlaceholder = true;
-      }
-    }
+  // prev reaches forward via nextSlotId; next reaches backward via prevSlotId.
+  const offer =
+    slotOffer(prevNeighbor, 'nextSlotId') || slotOffer(nextNeighbor, 'prevSlotId');
+  if (offer) {
+    return {
+      templateId: offer.templateId,
+      templateInstanceId: offer.templateInstanceId,
+      slotId: offer.slotId,
+      fixed: false,
+      readOnly: false,
+    };
   }
 
-  // nextSlotId overrides: the new block is in a slot region,
-  // so it should not inherit fixed/readOnly from the fixed neighbor.
-  if (fromNextPlaceholder) {
-    templateInfo.fixed = false;
-    templateInfo.readOnly = false;
+  // No slot faces this position. If the CONTAINER itself is a template instance (e.g. a
+  // columns block whose children are each their own fixed slot), a block added INSIDE it
+  // still joins that template — with a FRESH slotId (left null; the caller generates one).
+  // This is what separates "inside a template instance" (join) from the template's OUTER
+  // edge (746: the container is the page, which has no templateId, so a drop before a
+  // top/bottom fixed anchor correctly stays out).
+  const container = context.parentBlock || allBlocks?.[containerId];
+  if (container?.templateId) {
+    return {
+      templateId: container.templateId,
+      templateInstanceId: container.templateInstanceId,
+      slotId: null,
+      fixed: false,
+      readOnly: false,
+    };
   }
 
-  return {
-    ...templateInfo,
-    slotId: inheritedSlotId,
-  };
+  return undefined;
 }
 
 /**

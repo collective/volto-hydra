@@ -1742,6 +1742,17 @@ const Iframe = (props) => {
     // storage so this never branches on it. The neighbour is the LAST existing child for
     // 'inside' (append at end), else the sibling blockId we insert relative to.
     const inheritTemplateMembership = (bd) => {
+      // A pasted/added block takes on the membership of where it LANDS — strip any source
+      // template/slot it arrived carrying (e.g. copied from a template slot) so the
+      // recompute below derives membership purely from the destination. Fixed template
+      // blocks keep theirs. (Fresh adds have no membership, so this is a no-op for them.)
+      if (bd && !bd.fixed && (bd.templateId || bd.slotId)) {
+        bd = { ...bd };
+        delete bd.templateId;
+        delete bd.templateInstanceId;
+        delete bd.slotId;
+        delete bd.readOnly;
+      }
       const region = containerConfig?.region || 'items';
       // The REAL container the new block lands in: containerConfig.parentId (the page,
       // or the container for a nested/inside add). NOT blockPathMap[blockId].parentId —
@@ -3029,8 +3040,8 @@ const Iframe = (props) => {
             // based on neighboring blocks at the new location
             let updatedPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
             for (const moveBlockId of blocksToMove) {
-              const blockData = getBlockById(newFormData, updatedPathMap, moveBlockId);
-              if (!blockData) continue;
+              const originalBlockData = getBlockById(newFormData, updatedPathMap, moveBlockId);
+              if (!originalBlockData) continue;
 
               // Get container info for the new position
               const targetContainerConfig = getContainerFieldConfig(moveBlockId, updatedPathMap, newFormData, blocksConfig, intl);
@@ -3039,11 +3050,48 @@ const Iframe = (props) => {
               const { parentId: containerId, region: containerRegion } = targetContainerConfig;
               const containerPath = containerId === PAGE_BLOCK_UID ? [] : updatedPathMap[containerId]?.path;
               const container = containerPath ? getBlockByPath(newFormData, containerPath) : newFormData;
-              const layoutItems = container?.blocks_layout?.[containerRegion || 'items'] || [];
-              const position = layoutItems.indexOf(moveBlockId);
+              const fullLayout = container?.blocks_layout?.[containerRegion || 'items'] || [];
+              // Recompute membership from the block's NEIGHBOURS, with the block itself
+              // EXCLUDED. It already sits in the layout at this index, so a naive
+              // getNeighborData(position) would return the block itself and it would offer
+              // its own (stale, source) slot back to itself — keeping membership it should
+              // have shed. Excluding it makes `position` the insertion gap between its real
+              // prev/next neighbours.
+              const position = fullLayout.indexOf(moveBlockId);
+              const layoutItems = fullLayout.filter((id) => id !== moveBlockId);
+
+              // Membership on a move is GATED ON EDIT MODE (see architecture.md »
+              // "Template membership"):
+              //  - normal mode → a moved block takes on the membership of wherever it lands,
+              //    so we strip its source membership and re-derive from the destination
+              //    (a slot, a template-instance container, or NOTHING → plain page content);
+              //  - template edit mode → the author's slotId is EXPLICIT (you rename slots,
+              //    you don't change them by dragging), so a move that stays INSIDE the
+              //    template keeps its slotId. A move OUT of the template still strips (drag
+              //    out exits, even while editing).
+              // Fixed template blocks always keep their identity (their slot/fixed IS the
+              // template). "Inside the template" = a same-instance block sits both before AND
+              // after the landing gap.
+              const instId = originalBlockData.templateInstanceId;
+              const editingThisTemplate =
+                !!instId && (templateEditModeRef.current || []).includes(instId);
+              const inSameInstance = (id) =>
+                id && newFormData.blocks[id]?.templateInstanceId === instId;
+              const insideTemplate =
+                editingThisTemplate &&
+                layoutItems.slice(0, position).some(inSameInstance) &&
+                layoutItems.slice(position).some(inSameInstance);
+
+              let blockData = originalBlockData;
+              if (!originalBlockData.fixed && !insideTemplate) {
+                blockData = { ...blockData };
+                delete blockData.templateId;
+                delete blockData.templateInstanceId;
+                delete blockData.slotId;
+                delete blockData.readOnly;
+              }
 
               // Apply defaults with context - this derives template fields from neighbors
-              // insertAfter determines which neighbor's template membership to inherit
               const updatedBlockData = applyBlockDefaultsWithContext(blockData, {
                 containerId,
                 field: containerRegion,
@@ -3056,8 +3104,11 @@ const Iframe = (props) => {
                 intl,
               });
 
-              // Update block if defaults changed it
-              if (updatedBlockData !== blockData) {
+              // Update block if the recompute changed it from what was STORED. Compare
+              // against originalBlockData, not the (possibly membership-stripped) blockData
+              // copy — otherwise a stripped block whose recompute is a no-op is never
+              // written back, and the stored block keeps its stale source membership.
+              if (updatedBlockData !== originalBlockData) {
                 newFormData = updateBlockById(newFormData, updatedPathMap, moveBlockId, updatedBlockData);
                 updatedPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
                 log('MOVE_BLOCKS: Applied defaults to moved block:', moveBlockId, 'templateId:', updatedBlockData.templateId, 'slotId:', updatedBlockData.slotId);

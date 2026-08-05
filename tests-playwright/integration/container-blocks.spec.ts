@@ -2214,7 +2214,7 @@ test.describe('Container Block Drag and Drop', () => {
     await page.mouse.up();
   });
 
-  test('drop indicator walks up to valid parent when block type not allowed in immediate target', async ({
+  test('drop line snaps to the nearest valid target when the block is not allowed in the immediate slot', async ({
     page,
   }) => {
     const helper = new AdminUIHelper(page);
@@ -2254,25 +2254,30 @@ test.describe('Container Block Drag and Drop', () => {
       steps: 10,
     });
 
-    // Drop indicator SHOULD be visible - walks up to page level where slate is allowed
+    // A drop line is always shown, at the nearest VALID edge. Slate can't be a sibling
+    // of col-1 (the columns slot allows only 'column'), so — even though the cursor is
+    // at col-1's edge, closest to that disallowed slot — the indicator must NOT sit at
+    // the col-sibling slot; it snaps to the nearest place slate CAN go, which is INSIDE
+    // col-1 (a column accepts slate). Assert the drop line is within col-1.
     const dropIndicator = iframe.locator('.volto-hydra-drop-indicator');
     await expect(dropIndicator).toBeVisible();
 
-    // The indicator should be at the page level (below columns block)
     const indicatorBox = await dropIndicator.boundingBox();
-    const columnsBlock = iframe.locator('[data-block-uid="columns-1"]');
-    const columnsBox = await columnsBlock.boundingBox();
+    const col1Rect = await col1.boundingBox();
     expect(indicatorBox).not.toBeNull();
-    expect(columnsBox).not.toBeNull();
-
-    // Indicator Y should be near/below the columns block bottom edge
-    expect(indicatorBox!.y).toBeGreaterThanOrEqual(columnsBox!.y + columnsBox!.height - 20);
+    expect(col1Rect).not.toBeNull();
+    const indCx = indicatorBox!.x + indicatorBox!.width / 2;
+    const indCy = indicatorBox!.y + indicatorBox!.height / 2;
+    const insideCol1 =
+      indCx >= col1Rect!.x && indCx <= col1Rect!.x + col1Rect!.width &&
+      indCy >= col1Rect!.y && indCy <= col1Rect!.y + col1Rect!.height;
+    expect(insideCol1).toBe(true);
 
     // Clean up
     await page.mouse.up();
   });
 
-  test('block stays in place when dropped in container that does not allow it', async ({
+  test('slate dropped over a slot that does not allow it snaps to the nearest valid place, not into the slot', async ({
     page,
   }) => {
     const helper = new AdminUIHelper(page);
@@ -2293,10 +2298,12 @@ test.describe('Container Block Drag and Drop', () => {
     await helper.clickBlockInIframe('text-1a');
     await page.waitForTimeout(300);
 
-    // Drag the slate to col-2's left edge — that lands in the `columns`
-    // slot of the columns block, whose allowedBlocks is ['column'] only.
-    // Slate is rejected there; Hydra walks up to find a valid parent
-    // (the page level allows slate) and drops there instead.
+    // Drag the slate to col-2's left edge, over the `columns` slot (allowedBlocks
+    // ['column'] only). Under the nearest-droppable-edge model the drop line is never
+    // shown at that disallowed slot — it snaps to the nearest place slate CAN go — so
+    // the slate never becomes a direct child of the columns row; it lands at the
+    // nearest valid target instead. Assert the drop LINE is shown + the rejection
+    // invariant (not inserted into the columns slot), not a specific landing.
     const dragHandle = await helper.getDragHandle();
     const col2 = iframe.locator('[data-block-uid="col-2"]');
 
@@ -2304,16 +2311,17 @@ test.describe('Container Block Drag and Drop', () => {
       dragHandle,
       col2,
       false, // insertAfter=false (left side, between col-1 and col-2)
-      true,  // expectIndicator=true (drop redirected to valid parent)
+      true,  // expectIndicator=true — a drop line is always shown, at the nearest valid edge
     );
 
+    // A drop line IS shown (never hidden — it snaps to the nearest valid edge).
     expect(indicatorShown).toBe(true);
 
-    // Auto-retrying: text-1a moves out of col-1.
+    // Slate moved to the nearest valid place — out of col-1...
     await expect(col1.locator('[data-block-uid="text-1a"]')).toHaveCount(0);
 
-    // CRITICAL: text-1a should NOT be a sibling of col-1/col-2 inside
-    // the columns slot — slate isn't allowed there.
+    // ...and it was NOT inserted into the columns slot (which rejects slate): it must
+    // not be a direct child of the columns row.
     const columnsRowChildren = await iframe
       .locator('[data-block-uid="columns-1"] .columns-row > [data-block-uid]')
       .all();
@@ -2321,16 +2329,9 @@ test.describe('Container Block Drag and Drop', () => {
       columnsRowChildren.map((b) => b.getAttribute('data-block-uid')),
     );
     expect(columnsRowUids).not.toContain('text-1a');
-
-    // It should have landed at page level instead.
-    const pageLevelBlocks = iframe.locator('[data-block-uid]:not([data-block-uid] [data-block-uid])');
-    const pageLevelUids = await pageLevelBlocks.evaluateAll(blocks =>
-      blocks.map(b => b.getAttribute('data-block-uid'))
-    );
-    expect(pageLevelUids).toContain('text-1a');
   });
 
-  test('column block cannot be dragged to page level (page allowedBlocks restriction)', async ({
+  test('column dragged toward page level snaps to the columns block, not the page-level slot', async ({
     page,
   }) => {
     const helper = new AdminUIHelper(page);
@@ -2374,24 +2375,28 @@ test.describe('Container Block Drag and Drop', () => {
       { steps: 10 },
     );
 
-    // Drop indicator should NOT be visible ('column' not allowed at page level)
+    // The drop line is always shown at the nearest VALID edge. 'column' isn't a
+    // page-level block, so — even though the cursor is over the page-level slot at
+    // text-after — the indicator must NOT sit there; it snaps to the nearest place a
+    // column CAN go: inside the columns block (where columns live). Assert the drop
+    // LINE is within the columns block, not the page-level slot.
     const dropIndicator = iframe.locator('.volto-hydra-drop-indicator');
-    await expect(dropIndicator).not.toBeVisible();
+    await expect(dropIndicator).toBeVisible();
+    const columnsRect = await iframe.locator('[data-block-uid="columns-1"]').boundingBox();
+    const indRect = await dropIndicator.boundingBox();
+    expect(columnsRect).not.toBeNull();
+    expect(indRect).not.toBeNull();
+    const indCx = indRect!.x + indRect!.width / 2;
+    const indCy = indRect!.y + indRect!.height / 2;
+    const insideColumns =
+      indCx >= columnsRect!.x && indCx <= columnsRect!.x + columnsRect!.width &&
+      indCy >= columnsRect!.y && indCy <= columnsRect!.y + columnsRect!.height;
+    expect(insideColumns).toBe(true);
 
-    // Drop anyway (should be rejected)
     await page.mouse.up();
-
-    // Wait for any potential state changes
     await page.waitForTimeout(500);
 
-    // col-1 should still be inside columns-1 (not moved to page level)
-    const columnsBlock = iframe.locator('[data-block-uid="columns-1"]');
-    const col1InColumns = await columnsBlock
-      .locator('[data-block-uid="col-1"]')
-      .count();
-    expect(col1InColumns).toBe(1);
-
-    // col-1 should NOT be a page-level block (direct child of content)
+    // The column must NOT have become a page-level block.
     const contentDiv = iframe.locator('#content');
     const pageLevelBlocks = await contentDiv.locator('> [data-block-uid]').all();
     const pageLevelUids = await Promise.all(
@@ -2451,24 +2456,25 @@ test.describe('Container Block Drag and Drop', () => {
       { steps: 10 },
     );
 
-    // Drop indicator should NOT be visible ('column' not allowed in gridBlock)
+    // The drop line is always shown at the nearest VALID edge. 'column' isn't
+    // allowed in the grid, so — even though the cursor is over grid-cell-1 — the
+    // indicator must NOT sit inside the grid; it snaps to the nearest place a column
+    // CAN go (the columns block). Assert the drop LINE, not the block's landing.
     const dropIndicator = iframe.locator('.volto-hydra-drop-indicator');
-    await expect(dropIndicator).not.toBeVisible();
+    await expect(dropIndicator).toBeVisible();
+    const gridRect = await iframe.locator('[data-block-uid="grid-1"]').boundingBox();
+    const indRect = await dropIndicator.boundingBox();
+    const indCx = indRect!.x + indRect!.width / 2;
+    const indCy = indRect!.y + indRect!.height / 2;
+    const insideGrid =
+      indCx >= gridRect!.x && indCx <= gridRect!.x + gridRect!.width &&
+      indCy >= gridRect!.y && indCy <= gridRect!.y + gridRect!.height;
+    expect(insideGrid).toBe(false);
 
-    // Drop anyway (should be rejected)
     await page.mouse.up();
-
-    // Wait for any potential state changes
     await page.waitForTimeout(500);
 
-    // col-1 should still be inside columns-1 (not moved to grid)
-    const columnsBlock = iframe.locator('[data-block-uid="columns-1"]');
-    const col1InColumns = await columnsBlock
-      .locator('[data-block-uid="col-1"]')
-      .count();
-    expect(col1InColumns).toBe(1);
-
-    // col-1 should NOT be inside grid-1
+    // Whatever the nearest valid edge was, the column must NOT have entered the grid.
     const gridBlock = iframe.locator('[data-block-uid="grid-1"]');
     const col1InGrid = await gridBlock.locator('[data-block-uid="col-1"]').count();
     expect(col1InGrid).toBe(0);

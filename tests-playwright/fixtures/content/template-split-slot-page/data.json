@@ -1,0 +1,67 @@
+{
+  "@id": "/template-split-slot-page",
+  "@type": "Document",
+  "id": "template-split-slot-page",
+  "title": "Template Split Slot Page",
+  "description": "Three CONTIGUOUS 'primary' slot blocks between a fixed header and footer (valid on load). A test splits the group live by re-slotting the middle block, then asserts lock-time slot validation refuses the commit — the path editing can still reach.",
+  "blocks": {
+    "ss-header": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "value": [{ "type": "h1", "children": [{ "text": "Template Header - From Template" }] }],
+      "plaintext": "Template Header - From Template",
+      "templateId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "tpl-instance-ss",
+      "slotId": "header"
+    },
+    "ss-content-1": {
+      "@type": "slate",
+      "value": [{ "type": "p", "children": [{ "text": "First primary content" }] }],
+      "plaintext": "First primary content",
+      "templateId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "tpl-instance-ss",
+      "slotId": "primary"
+    },
+    "ss-content-2": {
+      "@type": "slate",
+      "value": [{ "type": "p", "children": [{ "text": "Middle primary content" }] }],
+      "plaintext": "Middle primary content",
+      "templateId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "tpl-instance-ss",
+      "slotId": "primary"
+    },
+    "ss-content-3": {
+      "@type": "slate",
+      "value": [{ "type": "p", "children": [{ "text": "Last primary content" }] }],
+      "plaintext": "Last primary content",
+      "templateId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "tpl-instance-ss",
+      "slotId": "primary"
+    },
+    "ss-footer": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "value": [{ "type": "p", "children": [{ "text": "Template Footer - From Template" }] }],
+      "plaintext": "Template Footer - From Template",
+      "templateId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "tpl-instance-ss",
+      "slotId": "footer"
+    }
+  },
+  "blocks_layout": {
+    "items": ["ss-header", "ss-content-1", "ss-content-2", "ss-content-3", "ss-footer"]
+  },
+  "@components": {
+    "actions": {
+      "@id": "/template-split-slot-page/@actions",
+      "object": [{ "@id": "/template-split-slot-page/edit", "id": "edit", "title": "Edit" }],
+      "object_buttons": []
+    },
+    "breadcrumbs": {
+      "@id": "/template-split-slot-page/@breadcrumbs",
+      "items": [{ "@id": "/template-split-slot-page", "title": "Template Split Slot Page" }]
+    }
+  }
+}

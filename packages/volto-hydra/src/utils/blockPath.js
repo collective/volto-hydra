@@ -3,8 +3,6 @@
  * Supports container blocks where blocks can be nested inside other blocks.
  */
 
-import { produce } from 'immer';
-import { get } from 'lodash';
 import {
   getApplyBlockDefaults,
   getDefaultBlockType,
@@ -312,13 +310,26 @@ export function setBlockByPath(formData, path, value) {
   // Empty path means replace root - return value directly
   if (!path || path.length === 0) return value;
 
-  return produce(formData, (draft) => {
-    let current = draft;
-    for (const key of path.slice(0, -1)) {
-      current = current[key];
+  // Immutable deep-set with structural sharing (dep-free — no immer): clone each
+  // node along the path (so the tree keeps referential identity everywhere the
+  // update didn't touch) and assign the leaf. Intermediate nodes are expected to
+  // exist (paths come from blockPathMap); a missing one surfaces loudly.
+  const root = Array.isArray(formData) ? [...formData] : { ...formData };
+  let current = root;
+  for (const key of path.slice(0, -1)) {
+    const next = current[key];
+    if (next === undefined || next === null) {
+      // Same failure immer's produce raised implicitly (set-on-undefined) — a
+      // path from blockPathMap should always exist; surface the bad path.
+      throw new Error(
+        `[HYDRA] setBlockByPath: missing intermediate '${key}' in path ${path.join('.')}`,
+      );
     }
-    current[path[path.length - 1]] = value;
-  });
+    current[key] = Array.isArray(next) ? [...next] : { ...next };
+    current = current[key];
+  }
+  current[path[path.length - 1]] = value;
+  return root;
 }
 
 /**
@@ -1603,12 +1614,11 @@ export function removeTemplateInstance(
 
   // Get current layout for the instance's region. Blocks are in shared
   // parent.blocks; the layout list lives at blocks_layout[region]. (Template
-  // instances are always blocks-layout containers.)
-  const layoutPath = `blocks_layout.${region}`;
-  const blocksPath = 'blocks';
-
-  const layout = get(parentBlock, layoutPath, []);
-  const blocks = get(parentBlock, blocksPath, {});
+  // instances are always blocks-layout containers.) Dep-free direct access — no
+  // lodash `get`: the offline evaluator bundles this module, so it must not pull
+  // heavy deps (see the DI-refactor).
+  const layout = parentBlock.blocks_layout?.[region] ?? [];
+  const blocks = parentBlock.blocks ?? {};
 
   // Separate blocks into: fixed (to delete), slot (to keep but strip), and unrelated
   const newLayout = [];
@@ -2114,13 +2124,7 @@ export function ensureEmptyBlockIfEmpty(
     const blocksObj = parentBlock.blocks || {};
     let newItems = null;
     let newBlocks = null;
-    for (let i = 0; i < items.length; i++) {
-      const cur = blocksObj[items[i]];
-      const slot = cur?.nextSlotId;
-      if (!slot) continue;
-      const next = blocksObj[items[i + 1]];
-      if (next?.slotId === slot) continue; // slot already filled
-      const emptyId = uuidGenerator();
+    const seedEmpty = (anchor, slot) => {
       let emptyBlock = { '@type': 'empty' };
       if (intl && blocksConfig) {
         emptyBlock = getApplyBlockDefaults()(
@@ -2128,14 +2132,31 @@ export function ensureEmptyBlockIfEmpty(
           blocksConfig,
         );
       }
-      emptyBlock = {
-        ...inheritTemplateMembership(emptyBlock, cur),
-        slotId: slot,
-      };
-      newItems = newItems || [...items];
-      newBlocks = newBlocks || { ...blocksObj };
-      newItems.splice(newItems.indexOf(items[i]) + 1, 0, emptyId);
-      newBlocks[emptyId] = emptyBlock;
+      return { ...inheritTemplateMembership(emptyBlock, anchor), slotId: slot };
+    };
+    for (let i = 0; i < items.length; i++) {
+      const cur = blocksObj[items[i]];
+      // Trailing slot: a fixed block's `nextSlotId` names the slot region AFTER it. If
+      // the block after it isn't in that slot, the slot is empty — seed a placeholder.
+      const nextSlot = cur?.nextSlotId;
+      if (nextSlot && blocksObj[items[i + 1]]?.slotId !== nextSlot) {
+        const emptyId = uuidGenerator();
+        newItems = newItems || [...items];
+        newBlocks = newBlocks || { ...blocksObj };
+        newItems.splice(newItems.indexOf(items[i]) + 1, 0, emptyId);
+        newBlocks[emptyId] = seedEmpty(cur, nextSlot);
+      }
+      // Leading slot (mirror): a fixed block's `prevSlotId` names the slot region BEFORE
+      // it — a bottom-anchored layout (slots above a fixed footer). If the block before it
+      // isn't in that slot, the leading slot is empty — seed a placeholder in front of it.
+      const prevSlot = cur?.prevSlotId;
+      if (prevSlot && blocksObj[items[i - 1]]?.slotId !== prevSlot) {
+        const emptyId = uuidGenerator();
+        newItems = newItems || [...items];
+        newBlocks = newBlocks || { ...blocksObj };
+        newItems.splice(newItems.indexOf(items[i]), 0, emptyId);
+        newBlocks[emptyId] = seedEmpty(cur, prevSlot);
+      }
     }
     if (newItems) {
       const updated = setContainerItems(

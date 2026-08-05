@@ -194,6 +194,120 @@ describe('applyBlockDefaultsWithContext — slotId inheritance on add', () => {
     expect(result.templateId).toBe('/t/test-layout');
     expect(result.templateInstanceId).toBe('inst-1');
   });
+
+  test('a block dropped BEFORE a fixed anchor with no leading slot is OUTSIDE the template (position, not drag direction)', () => {
+    // template-edit-mode:746 scenario. A top-anchored layout: the fixed header anchors
+    // the top and has NO slot before it (no prevSlotId). Dropping a block before the
+    // header lands it outside the top anchor = the page region. It must NOT inherit the
+    // header's membership merely because the insertion targets the header ("insert
+    // before Y inherits from Y") — there is no slot facing this position, so it's out.
+    // (Bug: the direction rule inherited templateId + fixed:true from the fixed header,
+    // producing an in-template, slot-less, read-only corrupt half-membership.)
+    const allBlocks = {
+      'standalone-1': { '@type': 'slate' }, // page block, no template
+      header: {
+        '@type': 'slate',
+        fixed: true,
+        readOnly: true,
+        slotId: 'header',
+        templateId: '/t/layout',
+        templateInstanceId: 'inst-1',
+        // no nextSlotId, no prevSlotId — nothing offers a slot before it
+      },
+    };
+    const context = {
+      blocksConfig: { slate: {} },
+      intl,
+      allBlocks,
+      layoutItems: ['standalone-1', 'header'],
+      position: 1, // insert BEFORE header (index 1)
+      insertAfter: false,
+      containerId: 'page',
+      field: 'blocks_layout',
+    };
+
+    const result = applyBlockDefaultsWithContext({ '@type': 'slate' }, context);
+
+    expect(result.templateId).toBeUndefined();
+    expect(result.slotId).toBeUndefined();
+    expect(result.fixed).toBeFalsy();
+  });
+
+  test('a block added BEFORE a FIXED neighbour with prevSlotId inherits that leading slot + membership', () => {
+    // Bottom-anchored layout: the slot region ("primary") precedes the fixed footer and
+    // is empty, so the footer carries prevSlotId: "primary" (mirror of nextSlotId). A
+    // block dropped before the footer fills that leading slot — it must inherit slotId
+    // "primary" + membership and be a real (non-fixed) slot member. Symmetric to the
+    // nextSlotId case above; unsupported until prevSlotId is added.
+    const allBlocks = {
+      footer: {
+        '@type': 'slate',
+        fixed: true,
+        slotId: 'footer',
+        prevSlotId: 'primary',
+        templateId: '/t/layout',
+        templateInstanceId: 'inst-1',
+      },
+    };
+    const context = {
+      blocksConfig: { slate: {} },
+      intl,
+      allBlocks,
+      items: [allBlocks['footer']],
+      layoutItems: ['footer'],
+      position: 0, // insert BEFORE the footer (index 0)
+      insertAfter: false,
+      containerId: 'page',
+      field: 'items',
+    };
+
+    const result = applyBlockDefaultsWithContext({ '@type': 'slate' }, context);
+
+    expect(result.slotId).toBe('primary');
+    expect(result.templateId).toBe('/t/layout');
+    expect(result.templateInstanceId).toBe('inst-1');
+    expect(result.fixed).toBeFalsy();
+  });
+
+  test('a block added inside a template-instance container (fixed children, no slot offer) joins the container template with a fresh slot', () => {
+    // A columns block that IS a template instance; its column is a fixed slot with no
+    // next/prevSlotId, so no neighbour offers a slot. Because the CONTAINER is a template
+    // instance, the added block still joins it (membership) and gets a FRESH slotId (the
+    // caller generates one) — distinct from the fixed neighbour's. This is the inside-a-
+    // template-instance case, as opposed to the template's outer edge. (allowed-layouts:685.)
+    const containerBlock = {
+      '@type': 'columns',
+      templateId: '/t/footer',
+      templateInstanceId: 'inst-1',
+    };
+    const context = {
+      blocksConfig: { column: {} },
+      intl,
+      allBlocks: {
+        'col-1': {
+          '@type': 'column',
+          fixed: true,
+          slotId: 'col-1',
+          templateId: '/t/footer',
+          templateInstanceId: 'inst-1',
+        },
+      },
+      parentBlock: containerBlock,
+      layoutItems: ['col-1'],
+      position: 1, // after the fixed col-1 (which has no nextSlotId)
+      insertAfter: true,
+      containerId: 'cols-1',
+      field: 'blocks',
+    };
+
+    const result = applyBlockDefaultsWithContext({ '@type': 'column' }, context);
+
+    expect(result.templateId).toBe('/t/footer');
+    expect(result.templateInstanceId).toBe('inst-1');
+    expect(result.slotId).toBeTruthy(); // a freshly generated slot
+    expect(result.slotId).not.toBe('col-1'); // NOT the fixed neighbour's slot
+    expect(result.fixed).toBeFalsy();
+  });
 });
 
 /**

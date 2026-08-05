@@ -114,6 +114,18 @@ const groupByPlaceholder = (childBlocks, templateEditMode) => {
   // when all blocks in the region were deleted
   const result = [];
   for (let i = 0; i < sections.length; i++) {
+    // Leading empty slot (prevSlotId): a fixed block whose slot region BEFORE it is empty
+    // (bottom-anchored layout — slots above a fixed footer). Insert the empty slot section
+    // in front of it. Mirror of the trailing nextSlotId case below.
+    if (sections[i].type === 'fixed') {
+      const prevPh = sections[i].block.data?.prevSlotId;
+      if (prevPh) {
+        const prev = result[result.length - 1];
+        if (!prev || prev.type !== 'slot' || prev.name !== prevPh) {
+          result.push({ type: 'slot', name: prevPh, blocks: [] });
+        }
+      }
+    }
     result.push(sections[i]);
     if (sections[i].type === 'fixed') {
       const nextPh = sections[i].block.data?.nextSlotId;
