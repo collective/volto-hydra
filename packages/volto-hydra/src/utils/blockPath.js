@@ -1287,9 +1287,18 @@ function mergeSlateValues(values) {
  * The child is `<rp.type | region default | slate>` carrying the value at
  * `<rp.field>`. blocks_layout regions key children by a minted uid; object_list
  * regions carry that id in their idField (setChildBlockEntries handles both).
+ *
+ * Throws if the resolved child type is not one the region allows: a
+ * `region/type/field` mapping that names a type the region forbids is a config
+ * bug, and a silently-invalid child is worse than a loud failure.
  */
 export function expandValueIntoRegion(targetBlock, region, rp, value, uuidGen) {
   const childType = rp.type || region.allowedBlocks?.[0] || 'slate';
+  if (region.allowedBlocks && !region.allowedBlocks.includes(childType)) {
+    throw new Error(
+      `expandValueIntoRegion: child type "${childType}" is not allowed in region "${region.region}" (allowed: ${region.allowedBlocks.join(', ')})`,
+    );
+  }
   const child = { '@type': childType, [rp.field]: value };
   const gen =
     uuidGen ||

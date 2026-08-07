@@ -124,7 +124,16 @@ const blocksConfig = {
       },
     },
     // calloutValue → calloutBox (EXPAND): wrap message into one slate child.
-    fieldMappings: { calloutValue: { message: 'items/slate/value' } },
+    // badValue → calloutBox names `image`, which the region forbids (guard test).
+    fieldMappings: {
+      calloutValue: { message: 'items/slate/value' },
+      badValue: { message: 'items/image/value' },
+    },
+  },
+  // A value block whose bridge names a child type the target region disallows.
+  badValue: {
+    blockSchema: { properties: { message: { widget: 'slate' } } },
+    fieldMappings: {},
   },
 };
 
@@ -297,5 +306,14 @@ describe('convertBlockType — single value ↔ region', () => {
     expect(back['@type']).toBe('calloutValue');
     expect(JSON.stringify(back.message)).toContain('remember me');
     expect(back.blocks).toBeUndefined();
+  });
+
+  test('expand fails loudly when the child type is forbidden by the region', () => {
+    // badValue → calloutBox maps to `items/image/value`, but calloutBox.items
+    // only allows `slate`. The invalid child must never be written.
+    const value = { '@type': 'badValue', message: slate('nope').value };
+    expect(() =>
+      convertBlockType(value, 'calloutBox', blocksConfig, '@type', intl),
+    ).toThrow(/not allowed in region/);
   });
 });

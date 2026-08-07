@@ -2857,24 +2857,30 @@ export function convertBlockType(blockData, newType, blocksConfig, typeFieldName
         const allowed = targetRegion.allowedBlocks;
         const converted = entries.map(({ id, block }) => {
           const childType = block?.[typeFieldName];
-          if (
-            allowed &&
-            childType &&
-            !allowed.includes(childType) &&
-            targetRegion.defaultBlockType
-          ) {
-            return {
-              id,
-              block: convertBlockType(
-                block,
-                targetRegion.defaultBlockType,
-                blocksConfig,
-                typeFieldName,
-                intl,
-              ),
-            };
+          // Unrestricted region, or the child is already a permitted type.
+          if (!allowed || !childType || allowed.includes(childType)) {
+            return { id, block };
           }
-          return { id, block };
+          // Restricted region + a disallowed child: convert it to the region's
+          // default. That default must itself be allowed — otherwise the cell
+          // can't legally live here and we fail loudly rather than write an
+          // invalid child.
+          const childTarget = targetRegion.defaultBlockType;
+          if (!childTarget || !allowed.includes(childTarget)) {
+            throw new Error(
+              `convertBlockType: cannot place child "${childType}" in region "${targetRegion.region}" of "${toType}" (allowed: ${allowed.join(', ')}; no valid default block type)`,
+            );
+          }
+          return {
+            id,
+            block: convertBlockType(
+              block,
+              childTarget,
+              blocksConfig,
+              typeFieldName,
+              intl,
+            ),
+          };
         });
         setChildBlockEntries(newData, targetRegion, converted);
         consumeSourceRegion(sourceRegion, consumedSourceFields);
