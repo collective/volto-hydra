@@ -3558,6 +3558,11 @@ const Iframe = (props) => {
               allowedBlocks: fieldDef.allowedBlocks || null,
               allowedTemplates: fieldDef.allowedTemplates || null,
               allowedLayouts: fieldDef.allowedLayouts || null,
+              // Preserve the region's seed type. Without this, defaultBlockType
+              // is dropped here and arrives null in the container config, so a
+              // single-allowedBlocks region auto-fills to that type instead of
+              // honouring e.g. defaultBlockType: 'empty' (a stay-empty slot).
+              defaultBlockType: fieldDef.defaultBlockType || null,
               maxLength: fieldDef.maxLength || null,
               title: fieldDef.title || fieldName,
             };
@@ -3949,8 +3954,13 @@ const Iframe = (props) => {
             blockPathMap = buildBlockPathMap(formDataToSend, config.blocks.blocksConfig, intl);
           }
 
-          // Update Redux with merged data
-          onChangeFormData(mergedFormData);
+          // Update Redux with the SAME data sent to the iframe (including seeded
+          // empty placeholders). Committing the pre-seed mergedFormData instead
+          // diverges Redux from the iframe: a custom region that renders from
+          // pageState (e.g. an empty forced announcement) loses its seed on the
+          // next Redux-sourced FORM_DATA sync. Edit-only seeds are stripped on
+          // save by stripEmptyBlocks, so they never persist.
+          onChangeFormData(formDataToSend);
 
           source.postMessage({
             type: 'INITIAL_DATA',
@@ -4051,8 +4061,13 @@ const Iframe = (props) => {
         }, origin);
         pendingInitialDataRef.current = null;
 
-        // Update Redux with merged data (without empty block additions - those are UI-only)
-        onChangeFormData(mergedFormData);
+        // Update Redux with the SAME data sent to the iframe (including seeded
+        // empty placeholders). Committing the pre-seed mergedFormData instead
+        // diverges Redux from the iframe: a custom region that renders from
+        // pageState (e.g. an empty forced announcement) loses its seed on the
+        // next Redux-sourced FORM_DATA sync. Edit-only seeds are stripped on save
+        // by stripEmptyBlocks, so they never persist.
+        onChangeFormData(formDataToSend);
       })().catch(err => {
         log('[INITIAL_DATA] ERROR in template loading/merge:', err.message, err.stack);
         console.error('[INITIAL_DATA] Error:', err);
@@ -4486,13 +4501,31 @@ const Iframe = (props) => {
     const allowed = filterAddableTypesByRule(
       iframeAllowedBlocks, properties, bpm, selectedBlock, containerConfig, blocksConfig, intl,
     );
-    if (allowed?.length === 1) {
+    // Filling an EMPTY placeholder CONVERTS it in place to a real allowedBlock —
+    // the region's `defaultBlockType: 'empty'` governs the passive seed, but the
+    // '+' must add a real block. Adding a sibling after would leave the empty at
+    // index 0, and a single-block region (e.g. a forced announcement) rendered
+    // from index 0 would never show the new block. The multi-allowed chooser path
+    // already converts empties; this covers the single-allowed auto-insert.
+    const selectedIsEmpty =
+      getBlockById(properties, bpm, selectedBlock)?.['@type'] === 'empty';
+    if (selectedIsEmpty && allowed?.length === 1) {
+      const newFormData = convertBlockInPlace(properties, bpm, selectedBlock, allowed[0]);
+      const newBpm = buildBlockPathMap(newFormData, blocksConfig, intl);
+      onChangeFormData(newFormData);
+      setIframeSyncState(prev => ({
+        ...prev,
+        formData: newFormData,
+        blockPathMap: newBpm,
+        pendingSelectBlockUid: selectedBlock,
+      }));
+    } else if (allowed?.length === 1) {
       insertAndSelectBlock(selectedBlock, allowed[0], 'after');
     } else {
       setPendingAdd({ mode: 'iframe', afterBlockId: selectedBlock, allowedBlocks: allowed });
       setAddNewBlockOpened(true);
     }
-  }, [iframeAllowedBlocks, selectedBlock, insertAndSelectBlock, iframeSyncState.blockPathMap, properties, blocksConfig, intl]);
+  }, [iframeAllowedBlocks, selectedBlock, insertAndSelectBlock, iframeSyncState.blockPathMap, properties, blocksConfig, intl, onChangeFormData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Convert a block to newType IN PLACE (container-aware), returning new formData.
   // Container blocks (any region with children) go through convertContainerBlock
