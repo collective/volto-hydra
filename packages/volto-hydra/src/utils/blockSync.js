@@ -38,7 +38,7 @@
  * branch can be removed — until then, both branches are load-bearing.
  */
 import { getInjectedBlocksConfig } from './injectedVoltoConfig.js';
-import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField, convertValueContainer, insertBlockInContainer } from './blockPath.js';
+import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField, convertValueContainer, insertBlockInContainer, parseRegionPath, expandValueIntoRegion, collapseRegionToValue } from './blockPath.js';
 import { addableSiblingTypes, buildBlockPathMap } from '../../../hydra-js/buildBlockPathMap.js';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import {
@@ -2675,7 +2675,12 @@ function resolveRegionDescriptor(blockType, path, blocksConfig, intl) {
         return { ...base, isObjectList: false };
       }
       if (fieldDef.widget === 'object_list') {
-        return { ...base, isObjectList: true, idField: fieldDef.idField || '@id' };
+        return {
+          ...base,
+          isObjectList: true,
+          idField: fieldDef.idField || '@id',
+          typeField: fieldDef.typeField || null,
+        };
       }
       return null; // last segment is a scalar, not a region
     }
@@ -2685,6 +2690,24 @@ function resolveRegionDescriptor(blockType, path, blocksConfig, intl) {
     schema = fieldDef.schema;
   }
   return null;
+}
+
+/**
+ * Record a source container region's raw storage fields so convertBlockType's
+ * "preserve unmapped fields" step drops them (nothing should leak the old
+ * children back onto the target). A nested region lives under its wrapper
+ * object (regionPath[0]); a top-level object_list is the field itself; a
+ * top-level blocks_layout is the shared blocks/blocks_layout pair.
+ */
+function consumeSourceRegion(region, consumed) {
+  if (region.regionPath.length) {
+    consumed.add(region.regionPath[0]);
+  } else if (region.isObjectList) {
+    consumed.add(region.region);
+  } else {
+    consumed.add('blocks');
+    consumed.add('blocks_layout');
+  }
 }
 
 /**
@@ -2734,11 +2757,12 @@ export function convertBlockType(blockData, newType, blocksConfig, typeFieldName
     }
   }
 
-  // Region storage the reshape has moved out of the source (top-level
-  // `blocks`/`blocks_layout`, or a `data` object wrapper). Excluded from the
-  // "preserve unmapped fields" step below so a container's old children don't
-  // leak onto the target alongside the freshly moved+converted ones.
-  const sourceRegionFields = new Set();
+  // Source fields already consumed by a region conversion — a moved region's
+  // raw storage (top-level `blocks`/`blocks_layout`, a `data` wrapper, or an
+  // object_list field), or a scalar value field expanded into a region.
+  // Excluded from the "preserve unmapped fields" step below so nothing leaks
+  // onto the target alongside the freshly converted result.
+  const consumedSourceFields = new Set();
 
   for (let i = 1; i < path.length; i++) {
     const fromType = path[i - 1];
@@ -2766,6 +2790,49 @@ export function convertBlockType(blockData, newType, blocksConfig, typeFieldName
     // Apply mappings: source-specific first, then default as fallback
     const mappings = { ...targetMappings?.['@default'], ...targetMappings?.[fromType] };
     for (const [sourceField, targetField] of Object.entries(mappings)) {
+      // Value↔region: a `region/type/field` path (parseRegionPath) on one side
+      // bridges a single scalar VALUE and a container region — the same bridge
+      // convertValueContainer uses, via shared helpers.
+      //   value → container (EXPAND): target is `region/type/field`; wrap the
+      //     source scalar into one child of that type in the region.
+      const targetRp = parseRegionPath(targetField);
+      if (targetRp) {
+        const region = resolveRegionDescriptor(
+          toType,
+          targetRp.region,
+          blocksConfig,
+          intl,
+        );
+        if (!region) continue;
+        expandValueIntoRegion(
+          newData,
+          region,
+          targetRp,
+          canonicalData[sourceField],
+        );
+        consumedSourceFields.add(sourceField);
+        continue;
+      }
+      //   container → value (COLLAPSE): source is `region/type/field`; gather
+      //     the region's matching children's field into the target scalar.
+      const sourceRp = parseRegionPath(sourceField);
+      if (sourceRp) {
+        const region = resolveRegionDescriptor(
+          fromType,
+          sourceRp.region,
+          blocksConfig,
+          intl,
+        );
+        if (!region) continue;
+        const { value } = collapseRegionToValue(canonicalData, region, sourceRp);
+        const targetFieldDef = targetSchema?.properties?.[targetField];
+        newData[targetField] = convertFieldValue(
+          value,
+          widgetToTargetType(targetFieldDef?.widget, targetFieldDef),
+        );
+        consumeSourceRegion(region, consumedSourceFields);
+        continue;
+      }
       // Region↔region (container reshape): when the target field names a
       // container REGION, move the source region's children across and
       // cascade-convert each to a type the target region allows (transitively,
@@ -2810,19 +2877,7 @@ export function convertBlockType(blockData, newType, blocksConfig, typeFieldName
           return { id, block };
         });
         setChildBlockEntries(newData, targetRegion, converted);
-        // Drop the source region's raw storage so its old children aren't
-        // preserved back on top of the moved+converted ones: a nested region
-        // lives under its wrapper object (regionPath[0]); a top-level
-        // object_list is the field itself; a top-level blocks_layout is the
-        // shared blocks/blocks_layout pair.
-        if (sourceRegion.regionPath.length) {
-          sourceRegionFields.add(sourceRegion.regionPath[0]);
-        } else if (sourceRegion.isObjectList) {
-          sourceRegionFields.add(sourceRegion.region);
-        } else {
-          sourceRegionFields.add('blocks');
-          sourceRegionFields.add('blocks_layout');
-        }
+        consumeSourceRegion(sourceRegion, consumedSourceFields);
         continue;
       }
       if (canonicalData[sourceField] !== undefined) {
@@ -2849,10 +2904,10 @@ export function convertBlockType(blockData, newType, blocksConfig, typeFieldName
   const { [typeFieldName]: _originalType, ...originalFields } = blockData;
   const { [typeFieldName]: finalType, ...convertedFields } = currentData;
 
-  // The reshape already moved (and cascade-converted) the source region's
-  // children into the target region; drop the raw source storage so the old,
-  // wrong-typed children don't get preserved back on top of them.
-  for (const field of sourceRegionFields) delete originalFields[field];
+  // Region conversions already moved/collapsed the source's children (or
+  // expanded a scalar into a region); drop the consumed source fields so
+  // nothing stale gets preserved back on top of the converted result.
+  for (const field of consumedSourceFields) delete originalFields[field];
 
   // Coerce preserved fields to match target schema widget types
   // e.g., description (string from summary) → Slate array for hero

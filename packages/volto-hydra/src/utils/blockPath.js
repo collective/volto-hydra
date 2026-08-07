@@ -1281,6 +1281,46 @@ function mergeSlateValues(values) {
 }
 
 /**
+ * Wrap a scalar VALUE into ONE child block inside a container region — the
+ * value→container ("expand") half of the value/container bridge, shared by
+ * convertValueContainer and convertBlockType so there is one implementation.
+ * The child is `<rp.type | region default | slate>` carrying the value at
+ * `<rp.field>`. blocks_layout regions key children by a minted uid; object_list
+ * regions carry that id in their idField (setChildBlockEntries handles both).
+ */
+export function expandValueIntoRegion(targetBlock, region, rp, value, uuidGen) {
+  const childType = rp.type || region.allowedBlocks?.[0] || 'slate';
+  const child = { '@type': childType, [rp.field]: value };
+  const gen =
+    uuidGen ||
+    (() =>
+      globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2));
+  setChildBlockEntries(targetBlock, region, [
+    { id: child['@id'] || gen(), block: child },
+  ]);
+}
+
+/**
+ * Gather a container region's matching children's `<rp.field>` into a single
+ * scalar — the container→value ("collapse") half of the bridge. Slate values
+ * are merged; otherwise the first is kept. Returns { value, dropped } where
+ * `dropped` counts non-slate values discarded (so the caller can warn).
+ */
+export function collapseRegionToValue(sourceBlock, region, rp) {
+  const values = getChildBlockEntries(sourceBlock, region)
+    .filter(
+      (e) => !rp.type || getBlockType(e.block, region.typeField) === rp.type,
+    )
+    .map((e) => e.block?.[rp.field])
+    .filter((v) => v != null);
+  if (values.length === 0) return { value: undefined, dropped: 0 };
+  if (values.every((v) => Array.isArray(v))) {
+    return { value: mergeSlateValues(values), dropped: 0 };
+  }
+  return { value: values[0], dropped: values.length - 1 };
+}
+
+/**
  * Convert a block between a CONTAINER shape (a region of child blocks) and a VALUE
  * shape (a scalar field) via a region-crossing `fieldMappings` path.
  *
@@ -1334,23 +1374,13 @@ export function convertValueContainer(
     delete newBlock.blocks_layout;
     for (const r of descriptors) if (r.isObjectList) delete newBlock[r.region];
 
-    const values = getChildBlockEntries(sourceBlock, region)
-      .filter(
-        (e) => !rp.type || getBlockType(e.block, region.typeField) === rp.type,
-      )
-      .map((e) => e.block?.[rp.field])
-      .filter((v) => v != null);
-    const allSlate = values.length > 0 && values.every((v) => Array.isArray(v));
-    if (allSlate) {
-      newBlock[valueField] = mergeSlateValues(values);
-    } else {
-      newBlock[valueField] = values[0];
-      if (values.length > 1) {
-        // eslint-disable-next-line no-console
-        console.warn(
-          `[HYDRA] convertValueContainer: collapse dropped ${values.length - 1} non-slate value(s) for "${valueField}"`,
-        );
-      }
+    const { value, dropped } = collapseRegionToValue(sourceBlock, region, rp);
+    newBlock[valueField] = value;
+    if (dropped) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[HYDRA] convertValueContainer: collapse dropped ${dropped} non-slate value(s) for "${valueField}"`,
+      );
     }
     return newBlock;
   }
@@ -1365,9 +1395,7 @@ export function convertValueContainer(
   if (!region) return null;
   const newBlock = { ...sourceBlock, '@type': targetType };
   delete newBlock[valueField];
-  const childType = rp.type || region.allowedBlocks?.[0] || 'slate';
-  const child = { '@type': childType, [rp.field]: sourceBlock[valueField] };
-  setChildBlockEntries(newBlock, region, [{ id: child['@id'], block: child }]);
+  expandValueIntoRegion(newBlock, region, rp, sourceBlock[valueField]);
   return newBlock;
 }
 

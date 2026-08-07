@@ -102,6 +102,30 @@ const blocksConfig = {
     },
     fieldMappings: { tabs: { items: 'data/items' } },
   },
+
+  // --- value ↔ region bridge (single value block ↔ a container of slate) ---
+  // calloutValue is a VALUE block (one slate `message`); calloutBox is the
+  // container form (a region of slate children). The bridge uses the
+  // `region/type/field` path on the region side, declared target-side both ways
+  // so "Convert to…" (findConversionPath) has an edge in each direction.
+  calloutValue: {
+    blockSchema: { properties: { message: { widget: 'slate' } } },
+    // calloutBox → calloutValue (COLLAPSE): gather items' slate `value` → message.
+    fieldMappings: { calloutBox: { 'items/slate/value': 'message' } },
+  },
+  calloutBox: {
+    blockSchema: {
+      properties: {
+        items: {
+          widget: 'blocks_layout',
+          allowedBlocks: ['slate'],
+          defaultBlockType: 'slate',
+        },
+      },
+    },
+    // calloutValue → calloutBox (EXPAND): wrap message into one slate child.
+    fieldMappings: { calloutValue: { message: 'items/slate/value' } },
+  },
 };
 
 const intl = { formatMessage: (m) => m?.defaultMessage ?? '' };
@@ -218,5 +242,60 @@ describe('convertBlockType — container↔container reshape', () => {
     expect(cells.map((c) => c.title)).toEqual(['One', 'Two']);
     const c0 = cells[0].blocks[cells[0].blocks_layout.items[0]];
     expect(c0.value[0].children[0].text).toBe('first');
+  });
+});
+
+describe('convertBlockType — single value ↔ region', () => {
+  test('expand: a value block becomes a container with one slate child', () => {
+    const value = { '@type': 'calloutValue', message: slate('heads up').value };
+    const out = convertBlockType(
+      value,
+      'calloutBox',
+      blocksConfig,
+      '@type',
+      intl,
+    );
+    expect(out['@type']).toBe('calloutBox');
+    // The scalar `message` was wrapped into ONE slate child in the region...
+    const ids = out.blocks_layout.items;
+    expect(ids).toHaveLength(1);
+    const child = out.blocks[ids[0]];
+    expect(child['@type']).toBe('slate');
+    expect(child.value[0].children[0].text).toBe('heads up');
+    // ...and the raw scalar did not leak onto the container.
+    expect(out.message).toBeUndefined();
+  });
+
+  test('collapse: a container of slate children becomes one value', () => {
+    const box = {
+      '@type': 'calloutBox',
+      blocks: { s1: slate('line one'), s2: slate('line two') },
+      blocks_layout: { items: ['s1', 's2'] },
+    };
+    const out = convertBlockType(
+      box,
+      'calloutValue',
+      blocksConfig,
+      '@type',
+      intl,
+    );
+    expect(out['@type']).toBe('calloutValue');
+    // Slate children merged into the single `message` value...
+    expect(Array.isArray(out.message)).toBe(true);
+    const text = JSON.stringify(out.message);
+    expect(text).toContain('line one');
+    expect(text).toContain('line two');
+    // ...and the region storage did not leak onto the value block.
+    expect(out.blocks).toBeUndefined();
+    expect(out.blocks_layout).toBeUndefined();
+  });
+
+  test('roundtrip value → container → value preserves the message', () => {
+    const value = { '@type': 'calloutValue', message: slate('remember me').value };
+    const box = convertBlockType(value, 'calloutBox', blocksConfig, '@type', intl);
+    const back = convertBlockType(box, 'calloutValue', blocksConfig, '@type', intl);
+    expect(back['@type']).toBe('calloutValue');
+    expect(JSON.stringify(back.message)).toContain('remember me');
+    expect(back.blocks).toBeUndefined();
   });
 });
