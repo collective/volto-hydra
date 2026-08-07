@@ -2218,7 +2218,7 @@ export function ensureEmptyBlockIfEmpty(
   // readOnly would freeze editing a template directly (template-edit-mode "a template page
   // loads + edits like a normal page"). Add-time seeds (initializeContainerBlock) DO inherit.
   const blockType = getEmptyBlockType(containerConfig);
-  const blockData = seedTemplateChild(
+  let blockData = seedTemplateChild(
     { '@type': blockType },
     blockType,
     newBlockId,
@@ -2227,6 +2227,27 @@ export function ensureEmptyBlockIfEmpty(
     uuidGenerator,
     { intl, metadata, properties, inheritFixed: false },
   );
+  // A FORCED region (allowedLayouts) is template-controlled: its default empty must
+  // be a LOCKED template member so it can't be filled per-page — you unlock the
+  // template first (like the footer). A fully-empty forced template has no anchor
+  // block to inherit from, so derive the membership from the forced layout id
+  // (forced layouts use templateInstanceId === templateId; templateId is the
+  // allowedLayouts entry — see helpers/index.js forced-apply). Reuse the SAME
+  // inheritTemplateMembership the slot-seed path uses; view-mode merge is untouched
+  // (this only runs in the editor's empty-seeding).
+  const forcedLayout = containerConfig.allowedLayouts?.find(Boolean);
+  if (forcedLayout) {
+    blockData = inheritTemplateMembership(
+      blockData,
+      {
+        templateInstanceId: forcedLayout,
+        templateId: forcedLayout,
+        fixed: true,
+        readOnly: true,
+      },
+      { inheritFixed: true },
+    );
+  }
   const blocksObj = { ...parentBlock.blocks, [newBlockId]: blockData };
   const updatedParentBlock = setContainerItems(
     parentBlock,
