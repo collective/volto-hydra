@@ -4541,7 +4541,15 @@ const Iframe = (props) => {
       return convertContainerBlock(props, bpm, blockId, newType, blocksConfig, intl);
     }
     const typeFieldName = bpm?.[blockId]?.typeField || '@type';
-    const newBlockData = convertBlockType(blockData, newType, blocksConfig, typeFieldName, intl);
+    let newBlockData = convertBlockType(blockData, newType, blocksConfig, typeFieldName, intl);
+    // Converting a TEMPLATE-MEMBER block keeps it template content — carry its
+    // membership over. convertBlockType builds a fresh block from the type's
+    // fields, so without this, filling a locked empty (in template-edit-mode)
+    // would drop templateId/templateInstanceId/fixed/readOnly and the new block
+    // would become per-page (and lose its lock). No-op for normal page blocks.
+    for (const k of ['templateId', 'templateInstanceId', 'slotId', 'fixed', 'readOnly']) {
+      if (blockData[k] !== undefined) newBlockData = { ...newBlockData, [k]: blockData[k] };
+    }
     return updateBlockById(props, bpm, blockId, newBlockData);
   };
 
