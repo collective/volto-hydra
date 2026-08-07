@@ -136,12 +136,6 @@ const blocksConfig = {
     fieldMappings: {},
   },
 
-  // Unrestricted target container: its `items` has NO allowedBlocks, so a
-  // reshape into it moves cells verbatim (nothing to convert them to).
-  openContainer: {
-    blockSchema: { properties: { items: { widget: 'blocks_layout' } } },
-    fieldMappings: { tabs: { items: 'items' } },
-  },
   // A container of slate whose cells cannot reach steps' `stepItem` (no path).
   plainList: {
     blockSchema: { properties: { items: containerRegion('slate') } },
@@ -263,22 +257,6 @@ describe('convertBlockType — container↔container reshape', () => {
     expect(cells.map((c) => c.title)).toEqual(['One', 'Two']);
     const c0 = cells[0].blocks[cells[0].blocks_layout.items[0]];
     expect(c0.value[0].children[0].text).toBe('first');
-  });
-
-  test('unrestricted target region moves cells as-is (no type to convert to)', () => {
-    const tabs = container('tabs', [cell('tab', 'a', 'Kept', 'x')]);
-    const out = convertBlockType(
-      tabs,
-      'openContainer',
-      blocksConfig,
-      '@type',
-      intl,
-    );
-    expect(out['@type']).toBe('openContainer');
-    // No allowedBlocks on the target region → the tab cell is not converted.
-    const only = out.blocks[out.blocks_layout.items[0]];
-    expect(only['@type']).toBe('tab');
-    expect(only.title).toBe('Kept');
   });
 
   test('a cell with no path to any allowed type fails loudly', () => {

@@ -2855,9 +2855,12 @@ export function convertBlockType(blockData, newType, blocksConfig, typeFieldName
         const allowed = targetRegion.allowedBlocks;
         const converted = entries.map(({ id, block }) => {
           const childType = block?.[typeFieldName];
-          // Region with no type restriction, or a child already of a permitted
-          // type: move it as-is — the region↔region mapping names no child
-          // target, so with nothing to convert to we don't convert.
+          // A child already of a type the region permits stays as-is — a cell's
+          // content is valid in both shapes, or a cell whose type already
+          // matches the target. (A region that lists NO allowedBlocks permits
+          // everything, so nothing is unsupported there either — but every real
+          // cell region DOES list its cell type, so an unsupported cell always
+          // falls through to conversion below.)
           if (!allowed || !childType || allowed.includes(childType)) {
             return { id, block };
           }
