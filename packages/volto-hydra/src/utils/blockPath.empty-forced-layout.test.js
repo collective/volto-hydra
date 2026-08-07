@@ -196,8 +196,13 @@ describe('forced empty layout is empty but LOCKED until the template is unlocked
     ).toBeTruthy();
   });
 
-  test('the seeded empty is read-only (locked) so it cannot be filled per-page', async () => {
+  test('the seeded empty is fixed + read-only (locked) — chrome, not per-page content', async () => {
     const { seed } = await seedForcedEmpty();
+    // fixed: it's template chrome — can't be moved or deleted in normal mode.
+    expect(seed?.fixed, 'a forced-layout empty must be fixed (template chrome)').toBe(
+      true,
+    );
+    // readOnly: locked — can't be edited/filled until the template is unlocked.
     expect(
       seed?.readOnly,
       'a forced-layout empty must be locked until the template is unlocked',
