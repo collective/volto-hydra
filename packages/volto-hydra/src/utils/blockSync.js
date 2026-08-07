@@ -2668,8 +2668,6 @@ function resolveRegionDescriptor(blockType, path, blocksConfig, intl) {
         region: segs[i],
         regionPath,
         allowedBlocks: fieldDef.allowedBlocks || null,
-        defaultBlockType:
-          fieldDef.defaultBlockType || fieldDef.allowedBlocks?.[0] || null,
       };
       if (fieldDef.widget === 'blocks_layout') {
         return { ...base, isObjectList: false };
@@ -2857,18 +2855,23 @@ export function convertBlockType(blockData, newType, blocksConfig, typeFieldName
         const allowed = targetRegion.allowedBlocks;
         const converted = entries.map(({ id, block }) => {
           const childType = block?.[typeFieldName];
-          // Unrestricted region, or the child is already a permitted type.
+          // Region with no type restriction, or a child already of a permitted
+          // type: move it as-is — the region↔region mapping names no child
+          // target, so with nothing to convert to we don't convert.
           if (!allowed || !childType || allowed.includes(childType)) {
             return { id, block };
           }
-          // Restricted region + a disallowed child: convert it to the region's
-          // default. That default must itself be allowed — otherwise the cell
-          // can't legally live here and we fail loudly rather than write an
-          // invalid child.
-          const childTarget = targetRegion.defaultBlockType;
-          if (!childTarget || !allowed.includes(childTarget)) {
+          // Restricted region + a disallowed child: convert it to the first
+          // allowed type its OWN fieldMappings can reach (transitively). The
+          // child's conversion graph decides the target — not a region default.
+          // No reachable allowed type ⇒ the cell can't legally live here ⇒ fail
+          // loudly rather than write invalid data.
+          const childTarget = allowed.find((t) =>
+            findConversionPath(childType, t, blocksConfig),
+          );
+          if (!childTarget) {
             throw new Error(
-              `convertBlockType: cannot place child "${childType}" in region "${targetRegion.region}" of "${toType}" (allowed: ${allowed.join(', ')}; no valid default block type)`,
+              `convertBlockType: child "${childType}" has no conversion to any type allowed in region "${targetRegion.region}" of "${toType}" (allowed: ${allowed.join(', ')})`,
             );
           }
           return {

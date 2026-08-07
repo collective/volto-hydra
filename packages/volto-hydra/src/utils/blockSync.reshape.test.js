@@ -84,7 +84,7 @@ const blocksConfig = {
   },
   steps: {
     blockSchema: { properties: { items: containerRegion('stepItem') } },
-    fieldMappings: { tabs: { items: 'items' } },
+    fieldMappings: { tabs: { items: 'items' }, plainList: { items: 'items' } },
   },
   definitionList: {
     blockSchema: { properties: { items: containerRegion('definitionItem') } },
@@ -133,6 +133,18 @@ const blocksConfig = {
   // A value block whose bridge names a child type the target region disallows.
   badValue: {
     blockSchema: { properties: { message: { widget: 'slate' } } },
+    fieldMappings: {},
+  },
+
+  // Unrestricted target container: its `items` has NO allowedBlocks, so a
+  // reshape into it moves cells verbatim (nothing to convert them to).
+  openContainer: {
+    blockSchema: { properties: { items: { widget: 'blocks_layout' } } },
+    fieldMappings: { tabs: { items: 'items' } },
+  },
+  // A container of slate whose cells cannot reach steps' `stepItem` (no path).
+  plainList: {
+    blockSchema: { properties: { items: containerRegion('slate') } },
     fieldMappings: {},
   },
 };
@@ -251,6 +263,31 @@ describe('convertBlockType — container↔container reshape', () => {
     expect(cells.map((c) => c.title)).toEqual(['One', 'Two']);
     const c0 = cells[0].blocks[cells[0].blocks_layout.items[0]];
     expect(c0.value[0].children[0].text).toBe('first');
+  });
+
+  test('unrestricted target region moves cells as-is (no type to convert to)', () => {
+    const tabs = container('tabs', [cell('tab', 'a', 'Kept', 'x')]);
+    const out = convertBlockType(
+      tabs,
+      'openContainer',
+      blocksConfig,
+      '@type',
+      intl,
+    );
+    expect(out['@type']).toBe('openContainer');
+    // No allowedBlocks on the target region → the tab cell is not converted.
+    const only = out.blocks[out.blocks_layout.items[0]];
+    expect(only['@type']).toBe('tab');
+    expect(only.title).toBe('Kept');
+  });
+
+  test('a cell with no path to any allowed type fails loudly', () => {
+    // plainList holds `slate` cells; steps' region allows only `stepItem`, and
+    // slate has no conversion to stepItem — so the reshape must not invent one.
+    const list = container('plainList', [slate('orphan')]);
+    expect(() =>
+      convertBlockType(list, 'steps', blocksConfig, '@type', intl),
+    ).toThrow(/no conversion to any type allowed/);
   });
 });
 
