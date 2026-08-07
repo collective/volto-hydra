@@ -48,6 +48,7 @@ import {
   getFieldDef,
   getFieldTypeString,
   getChildBlockEntries,
+  setChildBlockEntries,
   getBlockType,
   isSlateFieldType,
   slateNodesText,
@@ -2644,6 +2645,49 @@ export function widgetToTargetType(widget, fieldDef) {
 }
 
 /**
+ * Resolve a fieldMapping value that names a container REGION (a `blocks_layout`
+ * or `object_list` field), possibly nested under `widget:'object'` wrappers,
+ * into a getChildBlockEntries/setChildBlockEntries descriptor. Segments are
+ * '/'-separated: every segment but the last must be an object wrapper (→
+ * regionPath), the last a region field. So `"items"` → { region:'items',
+ * regionPath:[] } and `"data/items"` → { region:'items', regionPath:['data'] }.
+ * Returns null when the path is NOT a region (a plain scalar mapping) — that's
+ * how convertBlockType tells a region↔region mapping from a scalar one.
+ */
+function resolveRegionDescriptor(blockType, path, blocksConfig, intl) {
+  if (typeof path !== 'string') return null;
+  const segs = path.split('/');
+  let schema = getResolvedSchema(blocksConfig, blockType, intl);
+  const regionPath = [];
+  for (let i = 0; i < segs.length; i++) {
+    const fieldDef = schema?.properties?.[segs[i]];
+    if (!fieldDef) return null;
+    const isLast = i === segs.length - 1;
+    if (isLast) {
+      const base = {
+        region: segs[i],
+        regionPath,
+        allowedBlocks: fieldDef.allowedBlocks || null,
+        defaultBlockType:
+          fieldDef.defaultBlockType || fieldDef.allowedBlocks?.[0] || null,
+      };
+      if (fieldDef.widget === 'blocks_layout') {
+        return { ...base, isObjectList: false };
+      }
+      if (fieldDef.widget === 'object_list') {
+        return { ...base, isObjectList: true, idField: fieldDef.idField || '@id' };
+      }
+      return null; // last segment is a scalar, not a region
+    }
+    // Non-last segment must be an object wrapper to descend into.
+    if (fieldDef.widget !== 'object' || !fieldDef.schema) return null;
+    regionPath.push(segs[i]);
+    schema = fieldDef.schema;
+  }
+  return null;
+}
+
+/**
  * Convert a block from one type to another using fieldMappings.
  *
  * Supports transitive conversions - if Image→Teaser and Teaser→Hero exist,
@@ -2690,6 +2734,12 @@ export function convertBlockType(blockData, newType, blocksConfig, typeFieldName
     }
   }
 
+  // Region storage the reshape has moved out of the source (top-level
+  // `blocks`/`blocks_layout`, or a `data` object wrapper). Excluded from the
+  // "preserve unmapped fields" step below so a container's old children don't
+  // leak onto the target alongside the freshly moved+converted ones.
+  const sourceRegionFields = new Set();
+
   for (let i = 1; i < path.length; i++) {
     const fromType = path[i - 1];
     const toType = path[i];
@@ -2716,6 +2766,65 @@ export function convertBlockType(blockData, newType, blocksConfig, typeFieldName
     // Apply mappings: source-specific first, then default as fallback
     const mappings = { ...targetMappings?.['@default'], ...targetMappings?.[fromType] };
     for (const [sourceField, targetField] of Object.entries(mappings)) {
+      // Region↔region (container reshape): when the target field names a
+      // container REGION, move the source region's children across and
+      // cascade-convert each to a type the target region allows (transitively,
+      // via this same converter). A region is a region — blocks_layout or
+      // object_list, top-level or nested (`data/items`) — the child-entry
+      // helpers abstract the storage.
+      const targetRegion = resolveRegionDescriptor(
+        toType,
+        targetField,
+        blocksConfig,
+        intl,
+      );
+      if (targetRegion) {
+        const sourceRegion = resolveRegionDescriptor(
+          fromType,
+          sourceField,
+          blocksConfig,
+          intl,
+        );
+        if (!sourceRegion) continue;
+        const entries = getChildBlockEntries(canonicalData, sourceRegion);
+        const allowed = targetRegion.allowedBlocks;
+        const converted = entries.map(({ id, block }) => {
+          const childType = block?.[typeFieldName];
+          if (
+            allowed &&
+            childType &&
+            !allowed.includes(childType) &&
+            targetRegion.defaultBlockType
+          ) {
+            return {
+              id,
+              block: convertBlockType(
+                block,
+                targetRegion.defaultBlockType,
+                blocksConfig,
+                typeFieldName,
+                intl,
+              ),
+            };
+          }
+          return { id, block };
+        });
+        setChildBlockEntries(newData, targetRegion, converted);
+        // Drop the source region's raw storage so its old children aren't
+        // preserved back on top of the moved+converted ones: a nested region
+        // lives under its wrapper object (regionPath[0]); a top-level
+        // object_list is the field itself; a top-level blocks_layout is the
+        // shared blocks/blocks_layout pair.
+        if (sourceRegion.regionPath.length) {
+          sourceRegionFields.add(sourceRegion.regionPath[0]);
+        } else if (sourceRegion.isObjectList) {
+          sourceRegionFields.add(sourceRegion.region);
+        } else {
+          sourceRegionFields.add('blocks');
+          sourceRegionFields.add('blocks_layout');
+        }
+        continue;
+      }
       if (canonicalData[sourceField] !== undefined) {
         const targetFieldDef = targetSchema?.properties?.[targetField];
         const targetType = widgetToTargetType(targetFieldDef?.widget, targetFieldDef);
@@ -2739,6 +2848,11 @@ export function convertBlockType(blockData, newType, blocksConfig, typeFieldName
   // that exist in source and target but aren't explicitly mapped through intermediate types
   const { [typeFieldName]: _originalType, ...originalFields } = blockData;
   const { [typeFieldName]: finalType, ...convertedFields } = currentData;
+
+  // The reshape already moved (and cascade-converted) the source region's
+  // children into the target region; drop the raw source storage so the old,
+  // wrong-typed children don't get preserved back on top of them.
+  for (const field of sourceRegionFields) delete originalFields[field];
 
   // Coerce preserved fields to match target schema widget types
   // e.g., description (string from summary) → Slate array for hero
