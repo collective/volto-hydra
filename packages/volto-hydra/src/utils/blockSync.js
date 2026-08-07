@@ -2668,6 +2668,11 @@ function resolveRegionDescriptor(blockType, path, blocksConfig, intl) {
         region: segs[i],
         regionPath,
         allowedBlocks: fieldDef.allowedBlocks || null,
+        // The region's synced-type field, if any (e.g. a card-grid's
+        // `variation`). Passed to addableSiblingTypes so a reshape resolves the
+        // SAME addable set as add/DnD, narrowing a synced container to its one
+        // item type rather than the raw allowedBlocks list.
+        itemTypeField: fieldDef.itemTypeField || null,
       };
       if (fieldDef.widget === 'blocks_layout') {
         return { ...base, isObjectList: false };
@@ -2852,7 +2857,18 @@ export function convertBlockType(blockData, newType, blocksConfig, typeFieldName
         );
         if (!sourceRegion) continue;
         const entries = getChildBlockEntries(canonicalData, sourceRegion);
-        const allowed = targetRegion.allowedBlocks;
+        // Resolve the addable set through the SAME resolver as add/DnD/type-sync
+        // (addableSiblingTypes) rather than reading the raw schema allowedBlocks,
+        // so a reshape narrows a synced target container to its one item type.
+        // (Ancestor `disallowDescendantBlocks` needs live pathMap context the
+        // caller applies to the top-level convert; not available in this pure
+        // cascade.)
+        const allowed = addableSiblingTypes(
+          targetRegion.allowedBlocks,
+          targetRegion.itemTypeField,
+          newData,
+          blocksConfig,
+        );
         const converted = entries.map(({ id, block }) => {
           const childType = block?.[typeFieldName];
           // A child already of a type the region permits stays as-is — a cell's
