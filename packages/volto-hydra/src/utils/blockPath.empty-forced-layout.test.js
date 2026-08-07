@@ -9,6 +9,7 @@
  */
 import { describe, test, expect } from 'vitest';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
+import { getBlockAddability } from '@volto-hydra/helpers';
 import {
   buildBlockPathMap,
   ensureEmptyBlockIfEmpty,
@@ -138,5 +139,80 @@ describe('empty forced-layout data-prep pipeline (merge + seed)', () => {
     const resolved = getBlockById(seeded, map, seedId);
     expect(resolved, `getBlockById must resolve the seed ${seedId}`).toBeTruthy();
     expect(resolved?.['@type']).toBe('empty');
+  });
+});
+
+// A FORCED layout (allowedLayouts) region is template-controlled — its content
+// lives in the shared template and is edited centrally. So when such a region is
+// empty by default, its seeded placeholder must be a LOCKED template member: it
+// shows empty, but you cannot fill/edit it until you UNLOCK the template. If the
+// seed is plain page content (as it is today), filling it silently writes
+// per-page instead of to the shared template — the announcement stops being
+// site-wide. This is the "unlock like the footer" contract.
+describe('forced empty layout is empty but LOCKED until the template is unlocked', () => {
+  const template = {
+    '@id': '/templates/site-announcement',
+    '@type': 'Document',
+    blocks: {},
+    blocks_layout: { items: [] },
+  };
+  const cfg = makeCfg({ allowedBlocks: ['globalAlert'], defaultBlockType: 'empty' });
+
+  async function seedForcedEmpty() {
+    const page = {
+      '@type': 'Document',
+      blocks: { a: { '@type': 'slate' } },
+      blocks_layout: { items: ['a'], announcement: [] },
+    };
+    const { merged } = await mergeTemplatesIntoPage(page, {
+      loadTemplate: async () => template,
+      pageBlocksFields: {
+        items: {},
+        announcement: { allowedLayouts: ['/templates/site-announcement'] },
+      },
+      uuidGenerator: () => 'ann-seed',
+      blocksConfig: cfg,
+      intl,
+    });
+    let map = buildBlockPathMap(merged, cfg, intl);
+    const seeded = ensureEmptyBlockIfEmpty(
+      merged,
+      { parentId: PAGE_BLOCK_UID },
+      map,
+      () => 'ann-seed',
+      cfg,
+      { intl, properties: merged },
+    );
+    map = buildBlockPathMap(seeded, cfg, intl);
+    const id = seeded.blocks_layout.announcement[0];
+    return { seed: seeded.blocks[id], id };
+  }
+
+  test('the seeded empty is a template member (has a templateInstanceId)', async () => {
+    const { seed } = await seedForcedEmpty();
+    expect(
+      seed?.templateInstanceId,
+      'a forced-layout empty must belong to the template instance',
+    ).toBeTruthy();
+  });
+
+  test('the seeded empty is read-only (locked) so it cannot be filled per-page', async () => {
+    const { seed } = await seedForcedEmpty();
+    expect(
+      seed?.readOnly,
+      'a forced-layout empty must be locked until the template is unlocked',
+    ).toBe(true);
+  });
+
+  test('locked outside template-edit-mode, replaceable once the template is unlocked', async () => {
+    const { seed, id } = await seedForcedEmpty();
+    const map = { [id]: { blockType: 'empty' } };
+    // Not editing the template → the empty is locked (no '+').
+    expect(getBlockAddability(id, map, seed, null).canReplace).toBe(false);
+    // Unlocked (the empty's instance is in the set of unlocked templates) →
+    // fillable. templateEditMode is an ARRAY of unlocked instance ids (v2).
+    expect(
+      getBlockAddability(id, map, seed, [seed.templateInstanceId]).canReplace,
+    ).toBe(true);
   });
 });

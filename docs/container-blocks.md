@@ -307,6 +307,18 @@ Use this for optional site chrome — e.g. a header announcement that is usually
 absent but can hold a single global alert when needed. (Because the seed is
 `"empty"`, the frontend must render `empty` as a selectable slot — see below.)
 
+**Forced regions are locked until unlocked.** When the region is a **forced
+layout** (`allowedLayouts`), it is template-controlled — its content lives in the
+shared template and is edited *centrally*, like a branded footer. So the seeded
+empty is stamped as a **locked template member** (`readOnly`, with the forced
+layout's `templateId`/`templateInstanceId`): it shows empty, but you cannot fill
+it until you **unlock** the template (enter template-edit-mode). This prevents an
+editor from silently filling it per-page — the announcement stays site-wide.
+Filling then happens in template-edit-mode and locking publishes it everywhere.
+(This stamping happens in the editor's empty-seeding — `ensureEmptyBlockIfEmpty`
+— so **view-mode merging still leaves an empty forced layout empty**; no empty is
+ever inserted at render time.)
+
 ### `empty` is a universal placeholder — renderers must tolerate it
 
 In a no-default, multi-allowed region, `@type: "empty"` can appear in **any** container — including transiently, the moment a child is deleted and before the user picks a replacement. You never list `"empty"` in `allowedBlocks`; it isn't a type you opt into. So every container renderer has to render an `empty` child without erroring.
