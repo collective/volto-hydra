@@ -669,7 +669,10 @@ function renderHeroBlock(block) {
     const buttonText = block.buttonText || '';
     const buttonLink = getLinkUrl(block.buttonLink);
     const imageSrc = getImageUrl(block.image);
-    const description = block.description || [{ type: 'p', children: [{ text: '' }] }];
+    // Data-driven: no data ⇒ no element (issue #296). Do NOT substitute an empty
+    // paragraph — that renders an editable element for a field with no content and
+    // leaks an empty <p> into view markup.
+    const description = block.description || [];
 
     // Render subheading as textarea (preserve newlines)
     const subheadingHtml = subheading.replace(/\n/g, '<br>');
@@ -692,18 +695,27 @@ function renderHeroBlock(block) {
         }
     });
 
-    // Image with data-edit-media for inline image selection
+    // Data-driven (issue #296): no image ⇒ no element. The grey stand-in that used
+    // to render here was the "always-render" hack — it gave an inline target for an
+    // empty field at the cost of an empty div in view markup.
     const imageHtml = imageSrc
         ? `<img data-edit-media="image" src="${imageSrc}" alt="Hero image" style="max-width: 100%; height: auto; margin-bottom: 10px;" />`
-        : `<div data-edit-media="image" style="width: 100%; height: 150px; background: #e5e5e5; margin-bottom: 10px; border-radius: 4px;"></div>`;
+        : '';
+
+    // The <a> hosts TWO fields (buttonText + buttonLink), so it exists when the
+    // button exists — i.e. when it has a label or a target. This is the case the
+    // per-block `hideButton` flag was papering over.
+    const buttonHtml = (block.buttonText || block.buttonLink)
+        ? `<a data-edit-text="buttonText" data-edit-link="buttonLink" href="${buttonLink}" style="display: inline-block; padding: 10px 20px; background: #007eb1; color: white; text-decoration: none; border-radius: 4px; cursor: pointer;">${buttonText}</a>`
+        : '';
 
     return `
         <div class="hero-block" style="padding: 20px; background: #f0f0f0; border-radius: 8px;">
             ${imageHtml}
-            <h1 data-edit-text="heading">${heading}</h1>
-            <p data-edit-text="subheading" style="font-size: 1.2em; color: #666;">${subheadingHtml}</p>
-            <div class="hero-description" style="margin: 10px 0;">${descriptionHtml}</div>
-            <a data-edit-text="buttonText" data-edit-link="buttonLink" href="${buttonLink}" style="display: inline-block; padding: 10px 20px; background: #007eb1; color: white; text-decoration: none; border-radius: 4px; cursor: pointer;">${buttonText}</a>
+            ${heading ? `<h1 data-edit-text="heading">${heading}</h1>` : ''}
+            ${subheading ? `<p data-edit-text="subheading" style="font-size: 1.2em; color: #666;">${subheadingHtml}</p>` : ''}
+            ${descriptionHtml ? `<div class="hero-description" style="margin: 10px 0;">${descriptionHtml}</div>` : ''}
+            ${buttonHtml}
         </div>
     `;
 }
@@ -721,7 +733,8 @@ function renderHeroBlockClean(block) {
     const buttonText = block.buttonText || '';
     const buttonLink = getLinkUrl(block.buttonLink);
     const imageSrc = getImageUrl(block.image);
-    const description = block.description || [{ type: 'p', children: [{ text: '' }] }];
+    // Data-driven: no data ⇒ no element (issue #296).
+    const description = block.description || [];
 
     // Render subheading as textarea (preserve newlines)
     const subheadingHtml = subheading.replace(/\n/g, '<br>');
@@ -744,19 +757,25 @@ function renderHeroBlockClean(block) {
         }
     });
 
-    // Image - uses class instead of data-edit-media
+    // Image - uses class instead of data-edit-media. Data-driven (issue #296):
+    // no image ⇒ no element, so the comment selector simply matches nothing.
     const imageHtml = imageSrc
         ? `<img class="hero-image" src="${imageSrc}" alt="Hero image" style="max-width: 100%; height: auto; margin-bottom: 10px;" />`
-        : `<div class="hero-image" style="width: 100%; height: 150px; background: #e5e5e5; margin-bottom: 10px; border-radius: 4px;"></div>`;
+        : '';
+
+    // One element, two fields (buttonText + buttonLink) — see renderHeroBlock.
+    const buttonHtml = (block.buttonText || block.buttonLink)
+        ? `<a class="hero-button" href="${buttonLink}" style="display: inline-block; padding: 10px 20px; background: #007eb1; color: white; text-decoration: none; border-radius: 4px; cursor: pointer;">${buttonText}</a>`
+        : '';
 
     // No data-* attributes on fields - comment syntax will add them via selectors
     return `
         <div class="hero-block" style="padding: 20px; background: #f0f0f0; border-radius: 8px;">
             ${imageHtml}
-            <h1 class="hero-heading">${heading}</h1>
-            <p class="hero-subheading" style="font-size: 1.2em; color: #666;">${subheadingHtml}</p>
-            <div class="hero-description" style="margin: 10px 0;">${descriptionHtml}</div>
-            <a class="hero-button" href="${buttonLink}" style="display: inline-block; padding: 10px 20px; background: #007eb1; color: white; text-decoration: none; border-radius: 4px; cursor: pointer;">${buttonText}</a>
+            ${heading ? `<h1 class="hero-heading">${heading}</h1>` : ''}
+            ${subheading ? `<p class="hero-subheading" style="font-size: 1.2em; color: #666;">${subheadingHtml}</p>` : ''}
+            ${descriptionHtml ? `<div class="hero-description" style="margin: 10px 0;">${descriptionHtml}</div>` : ''}
+            ${buttonHtml}
         </div>
     `;
 }

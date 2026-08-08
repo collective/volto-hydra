@@ -56,19 +56,23 @@
   <!-- hydra edit-text=heading(.hero-heading) edit-text=subheading(.hero-subheading) edit-media=image(.hero-image) edit-text=buttonText(.hero-button) edit-link=buttonLink(.hero-button) -->
   <div :data-block-uid="block_uid"
        class="hero-block p-5 bg-gray-100 rounded-lg">
-    <!-- Image - uses class for selector, no data-edit-media -->
+    <!-- Image - uses class for selector, no data-edit-media.
+         Data-driven (issue #296): no data ⇒ no element. The `v-else` grey box that
+         used to sit here was the "always-render" hack — an inline target for an
+         empty field, at the cost of an empty div in view markup. -->
     <img v-if="block.image" class="hero-image w-full h-auto max-h-64 object-cover mb-4 rounded"
          :src="getImageUrl(block.image)"
          alt="Hero image" />
-    <div v-else class="hero-image w-full h-40 bg-gray-200 mb-4 rounded cursor-pointer">
+    <h1 v-if="block.heading" class="hero-heading text-3xl font-bold mb-2">{{ block.heading }}</h1>
+    <p v-if="block.subheading" class="hero-subheading text-xl text-gray-600 mb-4">{{ block.subheading }}</p>
+    <div v-if="block.description" class="hero-description mb-4" data-edit-text="description">
+      <RichText v-for="node in block.description" :key="node" :node="node" />
     </div>
-    <h1 class="hero-heading text-3xl font-bold mb-2">{{ block.heading }}</h1>
-    <p class="hero-subheading text-xl text-gray-600 mb-4">{{ block.subheading }}</p>
-    <div class="hero-description mb-4" data-edit-text="description">
-      <RichText v-for="node in (block.description || [])" :key="node" :node="node" />
-    </div>
-    <!-- Button - uses class for selectors -->
-    <a class="hero-button inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 no-underline"
+    <!-- Button - uses class for selectors. One element hosts TWO fields
+         (buttonText + buttonLink), so it exists when the button exists: it has a
+         label or a target. This is the case a per-block `hideButton` papers over. -->
+    <a v-if="block.buttonText || block.buttonLink"
+       class="hero-button inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 no-underline"
        :href="getUrl(block.buttonLink)">
       {{ block.buttonText }}
     </a>
