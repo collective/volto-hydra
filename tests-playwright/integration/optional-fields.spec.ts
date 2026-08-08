@@ -211,13 +211,15 @@ test.describe('Optional fields — reveal toggle (#296)', () => {
     // "No data ⇒ no element" would otherwise make a field a trapdoor: delete the
     // last character and the element the caret sits in stops existing.
     //
-    // For TEXT this already holds without the reveal machinery — hydra suppresses
-    // the re-render for the field being typed in — so this test passes with
-    // keepFieldRevealed disabled. It's kept because the property only started
-    // being AT RISK once renderers went data-driven. The variant that genuinely
-    // depends on keepFieldRevealed is media (clear an image, upload a replacement
-    // into the same overlay); inline-media-link-editing.spec.ts:116/413/475/546/629
-    // cover it and fail outright without it.
+    // It holds without any reveal machinery, because hydra suppresses the
+    // re-render for the field being typed in. Worth pinning even so: the property
+    // only started being AT RISK once renderers went data-driven.
+    //
+    // Note this is text-specific. Emptying a MEDIA field does remove its element,
+    // deliberately — deleting an image has to mean the image is gone, or there's no
+    // single action for "I want no image". Re-adding one inline is an explicit
+    // reveal, and swapping never needs either (the toolbar image button replaces it
+    // in one click). See inline-media-link-editing.spec.ts.
     //
     // hero-full's SUBHEADING is used because it starts POPULATED and owns its
     // element outright, unlike buttonText, whose <a> would survive on buttonLink

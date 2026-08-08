@@ -3339,19 +3339,6 @@ export class Bridge {
       }
     }
 
-    // Keep whatever the editor is editing revealed, so emptying it doesn't delete
-    // the element out from under them (clearing an image via the overlay X, or
-    // deleting the last character of a heading).
-    //
-    // Safe to do on every BLOCK_SELECTED, including plain selection: a focused
-    // field is derived from an element that EXISTS, and an element exists only
-    // when the field has content or is already revealed. So this can make an
-    // existing element sticky but can never materialise a new one — reveal stays
-    // explicit.
-    this.keepFieldRevealed(blockUid, focusedFieldName);
-    this.keepFieldRevealed(blockUid, focusedLinkableField);
-    this.keepFieldRevealed(blockUid, focusedMediaField);
-
     const message = {
       type: 'BLOCK_SELECTED',
       src,
@@ -3369,7 +3356,7 @@ export class Bridge {
       // currently are. Rides BLOCK_SELECTED exactly like mediaFields, so the
       // quanta toolbar can show/hide the toggle with no extra round-trip.
       revealableFields: this.revealableFields(blockUid),
-      revealed: this.revealedEmptyFields(blockUid).length > 0,
+      revealed: !!this._revealedBlocks?.has(blockUid),
       focusedFieldName,
       focusedFieldRect,
       focusedLinkableField,
@@ -10362,84 +10349,33 @@ export class Bridge {
   }
 
   /**
-   * Fields currently revealed, as blockUid -> Set(fieldName).
+   * Blocks currently in reveal mode, as a Set of blockUid.
    *
-   * Per FIELD, not per block, because the two things that reveal a field are
-   * different in scope: the toolbar toggle reveals all of a block's empty optional
-   * fields at once, while editing reveals exactly the one field being edited
-   * (see keepFieldRevealed). Revealing a block's whole set because the editor
-   * cleared its image would pop in heading, subheading and button unasked.
+   * Per BLOCK, not per field: reveal is one mode ("show me this block's empty
+   * optional fields"), so whatever is empty at render time shows. That keeps it
+   * consistent while revealed — empty a field and its element stays, because the
+   * block is still in reveal mode — without any second, invisible way for a field
+   * to become revealed.
+   *
+   * Deliberately NOT sticky per field on edit. Emptying a field has to mean the
+   * field is gone, or there is no single action for "I want no image": the editor
+   * would delete, then have to dismiss the leftover placeholder through a
+   * block-level control. Swapping an image costs nothing either way — the quanta
+   * toolbar's image button (SyncedSlateToolbar.jsx, gated on focusedMediaField)
+   * replaces it in one click without deleting first.
    */
-  get revealedFields() {
-    if (!this._revealedFields) this._revealedFields = new Map();
-    return this._revealedFields;
-  }
-
-  isFieldRevealed(blockUid, fieldName) {
-    return !!this._revealedFields?.get(blockUid)?.has(fieldName);
-  }
-
-  /**
-   * Keep a field revealed for as long as the editor is working in it.
-   *
-   * Without this, "no data ⇒ no element" turns every field into a trapdoor: clear
-   * a hero image and the X button deletes its own overlay target, so there is
-   * nowhere to upload the replacement; delete the last character of a heading and
-   * the <h1> vanishes from under the caret. Marking the field on INTERACTION (not
-   * on emptiness) means the element survives whatever the value does next.
-   *
-   * Still explicit — clicking into a field or opening its media/link overlay is an
-   * editor action on that field. Nothing here fires on selection or on insert.
-   *
-   * @returns {boolean} true if this newly revealed the field (caller may re-render)
-   */
-  keepFieldRevealed(blockUid, fieldName) {
-    if (!blockUid || !fieldName) return false;
-    if (this.isFieldRevealed(blockUid, fieldName)) return false;
-    if (!this.revealedFields.has(blockUid)) {
-      this.revealedFields.set(blockUid, new Set());
-    }
-    this.revealedFields.get(blockUid).add(fieldName);
-    return true;
-  }
-
-  /**
-   * The revealed fields that are actually SHOWING because of reveal — i.e. still
-   * empty, so their element exists only thanks to a seeded sentinel.
-   *
-   * The rest of the set is bookkeeping: a field the editor clicked into that has
-   * real content renders on its own, and pressing the toggle should not treat it
-   * as something to hide.
-   */
-  revealedEmptyFields(blockUid) {
-    const set = this._revealedFields?.get(blockUid);
-    if (!set?.size) return [];
-    return this.revealableFields(blockUid).filter((f) => set.has(f));
+  get revealedBlocks() {
+    if (!this._revealedBlocks) this._revealedBlocks = new Set();
+    return this._revealedBlocks;
   }
 
   /**
    * Toggle reveal for a block. Reveal is ALWAYS EXPLICIT — nothing here runs on
-   * selection or on insert.
-   *
-   * The revealed SET is the source of truth, deliberately not re-derived per
-   * render: once a field is revealed its element exists, so revealableFields()
-   * stops matching it and the field would flicker straight back out.
+   * selection, on insert, or on a field becoming empty.
    */
   toggleOptionalFields(blockUid) {
-    const showing = this.revealedEmptyFields(blockUid);
-    if (showing.length) {
-      const set = this.revealedFields.get(blockUid);
-      // Only un-reveal what reveal is showing; entries for fields the editor is
-      // editing stay, so hiding can't strand a caret.
-      showing.forEach((f) => set.delete(f));
-      if (!set.size) this.revealedFields.delete(blockUid);
-    } else {
-      if (!this.revealedFields.has(blockUid)) {
-        this.revealedFields.set(blockUid, new Set());
-      }
-      const set = this.revealedFields.get(blockUid);
-      this.revealableFields(blockUid).forEach((f) => set.add(f));
-    }
+    if (this.revealedBlocks.has(blockUid)) this.revealedBlocks.delete(blockUid);
+    else this.revealedBlocks.add(blockUid);
     if (this.onContentChangeCallback) this._executeRender(this.onContentChangeCallback);
   }
 
@@ -10482,14 +10418,11 @@ export class Bridge {
       // the answer doesn't change once revealed. (The old DOM-based rule asked "is
       // there no element?" — a question revealing itself falsified, so the field
       // flickered back out on the next render.)
-      const revealed = this._revealedFields?.get(blockUid);
-      if (!revealed?.size) continue;
-      // Intersect with what's still EMPTY: a revealed field the editor has since
-      // filled needs no sentinel, and seeding one over real content would clobber
-      // it. The set is not pruned — the field stays revealed so emptying it again
-      // doesn't make the element vanish mid-edit.
+      if (!this._revealedBlocks?.has(blockUid)) continue;
+      // revealableFields is already "empty AND has an inline affordance", so a
+      // field the editor has since filled drops out on its own and no sentinel is
+      // written over real content.
       for (const fieldName of this.revealableFields(blockUid)) {
-        if (!revealed.has(fieldName)) continue;
         const fieldDef = properties[fieldName];
         const sentinel = this._revealSentinelFor(
           fieldDef,
