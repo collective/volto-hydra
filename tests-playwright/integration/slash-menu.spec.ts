@@ -73,9 +73,14 @@ test.describe('Slash Menu', () => {
     // Slash menu should close
     await expect(slashMenu).not.toBeVisible({ timeout: 5000 });
 
-    // Block should now be a hero block (hero-heading appears inside the block)
-    const heroHeading = iframe.locator(`[data-block-uid="${blockId}"] .hero-heading`);
-    await expect(heroHeading).toBeVisible({ timeout: 5000 });
+    // Block should now be a hero block. Assert the block's OWN class, not a child
+    // field element: a freshly converted hero has no field data, and fields are
+    // data-driven (issue #296), so `.hero-heading` no longer renders. The wrapper
+    // is the direct signal for "this block is a hero" anyway.
+    await expect(
+      iframe.locator(`[data-block-uid="${blockId}"]`),
+      'block should have been converted to a hero',
+    ).toHaveClass(/hero-block/, { timeout: 5000 });
   });
 
   test('Escape dismisses slash menu', async ({ page }) => {
@@ -213,8 +218,11 @@ test.describe('Slash Menu', () => {
     // Slash menu should close
     await expect(slashMenu).not.toBeVisible({ timeout: 5000 });
 
-    // Block should now be a hero block (hero-heading appears inside the block)
-    const heroHeading = iframe.locator(`[data-block-uid="${blockId}"] .hero-heading`);
-    await expect(heroHeading).toBeVisible({ timeout: 5000 });
+    // Block should now be a hero block. Assert the block's OWN class, not a child
+    // field element — see the Enter-selects test above for why.
+    await expect(
+      iframe.locator(`[data-block-uid="${blockId}"]`),
+      'block should have been converted to a hero',
+    ).toHaveClass(/hero-block/, { timeout: 5000 });
   });
 });

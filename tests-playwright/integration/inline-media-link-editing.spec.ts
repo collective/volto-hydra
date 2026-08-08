@@ -138,8 +138,18 @@ test.describe('Inline image editing', () => {
     await expect(clearButton).toBeVisible({ timeout: 5000 });
     await clearButton.click();
 
-    // Wait for the image URL to disappear from the rendered block
+    // Clearing REMOVES the element — "no data ⇒ no element" (#296). Deleting an
+    // image has to mean the image is gone, otherwise there's no single action for
+    // "I want no image" and the editor has to dismiss a leftover placeholder.
     const heroMediaEl = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-media="image"]');
+    await expect(heroMediaEl, 'cleared image should render no element').toHaveCount(0, {
+      timeout: 5000,
+    });
+
+    // Getting an inline target back is an explicit ask. (Swapping an image never
+    // needs this — the toolbar image button replaces it without clearing first.)
+    await helper.revealOptionalFields();
+    await expect(heroMediaEl).toHaveCount(1);
     await expect(async () => {
       const src = await heroMediaEl.getAttribute('src');
       expect(src).not.toBe(initialSrc);
@@ -432,7 +442,9 @@ test.describe('Image upload and drag-drop', () => {
     const initialSrc = await heroImage.getAttribute('src');
     await clearButton.click();
 
-    // Wait for image to be cleared
+    // Clearing removes the element (#296) — re-editing it inline is an explicit ask.
+    await expect(heroImage, 'cleared image should render no element').toHaveCount(0);
+    await helper.revealOptionalFields();
     if (initialSrc) {
       await expect(heroImage).not.toHaveAttribute('src', initialSrc, { timeout: 5000 });
     }
@@ -501,7 +513,9 @@ test.describe('Image upload and drag-drop', () => {
     // Click the clear button
     await clearButton.click();
 
-    // Wait for image src to change (cleared) before checking overlay
+    // Clearing removes the element (#296) — re-editing it inline is an explicit ask.
+    await expect(heroImage, 'cleared image should render no element').toHaveCount(0);
+    await helper.revealOptionalFields();
     if (initialSrc) {
       await expect(heroImage).not.toHaveAttribute('src', initialSrc, { timeout: 5000 });
     }
@@ -564,6 +578,10 @@ test.describe('Image upload and drag-drop', () => {
     const clearButton = page.locator('button[aria-label="Clear image"]');
     await expect(clearButton).toBeVisible({ timeout: 5000 });
     await clearButton.click({ force: true });
+
+    // Clearing removes the element (#296) — re-editing it inline is an explicit ask.
+    await expect(heroImage, 'cleared image should render no element').toHaveCount(0);
+    await helper.revealOptionalFields();
 
     // Wait for empty overlay to appear (this is the drop zone)
     const emptyOverlay = page.locator('.empty-image-overlay');
@@ -651,7 +669,9 @@ test.describe('Image upload and drag-drop', () => {
 
     await clearButton.click();
 
-    // Wait for image src to change (cleared) before checking overlay
+    // Clearing removes the element (#296) — re-editing it inline is an explicit ask.
+    await expect(heroImage, 'cleared image should render no element').toHaveCount(0);
+    await helper.revealOptionalFields();
     if (initialSrc) {
       await expect(heroImage).not.toHaveAttribute('src', initialSrc, { timeout: 5000 });
     }

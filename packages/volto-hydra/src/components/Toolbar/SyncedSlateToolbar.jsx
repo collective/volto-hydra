@@ -15,6 +15,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import FormatDropdown from './FormatDropdown';
 import DropdownMenu from './DropdownMenu';
 import TemplateLockToggle from './TemplateLockToggle';
+import OptionalFieldsToggle from './OptionalFieldsToggle';
 import linkSVG from '@plone/volto/icons/link.svg';
 import imageSVG from '@plone/volto/icons/image.svg';
 import clearSVG from '@plone/volto/icons/clear.svg';
@@ -1297,6 +1298,23 @@ const SyncedSlateToolbar = ({
   // Block action buttons (e.g., add row/column for tables) also need slots
   const blockActionToolbarItems = blockActions?.toolbar || [];
 
+  // Reveal empty optional fields on the selected block (#296). Hydra owns the
+  // revealed set — it's ephemeral edit state that must never reach the admin's
+  // formData, so the admin only sends the intent and reads the result back off
+  // BLOCK_SELECTED (blockUI.revealableFields / blockUI.revealed).
+  // NOT a hook: this sits below the component's early returns, so a useCallback
+  // here would change hook order between renders ("Rendered more hooks than
+  // during the previous render"). It needs no memoisation anyway.
+  const toggleOptionalFields = (blockUid) => {
+    const iframe = document.getElementById('previewIframe');
+    if (iframe?.contentWindow) {
+      iframe.contentWindow.postMessage(
+        { type: 'TOGGLE_OPTIONAL_FIELDS', blockUid },
+        '*',
+      );
+    }
+  };
+
   // Slate buttons come first in toolbar, so they get priority for slots
   // Calculate slots for Slate (format dropdown + inline buttons) first
   const slotsAfterFormatDropdown = Math.max(0, availableSlots - formatDropdownSlots);
@@ -1465,6 +1483,22 @@ const SyncedSlateToolbar = ({
         }
         return dragHandle;
       })()}
+
+      {/* Reveal empty optional fields (#296). Rendered only when the selected block
+          actually has some — a fully populated block shows no control. pointerEvents
+          must be re-enabled: the toolbar itself sets 'none' so drag events reach the
+          iframe's invisible drag button underneath. */}
+      {selectedBlock && selectedBlock !== PAGE_BLOCK_UID &&
+        !isBlockReadonly(getBlock(selectedBlock), templateEditMode) && (
+          <div style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center' }}>
+            <OptionalFieldsToggle
+              blockUid={selectedBlock}
+              revealableFields={blockUI?.revealableFields}
+              revealed={blockUI?.revealed}
+              onToggle={toggleOptionalFields}
+            />
+          </div>
+        )}
 
       {/* Real Slate buttons - only show if we have a valid slate field value */}
       {/* IMPORTANT: Wrap in div with pointerEvents: 'auto' to make buttons clickable

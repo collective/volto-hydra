@@ -323,13 +323,40 @@ test.describe('Container UX: Edge-drag', () => {
     );
     expect(initialParent).toBe('section-1');
 
-    // Drag the bottom handle UPWARD into the container, past the child's midpoint.
+    // Centre the section first. The bottom handle must not START inside hydra's
+    // 80px auto-scroll band (_createAutoScroller): there, the drag holds the cursor
+    // still while the page scrolls underneath, so a target computed from pre-scroll
+    // geometry is never reached and the expel legitimately doesn't fire. Centring
+    // makes this independent of page height — otherwise anything that changes the
+    // page (an extra nav line, a longer title) silently breaks the test.
     const bottomHandle = iframe.locator('.volto-hydra-edge-handle[data-edge="bottom"]');
     await expect(bottomHandle).toBeVisible({ timeout: 3000 });
+    await iframe.locator('[data-block-uid="section-1"]').first().evaluate((el) =>
+      el.scrollIntoView({ block: 'center', behavior: 'instant' }),
+    );
+    // Let the handle follow the scroll before measuring.
+    let settled = '';
+    await expect(async () => {
+      const box = await bottomHandle.boundingBox();
+      const key = JSON.stringify(box);
+      const same = key === settled;
+      settled = key;
+      expect(same).toBe(true);
+    }).toPass({ timeout: 5000 });
+
+    // Drag the bottom handle UPWARD into the container, past the child's midpoint.
     const childRect = await iframe.locator('[data-block-uid="section-child-1"]').boundingBox();
     const handleBox = await bottomHandle.boundingBox();
     expect(childRect).not.toBeNull();
     expect(handleBox).not.toBeNull();
+
+    // Make the precondition explicit, so a regression fails loudly here rather
+    // than showing up as an unexplained "expel didn't happen".
+    const viewportH = await iframe.locator('body').evaluate(() => window.innerHeight);
+    expect(
+      viewportH - (handleBox!.y + handleBox!.height),
+      'bottom handle must start clear of the 80px auto-scroll band',
+    ).toBeGreaterThan(80);
     const startX = handleBox!.x + handleBox!.width / 2;
     const startY = handleBox!.y + handleBox!.height / 2;
 
