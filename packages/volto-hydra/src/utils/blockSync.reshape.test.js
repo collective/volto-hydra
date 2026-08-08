@@ -181,10 +181,6 @@ const reshape = (containerBlock, targetType) => {
   return out.blocks.c1;
 };
 
-// NOTE: accordion↔tabs (nested `data/items` ↔ top-level `items`) is DEFERRED —
-// getContainerRegionDescriptors surfaces only top-level regions, so the
-// pathMap-aware convertContainerBlock can't move a region nested under an object
-// wrapper yet. Tracked as a follow-up (nested-region descriptor support).
 describe('reshapeContainerBlock — container↔container reshape', () => {
   test('tabs → steps: tab cells become stepItems, content preserved', () => {
     const tabs = container('tabs', [
@@ -222,6 +218,38 @@ describe('reshapeContainerBlock — container↔container reshape', () => {
     const only = out.blocks[out.blocks_layout.items[0]];
     expect(only['@type']).toBe('definitionItem');
     expect(only.title).toBe('Term');
+  });
+
+  test('accordion → tabs: nested data/items cells move up + convert', () => {
+    // The accordion keeps panels under a `data` object wrapper (data/items).
+    // The pathMap-aware move must reach into that wrapper, not just top level.
+    const accordion = {
+      '@type': 'accordion',
+      data: {
+        blocks: { p0: cell('accordionPanel', 'a', 'Panel', 'inside') },
+        blocks_layout: { items: ['p0'] },
+      },
+    };
+    const out = reshape(accordion, 'tabs');
+    expect(out['@type']).toBe('tabs');
+    const cells = out.blocks_layout.items.map((id) => out.blocks[id]);
+    expect(cells.map((c) => c['@type'])).toEqual(['tab']);
+    expect(cells[0].title).toBe('Panel');
+    // The stale `data` wrapper did not ride along onto the tabs block.
+    expect(out.data).toBeUndefined();
+  });
+
+  test('tabs → accordion: cells move DOWN into the nested data/items region', () => {
+    const tabs = container('tabs', [cell('tab', 'a', 'Q', 'ans')]);
+    const out = reshape(tabs, 'accordion');
+    expect(out['@type']).toBe('accordion');
+    const ids = out.data.blocks_layout.items;
+    expect(ids).toHaveLength(1);
+    const panel = out.data.blocks[ids[0]];
+    expect(panel['@type']).toBe('accordionPanel');
+    expect(panel.title).toBe('Q');
+    // Cells are nested under `data`, not left at the top level.
+    expect(out.blocks).toBeUndefined();
   });
 
   test('roundtrip tabs → steps → tabs preserves titles + content', () => {

@@ -1233,7 +1233,13 @@ export function convertContainerBlock(
   const cleaned = { ...sourceBlock };
   delete cleaned.blocks;
   delete cleaned.blocks_layout;
-  for (const r of sourceRegions) if (r.isObjectList) delete cleaned[r.region];
+  for (const r of sourceRegions) {
+    if (r.isObjectList) delete cleaned[r.region];
+    // A region nested under an object wrapper (e.g. accordion `data/items`)
+    // stores its blocks/blocks_layout inside that wrapper — drop the wrapper so
+    // the old children don't ride along (the wrapper holds only its region).
+    if (r.regionPath?.length) delete cleaned[r.regionPath[0]];
+  }
 
   const newBlock = { ...cleaned, '@type': targetType };
   const perTargetRegion = new Map();
@@ -1431,27 +1437,37 @@ export function getContainerRegionDescriptors(
 ) {
   const schema = getBlockTypeSchema(blockType, intl, blocksConfig);
   const regions = [];
-  for (const [fieldName, fieldDef] of Object.entries(
-    schema?.properties || {},
-  )) {
-    if (fieldDef?.widget === 'object_list') {
-      regions.push({
-        region: fieldName,
-        isObjectList: true,
-        idField: fieldDef.idField || '@id',
-        typeField: fieldDef.typeField || null,
-        itemTypeField: fieldDef.itemTypeField || null,
-        allowedBlocks: fieldDef.allowedBlocks || null,
-      });
-    } else if (fieldDef?.widget === 'blocks_layout') {
-      regions.push({
-        region: fieldName,
-        isObjectList: false,
-        itemTypeField: fieldDef.itemTypeField || null,
-        allowedBlocks: fieldDef.allowedBlocks || null,
-      });
+  // Descend transparently through widget:'object' wrappers (the SAME way the
+  // pathMap does — buildBlockPathMap.processItem / getAllContainerFields), so a
+  // region nested under an object (e.g. accordion's `data/items`) is surfaced
+  // with its `regionPath`. Top-level regions omit regionPath, so their
+  // descriptor shape is unchanged for existing callers.
+  const collect = (properties, regionPath) => {
+    for (const [fieldName, fieldDef] of Object.entries(properties || {})) {
+      if (fieldDef?.widget === 'object' && fieldDef.schema?.properties) {
+        collect(fieldDef.schema.properties, [...regionPath, fieldName]);
+      } else if (fieldDef?.widget === 'object_list') {
+        regions.push({
+          region: fieldName,
+          ...(regionPath.length > 0 && { regionPath }),
+          isObjectList: true,
+          idField: fieldDef.idField || '@id',
+          typeField: fieldDef.typeField || null,
+          itemTypeField: fieldDef.itemTypeField || null,
+          allowedBlocks: fieldDef.allowedBlocks || null,
+        });
+      } else if (fieldDef?.widget === 'blocks_layout') {
+        regions.push({
+          region: fieldName,
+          ...(regionPath.length > 0 && { regionPath }),
+          isObjectList: false,
+          itemTypeField: fieldDef.itemTypeField || null,
+          allowedBlocks: fieldDef.allowedBlocks || null,
+        });
+      }
     }
-  }
+  };
+  collect(schema?.properties, []);
   // Instance-only: blocks_layout regions present in the DATA but not the (unresolved) schema.
   if (block) {
     const known = new Set(regions.map((r) => r.region));
