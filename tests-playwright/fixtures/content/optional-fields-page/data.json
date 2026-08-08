@@ -3,6 +3,7 @@
   "@type": "Document",
   "id": "optional-fields-page",
   "title": "Optional Fields Page",
+  "exclude_from_nav": true,
   "description": "Hero blocks with optional fields empty vs populated, for the reveal-optional-fields feature (issue #296). `hero` is the only block that exercises all four sentinel types at once: heading (plain string), subheading (textarea), description (slate), buttonLink (link), image (media). `anchor-slate` is here only so the page has a block-uid in VIEW mode: hero declares its uid in a hydra comment (renderer.js renderBlock), and comments are materialised by the bridge in edit mode only, so an all-hero page renders zero [data-block-uid] after save and AdminUIHelper.waitForIframeReady never settles.",
   "blocks": {
     "hero-empty": {
