@@ -38,7 +38,7 @@
  * branch can be removed — until then, both branches are load-bearing.
  */
 import { getInjectedBlocksConfig } from './injectedVoltoConfig.js';
-import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField, convertValueContainer, insertBlockInContainer, parseRegionPath, expandValueIntoRegion, collapseRegionToValue } from './blockPath.js';
+import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField, convertValueContainer, convertContainerBlock, getContainerRegionDescriptors, insertBlockInContainer, parseRegionPath, expandValueIntoRegion, collapseRegionToValue } from './blockPath.js';
 import { addableSiblingTypes, buildBlockPathMap } from '../../../hydra-js/buildBlockPathMap.js';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import {
@@ -2836,78 +2836,11 @@ export function convertBlockType(blockData, newType, blocksConfig, typeFieldName
         consumeSourceRegion(region, consumedSourceFields);
         continue;
       }
-      // Region↔region (container reshape): when the target field names a
-      // container REGION, move the source region's children across and
-      // cascade-convert each to a type the target region allows (transitively,
-      // via this same converter). A region is a region — blocks_layout or
-      // object_list, top-level or nested (`data/items`) — the child-entry
-      // helpers abstract the storage.
-      const targetRegion = resolveRegionDescriptor(
-        toType,
-        targetField,
-        blocksConfig,
-        intl,
-      );
-      if (targetRegion) {
-        const sourceRegion = resolveRegionDescriptor(
-          fromType,
-          sourceField,
-          blocksConfig,
-          intl,
-        );
-        if (!sourceRegion) continue;
-        const entries = getChildBlockEntries(canonicalData, sourceRegion);
-        // Resolve the addable set through the SAME resolver as add/DnD/type-sync
-        // (addableSiblingTypes) rather than reading the raw schema allowedBlocks,
-        // so a reshape narrows a synced target container to its one item type.
-        // (Ancestor `disallowDescendantBlocks` needs live pathMap context the
-        // caller applies to the top-level convert; not available in this pure
-        // cascade.)
-        const allowed = addableSiblingTypes(
-          targetRegion.allowedBlocks,
-          targetRegion.itemTypeField,
-          newData,
-          blocksConfig,
-        );
-        const converted = entries.map(({ id, block }) => {
-          const childType = block?.[typeFieldName];
-          // A child already of a type the region permits stays as-is — a cell's
-          // content is valid in both shapes, or a cell whose type already
-          // matches the target. (A region that lists NO allowedBlocks permits
-          // everything, so nothing is unsupported there either — but every real
-          // cell region DOES list its cell type, so an unsupported cell always
-          // falls through to conversion below.)
-          if (!allowed || !childType || allowed.includes(childType)) {
-            return { id, block };
-          }
-          // Restricted region + a disallowed child: convert it to the first
-          // allowed type its OWN fieldMappings can reach (transitively). The
-          // child's conversion graph decides the target — not a region default.
-          // No reachable allowed type ⇒ the cell can't legally live here ⇒ fail
-          // loudly rather than write invalid data.
-          const childTarget = allowed.find((t) =>
-            findConversionPath(childType, t, blocksConfig),
-          );
-          if (!childTarget) {
-            throw new Error(
-              `convertBlockType: child "${childType}" has no conversion to any type allowed in region "${targetRegion.region}" of "${toType}" (allowed: ${allowed.join(', ')})`,
-            );
-          }
-          return {
-            id,
-            block: convertBlockType(
-              block,
-              childTarget,
-              blocksConfig,
-              typeFieldName,
-              intl,
-            ),
-          };
-        });
-        setChildBlockEntries(newData, targetRegion, converted);
-        consumeSourceRegion(sourceRegion, consumedSourceFields);
-        continue;
-      }
+      // NOTE: container↔container region moves + cell cascade do NOT live here —
+      // they need the live blockPathMap (see reshapeContainerBlock). This pure
+      // converter handles childless / value sources: scalar fields + the
+      // value↔region bridge above. A container source reaches reshapeContainerBlock
+      // via convertBlockInPlace, never this function.
       if (canonicalData[sourceField] !== undefined) {
         const targetFieldDef = targetSchema?.properties?.[targetField];
         const targetType = widgetToTargetType(targetFieldDef?.widget, targetFieldDef);
@@ -2957,6 +2890,117 @@ export function convertBlockType(blockData, newType, blocksConfig, typeFieldName
     ...convertedFields,
     [typeFieldName]: finalType,
   };
+}
+
+/**
+ * Convert a CONTAINER block to another type IN PLACE — the pathMap-aware
+ * counterpart to convertBlockType (which handles childless / value sources).
+ * A container's cells must land as types the target region ALLOWS, and that
+ * resolution needs the live blockPathMap: a synced target narrows to its item
+ * type, and an ancestor's `disallowDescendantBlocks` is subtracted. convertBlockType
+ * can't know either — it has no pathMap — so container conversions route here.
+ *
+ * Two shapes:
+ *  - container → value (collapse): the target declares no regions but a
+ *    value↔region bridge exists — fold the region's children into the value
+ *    field (convertValueContainer).
+ *  - container → container (reshape): move each region's children across
+ *    (convertContainerBlock — by-name / primary→first), then cascade-convert any
+ *    cell whose type isn't in the target region's ADDABLE set (addableSiblingTypes
+ *    + the pathMap's descendantDisallowedTypes) to the first allowed type its own
+ *    fieldMappings can reach. Each cell converts via convertBlockType; its content
+ *    (valid in both shapes) is preserved.
+ *
+ * @returns {Object} new formData
+ */
+export function reshapeContainerBlock(
+  formData,
+  blockPathMap,
+  blockId,
+  targetType,
+  blocksConfig,
+  intl = null,
+) {
+  const sourceBlock = getBlockById(formData, blockPathMap, blockId);
+  if (!sourceBlock) {
+    throw new Error(`reshapeContainerBlock: block ${blockId} not found`);
+  }
+  const sourceType = sourceBlock['@type'];
+
+  // container → value: the target holds no regions. A value↔region bridge folds
+  // the children into the value field; without one, a plain type change.
+  const targetRegions = getContainerRegionDescriptors(
+    targetType,
+    blocksConfig,
+    intl,
+  );
+  if (targetRegions.length === 0) {
+    const collapsed = convertValueContainer(
+      sourceBlock,
+      sourceType,
+      targetType,
+      blocksConfig,
+      intl,
+    );
+    const typeField = blockPathMap[blockId]?.typeField || '@type';
+    const next =
+      collapsed ||
+      convertBlockType(sourceBlock, targetType, blocksConfig, typeField, intl);
+    return updateBlockById(formData, blockPathMap, blockId, next);
+  }
+
+  // container → container: move the regions verbatim, then cascade the cells.
+  const disallowed = blockPathMap[blockId]?.descendantDisallowedTypes;
+  const moved = convertContainerBlock(
+    formData,
+    blockPathMap,
+    blockId,
+    targetType,
+    blocksConfig,
+    intl,
+  );
+  const movedMap = buildBlockPathMap(moved, blocksConfig, intl);
+  const container = getBlockById(moved, movedMap, blockId);
+  const regions = getContainerRegionDescriptors(
+    targetType,
+    blocksConfig,
+    intl,
+    container,
+  );
+  for (const region of regions) {
+    // The addable set for THIS region — the SAME resolver add/DnD/type-sync use.
+    const allowed = addableSiblingTypes(
+      region.allowedBlocks,
+      region.itemTypeField,
+      container,
+      blocksConfig,
+      disallowed,
+    );
+    if (!allowed) continue; // unrestricted region: every cell is already permitted
+    const entries = getChildBlockEntries(container, region);
+    let changed = false;
+    const next = entries.map(({ id, block }) => {
+      const cellType = block?.['@type'];
+      if (!cellType || allowed.includes(cellType)) return { id, block };
+      // The cell's own fieldMappings decide the target — the first allowed type
+      // it can reach (transitively). None ⇒ it can't legally live here ⇒ throw.
+      const target = allowed.find((t) =>
+        findConversionPath(cellType, t, blocksConfig),
+      );
+      if (!target) {
+        throw new Error(
+          `reshapeContainerBlock: cell "${cellType}" has no conversion to any type allowed in region "${region.region}" of "${targetType}" (allowed: ${allowed.join(', ')})`,
+        );
+      }
+      changed = true;
+      return {
+        id,
+        block: convertBlockType(block, target, blocksConfig, '@type', intl),
+      };
+    });
+    if (changed) setChildBlockEntries(container, region, next);
+  }
+  return updateBlockById(moved, movedMap, blockId, container);
 }
 
 /**

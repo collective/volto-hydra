@@ -1440,12 +1440,14 @@ export function getContainerRegionDescriptors(
         isObjectList: true,
         idField: fieldDef.idField || '@id',
         typeField: fieldDef.typeField || null,
+        itemTypeField: fieldDef.itemTypeField || null,
         allowedBlocks: fieldDef.allowedBlocks || null,
       });
     } else if (fieldDef?.widget === 'blocks_layout') {
       regions.push({
         region: fieldName,
         isObjectList: false,
+        itemTypeField: fieldDef.itemTypeField || null,
         allowedBlocks: fieldDef.allowedBlocks || null,
       });
     }
