@@ -78,6 +78,12 @@ which it cannot always tell apart from a field you keep in the sidebar (alt text
 and css classes are strings too). Fields you don't render inline simply don't
 appear — the editor fills those from the sidebar as usual.
 
+Reveal replaces a per-block boolean only where "has data" and "should render"
+are the same thing. When they genuinely differ — the author has content but
+wants it hidden, or a field should appear only in certain configurations — add
+your own field and drive it with
+[`fieldRules`](custom-blocks.md#schema-enhancers).
+
 ## Allowed Navigation (data-linkable-allow)
 
 Add `data-linkable-allow` to elements that should navigate during edit mode (paging links, facet controls, etc.):
