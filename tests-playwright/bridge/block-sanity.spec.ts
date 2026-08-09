@@ -18,7 +18,7 @@ import { test as base, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 import { verifyBlockRendering } from '../helpers/BlockVerificationHelper';
 import { fieldsNeverEditable } from '../helpers/field-coverage';
-import { axeCheckBlock, formatViolations } from '../helpers/axe-sanity';
+import { axeCheckPage, formatViolations } from '../helpers/axe-sanity';
 import { getFrontendUrl } from './fixtures';
 import { URLS } from '../ports';
 import * as fs from 'fs';
@@ -202,12 +202,14 @@ test.describe('Block sanity (auto-discovered)', () => {
         checkEditTextClicks: false,
       });
 
-      // Optional per-block accessibility pass (axe-core). Off by default; opt in
-      // with SANITY_AXE=1. Runs axe scoped to just this block — blocking =
-      // serious/critical WCAG A/AA that's block-level; advisory (moderate/minor
-      // or page-context rules) is logged but doesn't fail.
-      if (process.env.SANITY_AXE) {
-        const { blocking, advisory } = await axeCheckBlock(iframe, block.blockId);
+      // Accessibility pass (axe-core) over the WHOLE rendered fixture page —
+      // not scoped to this one block — so document-outline rules (heading-order)
+      // are judged in context. serious/critical WCAG A/AA violations (incl.
+      // heading-order) BLOCK; advisory (moderate/minor, best-practice-only, or
+      // page-SHELL rules a minimal fixture can't be judged on) is logged only.
+      // Opt OUT with SANITY_AXE=0 to isolate a non-a11y failure while debugging.
+      if (process.env.SANITY_AXE !== '0') {
+        const { blocking, advisory } = await axeCheckPage(iframe);
         if (advisory.length > 0) {
           console.log(
             `[axe] ${label}: ${advisory.length} advisory finding(s)\n${formatViolations(advisory)}`,
