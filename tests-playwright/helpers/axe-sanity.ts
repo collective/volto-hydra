@@ -74,14 +74,18 @@ export async function axeCheckPage(
 
   const raw = (await body.evaluate(
     async (_el, { tags }: { tags: string[] }) => {
-      // Whole page — no scope. The block is judged in its real page context
-      // (header, nav, main, footer), exactly as a user's AT sees it. Chrome
-      // findings are real bugs to fix, not noise to hide; the page-SHELL rules
-      // that a minimal fixture genuinely can't satisfy are downgraded to advisory
-      // below, but concrete failures (an unnamed button, a bad lang) still block.
+      // Whole page MINUS the editor chrome. block-sanity renders in edit mode, so
+      // the bridge injects its own UI (`.volto-hydra-*`: the drag handle, quanta
+      // toolbar, add buttons, outlines) that a real user never sees — axe would
+      // flag it (e.g. the drag button has no accessible name) as a false positive.
+      // Exclude it so axe judges only the VIEW output, while keeping the whole-page
+      // context so document-outline rules (heading-order) still see every heading.
       const results = await (
         window as unknown as { axe: { run: (ctx: unknown, opts: unknown) => Promise<{ violations: unknown[] }> } }
-      ).axe.run(document, { runOnly: { type: 'tag', values: tags } });
+      ).axe.run(
+        { exclude: [['[class*="volto-hydra"]']] },
+        { runOnly: { type: 'tag', values: tags } },
+      );
       return (results.violations as Array<Record<string, unknown>>).map((v) => ({
         id: v.id as string,
         impact: (v.impact as string) ?? null,
