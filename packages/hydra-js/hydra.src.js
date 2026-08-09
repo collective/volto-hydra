@@ -10317,8 +10317,22 @@ export class Bridge {
    * affordance that the frontend is currently rendering no element for.
    *
    * Purely observational — no schema annotation, no dependence on `required`
-   * (most block schemas here don't declare it). The renderer's own omission is
-   * the signal, which makes this correct by construction.
+   * (most block schemas here don't declare it).
+   *
+   * DELIBERATELY OVER-INCLUSIVE, don't "fix" this. The widget/type only says a
+   * field COULD be edited inline, not that this frontend renders it: alt text, a
+   * css class, a free-text style value are all plain strings that live in the
+   * sidebar. Telling them apart from an empty heading is impossible without data,
+   * since "renders nothing because it's empty" and "never renders inline" look
+   * identical — it would need a schema annotation or a frontend-side declaration,
+   * i.e. exactly the per-field bookkeeping #296 exists to remove.
+   *
+   * So reveal is BEST-EFFORT: it seeds every candidate, the ones the frontend
+   * renders appear, and the rest are a no-op. A sentinel for a field nobody
+   * renders is harmless — it lives only in the render projection, never in state
+   * and never in saved content — and the editor fills those from the sidebar as
+   * before. No warning is raised for them: a frontend that legitimately keeps a
+   * field sidebar-only is not misconfigured.
    */
   revealableFields(blockUid) {
     const schema = this.getBlockSchema(blockUid);
