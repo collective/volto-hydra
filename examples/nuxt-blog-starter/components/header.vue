@@ -3,13 +3,10 @@
 <nav class="bg-white border-b border-gray-200 dark:bg-gray-900 relative">
     <div class="flex flex-wrap items-center justify-between max-w-screen-xl mx-auto p-4">
         <NuxtLink to="/" class="flex items-center space-x-3 rtl:space-x-reverse">
-            <!-- Decorative: the wordmark beside it already names the site, so
-                 announcing "Inka" twice would just be noise for screen readers. -->
             <img src="/inka-mark.svg" alt="" aria-hidden="true" class="w-8 h-8" />
             <span class="self-center text-2xl font-semibold whitespace-nowrap dark:text-white">Inka</span>
         </NuxtLink>
         <div class="flex items-center md:order-2 space-x-1 md:space-x-2 rtl:space-x-reverse">
-            <!-- Search icon + expandable input -->
             <div class="relative flex items-center">
                 <button v-if="!searchOpen" @click="openSearch" type="button"
                     class="p-2 text-gray-500 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-600"
@@ -34,16 +31,6 @@
         </div>
         <div :class="{ hidden: !mobileMenuOpen }" class="items-center justify-between w-full md:flex md:w-auto md:order-1">
             <ul class="flex flex-col mt-4 font-medium md:flex-row md:mt-0 md:space-x-8 rtl:space-x-reverse">
-                <!-- The section title is a LINK, with the mega-menu on a separate
-                     disclosure button beside it.
-
-                     It used to be a button alone, with every real link inside the
-                     v-if'd panel — so at prerender/SSR time the navigation
-                     contained no <a href> at all. That made the docs tree
-                     invisible to the SSG crawler AND to search engines, and cost
-                     users cmd-click, open-in-new-tab and copy-link-address on a
-                     section. Screen readers announced "button" with no way to
-                     reach the section itself. -->
                 <li v-for="item in nav" :key="getId(item)" class="flex items-center">
                     <NuxtLink
                         :to="getUrl(item)"
@@ -69,17 +56,6 @@
             </ul>
         </div>
     </div>
-
-    <!-- Full-width mega menu panels — one per section, ALWAYS RENDERED.
-
-         Navigation is content. It used to be a single v-if'd panel driven by
-         click state, which meant the entire link tree was absent from the
-         document until JavaScript ran and someone clicked: invisible to the
-         SSG crawler, to search engines, and to anyone without JS, on a site
-         whose whole job is documentation.
-
-         Now every panel is in the DOM and `hidden` merely toggles visibility,
-         so the links exist whether or not anything has been clicked. -->
     <div
         v-for="item in nav"
         :key="`panel-${getId(item)}`"
