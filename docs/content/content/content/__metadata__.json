@@ -75,7 +75,6 @@
     "docs/listings/data.json",
     "docs/live-preview/data.json",
     "docs/server-rendered-frontends/data.json",
-    "docs/static/data.json",
     "docs/templates/data.json",
     "docs/visual-editing/data.json",
     "docs/what-editors-will-experience/data.json",
@@ -148,7 +147,6 @@
     "docs-images-toc-edit-001/data.json",
     "docs-images-video-edit-001/data.json",
     "docs-images-wrap-chooser-001/data.json",
-    "docs/static/hydra-demo/data.json",
     "docs/what-editors-will-experience/adding-and-moving-blocks/data.json",
     "docs/what-editors-will-experience/containers/data.json",
     "docs/what-editors-will-experience/editing-text/data.json",
@@ -764,20 +762,6 @@
       }
     },
     "docs-examples-slider-001": {
-      "local_roles": {
-        "admin": [
-          "Owner"
-        ]
-      }
-    },
-    "docs-static-folder-001": {
-      "local_roles": {
-        "admin": [
-          "Owner"
-        ]
-      }
-    },
-    "docs-static-hydra-demo-001": {
       "local_roles": {
         "admin": [
           "Owner"
