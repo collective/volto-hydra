@@ -258,7 +258,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, getEmptyBlockType, getContainerRegionDescriptors } from '../../utils/blockPath';
+import { buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, getEmptyBlockType, getContainerRegionDescriptors } from '../../utils/blockPath';
 import { mergeAnchorsIntoContent } from '../../utils/linkableAnchors';
 import { canContainAll, getChildBlockEntries, setBlockType, clearBlockType } from '@volto-hydra/helpers';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
@@ -275,6 +275,7 @@ import {
   getConvertibleTypes,
   getConversionMap,
   convertBlockType,
+  reshapeContainerBlock,
   validateFieldMappings,
 } from '../../utils/blockSync';
 import {
@@ -4534,8 +4535,9 @@ const Iframe = (props) => {
   }, [iframeAllowedBlocks, selectedBlock, insertAndSelectBlock, iframeSyncState.blockPathMap, properties, blocksConfig, intl, onChangeFormData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Convert a block to newType IN PLACE (container-aware), returning new formData.
-  // Container blocks (any region with children) go through convertContainerBlock
-  // so their children carry over; a childless block converts its own fields.
+  // Container blocks (any region with children) go through reshapeContainerBlock
+  // — it carries their children over AND cascade-converts each cell to a type the
+  // target region allows (pathMap-aware). A childless block converts its own fields.
   // Shared by the chooser commit and the auto-convert-on-drop/paste paths.
   const convertBlockInPlace = (props, bpm, blockId, newType) => {
     const blockData = getBlockById(props, bpm, blockId);
@@ -4544,7 +4546,7 @@ const Iframe = (props) => {
       blockData['@type'], blocksConfig, intl, blockData,
     ).some((d) => getChildBlockEntries(blockData, d).length > 0);
     if (hasChildren) {
-      return convertContainerBlock(props, bpm, blockId, newType, blocksConfig, intl);
+      return reshapeContainerBlock(props, bpm, blockId, newType, blocksConfig, intl);
     }
     const typeFieldName = bpm?.[blockId]?.typeField || '@type';
     let newBlockData = convertBlockType(blockData, newType, blocksConfig, typeFieldName, intl);

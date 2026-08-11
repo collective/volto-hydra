@@ -1233,7 +1233,13 @@ export function convertContainerBlock(
   const cleaned = { ...sourceBlock };
   delete cleaned.blocks;
   delete cleaned.blocks_layout;
-  for (const r of sourceRegions) if (r.isObjectList) delete cleaned[r.region];
+  for (const r of sourceRegions) {
+    if (r.isObjectList) delete cleaned[r.region];
+    // A region nested under an object wrapper (e.g. accordion `data/items`)
+    // stores its blocks/blocks_layout inside that wrapper — drop the wrapper so
+    // the old children don't ride along (the wrapper holds only its region).
+    if (r.regionPath?.length) delete cleaned[r.regionPath[0]];
+  }
 
   const newBlock = { ...cleaned, '@type': targetType };
   const perTargetRegion = new Map();
@@ -1278,6 +1284,55 @@ function mergeSlateValues(values) {
       acc == null ? v : v == null ? acc : mergeBlockValues(acc, v).mergedValue,
     null,
   );
+}
+
+/**
+ * Wrap a scalar VALUE into ONE child block inside a container region — the
+ * value→container ("expand") half of the value/container bridge, shared by
+ * convertValueContainer and convertBlockType so there is one implementation.
+ * The child is `<rp.type | region default | slate>` carrying the value at
+ * `<rp.field>`. blocks_layout regions key children by a minted uid; object_list
+ * regions carry that id in their idField (setChildBlockEntries handles both).
+ *
+ * Throws if the resolved child type is not one the region allows: a
+ * `region/type/field` mapping that names a type the region forbids is a config
+ * bug, and a silently-invalid child is worse than a loud failure.
+ */
+export function expandValueIntoRegion(targetBlock, region, rp, value, uuidGen) {
+  const childType = rp.type || region.allowedBlocks?.[0] || 'slate';
+  if (region.allowedBlocks && !region.allowedBlocks.includes(childType)) {
+    throw new Error(
+      `expandValueIntoRegion: child type "${childType}" is not allowed in region "${region.region}" (allowed: ${region.allowedBlocks.join(', ')})`,
+    );
+  }
+  const child = { '@type': childType, [rp.field]: value };
+  const gen =
+    uuidGen ||
+    (() =>
+      globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2));
+  setChildBlockEntries(targetBlock, region, [
+    { id: child['@id'] || gen(), block: child },
+  ]);
+}
+
+/**
+ * Gather a container region's matching children's `<rp.field>` into a single
+ * scalar — the container→value ("collapse") half of the bridge. Slate values
+ * are merged; otherwise the first is kept. Returns { value, dropped } where
+ * `dropped` counts non-slate values discarded (so the caller can warn).
+ */
+export function collapseRegionToValue(sourceBlock, region, rp) {
+  const values = getChildBlockEntries(sourceBlock, region)
+    .filter(
+      (e) => !rp.type || getBlockType(e.block, region.typeField) === rp.type,
+    )
+    .map((e) => e.block?.[rp.field])
+    .filter((v) => v != null);
+  if (values.length === 0) return { value: undefined, dropped: 0 };
+  if (values.every((v) => Array.isArray(v))) {
+    return { value: mergeSlateValues(values), dropped: 0 };
+  }
+  return { value: values[0], dropped: values.length - 1 };
 }
 
 /**
@@ -1334,23 +1389,13 @@ export function convertValueContainer(
     delete newBlock.blocks_layout;
     for (const r of descriptors) if (r.isObjectList) delete newBlock[r.region];
 
-    const values = getChildBlockEntries(sourceBlock, region)
-      .filter(
-        (e) => !rp.type || getBlockType(e.block, region.typeField) === rp.type,
-      )
-      .map((e) => e.block?.[rp.field])
-      .filter((v) => v != null);
-    const allSlate = values.length > 0 && values.every((v) => Array.isArray(v));
-    if (allSlate) {
-      newBlock[valueField] = mergeSlateValues(values);
-    } else {
-      newBlock[valueField] = values[0];
-      if (values.length > 1) {
-        // eslint-disable-next-line no-console
-        console.warn(
-          `[HYDRA] convertValueContainer: collapse dropped ${values.length - 1} non-slate value(s) for "${valueField}"`,
-        );
-      }
+    const { value, dropped } = collapseRegionToValue(sourceBlock, region, rp);
+    newBlock[valueField] = value;
+    if (dropped) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[HYDRA] convertValueContainer: collapse dropped ${dropped} non-slate value(s) for "${valueField}"`,
+      );
     }
     return newBlock;
   }
@@ -1365,9 +1410,7 @@ export function convertValueContainer(
   if (!region) return null;
   const newBlock = { ...sourceBlock, '@type': targetType };
   delete newBlock[valueField];
-  const childType = rp.type || region.allowedBlocks?.[0] || 'slate';
-  const child = { '@type': childType, [rp.field]: sourceBlock[valueField] };
-  setChildBlockEntries(newBlock, region, [{ id: child['@id'], block: child }]);
+  expandValueIntoRegion(newBlock, region, rp, sourceBlock[valueField]);
   return newBlock;
 }
 
@@ -1394,25 +1437,37 @@ export function getContainerRegionDescriptors(
 ) {
   const schema = getBlockTypeSchema(blockType, intl, blocksConfig);
   const regions = [];
-  for (const [fieldName, fieldDef] of Object.entries(
-    schema?.properties || {},
-  )) {
-    if (fieldDef?.widget === 'object_list') {
-      regions.push({
-        region: fieldName,
-        isObjectList: true,
-        idField: fieldDef.idField || '@id',
-        typeField: fieldDef.typeField || null,
-        allowedBlocks: fieldDef.allowedBlocks || null,
-      });
-    } else if (fieldDef?.widget === 'blocks_layout') {
-      regions.push({
-        region: fieldName,
-        isObjectList: false,
-        allowedBlocks: fieldDef.allowedBlocks || null,
-      });
+  // Descend transparently through widget:'object' wrappers (the SAME way the
+  // pathMap does — buildBlockPathMap.processItem / getAllContainerFields), so a
+  // region nested under an object (e.g. accordion's `data/items`) is surfaced
+  // with its `regionPath`. Top-level regions omit regionPath, so their
+  // descriptor shape is unchanged for existing callers.
+  const collect = (properties, regionPath) => {
+    for (const [fieldName, fieldDef] of Object.entries(properties || {})) {
+      if (fieldDef?.widget === 'object' && fieldDef.schema?.properties) {
+        collect(fieldDef.schema.properties, [...regionPath, fieldName]);
+      } else if (fieldDef?.widget === 'object_list') {
+        regions.push({
+          region: fieldName,
+          ...(regionPath.length > 0 && { regionPath }),
+          isObjectList: true,
+          idField: fieldDef.idField || '@id',
+          typeField: fieldDef.typeField || null,
+          itemTypeField: fieldDef.itemTypeField || null,
+          allowedBlocks: fieldDef.allowedBlocks || null,
+        });
+      } else if (fieldDef?.widget === 'blocks_layout') {
+        regions.push({
+          region: fieldName,
+          ...(regionPath.length > 0 && { regionPath }),
+          isObjectList: false,
+          itemTypeField: fieldDef.itemTypeField || null,
+          allowedBlocks: fieldDef.allowedBlocks || null,
+        });
+      }
     }
-  }
+  };
+  collect(schema?.properties, []);
   // Instance-only: blocks_layout regions present in the DATA but not the (unresolved) schema.
   if (block) {
     const known = new Set(regions.map((r) => r.region));
