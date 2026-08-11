@@ -17,6 +17,14 @@
 const fs = require('fs');
 const path = require('path');
 
+// Content types whose payload lives in a separate blob file, mapped to the
+// data.json field holding the blob_path. Add a type here and it gets the same
+// missing-blob check for free.
+const BLOB_FIELDS = {
+  Image: 'image',
+  File: 'file',
+};
+
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
@@ -156,12 +164,17 @@ function validate(contentDir) {
     }
     if (data.UID) allUids.add(data.UID);
 
-    if (contentType === 'Image') {
-      const img = data.image || {};
-      const blobPath = img.blob_path || '';
-      const download = img.download || '';
+    // Blob-bearing types keep their payload in a separate file that data.json
+    // points at by blob_path. Each type names that field differently, so the
+    // field is looked up per type rather than guessed — an unlisted type simply
+    // has no blob to check.
+    const blobField = BLOB_FIELDS[contentType];
+    if (blobField) {
+      const payload = data[blobField] || {};
+      const blobPath = payload.blob_path || '';
+      const download = payload.download || '';
       if (download && download.startsWith('http')) {
-        errors.push(`  ${entry} image has remote URL instead of blob_path: ${download.slice(0, 80)}`);
+        errors.push(`  ${entry} ${blobField} has remote URL instead of blob_path: ${download.slice(0, 80)}`);
       } else if (blobPath) {
         const fullBlob = path.join(contentDir, blobPath);
         if (!fs.existsSync(fullBlob)) {
@@ -171,7 +184,7 @@ function validate(contentDir) {
           warnings.push(`  ${entry} blob_path not in _blob_files_: ${blobPath}`);
         }
       } else if (!blobPath && !download) {
-        warnings.push(`  ${entry} Image has no image data`);
+        warnings.push(`  ${entry} ${contentType} has no ${blobField} data`);
       }
     }
   }
