@@ -1619,7 +1619,11 @@ for (const mdFile of docsMdFiles) {
 
     const updatedRoot = {
       ...rootData,
-      title: 'Volto Hydra Documentation',
+      // Derived from index.md's H1, the same way every other page's title is.
+      // This was the hard-coded string 'Volto Hydra Documentation', so every
+      // sync silently reset the docs root title and any rename was undone on
+      // the next run.
+      title: (indexMd.match(/^#\s+(.+)$/m)?.[1] || rootData.title).trim(),
       description: indexMd.split('\n').slice(1).find(l => l.trim() && !l.startsWith('#') && !l.startsWith('```')) || rootData.description,
       blocks: { [titleId]: { '@type': 'title' }, ...parsedBlocks, ...preservedBlocks },
       blocks_layout: { items: newLayout },

@@ -43,9 +43,9 @@ These blocks demonstrate common patterns. Register them via `initBridge({ blocks
 Each block doc page follows this template:
 
 1. **Title & description** — what the block does, whether it's built-in or custom
-2. **Schema** — the `blockSchema` you'd pass to `initBridge` (or what Hydra registers internally for built-in blocks)
+2. **Schema** — the `blockSchema` you'd pass to `initBridge` (or what Inka registers internally for built-in blocks)
 3. **JSON Block Data** — what the block data looks like in the page content
-4. **Rendering** — React and Vue examples showing how to render the block with the correct `data-*` attributes for Hydra editing
+4. **Rendering** — React and Vue examples showing how to render the block with the correct `data-*` attributes for Inka editing
 
 ## Data Attributes for Editing
 

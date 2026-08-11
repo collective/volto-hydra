@@ -427,8 +427,8 @@
     "@id": "/",
     "@type": "Plone Site",
     "UID": "plone_site_root",
-    "description": "A Visual Headless CMS",
-    "title": "Volto Hydra",
+    "description": "Design-system-first page building. Strike the right balance for your site — make it easy for editors to create engagement while staying compliant.",
+    "title": "Inka",
     "type_title": "Plone Site"
   },
   "preview_caption": null,
@@ -436,7 +436,7 @@
   "review_state": "published",
   "rights": "",
   "subjects": [],
-  "title": "Inka Documentation",
+  "title": "Docs",
   "type_title": "Page",
   "version": "current",
   "workflow_history": {

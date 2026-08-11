@@ -483,7 +483,7 @@ The saved `fieldMapping` is read at render time by `expandListingBlocks` — no 
 
 ## HTML Paste Support (TODO)
 
-When the editor pastes rich HTML into the page, Hydra will eventually be able to recognise it as a custom block by matching against a CSS selector mapping. The proposed shape:
+When the editor pastes rich HTML into the page, Inka will eventually be able to recognise it as a custom block by matching against a CSS selector mapping. The proposed shape:
 
 <!-- codeExample: javascript -->
 ```javascript

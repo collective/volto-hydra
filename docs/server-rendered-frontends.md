@@ -1,6 +1,6 @@
 # Server-rendered frontends
 
-Hydra works with any frontend, including ones that have no client-side
+Inka works with any frontend, including ones that have no client-side
 reactivity at all — pure server-rendered frameworks like **Astro**, **PHP**,
 **Django**, **Rails**, **Laravel**, **Symfony**, **Go html/template**. The bridge
 ships a built-in pattern for these: one config option on `initBridge` and one
@@ -75,7 +75,7 @@ your templating language that puts the `<div data-block-uid={id}>` around
 every block before dispatching to the block's own template. Then block
 authors don't think about it — the wrapper IS the contract.
 
-That dispatch must also handle `@type: "empty"` — the placeholder Hydra seeds into any container region with no `defaultBlockType` and more than one `allowedBlocks` — by rendering an empty, selectable slot (with its `data-block-uid`) rather than erroring. See [Empty Blocks](container-blocks.md#empty-blocks).
+That dispatch must also handle `@type: "empty"` — the placeholder Inka seeds into any container region with no `defaultBlockType` and more than one `allowedBlocks` — by rendering an empty, selectable slot (with its `data-block-uid`) rather than erroring. See [Empty Blocks](container-blocks.md#empty-blocks).
 
 ## Worked example: Astro
 

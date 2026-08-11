@@ -8,7 +8,7 @@
   "creators": [
     "admin"
   ],
-  "description": "Hydra works with any frontend, including ones that have no client-side",
+  "description": "Inka works with any frontend, including ones that have no client-side",
   "effective": "2025-01-01T00:00:00",
   "exclude_from_nav": false,
   "expires": null,
@@ -61,13 +61,13 @@
     },
     "p-1": {
       "@type": "slate",
-      "plaintext": "Hydra works with any frontend, including ones that have no client-side reactivity at all — pure server-rendered frameworks like **Astro**, **PHP**, **Django**, **Rails**, **Laravel**, **Symfony**, **Go html/template**. The bridge ships a built-in pattern for these: one config option on `initBridge` and one small endpoint on your server.",
+      "plaintext": "Inka works with any frontend, including ones that have no client-side reactivity at all — pure server-rendered frameworks like **Astro**, **PHP**, **Django**, **Rails**, **Laravel**, **Symfony**, **Go html/template**. The bridge ships a built-in pattern for these: one config option on `initBridge` and one small endpoint on your server.",
       "value": [
         {
           "type": "p",
           "children": [
             {
-              "text": "Hydra works with any frontend, including ones that have no client-side reactivity at all — pure server-rendered frameworks like "
+              "text": "Inka works with any frontend, including ones that have no client-side reactivity at all — pure server-rendered frameworks like "
             },
             {
               "type": "strong",
@@ -538,7 +538,7 @@
     },
     "p-15": {
       "@type": "slate",
-      "plaintext": "That dispatch must also handle `@type: \"empty\"` — the placeholder Hydra seeds into any container region with no `defaultBlockType` and more than one `allowedBlocks` — by rendering an empty, selectable slot (with its `data-block-uid`) rather than erroring. See [Empty Blocks](container-blocks.md#empty-blocks).",
+      "plaintext": "That dispatch must also handle `@type: \"empty\"` — the placeholder Inka seeds into any container region with no `defaultBlockType` and more than one `allowedBlocks` — by rendering an empty, selectable slot (with its `data-block-uid`) rather than erroring. See [Empty Blocks](container-blocks.md#empty-blocks).",
       "value": [
         {
           "type": "p",
@@ -555,7 +555,7 @@
               ]
             },
             {
-              "text": " — the placeholder Hydra seeds into any container region with no "
+              "text": " — the placeholder Inka seeds into any container region with no "
             },
             {
               "type": "code",

@@ -62,18 +62,18 @@ your published page.
 {block.image && <img data-edit-media="image" src={block.image} />}
 ```
 
-Plain truthiness is enough — you never need `.length` or a null-safe walk. Hydra
+Plain truthiness is enough — you never need `.length` or a null-safe walk. Inka
 normalises a field the editor has cleared (widgets write `[]`, which is truthy)
 to absent before your renderer sees it.
 
 To fill an empty field from the canvas, the editor selects the block and presses
-**reveal optional fields** in the Quanta toolbar. Hydra feeds your renderer a
+**reveal optional fields** in the Quanta toolbar. Inka feeds your renderer a
 placeholder value for each empty field, so your own `&&` guard produces the
 element and it becomes editable. The placeholder exists only in the data handed
 to your renderer: it is never stored, so fields left unfilled leave no trace in
 saved content and render nothing in view. Your renderer needs no code for this.
 
-Reveal is best-effort. Hydra offers any field whose type could be edited inline,
+Reveal is best-effort. Inka offers any field whose type could be edited inline,
 which it cannot always tell apart from a field you keep in the sidebar (alt text
 and css classes are strings too). Fields you don't render inline simply don't
 appear — the editor fills those from the sidebar as usual.
@@ -162,7 +162,7 @@ Or using comment syntax:
 `data-block-readonly` is *your* call — use it when your frontend wants to lock a
 block for its own reasons (a teaser mirroring another page, a listing item).
 
-You do **not** need it for template content. Hydra already knows which blocks a
+You do **not** need it for template content. Inka already knows which blocks a
 template marks read-only from the block data and enforces that itself, so your
 renderer doesn't need to detect template blocks or mark them.
 
@@ -226,7 +226,7 @@ Inline content (bold, links, …) lives in that node's `children`.
 
 Editing can transiently produce more than one top-level node — pasting
 multiple paragraphs, pressing Enter, or a Backspace that demotes a list
-item to a paragraph (`[ul, p]`). Hydra normalizes that immediately:
+item to a paragraph (`[ul, p]`). Inka normalizes that immediately:
 
 - **Split** — when the field is the `value` of a `slate` block, each extra
   node becomes its own `slate` block, inserted after the original in the
