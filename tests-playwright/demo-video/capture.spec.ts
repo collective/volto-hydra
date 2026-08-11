@@ -1,9 +1,17 @@
 /**
  * Homepage demo video capture.
  *
- * Records a single deterministic edit session against /showcase-page that
+ * Records a single deterministic edit session against /demo-video-page that
  * shows off slate editing + DnD + container ops + frontend switching, in a
  * tight ~12-second loop suitable for the docs homepage hero (à la plate.js).
+ *
+ * The fixture is DEDICATED to this capture — nothing else reads it. It used to
+ * record /showcase-page, which is shared with screenshots/capture.spec.ts and
+ * inline-editing-placeholders.spec.ts, so a change made for either of those
+ * would silently alter the published homepage video. Keep it exclusive.
+ *
+ * Block ids in that fixture are load-bearing: the beats below drive 'intro',
+ * 'columns-1' and 'after-columns' by name.
  *
  * Run with:
  *   pnpm demo:capture
@@ -24,7 +32,7 @@ import { AdminUIHelper } from '../helpers/AdminUIHelper';
 import { PORTS, URLS } from '../ports';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
-const SHOWCASE_PATH = '/showcase-page';
+const DEMO_PATH = '/demo-video-page';
 const BEAT_MS = 900;
 const TRIM_MARKER_FILE = path.join(SCRIPT_DIR, '.recordings', 'trim-ms.txt');
 
@@ -74,7 +82,7 @@ test('hydra-demo — homepage hero loop', async ({ page }) => {
   test.setTimeout(120_000);
   const helper = new AdminUIHelper(page);
   await helper.login();
-  await helper.navigateToEdit(SHOWCASE_PATH);
+  await helper.navigateToEdit(DEMO_PATH);
 
   // Wait for a fully-settled editor before any beats — the recording
   // includes login + iframe load, but those are visually noisy and
