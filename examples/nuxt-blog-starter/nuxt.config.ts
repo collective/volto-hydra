@@ -49,6 +49,47 @@ export default defineNuxtConfig({
       concurrency: 2,
     },
   },
+
+  hooks: {
+    // Tell the prerenderer which routes exist, by asking the API.
+    //
+    // Without this the SSG shipped THREE files: nitro crawls outward from '/',
+    // and this site's header renders its navigation as <button> elements that
+    // open JS panels — there is not a single <a href> to a content page for a
+    // crawler to follow. So /docs and everything under it 404'd on the
+    // published site while existing perfectly well in the API.
+    //
+    // Enumerating from @search is also just more honest than crawling: a page
+    // that nothing happens to link to is still a page, and should still be
+    // built.
+    async 'nitro:config'(nitroConfig: any) {
+      if (nitroConfig.dev) return
+      // The edit build is a SPA — one shell serves every route, so prerendering
+      // content routes there would be pointless work. netlify-build.sh sets
+      // NUXT_EDIT_BASE_URL only for that pass.
+      if (process.env.NUXT_EDIT_BASE_URL) return
+
+      const res = await fetch(`${BACKEND_URL}/++api++/@search?b_size=9999`, {
+        headers: { Accept: 'application/json' },
+      })
+      if (!res.ok) {
+        // Fail the build rather than silently shipping a three-page site.
+        throw new Error(
+          `Could not enumerate routes for prerender: ${BACKEND_URL} returned ${res.status}`,
+        )
+      }
+      const { items = [] } = await res.json()
+      const routes = items
+        .map((i: any) => i['@id'].replace(BACKEND_URL, '').replace(/^\/\+\+api\+\+/, ''))
+        .filter((p: string) => p.startsWith('/'))
+
+      nitroConfig.prerender ||= {}
+      nitroConfig.prerender.routes = [
+        ...new Set([...(nitroConfig.prerender.routes || []), ...routes]),
+      ]
+      console.log(`[prerender] ${routes.length} routes from ${BACKEND_URL}`)
+    },
+  },
   app: {
     head: {
       htmlAttrs: {
