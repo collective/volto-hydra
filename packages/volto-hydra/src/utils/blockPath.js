@@ -3,10 +3,10 @@
  * Supports container blocks where blocks can be nested inside other blocks.
  */
 
-import { produce } from 'immer';
-import { get } from 'lodash';
-import { applyBlockDefaults } from '@plone/volto/helpers';
-import config from '@plone/volto/registry';
+import {
+  getApplyBlockDefaults,
+  getDefaultBlockType,
+} from './injectedVoltoConfig.js';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import {
   isBlockReadonly,
@@ -26,6 +26,9 @@ import {
   getResolvedSchema,
   buildIdFieldMap,
 } from '../../../hydra-js/buildBlockPathMap.js';
+// From the dep-free slateMerge (NOT slateTransforms) so the offline block-path
+// evaluator's esbuild bundle stays free of @plone/volto-slate / registry.
+import { mergeBlockValues } from './slateMerge.js';
 
 /**
  * Extract text content from a React element (JSX).
@@ -307,13 +310,26 @@ export function setBlockByPath(formData, path, value) {
   // Empty path means replace root - return value directly
   if (!path || path.length === 0) return value;
 
-  return produce(formData, (draft) => {
-    let current = draft;
-    for (const key of path.slice(0, -1)) {
-      current = current[key];
+  // Immutable deep-set with structural sharing (dep-free — no immer): clone each
+  // node along the path (so the tree keeps referential identity everywhere the
+  // update didn't touch) and assign the leaf. Intermediate nodes are expected to
+  // exist (paths come from blockPathMap); a missing one surfaces loudly.
+  const root = Array.isArray(formData) ? [...formData] : { ...formData };
+  let current = root;
+  for (const key of path.slice(0, -1)) {
+    const next = current[key];
+    if (next === undefined || next === null) {
+      // Same failure immer's produce raised implicitly (set-on-undefined) — a
+      // path from blockPathMap should always exist; surface the bad path.
+      throw new Error(
+        `[HYDRA] setBlockByPath: missing intermediate '${key}' in path ${path.join('.')}`,
+      );
     }
-    current[path[path.length - 1]] = value;
-  });
+    current[key] = Array.isArray(next) ? [...next] : { ...next };
+    current = current[key];
+  }
+  current[path[path.length - 1]] = value;
+  return root;
 }
 
 /**
@@ -655,7 +671,7 @@ export function getAllContainerFields(
   // restrict types). Without this a generic section would auto-fill its
   // empty state with the 'empty' picker placeholder, even though the
   // container is happy to accept the page's typing-friendly default.
-  const pageDefaultBlockType = config.settings.defaultBlockType || null;
+  const pageDefaultBlockType = getDefaultBlockType();
 
   // Helper to get current count for a container field
   const getFieldCount = (region, isObjectList = false, regionPath = []) => {
@@ -1241,6 +1257,121 @@ export function convertContainerBlock(
 }
 
 /**
+ * A region-crossing path `<region>/<type|*>/<field>` — targets the `<field>` of a
+ * container region's children. Returns { region, type, field } (type null for `*`,
+ * i.e. any child that exposes the field), or null for a plain scalar / object path.
+ * @private
+ */
+export function parseRegionPath(path) {
+  if (typeof path !== 'string') return null;
+  const parts = path.split('/');
+  if (parts.length !== 3) return null; // <region>/<type|*>/<field>
+  const [region, type, field] = parts;
+  if (!region || !type || !field) return null;
+  return { region, type: type === '*' ? null : type, field };
+}
+
+// Fold slate values left-to-right into one (lossless join via core-Volto's merge).
+function mergeSlateValues(values) {
+  return values.reduce(
+    (acc, v) =>
+      acc == null ? v : v == null ? acc : mergeBlockValues(acc, v).mergedValue,
+    null,
+  );
+}
+
+/**
+ * Convert a block between a CONTAINER shape (a region of child blocks) and a VALUE
+ * shape (a scalar field) via a region-crossing `fieldMappings` path.
+ *
+ * The bridge is declared ONCE on the VALUE block and serves BOTH directions:
+ *   tableHeaderCell: { fieldMappings: { tableCell: { value: 'items/slate/value' } } }
+ *   - container -> value (COLLAPSE): gather the region's matching children's <field>,
+ *     merge (slate) into the value field.
+ *   - value -> container (EXPAND): wrap the value in ONE child of <type> in the region.
+ *
+ * Returns the converted block, or null when no such bridge applies (the caller then
+ * falls back to convertContainerBlock's region funnel).
+ */
+export function convertValueContainer(
+  sourceBlock,
+  sourceType,
+  targetType,
+  blocksConfig,
+  intl,
+) {
+  const findBridge = (valueType, containerType) => {
+    const m = blocksConfig?.[valueType]?.fieldMappings?.[containerType];
+    for (const [valueField, path] of Object.entries(m || {})) {
+      const rp = parseRegionPath(path);
+      if (rp) return { valueField, rp };
+    }
+    return null;
+  };
+
+  // container -> value: the TARGET is the value block. value -> container: the SOURCE is.
+  let bridge = findBridge(targetType, sourceType);
+  let mode = 'collapse';
+  if (!bridge) {
+    bridge = findBridge(sourceType, targetType);
+    mode = 'expand';
+  }
+  if (!bridge) return null;
+  const { valueField, rp } = bridge;
+
+  if (mode === 'collapse') {
+    const descriptors = getContainerRegionDescriptors(
+      sourceType,
+      blocksConfig,
+      intl,
+      sourceBlock,
+    );
+    const region = descriptors.find((r) => r.region === rp.region);
+    if (!region) return null;
+    // Carry over scalar fields (key, width, …); drop the region storage.
+    const newBlock = { ...sourceBlock, '@type': targetType };
+    delete newBlock.blocks;
+    delete newBlock.blocks_layout;
+    for (const r of descriptors) if (r.isObjectList) delete newBlock[r.region];
+
+    const values = getChildBlockEntries(sourceBlock, region)
+      .filter(
+        (e) => !rp.type || getBlockType(e.block, region.typeField) === rp.type,
+      )
+      .map((e) => e.block?.[rp.field])
+      .filter((v) => v != null);
+    const allSlate = values.length > 0 && values.every((v) => Array.isArray(v));
+    if (allSlate) {
+      newBlock[valueField] = mergeSlateValues(values);
+    } else {
+      newBlock[valueField] = values[0];
+      if (values.length > 1) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[HYDRA] convertValueContainer: collapse dropped ${values.length - 1} non-slate value(s) for "${valueField}"`,
+        );
+      }
+    }
+    return newBlock;
+  }
+
+  // expand: the value block is the source.
+  const descriptors = getContainerRegionDescriptors(
+    targetType,
+    blocksConfig,
+    intl,
+  );
+  const region = descriptors.find((r) => r.region === rp.region);
+  if (!region) return null;
+  const newBlock = { ...sourceBlock, '@type': targetType };
+  delete newBlock[valueField];
+  const childType = rp.type || region.allowedBlocks?.[0] || 'slate';
+  const child = { '@type': childType, [rp.field]: sourceBlock[valueField] };
+  setChildBlockEntries(newBlock, region, [{ id: child['@id'], block: child }]);
+  return newBlock;
+}
+
+/**
  * ALL child regions of a container, in schema order — the storage-agnostic unit for every
  * container op. Storage (object_list vs blocks_layout) is a property of each REGION, not the
  * container: one container may mix object_list and blocks_layout regions. Returns a LIST of
@@ -1483,12 +1614,11 @@ export function removeTemplateInstance(
 
   // Get current layout for the instance's region. Blocks are in shared
   // parent.blocks; the layout list lives at blocks_layout[region]. (Template
-  // instances are always blocks-layout containers.)
-  const layoutPath = `blocks_layout.${region}`;
-  const blocksPath = 'blocks';
-
-  const layout = get(parentBlock, layoutPath, []);
-  const blocks = get(parentBlock, blocksPath, {});
+  // instances are always blocks-layout containers.) Dep-free direct access — no
+  // lodash `get`: the offline evaluator bundles this module, so it must not pull
+  // heavy deps (see the DI-refactor).
+  const layout = parentBlock.blocks_layout?.[region] ?? [];
+  const blocks = parentBlock.blocks ?? {};
 
   // Separate blocks into: fixed (to delete), slot (to keep but strip), and unrelated
   const newLayout = [];
@@ -1837,7 +1967,7 @@ function getPageDefaults(blocksConfig, formData) {
     allowedBlocks: getPageAllowedBlocksFromRestricted(blocksConfig, {
       properties: formData,
     }),
-    defaultBlockType: config.settings.defaultBlockType || null,
+    defaultBlockType: getDefaultBlockType(),
   };
 }
 
@@ -1994,28 +2124,39 @@ export function ensureEmptyBlockIfEmpty(
     const blocksObj = parentBlock.blocks || {};
     let newItems = null;
     let newBlocks = null;
-    for (let i = 0; i < items.length; i++) {
-      const cur = blocksObj[items[i]];
-      const slot = cur?.nextSlotId;
-      if (!slot) continue;
-      const next = blocksObj[items[i + 1]];
-      if (next?.slotId === slot) continue; // slot already filled
-      const emptyId = uuidGenerator();
+    const seedEmpty = (anchor, slot) => {
       let emptyBlock = { '@type': 'empty' };
       if (intl && blocksConfig) {
-        emptyBlock = applyBlockDefaults(
+        emptyBlock = getApplyBlockDefaults()(
           { data: emptyBlock, intl, metadata, properties },
           blocksConfig,
         );
       }
-      emptyBlock = {
-        ...inheritTemplateMembership(emptyBlock, cur),
-        slotId: slot,
-      };
-      newItems = newItems || [...items];
-      newBlocks = newBlocks || { ...blocksObj };
-      newItems.splice(newItems.indexOf(items[i]) + 1, 0, emptyId);
-      newBlocks[emptyId] = emptyBlock;
+      return { ...inheritTemplateMembership(emptyBlock, anchor), slotId: slot };
+    };
+    for (let i = 0; i < items.length; i++) {
+      const cur = blocksObj[items[i]];
+      // Trailing slot: a fixed block's `nextSlotId` names the slot region AFTER it. If
+      // the block after it isn't in that slot, the slot is empty — seed a placeholder.
+      const nextSlot = cur?.nextSlotId;
+      if (nextSlot && blocksObj[items[i + 1]]?.slotId !== nextSlot) {
+        const emptyId = uuidGenerator();
+        newItems = newItems || [...items];
+        newBlocks = newBlocks || { ...blocksObj };
+        newItems.splice(newItems.indexOf(items[i]) + 1, 0, emptyId);
+        newBlocks[emptyId] = seedEmpty(cur, nextSlot);
+      }
+      // Leading slot (mirror): a fixed block's `prevSlotId` names the slot region BEFORE
+      // it — a bottom-anchored layout (slots above a fixed footer). If the block before it
+      // isn't in that slot, the leading slot is empty — seed a placeholder in front of it.
+      const prevSlot = cur?.prevSlotId;
+      if (prevSlot && blocksObj[items[i - 1]]?.slotId !== prevSlot) {
+        const emptyId = uuidGenerator();
+        newItems = newItems || [...items];
+        newBlocks = newBlocks || { ...blocksObj };
+        newItems.splice(newItems.indexOf(items[i]), 0, emptyId);
+        newBlocks[emptyId] = seedEmpty(cur, prevSlot);
+      }
     }
     if (newItems) {
       const updated = setContainerItems(
@@ -2077,7 +2218,7 @@ export function ensureEmptyBlockIfEmpty(
   // readOnly would freeze editing a template directly (template-edit-mode "a template page
   // loads + edits like a normal page"). Add-time seeds (initializeContainerBlock) DO inherit.
   const blockType = getEmptyBlockType(containerConfig);
-  const blockData = seedTemplateChild(
+  let blockData = seedTemplateChild(
     { '@type': blockType },
     blockType,
     newBlockId,
@@ -2086,6 +2227,27 @@ export function ensureEmptyBlockIfEmpty(
     uuidGenerator,
     { intl, metadata, properties, inheritFixed: false },
   );
+  // A FORCED region (allowedLayouts) is template-controlled: its default empty must
+  // be a LOCKED template member so it can't be filled per-page — you unlock the
+  // template first (like the footer). A fully-empty forced template has no anchor
+  // block to inherit from, so derive the membership from the forced layout id
+  // (forced layouts use templateInstanceId === templateId; templateId is the
+  // allowedLayouts entry — see helpers/index.js forced-apply). Reuse the SAME
+  // inheritTemplateMembership the slot-seed path uses; view-mode merge is untouched
+  // (this only runs in the editor's empty-seeding).
+  const forcedLayout = containerConfig.allowedLayouts?.find(Boolean);
+  if (forcedLayout) {
+    blockData = inheritTemplateMembership(
+      blockData,
+      {
+        templateInstanceId: forcedLayout,
+        templateId: forcedLayout,
+        fixed: true,
+        readOnly: true,
+      },
+      { inheritFixed: true },
+    );
+  }
   const blocksObj = { ...parentBlock.blocks, [newBlockId]: blockData };
   const updatedParentBlock = setContainerItems(
     parentBlock,
@@ -2309,7 +2471,7 @@ function seedTemplateChild(
   // in a template being edited directly, where inheriting readOnly would freeze inline editing.
   const { intl, metadata, properties, inheritFixed } = options;
   if (intl) {
-    childData = applyBlockDefaults(
+    childData = getApplyBlockDefaults()(
       { data: childData, intl, metadata, properties },
       blocksConfig,
     );

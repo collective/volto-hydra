@@ -1,7 +1,12 @@
 /**
- * Schema Inheritance Utilities
+ * Block Sync Utilities
  *
- * Helpers for blocks that reference other block types and inherit their schemas.
+ * How a container block SYNCS schema + data with its child blocks: a grid/listing
+ * fixing its children's item type, inheriting shared defaults, hiding the fields
+ * the parent owns, and gating a child's fields on the parent's settings
+ * (`fieldRules`). Formerly "schemaInheritance" — the through-line is keeping
+ * parent and child blocks in sync, not inheritance per se.
+ *
  * Used by listing blocks, grid blocks, and other containers that need to show
  * editable fields from a referenced block type.
  *
@@ -32,9 +37,9 @@
  * inject `blockId` into the args at every Volto call site, the `hydraContext`
  * branch can be removed — until then, both branches are load-bearing.
  */
-import config from '@plone/volto/registry';
-import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField } from './blockPath';
-import { addableSiblingTypes } from '../../../hydra-js/buildBlockPathMap.js';
+import { getInjectedBlocksConfig } from './injectedVoltoConfig.js';
+import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField, convertValueContainer, insertBlockInContainer } from './blockPath.js';
+import { addableSiblingTypes, buildBlockPathMap } from '../../../hydra-js/buildBlockPathMap.js';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import {
   convertFieldValue,
@@ -47,7 +52,7 @@ import {
   isSlateFieldType,
   slateNodesText,
 } from '@volto-hydra/helpers';
-import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '../context';
+import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '../context/index.js';
 // Pure validation/default-application logic lives in schemaValidation.js
 // (no dependencies — safe to import from CI scripts and test runners).
 // Re-exported here for backward compat; schemaValidation.js is the SSOT.
@@ -377,7 +382,7 @@ function getNeighborData(index, context) {
 }
 
 function getTemplateInfoFromNeighbors(context) {
-  const { position, layoutItems, allBlocks, insertAfter, containerId, field, items } = context;
+  const { position, layoutItems, allBlocks, containerId, field, items } = context;
   const containerLength = items ? items.length : layoutItems?.length || 0;
 
   if (containerLength === 0) {
@@ -403,60 +408,71 @@ function getTemplateInfoFromNeighbors(context) {
     return undefined;
   }
 
-  // Determine the primary neighbor based on insertion direction
-  // insertAfter=true: we're inserting AFTER the block at position-1, so inherit from it
-  // insertAfter=false: we're inserting BEFORE the block at position, so inherit from it
+  // Position-based membership: examine BOTH neighbors and see whether a slot region
+  // reaches this insertion gap. Drag DIRECTION is irrelevant — the same position always
+  // yields the same membership. (The old `insertAfter ? prev : next` "inherit from the
+  // target block" rule made one position mean two different things and, before the first
+  // fixed anchor, inherited templateId + fixed:true from the fixed block while finding no
+  // slot — an in-template, slot-less, read-only corrupt half-membership.)
+  //
+  // A neighbor "offers" this position into a slot when a slot region touches the gap:
+  //   - a non-fixed slot block on EITHER side (the slot continues into the gap) → its slotId
+  //   - the block BEFORE the gap, if fixed, via its `nextSlotId` (slot region AFTER it)
+  //   - the block AFTER  the gap, if fixed, via its `prevSlotId` (slot region BEFORE it)
+  // `prevSlotId` mirrors `nextSlotId` so a leading slot (bottom-anchored layout: slots
+  // above a fixed footer) is reachable, symmetric with a trailing slot. No offer from
+  // either side → outside every template. A block that joins a slot is a real slot
+  // member: never fixed, never readOnly.
   const prevNeighbor = getNeighborData(position - 1, context);
   const nextNeighbor = getNeighborData(position, context);
 
-  // The "target" block determines template membership
-  const primaryNeighbor = insertAfter ? prevNeighbor : nextNeighbor;
-
-  // If the primary neighbor (target of insertion) is not in a template, stay outside
-  if (!primaryNeighbor?.templateId) {
-    return undefined;
-  }
-
-  // Primary neighbor is in a template - inherit template info
-  const templateInfo = {
-    templateId: primaryNeighbor.templateId,
-    templateInstanceId: primaryNeighbor.templateInstanceId,
-    fixed: primaryNeighbor.fixed || false,
-    readOnly: primaryNeighbor.readOnly || false,
+  const slotOffer = (neighbor, fixedSlotField) => {
+    if (!neighbor?.templateId) return null;
+    const slotId =
+      !neighbor.fixed && neighbor.slotId
+        ? neighbor.slotId
+        : neighbor.fixed && neighbor[fixedSlotField]
+          ? neighbor[fixedSlotField]
+          : null;
+    if (!slotId) return null;
+    return {
+      templateId: neighbor.templateId,
+      templateInstanceId: neighbor.templateInstanceId,
+      slotId,
+    };
   };
 
-  // Inherit slotId from the primary neighbor if it's not fixed
-  // For slotId inheritance, also check the secondary neighbor
-  let inheritedSlotId = null;
-  const secondaryNeighbor = insertAfter ? nextNeighbor : prevNeighbor;
-
-  let fromNextPlaceholder = false;
-  for (const neighbor of [primaryNeighbor, secondaryNeighbor].filter(Boolean)) {
-    if (neighbor?.templateId === templateInfo.templateId) {
-      // Same template - can inherit slotId
-      if (!neighbor.fixed && neighbor.slotId && !inheritedSlotId) {
-        inheritedSlotId = neighbor.slotId;
-      }
-      // Fixed blocks with nextSlotId indicate an adjacent slot region.
-      // This preserves slot info even when all slot blocks are deleted.
-      if (neighbor.fixed && neighbor.nextSlotId && !inheritedSlotId) {
-        inheritedSlotId = neighbor.nextSlotId;
-        fromNextPlaceholder = true;
-      }
-    }
+  // prev reaches forward via nextSlotId; next reaches backward via prevSlotId.
+  const offer =
+    slotOffer(prevNeighbor, 'nextSlotId') || slotOffer(nextNeighbor, 'prevSlotId');
+  if (offer) {
+    return {
+      templateId: offer.templateId,
+      templateInstanceId: offer.templateInstanceId,
+      slotId: offer.slotId,
+      fixed: false,
+      readOnly: false,
+    };
   }
 
-  // nextSlotId overrides: the new block is in a slot region,
-  // so it should not inherit fixed/readOnly from the fixed neighbor.
-  if (fromNextPlaceholder) {
-    templateInfo.fixed = false;
-    templateInfo.readOnly = false;
+  // No slot faces this position. If the CONTAINER itself is a template instance (e.g. a
+  // columns block whose children are each their own fixed slot), a block added INSIDE it
+  // still joins that template — with a FRESH slotId (left null; the caller generates one).
+  // This is what separates "inside a template instance" (join) from the template's OUTER
+  // edge (746: the container is the page, which has no templateId, so a drop before a
+  // top/bottom fixed anchor correctly stays out).
+  const container = context.parentBlock || allBlocks?.[containerId];
+  if (container?.templateId) {
+    return {
+      templateId: container.templateId,
+      templateInstanceId: container.templateInstanceId,
+      slotId: null,
+      fixed: false,
+      readOnly: false,
+    };
   }
 
-  return {
-    ...templateInfo,
-    slotId: inheritedSlotId,
-  };
+  return undefined;
 }
 
 /**
@@ -597,7 +613,8 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
   return (args) => {
     let { formData, schema, intl } = args;
 
-    const blocksConfig = config.blocks.blocksConfig;
+    const blocksConfig =
+      getHydraSchemaContext?.()?.blocksConfig || getInjectedBlocksConfig();
 
     // Read typeField from block-level config if not provided directly.
     // Uses the standard lookup (recipe → schema walk).
@@ -964,7 +981,7 @@ export function hideParentOwnedFields() {
     const hydraContext = getHydraSchemaContext();
     const blockPathMap = passedBlockPathMap || hydraContext?.blockPathMap;
     const blockId = passedBlockId ?? hydraContext?.currentBlockId;
-    const blocksConfig = hydraContext?.blocksConfig || config.blocks.blocksConfig;
+    const blocksConfig = hydraContext?.blocksConfig || getInjectedBlocksConfig();
     // For getLiveBlockData below: pageFormData + pathMap let getBlockById
     // resolve siblings/parents during buildBlockPathMap pass 2 (no React).
     const liveFallback = { formData: args.pageFormData, blockPathMap };
@@ -1289,6 +1306,100 @@ export function computeSmartDefaults(sourceFields, targetSchema, declaredMapping
  * @param {Object} intl - React Intl object for translations
  * @returns {Object} - FormData with defaults applied to blocks (or original if no changes)
  */
+/**
+ * Resolve a block's EFFECTIVE schema — the base schema with its schemaEnhancer
+ * applied (fieldRules visibility, hideParentOwnedFields, inheritSchemaFrom). This
+ * is the schema the editor actually renders and validates against, so its
+ * `required` is the DYNAMIC required set: a field hidden by a `when` rule (a
+ * card's `image`, shown only when the grid enables it) is dropped from `required`.
+ *
+ * Recipe-object enhancers ARE converted here (via createSchemaEnhancerFromRecipe),
+ * unlike buildBlockPathMap's pass which skips them — so callers get the fully
+ * resolved schema for recipe-based blocks too. Enhancers that compose
+ * `hideParentOwnedFields` must already be installed (installChildBlockEnhancers).
+ *
+ * Extracted from applySchemaDefaultsToFormData (its per-block resolution) so
+ * block-sanity's offline required check can reuse the exact same resolution.
+ *
+ * @returns {Object|null} the enhanced schema, or null if the block has no schema.
+ */
+export function resolveEffectiveBlockSchema(blockId, formData, blockPathMap, blocksConfig, intl) {
+  const blockData = getBlockById(formData, blockPathMap, blockId);
+  if (!blockData) return null;
+
+  // Use blockPathMap for type lookup (single source of truth).
+  // Don't use blockData['@type'] as object_list items don't store @type.
+  const blockType = blockPathMap?.[blockId]?.blockType;
+  if (!blockType) return null;
+
+  const blockConfig = blocksConfig?.[blockType];
+
+  // Base schema + enhancer come from the registered block config OR — for a
+  // non-typed object_list item (virtual blockType, no blocksConfig entry) — from
+  // the inline `itemSchema` the pathMap recorded. This resolves an inline
+  // object_list item's schema (e.g. a table cell's fieldRules) WITHOUT registering
+  // virtual types into the shared blocksConfig, which would pollute block
+  // discovery and the chooser.
+  const itemSchema = blockPathMap?.[blockId]?.itemSchema;
+  if (!blockConfig && !itemSchema) return null;
+
+  // Get base schema + its enhancer from whichever source applies.
+  let schema = null;
+  let enhancer = null;
+  if (blockConfig) {
+    if (typeof blockConfig.blockSchema === 'function') {
+      schema = blockConfig.blockSchema({ formData: blockData, intl });
+    } else if (blockConfig.blockSchema) {
+      schema = blockConfig.blockSchema;
+    } else if (typeof blockConfig.schema === 'function') {
+      schema = blockConfig.schema({ formData: blockData, intl });
+    } else if (blockConfig.schema) {
+      schema = blockConfig.schema;
+    }
+    enhancer = blockConfig.schemaEnhancer;
+  } else {
+    schema = itemSchema;
+    enhancer = itemSchema.schemaEnhancer;
+  }
+
+  if (!schema) return null;
+
+  // Apply schemaEnhancer if present (fieldRules/hideParentOwnedFields/inheritSchemaFrom).
+  if (enhancer) {
+    // schemaEnhancer can be a function or a recipe object
+    if (typeof enhancer !== 'function') {
+      // It's a recipe object - create enhancer from it
+      enhancer = createSchemaEnhancerFromRecipe(enhancer);
+    }
+    if (enhancer) {
+      // Set context so schemaEnhancer can access currentBlockId and blockPathMap
+      // (Volto HOC call sites that pass only {schema,formData,intl}); also pass
+      // them in args (the buildBlockPathMap contract) so `../` lookups resolve
+      // even without an active context.
+      const restoreContext = setHydraSchemaContext({
+        blockPathMap,
+        currentBlockId: blockId,
+        blocksConfig,
+        formData,
+      });
+      try {
+        schema = enhancer({
+          formData: blockData,
+          schema: { ...schema, properties: { ...schema.properties } },
+          intl,
+          pageFormData: formData,
+          blockId,
+          blockPathMap,
+        });
+      } finally {
+        restoreContext();
+      }
+    }
+  }
+
+  return schema;
+}
+
 export function applySchemaDefaultsToFormData(formData, blockPathMap, blocksConfig, intl) {
   if (!blockPathMap) return formData;
 
@@ -1299,64 +1410,154 @@ export function applySchemaDefaultsToFormData(formData, blockPathMap, blocksConf
     const blockData = getBlockById(result, blockPathMap, blockId);
     if (!blockData) continue;
 
-    // Use blockPathMap for type lookup (single source of truth)
-    // Don't use blockData['@type'] as object_list items don't store @type
-    const blockType = blockPathMap[blockId]?.blockType;
-    if (!blockType) continue;
-
-    const blockConfig = blocksConfig?.[blockType];
-    if (!blockConfig) continue;
-
-    // Get base schema
-    let schema = null;
-    if (typeof blockConfig.blockSchema === 'function') {
-      schema = blockConfig.blockSchema({ formData: blockData, intl });
-    } else if (blockConfig.blockSchema) {
-      schema = blockConfig.blockSchema;
-    } else if (typeof blockConfig.schema === 'function') {
-      schema = blockConfig.schema({ formData: blockData, intl });
-    } else if (blockConfig.schema) {
-      schema = blockConfig.schema;
-    }
-
+    const schema = resolveEffectiveBlockSchema(
+      blockId,
+      result,
+      blockPathMap,
+      blocksConfig,
+      intl,
+    );
     if (!schema) continue;
-
-    // Apply schemaEnhancer if present (this sets the `default` values)
-    if (blockConfig.schemaEnhancer) {
-      // schemaEnhancer can be a function or a recipe object
-      let enhancer = blockConfig.schemaEnhancer;
-      if (typeof enhancer !== 'function') {
-        // It's a recipe object - create enhancer from it
-        enhancer = createSchemaEnhancerFromRecipe(enhancer);
-      }
-      if (enhancer) {
-        // Set context so schemaEnhancer can access currentBlockId and blockPathMap
-        const restoreContext = setHydraSchemaContext({
-          blockPathMap,
-          currentBlockId: blockId,
-          blocksConfig,
-          formData: result,
-        });
-        try {
-          schema = enhancer({
-            formData: blockData,
-            schema: { ...schema, properties: { ...schema.properties } },
-            intl,
-          });
-        } finally {
-          restoreContext();
-        }
-      }
-    }
 
     // Apply defaults from enhanced schema
     const updatedBlock = applySchemaDefaultsToBlock(blockData, schema);
     if (updatedBlock !== blockData) {
       result = updateBlockById(result, blockPathMap, blockId, updatedBlock);
     }
+
+    // `@type` RULE — a position-driven type. When a typed object_list item carries
+    // a `typeRule` (a `when`-based fieldRule whose `set` is a block-TYPE name),
+    // re-resolve the type the item SHOULD have at its current position and, if it
+    // differs from the stored `@type`, convert the item in place. This is the same
+    // "run the rules, see what changed, write it back" pass that applies defaults —
+    // no separate resolver, no editor plumbing. It's how a table cell flips between
+    // `tableHeaderCell` (a slate value) and `tableCell` (a blocks container) when
+    // its row moves to/from a header position. Deterministic by position, so it
+    // settles (the target type re-resolves to itself next pass — no oscillation).
+    const typeRule = blockPathMap[blockId]?.typeRule;
+    if (typeRule) {
+      const current = getBlockById(result, blockPathMap, blockId);
+      const currentType = current?.['@type'] || blockPathMap[blockId]?.blockType;
+      const targetType = evaluateFieldRule(typeRule, current, {
+        blockId,
+        blockPathMap,
+        pageFormData: result,
+      });
+      if (typeof targetType === 'string' && targetType !== currentType) {
+        const converted = convertValueContainer(
+          current,
+          currentType,
+          targetType,
+          blocksConfig,
+          intl,
+        );
+        // null → no bridge for this pair; leave the item as-is (fail visibly by
+        // simply not converting rather than corrupting it).
+        if (converted) {
+          result = updateBlockById(result, blockPathMap, blockId, converted);
+        }
+      }
+    }
   }
 
   return result;
+}
+
+/**
+ * TRIAL a would-be state (a candidate drop/paste result) and report every block
+ * whose `@type` the rules would CHANGE — so the caller can ask before committing.
+ *
+ * This is the generic "sandbox the drop, see what converts" detector: it runs the
+ * SAME normalization pass that commits use (`applySchemaDefaultsToFormData`, which
+ * applies defaults AND `@type` rules via the container⇄value bridge) against a
+ * candidate formData, then diffs each block's `@type` before vs after. A type
+ * changes for ANY reason a rule fires — position (`typeRule`), a field condition,
+ * anything — not just tables. The caller (DnD/paste) trials the post-move formData,
+ * and if `conversions` is non-empty, confirms with the user, then commits the
+ * returned `formData` (already converted); an empty list commits silently.
+ *
+ * Blocks REMOVED by a conversion (e.g. a container's children collapsed into a
+ * value) are not "type changes" and are not reported — only surviving blocks whose
+ * `@type` differs. `blockPathMap` is the candidate's map; `getBlockById` is
+ * path-based, so it still resolves a converted block (same position, new `@type`).
+ *
+ * @returns {{ formData: object, conversions: Array<{blockId, from, to}> }}
+ */
+export function previewSchemaDefaultConversions(formData, blockPathMap, blocksConfig, intl) {
+  const before = {};
+  if (blockPathMap) {
+    for (const blockId of Object.keys(blockPathMap)) {
+      const b = getBlockById(formData, blockPathMap, blockId);
+      if (b) before[blockId] = b['@type'];
+    }
+  }
+  const normalized = applySchemaDefaultsToFormData(formData, blockPathMap, blocksConfig, intl);
+  const conversions = [];
+  for (const blockId of Object.keys(before)) {
+    const b = getBlockById(normalized, blockPathMap, blockId);
+    if (b && b['@type'] !== before[blockId]) {
+      conversions.push({ blockId, from: before[blockId], to: b['@type'] });
+    }
+  }
+  return { formData: normalized, conversions };
+}
+
+/**
+ * Filter a container's `allowedBlocks` down to the types that are actually ADDABLE
+ * at a given position, when a position `@type` rule (typeRule) governs the region.
+ *
+ * For each allowed type, TRIAL it: probe-insert a minimal item of that type after
+ * `refBlockId`, run the schema-default pass (which applies the typeRule), and keep
+ * the type only if the rule did NOT change it. A type the rule immediately rewrites
+ * (e.g. `tableCell` dropped where the position forces `tableHeaderCell`) is not a
+ * real choice at that spot, so it's dropped from the menu — a typeRule-driven
+ * container thus offers only the rule-consistent type(s). Usually one survives, so
+ * the caller's "single allowed type → add directly (no chooser)" path fires.
+ *
+ * Returns the filtered list (never empty — falls back to the input if the trial
+ * would drop everything, so a mis-authored rule can't strand the add). A container
+ * with ≤1 allowed type, or one whose items are all left unchanged, is returned as-is.
+ */
+export function filterAddableTypesByRule(
+  allowedBlocks,
+  formData,
+  blockPathMap,
+  refBlockId,
+  containerConfig,
+  blocksConfig,
+  intl,
+) {
+  if (!Array.isArray(allowedBlocks) || allowedBlocks.length <= 1) return allowedBlocks;
+  // No position `@type` rule governs this region → nothing can re-type the new
+  // item, so every allowed type is addable as-is. Skip the per-type sandbox
+  // entirely (the common case — only a typeRule container needs filtering). The
+  // region's `typeRule` is carried onto each typed item's pathMap entry, so the
+  // ref sibling carries it when the region has one.
+  if (!blockPathMap?.[refBlockId]?.typeRule) return allowedBlocks;
+  const idField = containerConfig?.idField || '@id';
+  const filtered = allowedBlocks.filter((type) => {
+    const probeId = `__probe_${type}__`;
+    let sandbox;
+    try {
+      sandbox = insertBlockInContainer(
+        formData,
+        blockPathMap,
+        refBlockId,
+        probeId,
+        { '@type': type, [idField]: probeId },
+        containerConfig,
+        'after',
+      );
+    } catch {
+      return true; // couldn't probe this type → don't drop it
+    }
+    const map = buildBlockPathMap(sandbox, blocksConfig, intl);
+    const normalized = applySchemaDefaultsToFormData(sandbox, map, blocksConfig, intl);
+    const after = getBlockById(normalized, map, probeId);
+    // Keep only if the position rule left this type unchanged (addable as-is).
+    return !after || after['@type'] === type;
+  });
+  return filtered.length ? filtered : allowedBlocks;
 }
 
 /**
@@ -1783,6 +1984,13 @@ function evaluateFieldRule(rule, formData, args) {
  *                   ordered list of its child block TYPES (`getBlockType`, so
  *                   `contains: 'image'` means "has an image block").
  *
+ * The virtual field `@index` is special: instead of field data it reads the
+ * block's ordinal POSITION within its parent object_list region (from the
+ * blockPathMap path) as a `'number'` surface — so `{ '@index': { lt: 1 } }` is
+ * "first in my region" and `../@index` is the parent block's index. Distinct
+ * from the region surface's numeric ops (which COUNT children); a non-object_list
+ * block yields an unset number (comparisons false, never a throw).
+ *
  * Only the current block carries a schema here (`args.schema`); a `../`/`/` ref
  * has none, so its non-region value defaults to the string surface.
  * @private
@@ -1797,6 +2005,35 @@ function resolveWhenField(fieldPath, formData, args) {
     curBlockId,
     blockPathMap,
   );
+
+  // Position surface — `@index` is a block's ordinal index within its parent
+  // object_list region, sourced from the blockPathMap PATH (its last element is
+  // the numeric array index for an object_list item), NOT from field data. It
+  // composes with the block-step grammar, so `../@index` is the parent block's
+  // index (a cell reading its row's position). This is what lets a rule key off
+  // POSITION rather than a field value — e.g. a table cell that is a header when
+  // its row is first (`../@index` < 1) or it is first in its row (`@index` < 1).
+  // It's a number surface, distinct from (and non-colliding with) the region
+  // surface's numeric ops, which COUNT a region's children. A non-object_list
+  // block (path with no numeric tail) yields an unset number, so comparisons are
+  // false rather than throwing.
+  //
+  // `../@index` can still carry its leading `../` here when there was no
+  // blockPathMap to resolve them — e.g. buildBlockPathMap PASS 1 computes a
+  // GENERIC schema (no blockId/blockPathMap), so `resolveFieldPath` returns the
+  // path verbatim. In that case the position is simply unknown → an UNSET number
+  // (every comparison false), never a throw. Pass 2 re-runs the enhancer WITH the
+  // blockPathMap, where `../@index` resolves to the parent block and this reads
+  // its real index. So strip any unresolved leading `../` before matching.
+  if (fieldName === '@index' || fieldName.replace(/^(?:\.\.\/)+/, '') === '@index') {
+    const p = blockPathMap?.[targetBlockId]?.path;
+    const last = Array.isArray(p) && p.length ? p[p.length - 1] : undefined;
+    return {
+      kind: 'number',
+      value: typeof last === 'number' ? last : undefined,
+      fieldPath,
+    };
+  }
 
   // Which block owns the field, and (only for the current block) its schema.
   let block;

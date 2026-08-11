@@ -20,7 +20,7 @@ test.describe('DnD / paste via conversion', () => {
     );
   });
 
-  test('drag into a container that only accepts a convert-target auto-converts it', async ({ page }) => {
+  test('drag into a container that only accepts a convert-target converts it (via confirm)', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/dnd-convert-page');
@@ -32,10 +32,11 @@ test.describe('DnD / paste via conversion', () => {
     ).toHaveCount(2);
 
     // Drop the convSource BETWEEN the box's two children (a clearly interior
-    // position, away from the container's padded edges).
-    await helper.dragBlockAfter('src-1', 'a-1');
+    // position). The drop would change its @type → the "Convert blocks?" confirm
+    // opens; clicking Convert commits.
+    await helper.dragBlockAfterConfirmConvert('src-1', 'a-1');
 
-    // After: the dropped convSource was auto-converted → box-1 has THREE convTargetA,
+    // After: the dropped convSource was converted → box-1 has THREE convTargetA,
     // and src-1 is no longer a convSource.
     await expect(
       iframe.locator('[data-block-uid="box-1"] [data-conv-type="convTargetA"]'),
@@ -80,10 +81,11 @@ test.describe('DnD / paste via conversion', () => {
     ).toHaveCount(0);
   });
 
-  test('multi-selected blocks each auto-convert into a single-option container', async ({ page }) => {
+  test('multi-selected blocks each convert into a single-option container (one confirm)', async ({ page }) => {
     // The multi-block auto-only rule (a batch drops only where every block has
     // exactly one convertible option) is unit-covered by acceptableAt; here we
-    // check the end-to-end auto path: two convSource blocks → two convTargetA.
+    // check the end-to-end path: two convSource blocks → two convTargetA, both
+    // listed in a single "Convert blocks?" confirm.
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/dnd-convert-page');
@@ -102,9 +104,12 @@ test.describe('DnD / paste via conversion', () => {
     const dragHandle = toolbar.locator('.drag-handle');
     await expect(dragHandle).toBeVisible({ timeout: 3000 });
 
-    // Drag both between box-1's children → each auto-converts (single option).
+    // Drag both between box-1's children → each converts (single option); the
+    // move waits on the confirm, so release without asserting a reorder.
     const target = iframe.locator('[data-block-uid="a-1"]').first();
-    await helper.dragBlockWithMouse(dragHandle, target, true);
+    await helper.dragBlockWithMouseNoDrop(dragHandle, target, true);
+    await page.mouse.up();
+    await helper.confirmConvert();
 
     await expect(
       iframe.locator('[data-block-uid="box-1"] [data-conv-type="convTargetA"]'),
@@ -143,7 +148,7 @@ test.describe('DnD / paste via conversion', () => {
     await expect(iframe.locator('[data-block-uid="src-1"] [data-conv-type="convSource"]')).toHaveCount(1);
   });
 
-  test('pasting a block into a restricted container auto-converts it', async ({ page }) => {
+  test('pasting a block into a restricted container converts it (via confirm)', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/dnd-convert-page');
@@ -159,10 +164,11 @@ test.describe('DnD / paste via conversion', () => {
     await page.keyboard.press('ControlOrMeta+c');
     await expect(page.locator('#toolbar-paste-blocks')).toBeVisible({ timeout: 3000 });
 
-    // Select a block inside box-1 and paste after it → auto-convert into the box.
+    // Select a block inside box-1 and paste after it → convert into the box (confirm).
     await helper.clickBlockInIframe('a-1');
     await helper.waitForIframeBlockHandle('a-1');
     await page.keyboard.press('ControlOrMeta+v');
+    await helper.confirmConvert();
 
     // box-1 gains a third convTargetA (the pasted convSource converted); the
     // original src-1 (a copy) remains a convSource at page level.
@@ -217,11 +223,12 @@ test.describe('DnD / paste via conversion', () => {
     await page.keyboard.press('ControlOrMeta+x');
     await expect.poll(async () => helper.blockExists('src-1')).toBe(false);
 
-    // Select a block inside box-1 and paste after it → the moved block auto-converts.
+    // Select a block inside box-1 and paste after it → the moved block converts (confirm).
     await helper.clickBlockInIframe('a-1');
     await helper.waitForIframeBlockHandle('a-1');
     await expect(page.locator('#toolbar-paste-blocks')).toBeVisible({ timeout: 3000 });
     await page.keyboard.press('ControlOrMeta+v');
+    await helper.confirmConvert();
 
     // box-1 gains a third convTargetA; src-1 (moved, not copied) is now that
     // converted block — no longer a convSource.
@@ -304,13 +311,16 @@ test.describe('DnD / paste via conversion', () => {
     ).toHaveCount(1);
 
     // Select the container itself (not its child), then drag it between
-    // grp-box-1's children (convGroupSrc → convGroupDst).
+    // grp-box-1's children (convGroupSrc → convGroupDst). The move waits on the
+    // confirm, so release without asserting a reorder, then confirm.
     await helper.clickContainerBlockInIframe('grp-src-1');
     const dragHandle = await helper.getDragHandle();
     const target = iframe.locator('[data-block-uid="gd-1"]').first();
-    await helper.dragBlockWithMouse(dragHandle, target, true);
+    await helper.dragBlockWithMouseNoDrop(dragHandle, target, true);
+    await page.mouse.up();
+    await helper.confirmConvert();
 
-    // grp-src-1 auto-converted to convGroupDst and moved in — via convertContainerBlock,
+    // grp-src-1 converted to convGroupDst and moved in — via convertContainerBlock,
     // so its child came along.
     await expect(
       iframe.locator('[data-block-uid="grp-box-1"] [data-container-type="convGroupDst"]'),

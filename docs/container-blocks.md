@@ -270,6 +270,55 @@ So the simplest way to never deal with empty placeholders in a region is to give
 
 Empty blocks are stripped before saving. Render them as empty space; Hydra puts a '+' button in the middle for the user to pick a real type in place. You can override the look of that '+' by rendering something inside the empty block and adding `data-block-add="button"` to it.
 
+### Making a region empty by default — `defaultBlockType: "empty"`
+
+The rules above mean a region with a `defaultBlockType`, or a single-entry
+`allowedBlocks`, is *never* empty — it always seeds a block of that type. To
+declare a region that should sit **empty until an editor adds something**, while
+still restricting **what** they can add, set **`defaultBlockType: "empty"`** and
+do **not** list `"empty"` in `allowedBlocks`:
+
+<!-- codeExample: javascript -->
+```javascript
+announcement: {
+    widget: 'blocks_layout',
+    allowedLayouts: ['/templates/site-announcement'],
+    allowedBlocks: ['globalAlert'], // the only thing an editor can add
+    defaultBlockType: 'empty',      // ...but empty by default (no band shown)
+}
+```
+
+This is the one case where `"empty"` is a **configured** default rather than the
+fallback Hydra inserts for an ambiguous region. The seed and the add diverge on
+purpose:
+
+- **Passive seed** (region loaded, or its last child deleted): Hydra seeds a bare
+  `@type: "empty"` placeholder — nothing renders. `defaultBlockType` wins over the
+  single-`allowedBlocks` auto-fill, so the region genuinely shows empty.
+- **The '+' (active add / fill)**: inserts a real block from `allowedBlocks`
+  (converting the empty placeholder **in place**), never another `empty`. The add
+  path reads `allowedBlocks`, not `defaultBlockType` — so a single-entry
+  `allowedBlocks` fills straight to that type with no chooser.
+- **`"empty"` is never in `allowedBlocks`** — it isn't a type an editor opts into;
+  it's the "region is empty" state. On save the placeholder is stripped, so a
+  genuinely-empty region persists with no blocks.
+
+Use this for optional site chrome — e.g. a header announcement that is usually
+absent but can hold a single global alert when needed. (Because the seed is
+`"empty"`, the frontend must render `empty` as a selectable slot — see below.)
+
+**Forced regions are locked until unlocked.** When the region is a **forced
+layout** (`allowedLayouts`), it is template-controlled — its content lives in the
+shared template and is edited *centrally*, like a branded footer. So the seeded
+empty is stamped as a **locked template member** (`readOnly`, with the forced
+layout's `templateId`/`templateInstanceId`): it shows empty, but you cannot fill
+it until you **unlock** the template (enter template-edit-mode). This prevents an
+editor from silently filling it per-page — the announcement stays site-wide.
+Filling then happens in template-edit-mode and locking publishes it everywhere.
+(This stamping happens in the editor's empty-seeding — `ensureEmptyBlockIfEmpty`
+— so **view-mode merging still leaves an empty forced layout empty**; no empty is
+ever inserted at render time.)
+
 ### `empty` is a universal placeholder — renderers must tolerate it
 
 In a no-default, multi-allowed region, `@type: "empty"` can appear in **any** container — including transiently, the moment a child is deleted and before the user picks a replacement. You never list `"empty"` in `allowedBlocks`; it isn't a type you opt into. So every container renderer has to render an `empty` child without erroring.

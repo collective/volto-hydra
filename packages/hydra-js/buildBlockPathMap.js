@@ -839,6 +839,13 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         isObjectListItem: true,
         idField,
         ...(typeField && { typeField }), // Only set if typed object_list
+        // A region-level `@type` RULE: a `when`-based fieldRule whose `set` is a
+        // block-TYPE name, deciding each item's `@type` by position (e.g. a table
+        // cell in a header row → `tableHeaderCell`). Carried onto every item so the
+        // normalization pass can re-resolve + convert the item when its position
+        // changes. Only meaningful for typed object_lists (an item must have an
+        // `@type` to rewrite).
+        ...(typeField && fieldDef.typeRule && { typeRule: fieldDef.typeRule }),
         ...(itemIsFixed && { isFixed: true }),
         ...(itemIsReadonly && { isReadonly: true }),
         ...(!canInsertBefore && { canInsertBefore: false }),
@@ -909,7 +916,10 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
 
     const { blockType } = pathInfo;
     const blockConfig = blocksConfig?.[blockType];
-    // No config or no enhancer → nothing to re-do.
+    // No config or no enhancer → nothing to re-do. A non-typed object_list item's
+    // virtual type is REGISTERED into blocksConfig at mint time (see
+    // registerVirtualType), so its inline schemaEnhancer is found here by name —
+    // the same path as a real typed block.
     if (!blockConfig || typeof blockConfig.schemaEnhancer !== 'function') continue;
 
     // Look up block data via path
@@ -925,9 +935,9 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
       intl,
       blocksConfig,
       blockData,
-      formData,      // pageFormData
-      blockId,       // NEW: blockId in enhancer args
-      pathMap,       // NEW: full pathMap in enhancer args
+      formData, // pageFormData
+      blockId, // blockId in enhancer args
+      pathMap, // full pathMap in enhancer args
     );
     if (!enhancedSchema) continue;
 

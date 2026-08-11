@@ -15,7 +15,7 @@ import {
   getConversionMap,
   validateFieldMappings,
   getBlockTypeChoices,
-} from './schemaInheritance';
+} from './blockSync';
 import config from '@plone/volto/registry';
 
 describe('validateFieldMappings — @default accepts any search-metadata field', () => {
@@ -193,6 +193,120 @@ describe('applyBlockDefaultsWithContext — slotId inheritance on add', () => {
     expect(result.slotId).toBe('primary');
     expect(result.templateId).toBe('/t/test-layout');
     expect(result.templateInstanceId).toBe('inst-1');
+  });
+
+  test('a block dropped BEFORE a fixed anchor with no leading slot is OUTSIDE the template (position, not drag direction)', () => {
+    // template-edit-mode:746 scenario. A top-anchored layout: the fixed header anchors
+    // the top and has NO slot before it (no prevSlotId). Dropping a block before the
+    // header lands it outside the top anchor = the page region. It must NOT inherit the
+    // header's membership merely because the insertion targets the header ("insert
+    // before Y inherits from Y") — there is no slot facing this position, so it's out.
+    // (Bug: the direction rule inherited templateId + fixed:true from the fixed header,
+    // producing an in-template, slot-less, read-only corrupt half-membership.)
+    const allBlocks = {
+      'standalone-1': { '@type': 'slate' }, // page block, no template
+      header: {
+        '@type': 'slate',
+        fixed: true,
+        readOnly: true,
+        slotId: 'header',
+        templateId: '/t/layout',
+        templateInstanceId: 'inst-1',
+        // no nextSlotId, no prevSlotId — nothing offers a slot before it
+      },
+    };
+    const context = {
+      blocksConfig: { slate: {} },
+      intl,
+      allBlocks,
+      layoutItems: ['standalone-1', 'header'],
+      position: 1, // insert BEFORE header (index 1)
+      insertAfter: false,
+      containerId: 'page',
+      field: 'blocks_layout',
+    };
+
+    const result = applyBlockDefaultsWithContext({ '@type': 'slate' }, context);
+
+    expect(result.templateId).toBeUndefined();
+    expect(result.slotId).toBeUndefined();
+    expect(result.fixed).toBeFalsy();
+  });
+
+  test('a block added BEFORE a FIXED neighbour with prevSlotId inherits that leading slot + membership', () => {
+    // Bottom-anchored layout: the slot region ("primary") precedes the fixed footer and
+    // is empty, so the footer carries prevSlotId: "primary" (mirror of nextSlotId). A
+    // block dropped before the footer fills that leading slot — it must inherit slotId
+    // "primary" + membership and be a real (non-fixed) slot member. Symmetric to the
+    // nextSlotId case above; unsupported until prevSlotId is added.
+    const allBlocks = {
+      footer: {
+        '@type': 'slate',
+        fixed: true,
+        slotId: 'footer',
+        prevSlotId: 'primary',
+        templateId: '/t/layout',
+        templateInstanceId: 'inst-1',
+      },
+    };
+    const context = {
+      blocksConfig: { slate: {} },
+      intl,
+      allBlocks,
+      items: [allBlocks['footer']],
+      layoutItems: ['footer'],
+      position: 0, // insert BEFORE the footer (index 0)
+      insertAfter: false,
+      containerId: 'page',
+      field: 'items',
+    };
+
+    const result = applyBlockDefaultsWithContext({ '@type': 'slate' }, context);
+
+    expect(result.slotId).toBe('primary');
+    expect(result.templateId).toBe('/t/layout');
+    expect(result.templateInstanceId).toBe('inst-1');
+    expect(result.fixed).toBeFalsy();
+  });
+
+  test('a block added inside a template-instance container (fixed children, no slot offer) joins the container template with a fresh slot', () => {
+    // A columns block that IS a template instance; its column is a fixed slot with no
+    // next/prevSlotId, so no neighbour offers a slot. Because the CONTAINER is a template
+    // instance, the added block still joins it (membership) and gets a FRESH slotId (the
+    // caller generates one) — distinct from the fixed neighbour's. This is the inside-a-
+    // template-instance case, as opposed to the template's outer edge. (allowed-layouts:685.)
+    const containerBlock = {
+      '@type': 'columns',
+      templateId: '/t/footer',
+      templateInstanceId: 'inst-1',
+    };
+    const context = {
+      blocksConfig: { column: {} },
+      intl,
+      allBlocks: {
+        'col-1': {
+          '@type': 'column',
+          fixed: true,
+          slotId: 'col-1',
+          templateId: '/t/footer',
+          templateInstanceId: 'inst-1',
+        },
+      },
+      parentBlock: containerBlock,
+      layoutItems: ['col-1'],
+      position: 1, // after the fixed col-1 (which has no nextSlotId)
+      insertAfter: true,
+      containerId: 'cols-1',
+      field: 'blocks',
+    };
+
+    const result = applyBlockDefaultsWithContext({ '@type': 'column' }, context);
+
+    expect(result.templateId).toBe('/t/footer');
+    expect(result.templateInstanceId).toBe('inst-1');
+    expect(result.slotId).toBeTruthy(); // a freshly generated slot
+    expect(result.slotId).not.toBe('col-1'); // NOT the fixed neighbour's slot
+    expect(result.fixed).toBeFalsy();
   });
 });
 
@@ -662,6 +776,77 @@ describe('fieldRules — number surface', () => {
   test('contains / regex throw on a number field', () => {
     expect(() => run(5, { f: { contains: 5 } })).toThrow(/operator "contains" is not valid/i);
     expect(() => run(5, { f: { regex: '5' } })).toThrow(/operator "regex" is not valid/i);
+  });
+});
+
+describe('fieldRules — @index position surface', () => {
+  // `@index` is a block's ordinal index within its parent object_list region,
+  // sourced from the blockPathMap path (its last element is the numeric array
+  // index for an object_list item), NOT from field data. `../@index` steps up to
+  // the parent block first. This is what lets a rule key off POSITION — e.g. a
+  // table cell that becomes a header when its row is first (`../@index` < 1) or
+  // when it is the first cell in its row (`@index` < 1).
+  //
+  // A cell at rows[0].cells[2] and its neighbours; each object_list item's path
+  // ends in the numeric index (buildBlockPathMap builds it that way).
+  const map = {
+    'cell-0':  { path: ['tbl', 'table', 'rows', 0, 'cells', 0], parentId: 'row-0', region: 'cells' },
+    'cell-2':  { path: ['tbl', 'table', 'rows', 0, 'cells', 2], parentId: 'row-0', region: 'cells' },
+    'cell-r1': { path: ['tbl', 'table', 'rows', 1, 'cells', 0], parentId: 'row-1', region: 'cells' },
+    'row-0':   { path: ['tbl', 'table', 'rows', 0], parentId: 'tbl', region: 'rows' },
+    'row-1':   { path: ['tbl', 'table', 'rows', 1], parentId: 'tbl', region: 'rows' },
+  };
+  const runPos = (blockId, when) => {
+    const recipe = { fieldRules: { target: { when, else: false } } };
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const schema = {
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['target'] }],
+      properties: { target: { title: 'Target' } },
+      required: [],
+    };
+    return (
+      enhancer({ schema, formData: {}, blockId, blockPathMap: map }).properties
+        .target !== undefined
+    );
+  };
+
+  test('@index — the block’s own index in its parent region (numeric ops)', () => {
+    expect(runPos('cell-0', { '@index': { lt: 1 } })).toBe(true); // first column
+    expect(runPos('cell-2', { '@index': { lt: 1 } })).toBe(false); // third column
+    expect(runPos('cell-2', { '@index': { gte: 2 } })).toBe(true);
+    expect(runPos('cell-0', { '@index': { is: 0 } })).toBe(true);
+  });
+
+  test('../@index — the parent block’s index (row position, read from a cell)', () => {
+    expect(runPos('cell-0', { '../@index': { lt: 1 } })).toBe(true); // row 0
+    expect(runPos('cell-r1', { '../@index': { lt: 1 } })).toBe(false); // row 1
+  });
+
+  test('compound AND — own column AND parent row position together', () => {
+    // first cell of the first row (the header corner)
+    const corner = { '@index': { lt: 1 }, '../@index': { lt: 1 } };
+    expect(runPos('cell-0', corner)).toBe(true);
+    expect(runPos('cell-2', corner)).toBe(false); // right column
+    expect(runPos('cell-r1', corner)).toBe(false); // second row
+  });
+
+  test('@index is a number surface (unset when the path has no numeric tail)', () => {
+    // A block-only pathMap entry (no numeric index) yields an unset number → all
+    // comparisons false, never a throw.
+    const recipe = { fieldRules: { target: { when: { '@index': { gte: 0 } }, else: false } } };
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const schema = {
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['target'] }],
+      properties: { target: { title: 'Target' } },
+      required: [],
+    };
+    const out = enhancer({
+      schema,
+      formData: {},
+      blockId: 'x',
+      blockPathMap: { x: { path: ['x'], parentId: null } },
+    });
+    expect(out.properties.target).toBeUndefined(); // gte:0 false → hidden
   });
 });
 

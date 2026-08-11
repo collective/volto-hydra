@@ -212,6 +212,11 @@ Each operator is driven by the field's **declared type**, never the value shape.
 
 `oneOf` (scalar value ∈ set) and `containsAny` (array shares any with a set) differ only on the field side — `oneOf` is for a single-valued field, `containsAny` for a multiselect; `oneOf` on an array throws (use `containsAny`).
 
+Two extras drive **position-** and **type-**aware rules:
+
+- The virtual field **`@index`** reads a block's ordinal position within its parent `object_list` region (a `number` surface) — `{ '@index': { lt: 1 } }` means "first in my region", and `../@index` is the parent block's index. Distinct from a region's `count` (which counts children).
+- A rule whose **`set` is a block-type NAME** (a string) rather than a field definition is a **`@type` rule** — it changes the item's *type* by position, not a field. Declared as `typeRule` on a typed `object_list`; see [`typeRule` — position picks a typed item's `@type`](#typerule--position-picks-a-typed-items-type). The retype is applied by CONVERSION (a schema enhancer can't rewrite stored `@type`), which brings up the confirm described under [Drag / paste via conversion](#drag--paste-via-conversion).
+
 ```javascript
 schemaEnhancer: {
     fieldRules: {
@@ -243,7 +248,24 @@ schemaEnhancer: {
 }
 ```
 
-Field paths: `../field` for the parent block's field, `/field` for a page metadata field.
+To condition on a block's **position** rather than a field value, use the virtual field **`@index`** — a block's ordinal index within its parent `object_list` region (a `number` surface). It composes with the block-step grammar, so `../@index` is the parent block's index. Unlike the region's numeric ops (which *count* children), `@index` is *where this block sits*:
+
+```javascript
+schemaEnhancer: {
+    fieldRules: {
+        // a table cell's blocks region: cap at one block when this cell is in the
+        // first row (a header row) — `../@index` is the cell's ROW index
+        blocks: [
+            { when: { '../../headerMode': { oneOf: ['row', 'both'] }, '../@index': { lt: 1 } }, set: { maxLength: 1 } },
+            { when: { '../../headerMode': { oneOf: ['col', 'both'] }, '@index':    { lt: 1 } }, set: { maxLength: 1 } },
+        ],
+    },
+}
+```
+
+A block that isn't an `object_list` item yields an unset `@index`, so comparisons are simply false (never an error). `lt: 1` is "first"; `lt: 2` is "first two", etc.
+
+Field paths: `../field` for the parent block's field (and `@index` / `../@index` for position), `/field` for a page metadata field.
 
 ## Block Conversion & fieldMappings
 
@@ -324,6 +346,72 @@ mapped field then shows a small **🔗 pull from linked** toggle in the sidebar
   re-ticking re-pulls the target value. Custom fields are recorded in the block's
   `_customFields` array (absence ⇒ linked), so the state persists with the block.
 
+### Container ⇄ value (region-crossing paths)
+
+A `fieldMappings` value is usually a sibling **field name**. It may instead be a
+**region-crossing path** `<region>/<type|*>/<field>`, which reaches the `<field>`
+of a container region's children — the one place the path grammar crosses a region
+boundary. This bridges a **container** block (a region of child blocks) and a
+**value** block (a scalar field), so a block can convert between the two shapes:
+
+<!-- codeExample: javascript -->
+```javascript
+tableHeaderCell: {                                   // the value form: one slate
+    blockSchema: { properties: { value: { widget: 'slate' } } },
+    // Declared ONCE on the value block; works both directions.
+    fieldMappings: { tableCell: { value: 'blocks/slate/value' } },
+},
+tableCell: {                                         // the container form
+    blockSchema: { properties: {
+        blocks: { widget: 'object_list', typeField: '@type',
+                  allowedBlocks: ['slate', 'image', 'video'] },
+    } },
+},
+```
+
+- **container → value (collapse)** — gather the region's matching children's
+  `<field>`; slate values are **merged** into one (lossless), not truncated.
+- **value → container (expand)** — wrap the value in **one** child of `<type>` in
+  the region.
+- `<type>` selects a child type; `*` = any child that exposes `<field>` (siblings
+  without it — an `image` for a `value` path — are skipped). A **concrete** type
+  (`blocks/slate/value`) makes expand unambiguous, so use it for a two-way bridge;
+  `*` suits read-only cross-region reads (e.g. a `when` condition).
+
+Non-region scalar fields (`key`, `width`, …) carry over unchanged. This is the
+`convertValueContainer` helper; DnD/paste and the block chooser reuse it via the
+same `fieldMappings` graph. See `proposals/container-value-conversion.md`.
+
+#### `typeRule` — position picks a typed item's `@type`
+
+The bridge converts on demand; a **`@type` rule** on a typed `object_list` field
+decides *when*, by **position**. It is an ordinary `when`-based fieldRule (same
+grammar — `@index`, `../@index`, `../../<field>`, `oneOf`, `lt`, …) whose `set` is a
+block-**type name** instead of a field definition:
+
+<!-- codeExample: javascript -->
+```javascript
+cells: {
+    widget: 'object_list', typeField: '@type',
+    allowedBlocks: ['tableCell', 'tableHeaderCell'],
+    typeRule: [
+        // header row OR header column → the value form
+        { when: { '../../headerMode': { oneOf: ['row', 'both'] }, '../@index': { lt: 1 } }, set: 'tableHeaderCell' },
+        { when: { '../../headerMode': { oneOf: ['col', 'both'] }, '@index': { lt: 1 } },     set: 'tableHeaderCell' },
+        { set: 'tableCell' },                                // otherwise the container form
+    ],
+},
+```
+
+The rule is evaluated in the same pass that applies field defaults (run on every
+edit): each typed item's target `@type` is re-resolved, and when it differs from the
+stored `@type` the item is **converted in place** via the bridge above. So moving a
+row to/from row 0 flips its cells between `tableHeaderCell` (a slate `value`) and
+`tableCell` (a `blocks` container), losslessly — no imperative "re-type the cells"
+code. Only meaningful on a **typed** object_list (a `typeField` item has an `@type`
+to rewrite); it settles in one pass (the target type re-resolves to itself once the
+item is in place).
+
 Each field's value is converted to the shape its destination widget expects
 (derived from the widget): strings copy across, an image field is assembled from
 the target's `image_scales` / `image_field`, multi-value fields (e.g. `Subject` →
@@ -352,7 +440,11 @@ OpenGraph is a future enhancement.)
 
 ### Drag / paste via conversion
 
-The same conversion graph gives drag-and-drop (and paste) more valid destinations: a block can be dropped or pasted into a container whose `allowedBlocks` only admits a type the block can *convert* to. On drop it's converted automatically when exactly one target type is reachable, or a chooser popup appears when several are (single-block only — the block moves only once you pick, so cancelling leaves it untouched). Multi-block selections and paste are auto-convert only. On mobile, conversion happens via cut → paste (drag/chevron move stays native-only). External-link and other type restrictions are unaffected; only the container's `allowedBlocks` gate is relaxed to "allowed or convertible".
+The same conversion graph gives drag-and-drop (and paste) more valid destinations: a block can be dropped or pasted into a container whose `allowedBlocks` only admits a type the block can *convert* to.
+
+**Every drop/paste is TRIALLED before it commits.** The candidate result is normalised (the same pass that applies field defaults and evaluates [`@type` rules](#typerule--position-picks-a-typed-items-type)), then each block's `@type` is diffed against what was dropped. If **anything** converted — because the dropped block had to convert to fit the container, **or** because a rule re-typed a block by its new position (e.g. a table row moved to row 0 turns its cells into header cells) — a **"Convert blocks?"** confirm lists each `from → to` and waits: **Convert** commits the already-converted result, **Cancel** aborts the whole drop. Nothing converted → it commits silently.
+
+The chooser popup survives only for the genuinely ambiguous case: a single block reachable to *several* target types, where you pick which one (cancelling leaves it untouched). Zero reachable types rejects the drop; multi-block selections are auto-only (every member must reach exactly one type). On mobile, conversion happens via cut → paste (drag/chevron move stays native-only). External-link and other type restrictions are unaffected; only the container's `allowedBlocks` gate is relaxed to "allowed or convertible".
 
 ### Mapping value format
 

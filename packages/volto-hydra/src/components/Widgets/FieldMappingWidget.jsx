@@ -20,7 +20,7 @@ import {
   computeSmartDefaults,
   getFieldType,
   findTypeField,
-} from '../../utils/schemaInheritance';
+} from '../../utils/blockSync';
 import { useHydraSchemaContext } from '../../context/HydraSchemaContext';
 import { getBlockById } from '../../utils/blockPath';
 

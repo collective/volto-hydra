@@ -1261,6 +1261,12 @@ export class Bridge {
       }
     };
     if (!this._edgeHandles) return;
+    // While an edge-handle drag is in progress the container's absorb/expel
+    // capability cannot change — only which children the cursor has crossed.
+    // Re-probing here (triggered by autoscroll's scroll events) is pure churn
+    // and would yank the invisible handle out from under the active drag, so
+    // freeze: keep the capability flags computed at mousedown.
+    if (this._edgeDragActive) return;
     const uid = this.selectedBlockUid;
     if (!uid || uid === PAGE_BLOCK_UID) { hide(); return; }
     const info = this.blockPathMap?.[uid];
@@ -1449,7 +1455,9 @@ export class Bridge {
     let candidates;
     let accepts;
     if (mode === 'absorb') {
-      accepts = (t) => !childAllowed || (t && childAllowed.includes(t));
+      // Same drop-acceptance the DnD scan uses (native OR conversion via conversionMap),
+      // NOT a bare allowed-types `.includes` — keep edge-drag and drag consistent (DRY).
+      accepts = (t) => acceptableAt(t, childAllowed, false, this.conversionMap);
       candidates = new Set();
       for (const [uid, info] of Object.entries(this.blockPathMap)) {
         if (!uid || uid === containerUid) continue;
@@ -1465,7 +1473,7 @@ export class Bridge {
         if (outwardOfEdge && inwardOfCursor) candidates.add(uid);
       }
     } else {
-      accepts = (t) => !parentAllowed || (t && parentAllowed.includes(t));
+      accepts = (t) => acceptableAt(t, parentAllowed, false, this.conversionMap);
       candidates = new Set();
       for (const [uid, info] of Object.entries(this.blockPathMap)) {
         if (!uid || uid === containerUid) continue;
@@ -1653,6 +1661,10 @@ export class Bridge {
       e.preventDefault();
       e.stopPropagation();
       dragging = true;
+      // Capability (canAbsorb/canExpel) was computed when the container was
+      // selected and is fixed for the duration of this drag; freeze
+      // _positionEdgeHandles so autoscroll's scroll events don't re-probe.
+      this._edgeDragActive = true;
       lastX = e.clientX;
       lastY = e.clientY;
       autoScroller = this._createAutoScroller();
@@ -1684,6 +1696,7 @@ export class Bridge {
     document.addEventListener('mouseup', () => {
       if (!dragging) return;
       dragging = false;
+      this._edgeDragActive = false;
       autoScroller?.stop();
       autoScroller = null;
 
@@ -9152,6 +9165,32 @@ export class Bridge {
       // re-runs even while the cursor is held stationary at an edge.
       const scroller = this._createAutoScroller();
 
+      // Droppability is FIXED for the whole drag: the dragged block types are
+      // set at drag start and each container's allowedSiblingTypes is stable
+      // while dragging (the pathmap doesn't mutate mid-drag). So resolve "can
+      // the dragged blocks drop beside block X" ONCE per container and memoize —
+      // only the nearest-edge GEOMETRY in onMouseMove needs the cursor. This
+      // avoids re-running the acceptance walk on every mousemove/scroll tick,
+      // which is exactly when the drag needs to stay responsive.
+      const draggedBlockUids = allElements.map(el => el.getAttribute('data-block-uid'));
+      const draggedBlockTypes = draggedBlockUids.map(uid => this.getBlockType(uid)).filter(Boolean);
+      const isMultiDrag = draggedBlockTypes.length > 1;
+      const uidOf = (el) => el && el.getAttribute('data-block-uid');
+      const _dropAcceptById = new Map();
+      // Can the dragged blocks drop as a sibling of `el` (into el's parent)?
+      // Allowed natively, or reachable via the conversionMap (single: any option;
+      // multi: exactly one — auto-only). Mirrors the walk-up's acceptance test.
+      const isDroppableBeside = (el) => {
+        const id = uidOf(el);
+        if (!id) return false;
+        if (_dropAcceptById.has(id)) return _dropAcceptById.get(id);
+        const ok = draggedBlockTypes.every((t) =>
+          acceptableAt(t, this.blockPathMap?.[id]?.allowedSiblingTypes, isMultiDrag, this.conversionMap),
+        );
+        _dropAcceptById.set(id, ok);
+        return ok;
+      };
+
       // Handle mouse movement
       const onMouseMove = (e) => {
         scroller.onMouseMove(e);
@@ -9170,40 +9209,125 @@ export class Bridge {
 
         // Exclude the dragged block(s) and ghost from being drop targets
         // For multi-element blocks (listings, template instances), exclude all elements
-        const draggedBlockUids = allElements.map(el => el.getAttribute('data-block-uid'));
         const isSelfOrGhost = closestBlock &&
           (closestBlock === draggedBlock || allElements.includes(closestBlock) ||
            draggedBlockUids.includes(closestBlock.getAttribute('data-block-uid')));
         if (isSelfOrGhost) closestBlock = null;
 
-        // Handle overshoot - find nearest block when cursor isn't over any block
-        if (!closestBlock) {
-          const allBlocks = Array.from(document.querySelectorAll('[data-block-uid]'))
-            .filter(el => el !== draggedBlock && !draggedBlockUids.includes(el.getAttribute('data-block-uid')));
+        // draggedBlockTypes / isMultiDrag / uidOf / isDroppableBeside are
+        // computed ONCE at drag start (above) — droppability can't change
+        // mid-drag, only which edge is nearest the cursor.
 
-          // Find nearest block by vertical distance to cursor
-          let nearest = { el: null, dist: Infinity, above: false };
-          for (const el of allBlocks) {
+        // NEAREST DROPPABLE EDGE — the single resolution for "the cursor isn't on a
+        // droppable leaf": either over NOTHING (the old overshoot) or over a
+        // CONTAINER's own chrome (its padding / the gap between children, where
+        // elementFromPoint resolves to the container, not a child). Both used to be
+        // handled separately and wrongly: over-nothing picked the nearest block
+        // without checking it accepts the drop, and on-a-container the walk-up saw
+        // only the container's OUTER sibling level and dropped the blocks BESIDE it
+        // (for a convert-drop, skipping the conversion — because these blocks are
+        // usually allowed at the outer level too, the walk-up stopped there and never
+        // descended). Instead, scan every candidate block, measure its nearest edge to
+        // the cursor, and take the nearest edge the dragged blocks can actually drop at
+        // (native, or via the conversionMap). "Drop at the nearest place it can go":
+        // deep inside a container a child edge wins (drop in); at its outer border a
+        // sibling edge wins (drop beside); a leaf the cursor is on picks that leaf's own
+        // nearest edge. This ONE scan is the sole resolver — it replaces BOTH the old
+        // up-only walk-up and the over-nothing overshoot, and it ALWAYS runs, so
+        // resolution is uniform for every cursor position (it effectively walks both up
+        // and down and takes the nearest droppable edge). Enable HYDRA_DEBUG to trace.
+        {
+          const candidates = Array.from(document.querySelectorAll('[data-block-uid]'))
+            .filter(el => el !== draggedBlock && !draggedBlockUids.includes(uidOf(el)));
+          // For each candidate, measure BOTH insert edges along the axis its siblings
+          // are laid out on — a horizontal row (columns / data-block-add="right") uses
+          // the left/right edges + clientX, a vertical stack uses top/bottom + clientY
+          // (the same axis the drop indicator is drawn on downstream, getAddDirection) —
+          // and take the nearer: the leading edge inserts BEFORE (insertAt 0), the
+          // trailing edge inserts AFTER (insertAt 1). Measuring both edges per block
+          // (rather than only the add edge) keeps a dense set of candidates so the
+          // nearest inside edge reliably wins near a container boundary.
+          let bestEdge = null;
+          // Accumulate a compact per-candidate trace and emit it as ONE log line per
+          // move (below), not one line PER candidate: with HYDRA_DEBUG on in tests the
+          // scan runs every mousemove, and a log() per candidate floods the CDP console
+          // channel enough to starve mouse.move/boundingBox (60s timeouts). Batching to
+          // a single message per move keeps the "why each candidate didn't match" trace
+          // the design calls for at ~1/30th the message volume.
+          const edgeTrace = (debugEnabled || window.HYDRA_DEBUG) ? [] : null;
+          for (const el of candidates) {
             const rect = el.getBoundingClientRect();
-            const aboveDist = rect.top - e.clientY; // positive if cursor above block
-            const belowDist = e.clientY - rect.bottom; // positive if cursor below block
-            if (aboveDist > 0 && aboveDist < nearest.dist) {
-              nearest = { el, dist: aboveDist, above: true };
-            } else if (belowDist > 0 && belowDist < nearest.dist) {
-              nearest = { el, dist: belowDist, above: false };
+            const horizontal = this.getAddDirection(el) === 'right';
+            // True 2D distance from the cursor to each insert-edge LINE SEGMENT, not
+            // just the perpendicular axis — otherwise blocks that share the insertion
+            // axis but sit at a different offset on the other axis (e.g. children of
+            // DIFFERENT columns at the same Y) are indistinguishable and the wrong one
+            // can win. The edge is a segment along the block's span on the OTHER axis;
+            // `over` is how far the cursor is outside that span (0 when within it, so a
+            // vertical stack the cursor is over reduces to the plain perpendicular dy).
+            let dStart, dEnd;
+            if (horizontal) {
+              // vertical insert edges (left/right); segment spans rect.top..rect.bottom
+              const over = e.clientY < rect.top ? rect.top - e.clientY
+                : e.clientY > rect.bottom ? e.clientY - rect.bottom : 0;
+              dStart = Math.hypot(e.clientX - rect.left, over);
+              dEnd = Math.hypot(e.clientX - rect.right, over);
+            } else {
+              // horizontal insert edges (top/bottom); segment spans rect.left..rect.right
+              const over = e.clientX < rect.left ? rect.left - e.clientX
+                : e.clientX > rect.right ? e.clientX - rect.right : 0;
+              dStart = Math.hypot(over, e.clientY - rect.top);
+              dEnd = Math.hypot(over, e.clientY - rect.bottom);
+            }
+            const at = dStart <= dEnd ? 0 : 1; // 0 = before (top/left), 1 = after (bottom/right)
+            const dist = Math.min(dStart, dEnd);
+            const droppable = isDroppableBeside(el);
+            // Nesting depth (block ancestors). A container's insert edge ~coincides with
+            // its last/first child's edge, so at an exact-or-near distance tie a pure
+            // `dist <` picks whichever comes FIRST in DOM order — the ANCESTOR container —
+            // and a reorder meant to stay inside the container ejects the block to the
+            // outer level. Depth breaks that tie toward the INNER (deeper) edge so the
+            // block reorders within the container the cursor is over. (object-blocks:213:
+            // ob-1 and child-2 both at d6 → without this, ob-1 wins and child-1 ejects.)
+            let depth = 0;
+            for (let p = el.parentElement; p; p = p.parentElement) {
+              if (p.hasAttribute && p.hasAttribute('data-block-uid')) depth++;
+            }
+            if (edgeTrace) edgeTrace.push(`${uidOf(el)}${horizontal ? 'H' : 'V'}@${at}d${Math.round(dist)}${droppable ? 'ok' : 'x'}`);
+            if (droppable) {
+              const NEST_EPS = 8; // px within which two edges count as coincident
+              let better = false;
+              if (!bestEdge) {
+                better = true;
+              } else if (dist < bestEdge.dist - NEST_EPS) {
+                better = true; // clearly closer — cursor is genuinely nearer this edge
+              } else if (dist <= bestEdge.dist + NEST_EPS) {
+                // near-coincident: prefer the deeper (inner) edge; tie at equal depth → closer
+                better =
+                  depth > bestEdge.depth ||
+                  (depth === bestEdge.depth && dist < bestEdge.dist);
+              }
+              if (better) bestEdge = { el, at, dist, depth };
             }
           }
-          if (nearest.el) {
-            closestBlock = nearest.el;
-            insertAt = nearest.above ? 0 : 1;
+          if (edgeTrace) log('[drag-edge] candidates', edgeTrace.join(' '));
+          if (bestEdge) {
+            log('[drag-edge] nearest droppable edge ->', uidOf(bestEdge.el), 'insertAt', bestEdge.at);
+            closestBlock = bestEdge.el;
+            insertAt = bestEdge.at;
+          } else {
+            // Nothing anywhere accepts these blocks — no valid drop.
+            closestBlock = null;
           }
         }
 
         if (closestBlock) {
-          // Check if the dragged block type(s) are allowed in the target container
-          // If not, walk up the parent chain to find a valid drop target
-          // For template instances, check all child block types are allowed
-          const draggedBlockTypes = draggedBlockUids.map(uid => this.getBlockType(uid)).filter(Boolean);
+          // Walk up the parent chain to the first level that accepts the dragged
+          // block type(s) — natively or via conversion. When the cursor was over a
+          // container's chrome or over nothing, closestBlock is already the nearest
+          // DROPPABLE edge resolved above, so this normally accepts immediately; it
+          // still runs so a directly-hovered leaf that can't take the drop escapes to
+          // an ancestor that can.
 
           // Find a valid drop target by walking up the parent chain
           let validDropTarget = closestBlock;
@@ -9220,6 +9344,18 @@ export class Bridge {
             const allTypesAllowed = draggedBlockTypes.length === 0 ||
               draggedBlockTypes.every(type =>
                 acceptableAt(type, allowedSiblingTypes, isMulti, this.conversionMap));
+            // Trace WHY this level did/didn't accept — native fit vs conversion vs
+            // no-fit — so a mis-resolved drop is diagnosable from the log alone
+            // (enable HYDRA_DEBUG). A line like `level box-1 ACCEPT convSource:native`
+            // means it matched at the container's OUTER sibling level natively and
+            // never descended; `convert(convTargetA)` means it descended + converts.
+            log('[drag-walk] level', validDropTargetUid, allTypesAllowed ? 'ACCEPT' : 'escape->parent',
+              draggedBlockTypes.map((t) => {
+                if (!allowedSiblingTypes) return t + ':any';
+                if (allowedSiblingTypes.includes(t)) return t + ':native';
+                const opts = ((this.conversionMap && this.conversionMap[t]) || []).filter((x) => allowedSiblingTypes.includes(x));
+                return t + ':' + (opts.length === 0 ? 'no-fit' : opts.length === 1 ? 'convert(' + opts[0] + ')' : 'convert-choose');
+              }).join(','));
             if (allTypesAllowed) {
               // Drop is allowed at this level
               break;
@@ -9422,6 +9558,8 @@ export class Bridge {
             });
           }
           dropIndicatorVisible = true;
+          // TODO(scroll-into-view): if the resolved edge is off-screen, scroll it into
+          // view — deferred; scrolling mid-drag fights a held cursor, needs its own design.
         } else {
           // No valid drop target - hide indicator and mark as not droppable
           const existingIndicator = document.querySelector('.volto-hydra-drop-indicator');
