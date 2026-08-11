@@ -3308,6 +3308,8 @@ const Iframe = (props) => {
                 prevBlockUI.focusedLinkableField === event.data.focusedLinkableField &&
                 prevBlockUI.focusedMediaField === event.data.focusedMediaField &&
                 prevBlockUI.addDirection === event.data.addDirection &&
+                prevBlockUI.revealed === event.data.revealed &&
+                JSON.stringify(prevBlockUI.revealableFields) === JSON.stringify(event.data.revealableFields) &&
                 prevBlockUI.rect?.top === event.data.rect?.top &&
                 prevBlockUI.rect?.left === event.data.rect?.left &&
                 prevBlockUI.rect?.width === event.data.rect?.width &&
@@ -3342,6 +3344,10 @@ const Iframe = (props) => {
               editableFields: event.data.editableFields, // Map of fieldName -> fieldType from iframe
               linkableFields: event.data.linkableFields, // Map of fieldName -> true for link fields
               mediaFields: event.data.mediaFields, // Map of fieldName -> true for image/media fields
+              // Reveal (#296): empty inline-editable fields the quanta toolbar can
+              // offer to reveal, and whether they currently are.
+              revealableFields: event.data.revealableFields, // string[] of field names
+              revealed: event.data.revealed, // are they currently revealed
               addDirection: event.data.addDirection, // Direction for add button positioning
               isMultiElement: event.data.isMultiElement, // True if block renders as multiple DOM elements
               canResize: event.data.canResize || null, // {top,bottom,left,right} booleans for edge-drag chrome

@@ -531,11 +531,69 @@ export class Bridge {
         continue;
       }
 
+      // Which block this comment belongs to. Both declaration styles are legal and
+      // in use: the mock frontend names the uid in the comment, while the Nuxt
+      // example omits it because the central <Block> wrapper already carries
+      // data-block-uid. Needed only to judge the selector warning below.
+      const blockUid =
+        parsed.attrs['block-uid']?.[0]?.value ??
+        nextElement.closest('[data-block-uid]')?.getAttribute('data-block-uid');
+
       // Apply attributes to the element
-      this.applyHydraAttributes(nextElement, parsed.attrs);
+      this.applyHydraAttributes(nextElement, parsed.attrs, this.getRenderedBlockData(blockUid));
     }
 
     log('materializeHydraComments: completed');
+  }
+
+  /**
+   * The block's data AS RENDERED — i.e. after _projectForRender, so a revealed
+   * field carries its sentinel here even though state has it empty.
+   *
+   * @param {string} blockUid
+   * @returns {Object|undefined}
+   */
+  getRenderedBlockData(blockUid) {
+    if (!blockUid || !this._lastRenderedData) return undefined;
+    const pathInfo = this.blockPathMap?.[blockUid];
+    if (!pathInfo?.path) return undefined;
+    let current = this._lastRenderedData;
+    for (const key of pathInfo.path) {
+      if (!current || typeof current !== 'object') return undefined;
+      current = current[key];
+    }
+    return current;
+  }
+
+  /**
+   * Is a comment selector matching nothing the CORRECT outcome?
+   *
+   * Yes exactly when the field it names has no data: "no data ⇒ no element" is the
+   * contract (issue #296), so a data-driven renderer is right to emit nothing and
+   * shouting about it would train devs to ignore the console. Everything else stays
+   * an error — a field WITH content and no element is a renderer bug, and that
+   * includes a revealed sentinel, where it means the reveal silently did nothing.
+   *
+   * Only edit-* attributes name a field. block-uid, block-add, linkable-* and the
+   * rest are structural, so a missing target is always wrong.
+   */
+  isFieldAbsentFromRender(name, fieldName, renderedBlock) {
+    if (name !== 'edit-text' && name !== 'edit-link' && name !== 'edit-media') {
+      return false;
+    }
+    // A leading slash means a PAGE field (/title, /description), which lives on the
+    // form root rather than the block.
+    const source = fieldName.startsWith('/')
+      ? this._lastRenderedData
+      : renderedBlock;
+    if (!source) return false;
+    const value = source[fieldName.replace(/^\//, '')];
+    return (
+      value === undefined ||
+      value === null ||
+      value === '' ||
+      (Array.isArray(value) && value.length === 0)
+    );
   }
 
   /**
@@ -543,8 +601,10 @@ export class Bridge {
    *
    * @param {HTMLElement} element - The root element
    * @param {Object} attrs - Parsed attributes { name: [{ value, selector }, ...] }
+   * @param {Object} [renderedBlock] - The block data the renderer was handed, used
+   *   to judge whether a selector matching nothing is correct or a bug.
    */
-  applyHydraAttributes(element, attrs) {
+  applyHydraAttributes(element, attrs, renderedBlock) {
     const attrMap = {
       'block-uid': 'data-block-uid',
       'block-readonly': 'data-block-readonly',
@@ -576,7 +636,7 @@ export class Bridge {
           ? element.querySelectorAll(selector)
           : [element];
 
-        if (selector && targets.length === 0) {
+        if (selector && targets.length === 0 && !this.isFieldAbsentFromRender(name, value, renderedBlock)) {
           console.error(`[hydra] Comment selector "${selector}" for ${name}=${value} matched no elements in`, element.tagName, element.className);
         }
 
@@ -3305,6 +3365,11 @@ export class Bridge {
       editableFields,
       linkableFields,
       mediaFields,
+      // Reveal (#296): which optional fields COULD be revealed, and whether they
+      // currently are. Rides BLOCK_SELECTED exactly like mediaFields, so the
+      // quanta toolbar can show/hide the toggle with no extra round-trip.
+      revealableFields: this.revealableFields(blockUid),
+      revealed: !!this._revealedBlocks?.has(blockUid),
       focusedFieldName,
       focusedFieldRect,
       focusedLinkableField,
@@ -4136,6 +4201,10 @@ export class Bridge {
             log('Clearing processing state due to SLATE_ERROR');
             this.setBlockProcessing(blockId, false);
           }
+        } else if (event.data.type === 'TOGGLE_OPTIONAL_FIELDS') {
+          // Editor pressed the reveal toggle on the quanta toolbar.
+          log('Received TOGGLE_OPTIONAL_FIELDS:', event.data.blockUid);
+          this.toggleOptionalFields(event.data.blockUid);
         } else if (event.data.type === 'FOCUS_FIELD') {
           // Restore focus to a specific field (e.g., after LinkEditor closes)
           const { blockId, fieldName } = event.data;
@@ -10288,6 +10357,244 @@ export class Bridge {
    * naturally skipped because isInlineEditing is false and pendingTransform
    * / _reRenderBlocking are unset.
    */
+  /**
+   * Build the copy of formData the RENDERER sees. `this.formData` is never
+   * mutated — it stays exactly what the admin sent, so echo detection and the
+   * data that goes back up stay truthful.
+   *
+   * Today this does one job: make "cleared" read as "absent".
+   *
+   * A frontend's natural rule for an optional field is plain truthiness —
+   * `{block.heading && …}`, `v-if="block.buttonLink"`. That's the rule we want
+   * developers to write without thinking about edit mode. It works for every
+   * state except one: a field the editor CLEARED. Volto's ObjectBrowserWidget
+   * writes `[]` on remove (removeItem, ObjectBrowserWidget.jsx:163), not
+   * undefined — and `[]` is truthy in JS, so the natural rule would render an
+   * element for a field that has nothing in it. Making every renderer write
+   * `.length` to dodge that is exactly the per-block complexity issue #296 is
+   * removing, so the bridge collapses it here instead.
+   *
+   * Safe because `undefined` is ALREADY a legal state for every one of these
+   * fields (a never-set field arrives that way), so this introduces no state a
+   * renderer isn't already handling.
+   *
+   * Scoped by schema, deliberately: a blind recursive sweep would also strip
+   * `blocks_layout.items: []` on an empty container and break renderers that
+   * map over it. Only declared, non-container schema fields are touched.
+   */
+  /**
+   * Zero-width space. The reveal sentinel for every text-ish shape.
+   * Not a new convention — the bridge already inserts ZWS into empty inline
+   * elements for cursor positioning (_ensureZeroWidthSpaces) and already ignores
+   * it when deciding emptiness (updateFieldEmptyState), and the admin plants it
+   * so empty inline slate nodes survive withEmptyInlineRemoval.
+   */
+  static get REVEAL_ZWS() { return '\u200B'; }
+
+  /**
+   * The reveal sentinel for a string-URL image field: a fully transparent SVG
+   * with REAL intrinsic dimensions.
+   *
+   * Not a 1x1. The size matters — the frontend styles this exactly as it styles
+   * any other image, so the editor gets a correctly-shaped click target and
+   * hydra's zero-dimension media guard is satisfied naturally. The alternative
+   * (a 1x1 plus injected min-width/min-height CSS) would have been the one
+   * injection that reshapes the host page's layout, which the existing injected
+   * rules deliberately avoid — they use `outline` precisely so "the host element
+   * position is NOT mutated".
+   *
+   * Transparent, so nothing of ours is ever painted into the frontend.
+   */
+  static get REVEAL_PIXEL() {
+    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'/%3E";
+  }
+
+  /**
+   * The sentinel for a field, chosen by WIDGET — never by inspecting the current
+   * value, which is absent precisely when a sentinel is needed.
+   *
+   * Shape-preserving is the whole point: a renderer reading an object_browser
+   * field does `block.href?.[0]?.['@id']` or maps over it, so handing it a bare
+   * string would make it iterate characters.
+   *
+   * Returns undefined for a field that has no inline affordance (select, boolean,
+   * number …) — those are sidebar-only and nothing can be revealed for them.
+   */
+  _revealSentinelFor(fieldDef, fieldType) {
+    const Z = Bridge.REVEAL_ZWS;
+    // The admin DECORATES field defs — a copyFromTargetField wrapper keeps the real
+    // one under `baseWidget`. Read the wrapper and every media/link field looks like
+    // an unknown widget and silently yields no sentinel, so it never reveals.
+    let def = fieldDef;
+    while (def?.baseWidget) def = def.baseWidget;
+    const widget = def?.widget;
+    fieldDef = def;
+
+    if (widget === 'object_browser') return [{ '@id': Z, title: Z }];
+    if (widget === 'image' || fieldDef?.type === 'image') return Bridge.REVEAL_PIXEL;
+    if (widget === 'url' || fieldDef?.type === 'url') return Z;
+    if (isSlateFieldType(fieldType)) return [{ type: 'p', children: [{ text: Z }] }];
+    if (isTextEditableFieldType(fieldType)) return Z;
+    return undefined;
+  }
+
+  /** True when a value is (or contains) a reveal sentinel rather than real content. */
+  _isRevealSentinel(value) {
+    const Z = Bridge.REVEAL_ZWS;
+    if (value === Z || value === Bridge.REVEAL_PIXEL) return true;
+    if (Array.isArray(value) && value.length === 1) {
+      const only = value[0];
+      if (only && only['@id'] === Z) return true;
+      if (only?.children?.length === 1 && only.children[0]?.text === Z) return true;
+    }
+    return false;
+  }
+
+  /**
+   * The block's schema fields that COULD be revealed: ones with an inline
+   * affordance that the frontend is currently rendering no element for.
+   *
+   * Purely observational — no schema annotation, no dependence on `required`
+   * (most block schemas here don't declare it).
+   *
+   * DELIBERATELY OVER-INCLUSIVE, don't "fix" this. The widget/type only says a
+   * field COULD be edited inline, not that this frontend renders it: alt text, a
+   * css class, a free-text style value are all plain strings that live in the
+   * sidebar. Telling them apart from an empty heading is impossible without data,
+   * since "renders nothing because it's empty" and "never renders inline" look
+   * identical — it would need a schema annotation or a frontend-side declaration,
+   * i.e. exactly the per-field bookkeeping #296 exists to remove.
+   *
+   * So reveal is BEST-EFFORT: it seeds every candidate, the ones the frontend
+   * renders appear, and the rest are a no-op. A sentinel for a field nobody
+   * renders is harmless — it lives only in the render projection, never in state
+   * and never in saved content — and the editor fills those from the sidebar as
+   * before. No warning is raised for them: a frontend that legitimately keeps a
+   * field sidebar-only is not misconfigured.
+   */
+  revealableFields(blockUid) {
+    const schema = this.getBlockSchema(blockUid);
+    const properties = schema?.properties;
+    const block = this.getBlockData(blockUid);
+    if (!properties || !block) return [];
+
+    const isEmpty = (v) =>
+      v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
+
+    return Object.entries(properties)
+      .filter(([fieldName, fieldDef]) => {
+        // Has an inline affordance at all. Returns undefined for select /
+        // boolean / number, so sidebar-only fields drop out for free.
+        if (!this._revealSentinelFor(fieldDef, this.getFieldType(blockUid, fieldName))) {
+          return false;
+        }
+        // A REQUIRED field is rendered unconditionally by the frontend (a value
+        // is guaranteed, so no `{field && …}` guard), which means its element
+        // always exists and there is nothing to reveal. Excluding it keeps the
+        // button's "N empty optional fields" count honest. If a required field
+        // ever IS missing an element, that's a renderer bug for the dev-warning
+        // to shout about — not something reveal should paper over.
+        if (schema.required?.includes(fieldName)) return false;
+        return isEmpty(block[fieldName]);
+      })
+      .map(([fieldName]) => fieldName);
+  }
+
+  /**
+   * Blocks currently in reveal mode, as a Set of blockUid.
+   *
+   * Per BLOCK, not per field: reveal is one mode ("show me this block's empty
+   * optional fields"), so whatever is empty at render time shows. That keeps it
+   * consistent while revealed — empty a field and its element stays, because the
+   * block is still in reveal mode — without any second, invisible way for a field
+   * to become revealed.
+   *
+   * Deliberately NOT sticky per field on edit. Emptying a field has to mean the
+   * field is gone, or there is no single action for "I want no image": the editor
+   * would delete, then have to dismiss the leftover placeholder through a
+   * block-level control. Swapping an image costs nothing either way — the quanta
+   * toolbar's image button (SyncedSlateToolbar.jsx, gated on focusedMediaField)
+   * replaces it in one click without deleting first.
+   */
+  get revealedBlocks() {
+    if (!this._revealedBlocks) this._revealedBlocks = new Set();
+    return this._revealedBlocks;
+  }
+
+  /**
+   * Toggle reveal for a block. Reveal is ALWAYS EXPLICIT — nothing here runs on
+   * selection, on insert, or on a field becoming empty.
+   */
+  toggleOptionalFields(blockUid) {
+    if (this.revealedBlocks.has(blockUid)) this.revealedBlocks.delete(blockUid);
+    else this.revealedBlocks.add(blockUid);
+    if (this.onContentChangeCallback) this._executeRender(this.onContentChangeCallback);
+  }
+
+  _projectForRender(formData) {
+    if (!formData || !this.blockPathMap) return formData;
+
+    // Container fields hold structure, not content — an empty one still has to
+    // arrive as an array for the renderer to map over.
+    const CONTAINER_WIDGETS = new Set(['blocks_layout', 'object_list']);
+
+    let projected = null; // cloned lazily; most renders change nothing
+    for (const blockUid of Object.keys(this.blockPathMap)) {
+      if (blockUid === '_schemas' || blockUid === '_page') continue;
+      const schema = this.getBlockSchema(blockUid);
+      const properties = schema?.properties;
+      if (!properties) continue;
+
+      const pathInfo = this.blockPathMap[blockUid];
+      const source = this.getBlockData(blockUid);
+      if (!source || !pathInfo?.path) continue;
+
+      for (const [fieldName, fieldDef] of Object.entries(properties)) {
+        if (CONTAINER_WIDGETS.has(fieldDef?.widget)) continue;
+        const value = source[fieldName];
+        if (!Array.isArray(value) || value.length > 0) continue;
+
+        // First actual change on this render — clone before touching anything.
+        if (!projected) projected = JSON.parse(JSON.stringify(formData));
+        let target = projected;
+        for (const key of pathInfo.path) target = target?.[key];
+        if (target) delete target[fieldName];
+      }
+
+      // Reveal: seed a sentinel into each empty inline field of a revealed
+      // block, so the renderer's own `{field && …}` rule fires and produces an
+      // element to click. Nothing here is persisted — the sentinel exists only
+      // in this projection and in the DOM.
+      // Re-derived every render, and stable BECAUSE sentinels never enter state:
+      // the projection reads this.formData, which stays empty for these fields, so
+      // the answer doesn't change once revealed. (The old DOM-based rule asked "is
+      // there no element?" — a question revealing itself falsified, so the field
+      // flickered back out on the next render.)
+      if (!this._revealedBlocks?.has(blockUid)) continue;
+      // revealableFields is already "empty AND has an inline affordance", so a
+      // field the editor has since filled drops out on its own and no sentinel is
+      // written over real content.
+      for (const fieldName of this.revealableFields(blockUid)) {
+        const fieldDef = properties[fieldName];
+        const sentinel = this._revealSentinelFor(
+          fieldDef,
+          this.getFieldType(blockUid, fieldName),
+        );
+        if (sentinel === undefined) continue;
+        if (!projected) projected = JSON.parse(JSON.stringify(formData));
+        let target = projected;
+        for (const key of pathInfo.path) target = target?.[key];
+        if (target) target[fieldName] = sentinel;
+      }
+    }
+    // What the renderer was actually handed. materializeHydraComments needs this
+    // (not this.formData) to tell "field is empty, so no element is CORRECT" from
+    // "field has content but the renderer produced no element" — including a
+    // revealed sentinel, whose element failing to appear means reveal did nothing.
+    this._lastRenderedData = projected || formData;
+    return this._lastRenderedData;
+  }
+
   _executeRender(callbackFn, afterRenderOptions = {}) {
     this._renderInProgress = true;
     this._renderStartTime = performance.now();
@@ -10331,8 +10638,9 @@ export class Bridge {
       this.blockTextMutationObserver.disconnect();
     }
 
-    // Call the callback to trigger the render
-    callbackFn(this.formData);
+    // Call the callback to trigger the render. The renderer never sees
+    // this.formData directly — it gets a projection (see _projectForRender).
+    callbackFn(this._projectForRender(this.formData));
 
     const afterRender = () => {
       this.afterContentRender(afterRenderOptions);

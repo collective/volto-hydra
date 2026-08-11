@@ -2442,6 +2442,21 @@ export class AdminUIHelper {
    * Save the current content being edited.
    * Clicks Save, waits for navigation out of /edit, and waits for iframe to render.
    */
+  /**
+   * Press the quanta toolbar's "reveal optional fields" toggle for the selected
+   * block (issue #296).
+   *
+   * Needed after emptying a field inline: "no data ⇒ no element" means clearing a
+   * media or link field removes its element, so getting an inline target back is
+   * an explicit ask. (Replacing an image doesn't need this — the toolbar's image
+   * button swaps it in one click without clearing first.)
+   */
+  async revealOptionalFields(): Promise<void> {
+    const toggle = this.page.locator('.optional-fields-toggle');
+    await expect(toggle).toBeVisible({ timeout: 5000 });
+    await toggle.click();
+  }
+
   async saveContent(): Promise<void> {
     const saveButton = this.page.locator('#toolbar-save, button:has-text("Save")');
     await saveButton.click();

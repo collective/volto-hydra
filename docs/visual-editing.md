@@ -50,6 +50,40 @@ If you can't modify the markup (e.g., using a 3rd party component library), use 
 
 Supported attributes: `block-uid`, `block-readonly`, `edit-text`, `edit-link`, `edit-media`, `block-add`
 
+## Optional Fields — empty means absent
+
+Render optional fields **data-driven**: no data, no element. Don't render an empty
+element just to give the editor something to click — it leaks empty markup into
+your published page.
+
+<!-- codeExample: jsx -->
+```jsx
+{block.heading && <h1 data-edit-text="heading">{block.heading}</h1>}
+{block.image && <img data-edit-media="image" src={block.image} />}
+```
+
+Plain truthiness is enough — you never need `.length` or a null-safe walk. Hydra
+normalises a field the editor has cleared (widgets write `[]`, which is truthy)
+to absent before your renderer sees it.
+
+To fill an empty field from the canvas, the editor selects the block and presses
+**reveal optional fields** in the Quanta toolbar. Hydra feeds your renderer a
+placeholder value for each empty field, so your own `&&` guard produces the
+element and it becomes editable. The placeholder exists only in the data handed
+to your renderer: it is never stored, so fields left unfilled leave no trace in
+saved content and render nothing in view. Your renderer needs no code for this.
+
+Reveal is best-effort. Hydra offers any field whose type could be edited inline,
+which it cannot always tell apart from a field you keep in the sidebar (alt text
+and css classes are strings too). Fields you don't render inline simply don't
+appear — the editor fills those from the sidebar as usual.
+
+Reveal replaces a per-block boolean only where "has data" and "should render"
+are the same thing. When they genuinely differ — the author has content but
+wants it hidden, or a field should appear only in certain configurations — add
+your own field and drive it with
+[`fieldRules`](custom-blocks.md#schema-enhancers).
+
 ## Allowed Navigation (data-linkable-allow)
 
 Add `data-linkable-allow` to elements that should navigate during edit mode (paging links, facet controls, etc.):
