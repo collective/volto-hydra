@@ -36,7 +36,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    include: ['packages/volto-hydra/**/*.{test,spec}.{js,jsx,ts,tsx}'],
+    include: [
+      'packages/volto-hydra/**/*.{test,spec}.{js,jsx,ts,tsx}',
+      // the docs markdown->blocks parser (docs/markdown-to-blocks.mjs)
+      'docs/**/*.{test,spec}.mjs',
+    ],
     // hydra-js has its own jest harness; covered by `cd packages/hydra-js && pnpm test` in CI.
     exclude: ['**/node_modules/**', 'packages/hydra-js/**'],
     // Reuse Volto's setup files via the workspace. These initialise the

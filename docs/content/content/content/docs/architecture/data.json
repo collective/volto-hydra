@@ -1174,7 +1174,7 @@
     },
     "ol-26": {
       "@type": "slate",
-      "plaintext": "Strip the source membership — but only when the destination should re-derive it. A moved/pasted non-fixed block has its templateId / templateInstanceId / slotId / readOnly deleted before the recompute, so applyBlockDefaultsWithContext can only refill them from the destination. This runs in normal mode, and in *template edit mode only when the block lands outside the template (a same-instance block no longer sits both before and after the landing gap) — that's the drag-out exit. For an in-template move while editing, the strip is skipped, so the recompute's prefer-existing-slotId* keeps the authored slot. Fixed blocks are never stripped. Exclude the block from its own neighbour scan. On a move the block already sits in the layout at its new index, so a naïve getNeighborData(position) returns the block itself — it would offer its own stale slot back to itself. The recompute filters the moved block out and treats position as the insertion gap between its real prev/next neighbours (also the basis of the \"inside the template?\" test above). Write back against the original. The update guard compares the recompute result to the originally stored block, not the stripped copy — otherwise a block whose stripped recompute is a structural no-op is never written back and the stale membership survives. templateEditModeRef for the mode check. The handler reads the current set of unlocked template instances from a ref (not the effect-closure value), so the gate sees the live edit-mode state.",
+      "plaintext": "Strip the source membership — but only when the destination should re-derive it. A moved/pasted non-fixed block has its templateId / templateInstanceId / slotId / readOnly deleted before the recompute, so applyBlockDefaultsWithContext can only refill them from the destination. This runs in normal mode, and in template edit mode only when the block lands outside the template (a same-instance block no longer sits both before and after the landing gap) — that's the drag-out exit. For an in-template move while editing, the strip is skipped, so the recompute's prefer-existing-slotId keeps the authored slot. Fixed blocks are never stripped. Exclude the block from its own neighbour scan. On a move the block already sits in the layout at its new index, so a naïve getNeighborData(position) returns the block itself — it would offer its own stale slot back to itself. The recompute filters the moved block out and treats position as the insertion gap between its real prev/next neighbours (also the basis of the \"inside the template?\" test above). Write back against the original. The update guard compares the recompute result to the originally stored block, not the stripped copy — otherwise a block whose stripped recompute is a structural no-op is never written back and the stale membership survives. templateEditModeRef for the mode check. The handler reads the current set of unlocked template instances from a ref (not the effect-closure value), so the gate sees the live edit-mode state.",
       "value": [
         {
           "type": "ol",
@@ -1268,37 +1268,32 @@
                   ]
                 },
                 {
-                  "text": ", and in *"
+                  "text": ", and in "
                 },
                 {
-                  "type": "em",
+                  "type": "strong",
                   "children": [
                     {
                       "text": "template edit mode only when the block lands "
-                    }
-                  ]
-                },
-                {
-                  "text": "outside"
-                },
-                {
-                  "type": "em",
-                  "children": [
+                    },
+                    {
+                      "type": "em",
+                      "children": [
+                        {
+                          "text": "outside"
+                        }
+                      ]
+                    },
                     {
                       "text": " the template"
                     }
                   ]
                 },
                 {
-                  "type": "em",
-                  "children": [
-                    {
-                      "text": " (a same-instance block no longer sits both before and after the landing gap) — that's the drag-out exit. For an "
-                    }
-                  ]
+                  "text": " (a same-instance block no longer sits both before and after the landing gap) — that's the drag-out exit. For an "
                 },
                 {
-                  "type": "em",
+                  "type": "strong",
                   "children": [
                     {
                       "text": "in-template move while editing"
@@ -1306,34 +1301,29 @@
                   ]
                 },
                 {
-                  "type": "em",
-                  "children": [
-                    {
-                      "text": ", the strip is skipped, so the recompute's "
-                    }
-                  ]
-                },
-                {
-                  "text": "prefer-existing-"
-                },
-                {
-                  "type": "code",
-                  "children": [
-                    {
-                      "text": "slotId"
-                    }
-                  ]
+                  "text": ", the strip is skipped, so the recompute's "
                 },
                 {
                   "type": "em",
                   "children": [
                     {
-                      "text": " keeps the authored slot. "
+                      "text": "prefer-existing-"
+                    },
+                    {
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "slotId"
+                        }
+                      ]
                     }
                   ]
                 },
                 {
-                  "type": "em",
+                  "text": " keeps the authored slot. "
+                },
+                {
+                  "type": "strong",
                   "children": [
                     {
                       "text": "Fixed"
@@ -1341,7 +1331,7 @@
                   ]
                 },
                 {
-                  "text": "* blocks are never stripped."
+                  "text": " blocks are never stripped."
                 }
               ]
             },
@@ -1417,7 +1407,15 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`templateEditModeRef` for the mode check."
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "templateEditModeRef"
+                        }
+                      ]
+                    },
+                    {
+                      "text": " for the mode check."
                     }
                   ]
                 },
@@ -1568,7 +1566,15 @@
               "type": "strong",
               "children": [
                 {
-                  "text": "Do not set `RAZZLE_PUBLIC_URL`"
+                  "text": "Do not set "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "RAZZLE_PUBLIC_URL"
+                    }
+                  ]
                 }
               ]
             },
@@ -2474,7 +2480,18 @@
                         },
                         "children": [
                           {
-                            "text": "Custom Blocks › `initBridge()` Reference"
+                            "text": "Custom Blocks › "
+                          },
+                          {
+                            "type": "code",
+                            "children": [
+                              {
+                                "text": "initBridge()"
+                              }
+                            ]
+                          },
+                          {
+                            "text": " Reference"
                           }
                         ]
                       },

@@ -129,7 +129,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`hydra-edit:<origin>`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "hydra-edit:<origin>"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -156,7 +161,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`hydra-view:<origin>`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "hydra-view:<origin>"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -474,7 +484,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`sendBlockUpdate`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "sendBlockUpdate"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -490,7 +505,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`sendBlockAction`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "sendBlockAction"
+                        }
+                      ]
                     }
                   ]
                 },

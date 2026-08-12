@@ -173,7 +173,7 @@
     },
     "ul-6": {
       "@type": "slate",
-      "plaintext": "Select text → the Quanta toolbar shows formatting options. Apply marks: Bold, Italic, ~~Strikethrough~~ via toolbar buttons or keyboard shortcuts. Select text and click the link button to attach a URL or pick another page. The toolbar also surfaces paragraph-level type changes (heading, list, blockquote, etc.).",
+      "plaintext": "Select text → the Quanta toolbar shows formatting options. Apply marks: Bold, Italic, Strikethrough via toolbar buttons or keyboard shortcuts. Select text and click the link button to attach a URL or pick another page. The toolbar also surfaces paragraph-level type changes (heading, list, blockquote, etc.).",
       "value": [
         {
           "type": "ul",
@@ -212,7 +212,18 @@
                   ]
                 },
                 {
-                  "text": ", ~~Strikethrough~~ via toolbar buttons or keyboard shortcuts."
+                  "text": ", "
+                },
+                {
+                  "type": "del",
+                  "children": [
+                    {
+                      "text": "Strikethrough"
+                    }
+                  ]
+                },
+                {
+                  "text": " via toolbar buttons or keyboard shortcuts."
                 }
               ]
             },
@@ -615,29 +626,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "`"
-                      },
-                      {
                         "type": "code",
                         "children": [
                           {
-                            "text": " "
+                            "text": "`code`"
                           }
                         ]
-                      },
-                      {
-                        "text": "code"
-                      },
-                      {
-                        "type": "code",
-                        "children": [
-                          {
-                            "text": " "
-                          }
-                        ]
-                      },
-                      {
-                        "text": "`"
                       }
                     ]
                   }
@@ -797,7 +791,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "~~strikethrough~~"
+                        "type": "del",
+                        "children": [
+                          {
+                            "text": "strikethrough"
+                          }
+                        ]
                       }
                     ]
                   }

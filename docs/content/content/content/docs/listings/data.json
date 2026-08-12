@@ -257,7 +257,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`blocks`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "blocks"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -273,7 +278,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`fetchItems`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "fetchItems"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -311,7 +321,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`paging`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "paging"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -338,7 +353,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`seen`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "seen"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -365,7 +385,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`itemTypeField`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "itemTypeField"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -392,7 +417,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`defaultItemType`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "defaultItemType"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -2615,7 +2645,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`currentPage`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "currentPage"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -2631,7 +2666,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`totalPages`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "totalPages"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -2647,7 +2687,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`totalItems`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "totalItems"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -2663,7 +2708,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`prev`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "prev"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -2679,7 +2729,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`next`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "next"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -2695,7 +2750,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`pages`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "pages"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -2722,7 +2782,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`seen`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "seen"
+                        }
+                      ]
                     }
                   ]
                 },

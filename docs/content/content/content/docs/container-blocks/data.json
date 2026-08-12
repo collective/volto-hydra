@@ -146,7 +146,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`blocks_layout`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "blocks_layout"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -209,7 +214,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`object_list`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "object_list"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -369,26 +379,34 @@
         }
       ]
     },
-    "p-10": {
+    "bq-10": {
       "@type": "slate",
-      "plaintext": "> **The region name is a key inside `blocks_layout` — not a top-level field.** The > ordering list lives at `blocks_layout.<region>` (a plain array of ids). A tempting > mistake is to store it as a top-level field named after the region: > > <!-- codeExample: json --> > ```json > // ✅ CORRECT — ordering keyed inside the shared blocks_layout dict > { \"@type\": \"slider\", \"blocks\": { … }, \"blocks_layout\": { \"slides\": [\"slide-1\", \"slide-2\"] } } > > // ❌ WRONG — an ad-hoc top-level `slides` field holding { items: [...] } > { \"@type\": \"slider\", \"blocks\": { … }, \"slides\": { \"items\": [\"slide-1\", \"slide-2\"] } } > ``` > > The wrong form may *look* fine in a frontend that reads it back the same way, but > `slides` is **not a registered field**, so the backend **silently drops it on save** > (see [Why these persist](#why-these-persist-and-separate-top-level-fields-dont)) — > and tools that walk the shared dict (the block path map, the sanity checks, the > editor's reorder/drag) never see the region, because they look under > `blocks_layout`, never at a field named for the region. Renderers must read the > ordering from `blocks_layout[<region>]`, not from `<region>.items`.",
+      "plaintext": "The region name is a key inside blocks_layout — not a top-level field. The ordering list lives at blocks_layout.<region> (a plain array of ids). A tempting mistake is to store it as a top-level field named after the region:  <!-- codeExample: json --> json // ✅ CORRECT — ordering keyed inside the shared blocks_layout dict { \"@type\": \"slider\", \"blocks\": { … }, \"blocks_layout\": { \"slides\": [\"slide-1\", \"slide-2\"] } }  // ❌ WRONG — an ad-hoc top-level `slides` field holding { items: [...] } { \"@type\": \"slider\", \"blocks\": { … }, \"slides\": { \"items\": [\"slide-1\", \"slide-2\"] } }   The wrong form may look fine in a frontend that reads it back the same way, but slides is not a registered field, so the backend silently drops it on save (see Why these persist) — and tools that walk the shared dict (the block path map, the sanity checks, the editor's reorder/drag) never see the region, because they look under blocks_layout, never at a field named for the region. Renderers must read the ordering from blocks_layout[<region>], not from <region>.items.",
       "value": [
         {
-          "type": "p",
+          "type": "blockquote",
           "children": [
-            {
-              "text": "> "
-            },
             {
               "type": "strong",
               "children": [
                 {
-                  "text": "The region name is a key inside `blocks_layout` — not a top-level field."
+                  "text": "The region name is a key inside "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "blocks_layout"
+                    }
+                  ]
+                },
+                {
+                  "text": " — not a top-level field."
                 }
               ]
             },
             {
-              "text": " The > ordering list lives at "
+              "text": " The ordering list lives at "
             },
             {
               "type": "code",
@@ -399,73 +417,115 @@
               ]
             },
             {
-              "text": " (a plain array of ids). A tempting > mistake is to store it as a top-level field named after the region: > > <!-- codeExample: json --> > ``"
+              "text": " (a plain array of ids). A tempting mistake is to store it as a top-level field named after the region:  "
+            },
+            {
+              "text": "<!-- codeExample: json -->"
+            },
+            {
+              "text": " "
             },
             {
               "type": "code",
               "children": [
                 {
-                  "text": "json > // ✅ CORRECT — ordering keyed inside the shared blocks_layout dict > { \"@type\": \"slider\", \"blocks\": { … }, \"blocks_layout\": { \"slides\": [\"slide-1\", \"slide-2\"] } } > > // ❌ WRONG — an ad-hoc top-level "
+                  "text": "json // ✅ CORRECT — ordering keyed inside the shared blocks_layout dict { \"@type\": \"slider\", \"blocks\": { … }, \"blocks_layout\": { \"slides\": [\"slide-1\", \"slide-2\"] } }  // ❌ WRONG — an ad-hoc top-level `slides` field holding { items: [...] } { \"@type\": \"slider\", \"blocks\": { … }, \"slides\": { \"items\": [\"slide-1\", \"slide-2\"] } } "
                 }
               ]
             },
             {
-              "text": "slides"
+              "text": "  The wrong form may "
+            },
+            {
+              "type": "em",
+              "children": [
+                {
+                  "text": "look"
+                }
+              ]
+            },
+            {
+              "text": " fine in a frontend that reads it back the same way, but "
             },
             {
               "type": "code",
               "children": [
                 {
-                  "text": " field holding { items: [...] } > { \"@type\": \"slider\", \"blocks\": { … }, \"slides\": { \"items\": [\"slide-1\", \"slide-2\"] } } > "
+                  "text": "slides"
                 }
               ]
             },
             {
-              "text": "`"
+              "text": " is "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "not a registered field"
+                }
+              ]
+            },
+            {
+              "text": ", so the backend "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "silently drops it on save"
+                }
+              ]
+            },
+            {
+              "text": " (see "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "#why-these-persist-and-separate-top-level-fields-dont"
+              },
+              "children": [
+                {
+                  "text": "Why these persist"
+                }
+              ]
+            },
+            {
+              "text": ") — and tools that walk the shared dict (the block path map, the sanity checks, the editor's reorder/drag) never see the region, because they look under "
             },
             {
               "type": "code",
               "children": [
                 {
-                  "text": " > > The wrong form may *look* fine in a frontend that reads it back the same way, but > "
+                  "text": "blocks_layout"
                 }
               ]
             },
             {
-              "text": "slides"
+              "text": ", never at a field named for the region. Renderers must read the ordering from "
             },
             {
               "type": "code",
               "children": [
                 {
-                  "text": " is **not a registered field**, so the backend **silently drops it on save** > (see [Why these persist](#why-these-persist-and-separate-top-level-fields-dont)) — > and tools that walk the shared dict (the block path map, the sanity checks, the > editor's reorder/drag) never see the region, because they look under > "
+                  "text": "blocks_layout[<region>]"
                 }
               ]
             },
             {
-              "text": "blocks_layout"
+              "text": ", not from "
             },
             {
               "type": "code",
               "children": [
                 {
-                  "text": ", never at a field named for the region. Renderers must read the > ordering from "
+                  "text": "<region>.items"
                 }
               ]
             },
             {
-              "text": "blocks_layout[<region>]"
-            },
-            {
-              "type": "code",
-              "children": [
-                {
-                  "text": ", not from "
-                }
-              ]
-            },
-            {
-              "text": "<region>.items`."
+              "text": "."
             }
           ]
         }
@@ -739,7 +799,18 @@
               "type": "strong",
               "children": [
                 {
-                  "text": "keys inside the registered `blocks_layout` dict"
+                  "text": "keys inside the registered "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "blocks_layout"
+                    }
+                  ]
+                },
+                {
+                  "text": " dict"
                 }
               ]
             },
@@ -1184,7 +1255,12 @@
               "type": "strong",
               "children": [
                 {
-                  "text": "`object_list`"
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "object_list"
+                    }
+                  ]
                 }
               ]
             },
@@ -1231,7 +1307,12 @@
               "type": "strong",
               "children": [
                 {
-                  "text": "`blocks_layout`"
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "blocks_layout"
+                    }
+                  ]
                 }
               ]
             },
@@ -2094,7 +2175,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`data-block-add=\"bottom|right\"`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "data-block-add=\"bottom|right\""
+                        }
+                      ]
                     }
                   ]
                 },
@@ -2110,7 +2196,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`data-block-selector=\"-1|+1|blockId\"`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "data-block-selector=\"-1|+1|blockId\""
+                        }
+                      ]
                     }
                   ]
                 },
@@ -2126,7 +2217,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`data-block-selector=\"uid1 uid2 uid3 …\"`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "data-block-selector=\"uid1 uid2 uid3 …\""
+                        }
+                      ]
                     }
                   ]
                 },
@@ -2366,7 +2462,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`defaultBlockType`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "defaultBlockType"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -2415,7 +2516,26 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "no `defaultBlockType` and more than one `allowedBlocks`"
+                      "text": "no "
+                    },
+                    {
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "defaultBlockType"
+                        }
+                      ]
+                    },
+                    {
+                      "text": " and more than one "
+                    },
+                    {
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "allowedBlocks"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -2602,7 +2722,12 @@
               "type": "strong",
               "children": [
                 {
-                  "text": "`defaultBlockType: \"empty\"`"
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "defaultBlockType: \"empty\""
+                    }
+                  ]
                 }
               ]
             },
@@ -2695,7 +2820,7 @@
     },
     "ul-55": {
       "@type": "slate",
-      "plaintext": "Passive seed (region loaded, or its last child deleted): Inka seeds a bare",
+      "plaintext": "Passive seed (region loaded, or its last child deleted): Inka seeds a bare @type: \"empty\" placeholder — nothing renders. defaultBlockType wins over the single-allowedBlocks auto-fill, so the region genuinely shows empty. The '+' (active add / fill): inserts a real block from allowedBlocks (converting the empty placeholder in place), never another empty. The add path reads allowedBlocks, not defaultBlockType — so a single-entry allowedBlocks fills straight to that type with no chooser. \"empty\" is never in allowedBlocks — it isn't a type an editor opts into; it's the \"region is empty\" state. On save the placeholder is stripped, so a genuinely-empty region persists with no blocks.",
       "value": [
         {
           "type": "ul",
@@ -2712,65 +2837,43 @@
                   ]
                 },
                 {
-                  "text": " (region loaded, or its last child deleted): Inka seeds a bare"
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    "p-56": {
-      "@type": "slate",
-      "plaintext": "`@type: \"empty\"` placeholder — nothing renders. `defaultBlockType` wins over the   single-`allowedBlocks` auto-fill, so the region genuinely shows empty.",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "type": "code",
-              "children": [
+                  "text": " (region loaded, or its last child deleted): Inka seeds a bare "
+                },
                 {
-                  "text": "@type: \"empty\""
-                }
-              ]
-            },
-            {
-              "text": " placeholder — nothing renders. "
-            },
-            {
-              "type": "code",
-              "children": [
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "@type: \"empty\""
+                    }
+                  ]
+                },
                 {
-                  "text": "defaultBlockType"
-                }
-              ]
-            },
-            {
-              "text": " wins over the   single-"
-            },
-            {
-              "type": "code",
-              "children": [
+                  "text": " placeholder — nothing renders. "
+                },
                 {
-                  "text": "allowedBlocks"
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "defaultBlockType"
+                    }
+                  ]
+                },
+                {
+                  "text": " wins over the single-"
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "allowedBlocks"
+                    }
+                  ]
+                },
+                {
+                  "text": " auto-fill, so the region genuinely shows empty."
                 }
               ]
             },
-            {
-              "text": " auto-fill, so the region genuinely shows empty."
-            }
-          ]
-        }
-      ]
-    },
-    "ul-57": {
-      "@type": "slate",
-      "plaintext": "The '+' (active add / fill): inserts a real block from allowedBlocks",
-      "value": [
-        {
-          "type": "ul",
-          "children": [
             {
               "type": "li",
               "children": [
@@ -2792,89 +2895,67 @@
                       "text": "allowedBlocks"
                     }
                   ]
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    "p-58": {
-      "@type": "slate",
-      "plaintext": "(converting the empty placeholder **in place**), never another `empty`. The add   path reads `allowedBlocks`, not `defaultBlockType` — so a single-entry   `allowedBlocks` fills straight to that type with no chooser.",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "(converting the empty placeholder "
-            },
-            {
-              "type": "strong",
-              "children": [
+                },
                 {
-                  "text": "in place"
-                }
-              ]
-            },
-            {
-              "text": "), never another "
-            },
-            {
-              "type": "code",
-              "children": [
+                  "text": " (converting the empty placeholder "
+                },
                 {
-                  "text": "empty"
-                }
-              ]
-            },
-            {
-              "text": ". The add   path reads "
-            },
-            {
-              "type": "code",
-              "children": [
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "in place"
+                    }
+                  ]
+                },
                 {
-                  "text": "allowedBlocks"
-                }
-              ]
-            },
-            {
-              "text": ", not "
-            },
-            {
-              "type": "code",
-              "children": [
+                  "text": "), never another "
+                },
                 {
-                  "text": "defaultBlockType"
-                }
-              ]
-            },
-            {
-              "text": " — so a single-entry   "
-            },
-            {
-              "type": "code",
-              "children": [
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "empty"
+                    }
+                  ]
+                },
                 {
-                  "text": "allowedBlocks"
+                  "text": ". The add path reads "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "allowedBlocks"
+                    }
+                  ]
+                },
+                {
+                  "text": ", not "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "defaultBlockType"
+                    }
+                  ]
+                },
+                {
+                  "text": " — so a single-entry "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "allowedBlocks"
+                    }
+                  ]
+                },
+                {
+                  "text": " fills straight to that type with no chooser."
                 }
               ]
             },
-            {
-              "text": " fills straight to that type with no chooser."
-            }
-          ]
-        }
-      ]
-    },
-    "ul-59": {
-      "@type": "slate",
-      "plaintext": "\"empty\" is never in allowedBlocks — it isn't a type an editor opts into;",
-      "value": [
-        {
-          "type": "ul",
-          "children": [
             {
               "type": "li",
               "children": [
@@ -2882,12 +2963,28 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`\"empty\"` is never in `allowedBlocks`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "\"empty\""
+                        }
+                      ]
+                    },
+                    {
+                      "text": " is never in "
+                    },
+                    {
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "allowedBlocks"
+                        }
+                      ]
                     }
                   ]
                 },
                 {
-                  "text": " — it isn't a type an editor opts into;"
+                  "text": " — it isn't a type an editor opts into; it's the \"region is empty\" state. On save the placeholder is stripped, so a genuinely-empty region persists with no blocks."
                 }
               ]
             }
@@ -2895,21 +2992,7 @@
         }
       ]
     },
-    "p-60": {
-      "@type": "slate",
-      "plaintext": "it's the \"region is empty\" state. On save the placeholder is stripped, so a   genuinely-empty region persists with no blocks.",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "it's the \"region is empty\" state. On save the placeholder is stripped, so a   genuinely-empty region persists with no blocks."
-            }
-          ]
-        }
-      ]
-    },
-    "p-61": {
+    "p-56": {
       "@type": "slate",
       "plaintext": "Use this for optional site chrome — e.g. a header announcement that is usually absent but can hold a single global alert when needed. (Because the seed is `\"empty\"`, the frontend must render `empty` as a selectable slot — see below.)",
       "value": [
@@ -2945,7 +3028,7 @@
         }
       ]
     },
-    "p-62": {
+    "p-57": {
       "@type": "slate",
       "plaintext": "**Forced regions are locked until unlocked.** When the region is a **forced layout** (`allowedLayouts`), it is template-controlled — its content lives in the shared template and is edited *centrally*, like a branded footer. So the seeded empty is stamped as a **locked template member** (`readOnly`, with the forced layout's `templateId`/`templateInstanceId`): it shows empty, but you cannot fill it until you **unlock** the template (enter template-edit-mode). This prevents an editor from silently filling it per-page — the announcement stays site-wide. Filling then happens in template-edit-mode and locking publishes it everywhere. (This stamping happens in the editor's empty-seeding — `ensureEmptyBlockIfEmpty` — so **view-mode merging still leaves an empty forced layout empty**; no empty is ever inserted at render time.)",
       "value": [
@@ -3077,7 +3160,7 @@
         }
       ]
     },
-    "h-63": {
+    "h-58": {
       "@type": "slate",
       "plaintext": "empty is a universal placeholder — renderers must tolerate it",
       "value": [
@@ -3099,7 +3182,7 @@
         }
       ]
     },
-    "p-64": {
+    "p-59": {
       "@type": "slate",
       "plaintext": "In a no-default, multi-allowed region, `@type: \"empty\"` can appear in **any** container — including transiently, the moment a child is deleted and before the user picks a replacement. You never list `\"empty\"` in `allowedBlocks`; it isn't a type you opt into. So every container renderer has to render an `empty` child without erroring.",
       "value": [
@@ -3168,7 +3251,7 @@
         }
       ]
     },
-    "p-65": {
+    "p-60": {
       "@type": "slate",
       "plaintext": "If your container renders its children by delegating each one to your central block dispatch (the function or component that switches on `@type`), you get this for free — just give that dispatch an `empty` case that renders a selectable placeholder.",
       "value": [
@@ -3204,7 +3287,7 @@
         }
       ]
     },
-    "p-66": {
+    "p-61": {
       "@type": "slate",
       "plaintext": "The trap is a **custom** container renderer that only expects specific child types — a `contextNavigation` that walks `navItem`/`listing` children, say. Don't hand-roll an allow-list that rejects anything else, or a seeded `empty` will throw and break the whole container. Route non-special children through your central dispatch instead of throwing:",
       "value": [
@@ -3273,18 +3356,18 @@
         }
       ]
     },
-    "ce-67": {
+    "ce-62": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-67-javascript-b50ae0",
+          "@id": "ce-62-javascript-4ebff8",
           "label": "Javascript",
           "language": "javascript",
           "code": "for (const childId of items) {\n    const child = blocks[childId];\n    if (child['@type'] === 'navItem') { /* nav-specific rendering */ }\n    else if (child['@type'] === 'listing') { /* expand listing */ }\n    else renderBlock(childId, child);   // empty (or anything else) → central dispatch, never throw\n}"
         }
       ]
     },
-    "p-68": {
+    "p-63": {
       "@type": "slate",
       "plaintext": "Two more things a renderer must survive once the user picks a type for a seeded empty:",
       "value": [
@@ -3298,7 +3381,7 @@
         }
       ]
     },
-    "ul-69": {
+    "ul-64": {
       "@type": "slate",
       "plaintext": "Re-render on the type change. The child's @type flips from empty to the picked type in place (same data-block-uid). If your renderer memoises or does its work once (e.g. an async setup), make sure it re-runs when a child's type changes — otherwise it keeps showing the stale empty. Tolerate a freshly-typed child with no data yet. A just-picked navItem has no href; a just-picked form field has no value — render a placeholder, don't crash on the missing field.",
       "value": [
@@ -3407,7 +3490,7 @@
         }
       ]
     },
-    "h-70": {
+    "h-65": {
       "@type": "slate",
       "plaintext": "Synchronised Block Types in a Container",
       "value": [
@@ -3421,7 +3504,7 @@
         }
       ]
     },
-    "p-71": {
+    "p-66": {
       "@type": "slate",
       "plaintext": "You can have one container type whose children are all kept the same `@type`, with the editor picking that type once on the parent. When the type changes, every child is converted (using each child's `fieldMappings`); when a new child is added it gets the selected type.",
       "value": [
@@ -3457,7 +3540,7 @@
         }
       ]
     },
-    "p-72": {
+    "p-67": {
       "@type": "slate",
       "plaintext": "Declare `itemTypeField` on the *blocks field* — its value names a sibling field on the same schema whose value drives every child's `@type`. The sibling field is typically rendered with `widget: 'blockTypeSelect'`, which computes its `choices` from the blocks field's `allowedBlocks` at render time:",
       "value": [
@@ -3537,18 +3620,18 @@
         }
       ]
     },
-    "ce-73": {
+    "ce-68": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-73-javascript-94250b",
+          "@id": "ce-68-javascript-cdad0c",
           "label": "Javascript",
           "language": "javascript",
           "code": "blocks: {\n    gridBlock: {\n        blockSchema: {\n            properties: {\n                slides: {\n                    widget: 'blocks_layout',\n                    itemTypeField: 'variation',         // sync trigger\n                    allowedBlocks: ['teaser', 'image'],\n                },\n                variation: {\n                    widget: 'blockTypeSelect',          // dropdown\n                },\n            },\n        },\n    },\n    teaser: {\n        fieldMappings: {\n            '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },\n        },\n    },\n    image: {\n        fieldMappings: {\n            '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },\n        },\n    },\n}"
         }
       ]
     },
-    "p-74": {
+    "p-69": {
       "@type": "slate",
       "plaintext": "The relationship is local: read the schema and you can see \"the children of `slides` get their `@type` from `variation`\" right next to the field declaration. Works the same for `widget: 'blocks_layout'` and `widget: 'object_list'` children.",
       "value": [
@@ -3617,7 +3700,7 @@
         }
       ]
     },
-    "h-75": {
+    "h-70": {
       "@type": "slate",
       "plaintext": "Field-value syncing",
       "value": [
@@ -3631,7 +3714,7 @@
         }
       ]
     },
-    "p-76": {
+    "p-71": {
       "@type": "slate",
       "plaintext": "On top of type syncing you can also have field _values_ centrally controlled at the parent — set once on the parent, applied to every child. Add ONE enhancer on the parent:",
       "value": [
@@ -3639,24 +3722,35 @@
           "type": "p",
           "children": [
             {
-              "text": "On top of type syncing you can also have field _values_ centrally controlled at the parent — set once on the parent, applied to every child. Add ONE enhancer on the parent:"
+              "text": "On top of type syncing you can also have field "
+            },
+            {
+              "type": "em",
+              "children": [
+                {
+                  "text": "values"
+                }
+              ]
+            },
+            {
+              "text": " centrally controlled at the parent — set once on the parent, applied to every child. Add ONE enhancer on the parent:"
             }
           ]
         }
       ]
     },
-    "ce-77": {
+    "ce-72": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-77-javascript-c5bff1",
+          "@id": "ce-72-javascript-521655",
           "label": "Javascript",
           "language": "javascript",
           "code": "gridBlock: {\n    blockSchema: {\n        properties: {\n            slides: { widget: 'blocks_layout', itemTypeField: 'variation', allowedBlocks: ['teaser', 'image'] },\n            variation: { widget: 'blockTypeSelect' },\n        },\n    },\n    schemaEnhancer: { inheritSchemaFrom: {} },\n}"
         }
       ]
     },
-    "p-78": {
+    "p-73": {
       "@type": "slate",
       "plaintext": "`inheritSchemaFrom` does two things automatically:",
       "value": [
@@ -3678,7 +3772,7 @@
         }
       ]
     },
-    "ol-79": {
+    "ol-74": {
       "@type": "slate",
       "plaintext": "Surfaces the parent-claimed fields on the parent's sidebar under an \"Item Defaults\" fieldset. Auto-hides the same fields on every child's sidebar (via a hideParentOwnedFields enhancer that's applied to every block at INIT — no per-child opt-in).",
       "value": [
@@ -3727,7 +3821,7 @@
         }
       ]
     },
-    "p-80": {
+    "p-75": {
       "@type": "slate",
       "plaintext": "The parent declares **what it claims** per child block type via `parentControlled`. If absent, the default is: parent claims everything _not_ listed in the child's `fieldMappings['@default']` mapping. The default works for typical cases; set `parentControlled` only when you want a different split (e.g. keep a meta-toggle field editable per-child):",
       "value": [
@@ -3757,7 +3851,18 @@
               ]
             },
             {
-              "text": ". If absent, the default is: parent claims everything _not_ listed in the child's "
+              "text": ". If absent, the default is: parent claims everything "
+            },
+            {
+              "type": "em",
+              "children": [
+                {
+                  "text": "not"
+                }
+              ]
+            },
+            {
+              "text": " listed in the child's "
             },
             {
               "type": "code",
@@ -3785,18 +3890,18 @@
         }
       ]
     },
-    "ce-81": {
+    "ce-76": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-81-javascript-2004b8",
+          "@id": "ce-76-javascript-6b52c5",
           "label": "Javascript",
           "language": "javascript",
           "code": "listing: {\n    schemaEnhancer: {\n        inheritSchemaFrom: {\n            typeField: 'variation',\n            mappingField: 'fieldMapping',\n            // Only these fields are claimed by listing for teaser children.\n            // The rest (including teaser's `overwrite` toggle) stay editable.\n            parentControlled: {\n                teaser: ['head_title', 'openLinkInNewTab', 'styles'],\n            },\n        },\n    },\n}"
         }
       ]
     },
-    "p-82": {
+    "p-77": {
       "@type": "slate",
       "plaintext": "When `parentControlled[childType]` is set, it **replaces** the `@default` fallback for that child type. Both sides — the parent's \"Item Defaults\" fieldset and the child's hidden fields — are computed from the same single rule, so they can never get out of sync.",
       "value": [
@@ -3843,7 +3948,7 @@
         }
       ]
     },
-    "h-83": {
+    "h-78": {
       "@type": "slate",
       "plaintext": "Recipe options",
       "value": [
@@ -3857,9 +3962,9 @@
         }
       ]
     },
-    "ul-84": {
+    "ul-79": {
       "@type": "slate",
-      "plaintext": "inheritSchemaFrom — schemaEnhancer recipe; surfaces parent-claimed fields on the parent and hides them on children. itemTypeField — declared on a blocks_layout/object_list field; names the sibling field whose value drives every child's @type. typeField — names the sibling field directly on inheritSchemaFrom. Use this when there is no blocks field to declare itemTypeField on (e.g. listings — see Listings). mappingField — name of the field where a per-block fieldMapping override is stored. Required for the FieldMappingWidget to appear. parentControlled — { childType: [fieldName, ...] } per-child-type override. Replaces the fieldMappings['@default'] fallback. defaultsField — prefix for the inherited fields on the parent's \"Item Defaults\" fieldset (default: 'itemDefaults'). blockTypeSelect widget options:",
+      "plaintext": "inheritSchemaFrom — schemaEnhancer recipe; surfaces parent-claimed fields on the parent and hides them on children. itemTypeField — declared on a blocks_layout/object_list field; names the sibling field whose value drives every child's @type. typeField — names the sibling field directly on inheritSchemaFrom. Use this when there is no blocks field to declare itemTypeField on (e.g. listings — see Listings). mappingField — name of the field where a per-block fieldMapping override is stored. Required for the FieldMappingWidget to appear. parentControlled — { childType: [fieldName, ...] } per-child-type override. Replaces the fieldMappings['@default'] fallback. defaultsField — prefix for the inherited fields on the parent's \"Item Defaults\" fieldset (default: 'itemDefaults'). blockTypeSelect widget options:blocksField — which sub-blocks field's allowedBlocks to use for the choices. Auto-discovers if omitted. Set to '..' when the choices should come from the enclosing parent's allowedSiblingTypes.filterConvertibleFrom — only offer types whose fieldMappings accept the named source. Typically '@default' for listings (every item type must be populatable from canonical content fields).",
       "value": [
         {
           "type": "ul",
@@ -3871,7 +3976,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`inheritSchemaFrom`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "inheritSchemaFrom"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -3887,7 +3997,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`itemTypeField`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "itemTypeField"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -3936,7 +4051,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`typeField`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "typeField"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -3988,7 +4108,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`mappingField`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "mappingField"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -4026,7 +4151,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`parentControlled`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "parentControlled"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -4064,7 +4194,12 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`defaultsField`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "defaultsField"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -4091,116 +4226,132 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "`blockTypeSelect`"
+                      "type": "code",
+                      "children": [
+                        {
+                          "text": "blockTypeSelect"
+                        }
+                      ]
                     }
                   ]
                 },
                 {
                   "text": " widget options:"
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    "p-85": {
-      "@type": "slate",
-      "plaintext": "- **`blocksField`** — which sub-blocks field's `allowedBlocks` to use for the choices. Auto-discovers if omitted. Set to `'..'` when the choices should come from the *enclosing parent's* `allowedSiblingTypes`.   - **`filterConvertibleFrom`** — only offer types whose `fieldMappings` accept the named source. Typically `'@default'` for listings (every item type must be populatable from canonical content fields).",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "- "
-            },
-            {
-              "type": "strong",
-              "children": [
+                },
                 {
-                  "text": "`blocksField`"
+                  "type": "ul",
+                  "children": [
+                    {
+                      "type": "li",
+                      "children": [
+                        {
+                          "type": "strong",
+                          "children": [
+                            {
+                              "type": "code",
+                              "children": [
+                                {
+                                  "text": "blocksField"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "text": " — which sub-blocks field's "
+                        },
+                        {
+                          "type": "code",
+                          "children": [
+                            {
+                              "text": "allowedBlocks"
+                            }
+                          ]
+                        },
+                        {
+                          "text": " to use for the choices. Auto-discovers if omitted. Set to "
+                        },
+                        {
+                          "type": "code",
+                          "children": [
+                            {
+                              "text": "'..'"
+                            }
+                          ]
+                        },
+                        {
+                          "text": " when the choices should come from the "
+                        },
+                        {
+                          "type": "em",
+                          "children": [
+                            {
+                              "text": "enclosing parent's"
+                            }
+                          ]
+                        },
+                        {
+                          "text": " "
+                        },
+                        {
+                          "type": "code",
+                          "children": [
+                            {
+                              "text": "allowedSiblingTypes"
+                            }
+                          ]
+                        },
+                        {
+                          "text": "."
+                        }
+                      ]
+                    },
+                    {
+                      "type": "li",
+                      "children": [
+                        {
+                          "type": "strong",
+                          "children": [
+                            {
+                              "type": "code",
+                              "children": [
+                                {
+                                  "text": "filterConvertibleFrom"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "text": " — only offer types whose "
+                        },
+                        {
+                          "type": "code",
+                          "children": [
+                            {
+                              "text": "fieldMappings"
+                            }
+                          ]
+                        },
+                        {
+                          "text": " accept the named source. Typically "
+                        },
+                        {
+                          "type": "code",
+                          "children": [
+                            {
+                              "text": "'@default'"
+                            }
+                          ]
+                        },
+                        {
+                          "text": " for listings (every item type must be populatable from canonical content fields)."
+                        }
+                      ]
+                    }
+                  ]
                 }
               ]
-            },
-            {
-              "text": " — which sub-blocks field's "
-            },
-            {
-              "type": "code",
-              "children": [
-                {
-                  "text": "allowedBlocks"
-                }
-              ]
-            },
-            {
-              "text": " to use for the choices. Auto-discovers if omitted. Set to "
-            },
-            {
-              "type": "code",
-              "children": [
-                {
-                  "text": "'..'"
-                }
-              ]
-            },
-            {
-              "text": " when the choices should come from the "
-            },
-            {
-              "type": "em",
-              "children": [
-                {
-                  "text": "enclosing parent's"
-                }
-              ]
-            },
-            {
-              "text": " "
-            },
-            {
-              "type": "code",
-              "children": [
-                {
-                  "text": "allowedSiblingTypes"
-                }
-              ]
-            },
-            {
-              "text": ".   - "
-            },
-            {
-              "type": "strong",
-              "children": [
-                {
-                  "text": "`filterConvertibleFrom`"
-                }
-              ]
-            },
-            {
-              "text": " — only offer types whose "
-            },
-            {
-              "type": "code",
-              "children": [
-                {
-                  "text": "fieldMappings"
-                }
-              ]
-            },
-            {
-              "text": " accept the named source. Typically "
-            },
-            {
-              "type": "code",
-              "children": [
-                {
-                  "text": "'@default'"
-                }
-              ]
-            },
-            {
-              "text": " for listings (every item type must be populatable from canonical content fields)."
             }
           ]
         }
@@ -4219,7 +4370,7 @@
       "p-7",
       "ce-8",
       "p-9",
-      "p-10",
+      "bq-10",
       "h-11",
       "p-12",
       "p-13",
@@ -4266,35 +4417,29 @@
       "p-54",
       "ul-55",
       "p-56",
-      "ul-57",
-      "p-58",
-      "ul-59",
+      "p-57",
+      "h-58",
+      "p-59",
       "p-60",
       "p-61",
-      "p-62",
-      "h-63",
-      "p-64",
-      "p-65",
+      "ce-62",
+      "p-63",
+      "ul-64",
+      "h-65",
       "p-66",
-      "ce-67",
-      "p-68",
-      "ul-69",
+      "p-67",
+      "ce-68",
+      "p-69",
       "h-70",
       "p-71",
-      "p-72",
-      "ce-73",
-      "p-74",
-      "h-75",
-      "p-76",
-      "ce-77",
-      "p-78",
-      "ol-79",
-      "p-80",
-      "ce-81",
-      "p-82",
-      "h-83",
-      "ul-84",
-      "p-85"
+      "ce-72",
+      "p-73",
+      "ol-74",
+      "p-75",
+      "ce-76",
+      "p-77",
+      "h-78",
+      "ul-79"
     ]
   }
 }
