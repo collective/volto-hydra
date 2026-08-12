@@ -216,6 +216,49 @@ export function slateToMd(value) {
   return mdSerializer.stringify(tree).trim();
 }
 
+
+/**
+ * Does this slate value survive a markdown round-trip?
+ *
+ * Not all valid slate can be written as markdown. An editor can produce
+ * adjacent emphasis nodes, a text leaf containing a bare "*", emphasis
+ * boundaries that no markdown delimiters can reproduce. Those are legal slate
+ * and the format must not lose them.
+ *
+ * So rather than enumerate markdown's limitations, the emitter CHECKS: if the
+ * prose does not come back identical, that block falls back to raw slate in
+ * the escape hatch. Losslessness becomes a property of the design instead of a
+ * statistic we measure afterwards.
+ */
+export function slateRoundTrips(value) {
+  try {
+    const md = slateToMd(value);
+    // Empty prose emits nothing, and nothing cannot be read back as a block.
+    if (!md.trim()) return false;
+    return JSON.stringify(semantic(mdToSlate(md))) === JSON.stringify(semantic(value));
+  } catch {
+    return false;
+  }
+}
+
+/** Comparison view: empty text leaves are normalisation noise, not content. */
+function semantic(v) {
+  if (Array.isArray(v)) return v.map(semantic).filter((x) => x !== undefined);
+  if (v && typeof v === 'object') {
+    const keys = Object.keys(v);
+    if (keys.length === 1 && keys[0] === 'text' && v.text === '') return undefined;
+    const out = {};
+    for (const k of keys.sort()) {
+      const r = semantic(v[k]);
+      // An empty children array and an absent one carry the same content;
+      // stored slate uses both for an empty paragraph.
+      if (r !== undefined && !(Array.isArray(r) && !r.length)) out[k] = r;
+    }
+    return out;
+  }
+  return v;
+}
+
 export function plaintextOf(v) {
   let s = '';
   const walk = (n) => {
@@ -238,21 +281,217 @@ function attrable(v) {
 }
 
 function fmtAttrs(o) {
-  return Object.entries(o).map(([k, v]) =>
-    typeof v === 'string' ? `${k}="${v}"` : `${k}=${v}`).join(' ');
+  return Object.entries(o).map(([k, v]) => {
+    if (v instanceof Ref) return `${k}=$${v.index != null ? `${v.index + 1}.` : ''}${v.part}`;
+    if (v instanceof Template) return `${k}="${v.text}"`;
+    return typeof v === 'string' ? `${k}="${v}"` : `${k}=${v}`;
+  }).join(' ');
 }
 
 const ATTR_RE = /([\w@.-]+)=(?:"([^"]*)"|(\S+))/g;
 
+/**
+ * An attribute value is a JSON scalar, or a reference into the block's body.
+ *
+ * Those two spaces do not overlap: `$src` is not a valid JSON token, so a
+ * reference can never be mistaken for data and a literal never needs escaping
+ * (`title="$5.00"` is quoted, therefore a string).
+ *
+ * Anything else is an error. It used to fall through to `out[k] = bare`, so a
+ * typo, a stray sigil, or syntax this reader predates all became plausible
+ * string data and nothing complained -- the same silent-partial-loss shape as
+ * the object_list bug that quietly dropped every codeExample's `code`.
+ */
 function parseAttrs(s) {
   const out = {};
   for (const [, k, quoted, bare] of (s || '').matchAll(ATTR_RE)) {
-    if (quoted !== undefined) out[k] = quoted;
+    if (quoted !== undefined) out[k] = isTemplate(quoted) ? new Template(quoted) : quoted;
     else if (bare === 'true' || bare === 'false') out[k] = bare === 'true';
+    else if (bare === 'null') out[k] = null;
     else if (/^-?\d+(\.\d+)?$/.test(bare)) out[k] = Number(bare);
-    else out[k] = bare;
+    else if (bare.startsWith('$')) out[k] = new Ref(bare.slice(1));
+    else {
+      throw new Error(
+        `Bad attribute value ${k}=${bare}: expected a quoted string, a number, `
+        + 'true/false/null, or a $reference.',
+      );
+    }
   }
   return out;
+}
+
+/**
+ * A quoted attribute carrying `${part}` interpolation.
+ *
+ * This is a distinct kind decided at PARSE time, not any string that happens
+ * to contain `${`. Source code in a fenced field is full of JS template
+ * literals; treating those as interpolation rewrote 11 codeExample blocks.
+ */
+class Template {
+  constructor(text) { this.text = text; }
+}
+
+/** A `$part` / `$N.part` reference, resolved against the body once it is read. */
+class Ref {
+  constructor(spec) {
+    const m = /^(?:(\d+)\.)?([A-Za-z]\w*)$/.exec(spec);
+    if (!m) throw new Error(`Bad reference $${spec}: expected $part or $N.part.`);
+    this.index = m[1] ? Number(m[1]) - 1 : null;
+    this.part = m[2];
+  }
+}
+
+
+// ------------------------------------------------- native markdown fields ---
+/**
+ * Some fields have a native markdown spelling: a heading block IS a heading, an
+ * image block IS an image. Writing them as attributes or fenced JSON is the
+ * format failing at its one job.
+ *
+ * The mapping is not built in per block type -- that would need this file to
+ * know every block that will ever exist. Instead the schema declares a role per
+ * field, and the DOCUMENT carries the mapping in its own attributes, so a
+ * reader needs no schema:
+ *
+ *     :::heading{uid="…" heading=$text tag="h${level}"}
+ *     ## Button Block
+ *     :::
+ *
+ * `$text` is a reference (bare, outside the JSON value space). `"h${level}"` is
+ * a quoted string with interpolation, which is how a level of 2 becomes "h2"
+ * without anything hardcoding the letter h.
+ */
+
+/** Split "h${level}" into literal and named segments. */
+function templateParts(t) {
+  const out = [];
+  let last = 0;
+  for (const m of t.matchAll(/\$\{([A-Za-z]\w*)\}/g)) {
+    out.push({ lit: t.slice(last, m.index) });
+    out.push({ name: m[1] });
+    last = m.index + m[0].length;
+  }
+  out.push({ lit: t.slice(last) });
+  return out;
+}
+
+const isTemplate = (v) => typeof v === 'string' && /\$\{[A-Za-z]\w*\}/.test(v);
+
+/** Forward: "h${level}" + {level: 2} -> "h2". */
+function render(t, parts) {
+  return t.replace(/\$\{([A-Za-z]\w*)\}/g, (_, n) => String(parts[n] ?? ''));
+}
+
+/**
+ * Backward: "h${level}" + "h2" -> {level: "2"}.
+ *
+ * Interpolation is not generally invertible ("${a}${b}" = "h2" has several
+ * solutions), so this is only ever used by the EMITTER, which then checks that
+ * rendering the result reproduces the stored value. The parser only runs
+ * forward.
+ */
+function invert(t, value) {
+  if (typeof value !== 'string') return null;
+  const parts = templateParts(t);
+  const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`^${parts.map((p) => ('name' in p ? '(.+?)' : esc(p.lit))).join('')}$`);
+  const m = re.exec(value);
+  if (!m) return null;
+  const out = {};
+  parts.filter((x) => 'name' in x).forEach((x, i) => { out[x.name] = m[i + 1]; });
+  return out;
+}
+
+/** Plain text of mdast inline nodes. */
+function mdText(nodes) {
+  return (nodes || []).map((n) => (n.value != null ? n.value : mdText(n.children))).join('');
+}
+
+/**
+ * The body's block-level constructs, each exposing named parts. This is the
+ * whole vocabulary a `$ref` can name -- it is tied to markdown's constructs,
+ * not to any block type, which is what keeps the mechanism generic.
+ */
+function constructsOf(md) {
+  return (mdParser.parse(md || '').children || []).map((n) => {
+    if (n.type === 'heading') return { text: mdText(n.children), level: n.depth };
+    if (n.type === 'paragraph') {
+      const kids = n.children || [];
+      const only = kids.length === 1 ? kids[0] : null;
+      if (only?.type === 'image') return { src: only.url, alt: only.alt || '' };
+      if (only?.type === 'link') return { text: mdText(only.children), href: only.url };
+      return { text: mdText(kids) };
+    }
+    return {};
+  });
+}
+
+/** `$part` searches the constructs in order; `$N.part` indexes one. */
+function lookup(constructs, ref) {
+  if (ref.index != null) return constructs[ref.index]?.[ref.part];
+  return constructs.find((c) => c[ref.part] !== undefined)?.[ref.part];
+}
+
+/** Resolve every reference and template in a block against its own body. */
+function resolveRefs(block, md) {
+  const constructs = constructsOf(md);
+  for (const [k, v] of Object.entries(block)) {
+    if (v instanceof Ref) block[k] = lookup(constructs, v);
+    else if (v instanceof Template) {
+      block[k] = v.text.replace(/\$\{([A-Za-z]\w*)\}/g,
+        (_, spec) => String(lookup(constructs, new Ref(spec)) ?? ''));
+    }
+  }
+}
+
+/** Build the markdown for a construct from its parts. */
+function renderConstruct(kind, parts) {
+  if (kind === 'heading') {
+    const level = Math.min(6, Math.max(1, Number(parts.level) || 2));
+    return `${'#'.repeat(level)} ${parts.text}`;
+  }
+  if (kind === 'image') return `![${parts.alt ?? ''}](${parts.src})`;
+  if (kind === 'link') return `[${parts.text}](${parts.href})`;
+  return parts.text ?? '';
+}
+
+/**
+ * Lift a block's mapped fields into the body, returning the markdown and the
+ * attribute values that replace them -- or null when it would not survive the
+ * round trip, in which case the caller leaves the fields as ordinary attrs.
+ */
+function nativeBody(type, b, roles) {
+  const role = roles?.[type];
+  if (!role) return null;
+  const parts = {}, attrs = {};
+  for (const [field, spec] of Object.entries(role.fields)) {
+    const v = b[field];
+    if (v == null || v === '') continue;
+    if (isTemplate(spec)) {
+      const got = invert(spec, v);
+      if (!got || render(spec, got) !== v) return null;
+      Object.assign(parts, got);
+    } else if (typeof spec === 'string' && spec.startsWith('$')) {
+      if (typeof v !== 'string') return null;
+      parts[spec.slice(1)] = v;
+    } else return null;
+    attrs[field] = spec;
+  }
+  if (parts.text === undefined && parts.src === undefined) return null;
+  const md = renderConstruct(role.construct, parts);
+
+  // Same contract as slate: check, do not assume. A value the construct cannot
+  // carry (a heading whose text ends in a space) keeps its literal attribute
+  // rather than being silently rewritten.
+  const back = {};
+  for (const [field, spec] of Object.entries(attrs)) {
+    const c = constructsOf(md);
+    back[field] = isTemplate(spec)
+      ? spec.replace(/\$\{([A-Za-z]\w*)\}/g, (_, n) => String(lookup(c, new Ref(n)) ?? ''))
+      : lookup(c, new Ref(spec.slice(1)));
+  }
+  if (Object.entries(back).some(([f, v]) => v !== b[f])) return null;
+  return { md, attrs };
 }
 
 // -------------------------------------------------------------- emitting ---
@@ -262,17 +501,25 @@ function childFields(schema, type) {
     .map(([f]) => f);
 }
 
+
 function blockToMd(uid, b, schema, depth = 0) {
   const type = b['@type'];
   const kidFields = childFields(schema, type);
   const skip = new Set([...RESERVED, ...kidFields]);
+  const native = nativeBody(type, b, schema?._markdown);
+  if (native) for (const f of Object.keys(native.attrs)) skip.add(f);
   const attrs = {}, complex = {};
   for (const [k, v] of Object.entries(b)) {
     if (skip.has(k)) continue;
     (attrable(v) ? attrs : complex)[k] = v;
   }
 
-  const lines = [`:::${type}{${fmtAttrs({ uid, ...attrs })}}`];
+  const refAttrs = {};
+  if (native) for (const [f, spec] of Object.entries(native.attrs)) {
+    refAttrs[f] = spec.startsWith('$') && !isTemplate(spec)
+      ? new Ref(spec.slice(1)) : new Template(spec);
+  }
+  const lines = [`:::${type}{${fmtAttrs({ uid, ...attrs, ...refAttrs })}}`];
 
   // A multi-line STRING is prose or source code — the things markdown exists
   // for. Emitting it as a JSON one-liner (which is what a generic escape hatch
@@ -289,7 +536,11 @@ function blockToMd(uid, b, schema, depth = 0) {
   for (const [k, v] of Object.entries(fenced)) {
     lines.push(openFence(v, k, attrs.language), v, closeFence(v));
   }
-  if ((type === 'slate' || type === 'introduction') && b.value) lines.push(slateToMd(b.value));
+  if (native) lines.push(native.md);
+  if ((type === 'slate' || type === 'introduction') && b.value) {
+    if (slateRoundTrips(b.value)) lines.push(slateToMd(b.value));
+    else lines.push('```field-json:value', JSON.stringify(b.value, null, 1), '```');
+  }
 
   for (const f of kidFields) {
     if (!Array.isArray(b[f])) continue;
@@ -352,7 +603,7 @@ export function pageToMd(page, schema = {}) {
     // Bare markdown only when there IS prose: an empty paragraph serialises to
     // an empty string and would silently disappear from the document.
     if (b['@type'] === 'slate' && !extra.length && (b.value || []).length === 1
-        && slateToMd(b.value).trim()) {
+        && slateToMd(b.value).trim() && slateRoundTrips(b.value)) {
       return slateToMd(b.value);
     }
     return blockToMd(uid, b, schema);
@@ -444,12 +695,31 @@ export function mdToPage(md, schema = {}) {
         // blockToMd synthesises a type from the field name (tabs -> tab) for
         // items that have none; drop it again so the item matches storage.
         if (region && block['@type'] === singular(region)) delete block['@type'];
-        if ((block['@type'] === 'slate' || block['@type'] === 'introduction') && block._md) {
+        const hadRaw = block._rawValue; delete block._rawValue;
+        const isProse = block['@type'] === 'slate' || block['@type'] === 'introduction';
+        if (!hadRaw && isProse && block._md) {
           block.value = mdToSlate(block._md.trim());
           block.plaintext = plaintextOf(block.value);
         }
+        if (hadRaw && block.value) block.plaintext = plaintextOf(block.value);
+        // Fields written in their native markdown are read back out of the
+        // body. The document says where each one goes, so this needs no
+        // schema and knows no block types.
+        if (!isProse) resolveRefs(block, block._md || '');
         delete block._md;
       }
+      continue;
+    }
+
+    const jsonFence = /^(`{3,})field-json:([\w.-]+)\s*$/.exec(line);
+    if (jsonFence && stack.length) {
+      const close = jsonFence[1];
+      const chunk = [];
+      let j = i + 1;
+      while (j < lines.length && lines[j].trim() !== close) chunk.push(lines[j++]);
+      stack[stack.length - 1].block[jsonFence[2]] = JSON.parse(chunk.join('\n'));
+      stack[stack.length - 1].block._rawValue = true;
+      i = j;
       continue;
     }
 

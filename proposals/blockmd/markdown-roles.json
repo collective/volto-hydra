@@ -1,0 +1,5 @@
+{
+  "_comment": "Which fields have a native markdown spelling. Belongs in the block schema next to `widget` -- it lives here while the shape is settled. The value is literally what gets written in the attribute, so the role IS the mapping: `$text` takes the construct's text, `h${level}` composes its level.",
+  "heading": { "construct": "heading", "fields": { "heading": "$text", "tag": "h${level}" } },
+  "image":   { "construct": "image",   "fields": { "url": "$src", "alt": "$alt" } }
+}

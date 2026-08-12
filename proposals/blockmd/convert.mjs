@@ -24,6 +24,10 @@ const CHECK = process.argv.includes('--check');
 
 const schema = existsSync(join(HERE, 'schemas.json'))
   ? JSON.parse(readFileSync(join(HERE, 'schemas.json'), 'utf8')) : {};
+// Which fields have a native markdown spelling. Belongs alongside `widget` in
+// the block schema; kept separate while the shape is being settled.
+schema._markdown = existsSync(join(HERE, 'markdown-roles.json'))
+  ? JSON.parse(readFileSync(join(HERE, 'markdown-roles.json'), 'utf8')) : {};
 
 function walk(dir, hits = []) {
   if (!existsSync(dir)) return hits;

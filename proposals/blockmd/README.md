@@ -13,7 +13,7 @@ node convert.mjs --check   # report only
 |---|---|
 | page metadata | **74 / 74 — 100%** |
 | block order | **74 / 74 — 100%** |
-| blocks (semantic) | **1545 / 1546** |
+| blocks (semantic) | **1494 / 1494 — 100%** |
 
 The round-trip writes each file to disk and parses **that file back**, not the
 in-memory string — comparing a string against itself only proves the functions
@@ -85,12 +85,68 @@ Plain prose is a slate block. No wrapper.
 | scalar field, single line, ≤200 chars | `{key="value"}` attr |
 | multi-line string | ` ```field:name lang ` fenced block |
 | object/array field | ` ```fields ` JSON escape hatch |
+| slate with no markdown form | ` ```field-json:value ` — emitter-verified |
+| field with a native spelling | `$ref` into the body (see below) |
 | nested `blocks` | nested `:::`, `::::region` for named regions |
 | `object_list` field | `::::field` containing `:::item` — **needs the schema** |
 | `plaintext` | derived, never authored |
 
 Multi-line strings get a fence long enough to contain any backtick run inside
 them, so a code sample containing ``` still round-trips.
+
+## Fields that are markdown
+
+A heading block IS a heading; an image block IS an image. Writing them as
+attributes or fenced JSON is the format failing at its one job:
+
+```markdown
+:::heading{uid="a0e70eab…" alignment="left" heading=$text tag="h${level}"}
+## Button Block
+:::
+
+:::image{uid="img-14" align="center" size="l" url=$src alt=$alt}
+![Frontend switcher panel — Viewport section…](/docs/images/frontend-switcher)
+:::
+```
+
+**The document carries its own mapping**, so a reader needs no schema. That is
+what lets the mock API serve markdown directly.
+
+An attribute value is a JSON scalar *or* a reference — two spaces that cannot
+overlap, because `$src` is not a valid JSON token:
+
+| form | meaning |
+|---|---|
+| `title="…"` | string literal, always — `title="$5.00"` needs no escape |
+| `n=3` `ok=true` `x=null` | that JSON value |
+| `url=$src` | reference: the construct's part, type preserved |
+| `tag="h${level}"` | interpolation: composes a string, so nothing hardcodes the `h` |
+| anything else bare | **error** — it used to become a string, silently |
+
+`$part` searches the body's constructs in order; `$N.part` indexes one. The
+part vocabulary belongs to markdown, not to any block type — which is what
+keeps this generic:
+
+| construct | parts |
+|---|---|
+| `## text` | `text`, `level` |
+| `![alt](src)` | `src`, `alt` |
+| `[label](target)` | `text`, `href` |
+| paragraph | `text` |
+
+Interpolation is not invertible in general (`"${a}${b}"` = `"h2"` has several
+solutions), so only the *emitter* runs it backwards, and it checks the result
+reproduces the stored value. The parser only runs forward. A value the
+construct cannot carry — one heading's text ends in a space — keeps its literal
+attribute instead of being quietly rewritten.
+
+A `Template` is a kind decided where it appears, never inferred from a string's
+contents: source code in a fenced field is full of JS template literals, and
+treating those as interpolation rewrote 11 codeExample blocks.
+
+`markdown-roles.json` says which fields have a native spelling. It belongs in
+the block schema beside `widget`; it is separate while the shape settles. No
+block type is named anywhere in `blockmd.mjs`.
 
 ## Why the schema is needed
 
@@ -110,17 +166,47 @@ agent being able to author `:::accordion` with `:::panel` children.
 `shared-block-schemas.js` is incomplete: `teaser.href`, `search.facets` and
 `socialLinks.links` are absent, so they fall back to the hatch.
 
-## The one block that doesn't round-trip
+## Not all valid slate is expressible in markdown
 
-`docs/architecture` `ol-26` has two `em` nodes separated only by unspaced text.
-That serialises to `*a*outside* the template*`, which no markdown parser can
-read back unambiguously — emphasis and strong share the `*` delimiter and there
-is nothing to disambiguate against. Switching emphasis to `_` fixes this case
-and breaks a worse one (remark emits a broken `&#xNAN;` character reference when
-a paragraph *starts* with emphasis), so `*` stays.
+Slate is the larger language. An editor can legally produce two adjacent `em`
+nodes with no gap, a text leaf containing a bare `*`, an emphasis boundary
+falling mid-word — structures with no markdown spelling, or whose only spelling
+reads back as something else. `docs/architecture` `ol-26` is a real example:
 
-Fixable by editing that sentence to put a space around the emphasis. Not worth
-special-casing in the parser.
+```json
+{"text": ", and in *"},
+{"type": "em", "children": [{"text": "template edit mode only when…"}]},
+{"text": "outside"},
+{"type": "em", "children": [{"text": " the template"}]}
+```
+
+That is well-formed slate. It is not writable in markdown.
+
+The format does not try to enumerate these cases — that list is unbounded and
+any omission is silent data loss. Instead **the emitter checks its own work**:
+
+```js
+slateRoundTrips(value)   // slateToMd -> mdToSlate -> compare
+```
+
+Prose that survives is written as markdown. Prose that doesn't falls back to
+` ```field-json:value `, carrying the slate verbatim. Losslessness is therefore
+a property of the design, not a number we measured and hope holds on the next
+document.
+
+**15 of 1546 blocks (1%) take the fallback** — 14 empty paragraphs (nothing
+cannot be read back as a block) and `ol-26`. The other 99% stay readable
+markdown.
+
+An earlier version of this note blamed `ol-26` on `*` being ambiguous between
+emphasis and strong. That was wrong: remark disambiguates correctly using
+character references (`*inside*outsid&#x65;*&#x20;the template*` reparses
+exactly). The real reason is simply that this slate has no markdown form.
+
+Separately, that slate does not match its source — `docs/architecture.md:83`
+has well-formed nested emphasis, so `sync.mjs` flattened it on the way in.
+Worth fixing at source, but *independent* of the format: the format's job is to
+carry whatever slate it is handed, however it got there.
 
 ## Content normalised to get here
 

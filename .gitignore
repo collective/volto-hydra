@@ -48,3 +48,8 @@ packages/hydra-js/hydra.js.map
 docs/examples/_images/
 *.mp4
 *.webm
+
+# blockmd prototype output — regenerate with `node proposals/blockmd/convert.mjs`
+# and `node proposals/blockmd/export-tree.mjs`
+proposals/blockmd/out/
+proposals/blockmd/tree/
