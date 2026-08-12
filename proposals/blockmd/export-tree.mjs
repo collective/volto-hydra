@@ -29,14 +29,61 @@ import { pageToMd, AUTHORED, IDENTITY } from './blockmd.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const INKA = resolve(HERE, '../..');
-const SRC = resolve(INKA, 'docs/content/content/content');
+const SITE = resolve(INKA, '..');
+
+/**
+ * The trees to convert. `toc` is the authored Sphinx source whose {toctree}
+ * gives sibling order; the site tree is authored as JSON and has none, so its
+ * order comes from its own __metadata__.json.
+ */
+const TREES = {
+  docs: {
+    src: resolve(INKA, 'docs/content/content/content'),
+    out: resolve(INKA, 'docs/content-md'),
+    toc: { root: resolve(INKA, 'docs'), mount: '/docs' },
+  },
+  site: {
+    src: resolve(SITE, 'content/content'),
+    out: resolve(SITE, 'content-md'),
+    toc: null,
+  },
+};
+
+const which = process.argv.find((a) => TREES[a]) ?? null;
 const outArg = process.argv.indexOf('--out');
-const OUT = outArg > -1 ? resolve(process.argv[outArg + 1]) : join(HERE, 'tree');
 
 const schema = existsSync(join(HERE, 'schemas.json'))
   ? JSON.parse(readFileSync(join(HERE, 'schemas.json'), 'utf8')) : {};
 schema._markdown = existsSync(join(HERE, 'markdown-roles.json'))
   ? JSON.parse(readFileSync(join(HERE, 'markdown-roles.json'), 'utf8')) : {};
+
+/**
+ * Sibling order, from the authored {toctree}.
+ *
+ * This is the only place order is authored. __metadata__.json's `ordering` is
+ * a lossy derivation of it -- children with no position at all, and colliding
+ * positions -- so it is read from the source rather than carried forward.
+ *
+ * The exported index.md's body is generated from the page's blocks, so a
+ * toctree written into it would parse back as a code-fence block. The toctree
+ * is therefore the SOURCE of order; the exported tree RECORDS it in the
+ * folder's frontmatter.
+ */
+function toctreeOrder(toc, contentPath) {
+  if (!toc) return null;
+  const rel = contentPath === toc.mount ? '' : contentPath.replace(`${toc.mount}/`, '');
+  for (const name of ['index.md', 'README.md']) {
+    const f = join(toc.root, rel, name);
+    if (!existsSync(f)) continue;
+    const m = /```\{toctree\}([\s\S]*?)```/.exec(readFileSync(f, 'utf8'));
+    if (!m) return null;
+    return m[1].split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith(':'))
+      .map((l) => l.replace(/.*<(.*)>/, '$1').split('/')[0]);
+  }
+  return null;
+}
 
 function walk(dir, hits = []) {
   if (!existsSync(dir)) return hits;
@@ -48,7 +95,8 @@ function walk(dir, hits = []) {
   return hits;
 }
 
-// ---------------------------------------------------------------- load ----
+function exportTree(name, { src: SRC, out: OUT, toc }) {
+  // ------------------------------------------------------------- load ----
 const items = [];
 for (const f of walk(SRC)) {
   let d;
@@ -85,7 +133,7 @@ if (existsSync(OUT)) rmSync(OUT, { recursive: true, force: true });
 
 // Blob metadata, grouped by the folder whose index.md will carry it.
 const blobsByFolder = new Map();  // folder @id -> blob entries
-let pages = 0, blobs = 0, skipped = [];
+let pages = 0, blobs = 0; const skipped = [];
 
 for (const { data, dir } of items) {
   const id = canon(data['@id']);
@@ -140,28 +188,54 @@ for (const { data, dir } of items) {
   pages++;
 }
 
-// --- fold blob identity into each folder's index.md frontmatter
-for (const [folderId, entries] of blobsByFolder) {
+// --- folder-level facts: which blobs it holds, and what order its children go
+// in. Both belong to the FOLDER rather than to any child, so both live in the
+// folder's own frontmatter.
+const childrenOf = new Map();
+for (const { data } of items) {
+  const pid = canon((data.parent || {})['@id'] ?? '');
+  if (!pid || !data.id) continue;
+  if (!childrenOf.has(pid)) childrenOf.set(pid, []);
+  childrenOf.get(pid).push(data.id);
+}
+
+for (const folderId of new Set([...blobsByFolder.keys(), ...childrenOf.keys()])) {
   const target = join(OUT, pathFor(folderId, true));
   if (!existsSync(target)) {
-    // A folder with blobs but no page of its own still needs somewhere to
-    // record them. Fail loudly rather than invent one silently.
-    skipped.push(`${folderId}: has ${entries.length} blob(s) but no index.md`);
+    // A folder with children but no page of its own has nowhere to record
+    // them. Fail loudly rather than invent a home silently.
+    skipped.push(`${folderId}: has children but no index.md`);
     continue;
   }
   const text = readFileSync(target, 'utf8');
   const m = /^---\n([\s\S]*?)\n---\n?/.exec(text);
   const front = m ? YAML.parse(m[1]) ?? {} : {};
-  front.blobs = entries;
-  const body = m ? text.slice(m[0].length) : text;
-  writeFileSync(target, `---\n${YAML.stringify(front).trim()}\n---\n${body ? `\n${body.replace(/^\n+/, '')}` : ''}`);
+
+  const listed = toctreeOrder(toc, folderId);
+  const present = childrenOf.get(folderId) ?? [];
+  if (listed) {
+    // Anything the toctree does not name keeps document order after it,
+    // rather than being dropped or silently sorted.
+    const known = listed.filter((id) => present.includes(id));
+    front.order = [...known, ...present.filter((id) => !known.includes(id))];
+  } else if (present.length > 1) {
+    front.order = present;
+  }
+  if (blobsByFolder.has(folderId)) front.blobs = blobsByFolder.get(folderId);
+
+  const rest = m ? text.slice(m[0].length) : text;
+  writeFileSync(target, `---\n${YAML.stringify(front).trim()}\n---\n${rest ? `\n${rest.replace(/^\n+/, '')}` : ''}`);
 }
 
-console.log(`pages   : ${pages}`);
-console.log(`blobs   : ${blobs}`);
-console.log(`folders carrying blob metadata: ${blobsByFolder.size}`);
-if (skipped.length) {
-  console.log(`\nnot exported (${skipped.length}):`);
-  for (const s of skipped) console.log(`  ${s}`);
+  console.log(`${name}: ${pages} pages, ${blobs} blobs -> ${OUT}`);
+  if (skipped.length) {
+    console.log(`  not exported (${skipped.length}):`);
+    for (const x of skipped) console.log(`    ${x}`);
+  }
 }
-console.log(`\nwritten to ${OUT}`);
+
+for (const [name, cfg] of Object.entries(TREES)) {
+  if (which && which !== name) continue;
+  const out = outArg > -1 ? resolve(process.argv[outArg + 1]) : cfg.out;
+  exportTree(name, { ...cfg, out });
+}

@@ -17,13 +17,17 @@ import { mdToPage } from './blockmd.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const INKA = resolve(HERE, '../..');
-const TREE = join(HERE, 'tree');
-const SRC = resolve(INKA, 'docs/content/content/content');
+const SITE = resolve(INKA, '..');
 
-const schema = existsSync(join(HERE, 'schemas.json'))
-  ? JSON.parse(readFileSync(join(HERE, 'schemas.json'), 'utf8')) : {};
-schema._markdown = existsSync(join(HERE, 'markdown-roles.json'))
-  ? JSON.parse(readFileSync(join(HERE, 'markdown-roles.json'), 'utf8')) : {};
+// Both trees, each with the JSON it must agree with.
+const TREES = {
+  docs: { tree: resolve(INKA, 'docs/content-md'), src: resolve(INKA, 'docs/content/content/content') },
+  site: { tree: resolve(SITE, 'content-md'),      src: resolve(SITE, 'content/content') },
+};
+const which = process.argv.find((a) => TREES[a]) ?? null;
+
+// Deliberately no schema: the markdown says which containers hold field items
+// and which fields each construct fills, so reading it needs nothing.
 
 // ------------------------------------------------------- blob metadata ----
 const MIME = {
@@ -81,19 +85,24 @@ function walk(dir, hits = []) {
 }
 
 /** file path in the tree -> content @id */
-function idFor(file) {
+function idFor(TREE, file) {
   const rel = relative(TREE, file).replace(/\\/g, '/');
   if (rel === 'index.md') return '/';
   return `/${rel.replace(/\/index\.md$/, '').replace(/\.md$/, '')}`;
 }
 
+/** Read one markdown tree into content items keyed by @id. */
+function readTree(TREE) {
 const items = new Map();
+const order = new Map();       // folder @id -> child ids, in order
 for (const file of walk(TREE)) {
   if (!file.endsWith('.md')) continue;
   const text = readFileSync(file, 'utf8');
   const page = mdToPage(text);
-  const id = idFor(file);
+  const id = idFor(TREE, file);
   page['@id'] = id;
+  // `order:` and `blobs:` are facts about the FOLDER, not content of the page.
+  if (page.order) { order.set(id, page.order); delete page.order; }
   items.set(id, page);
 
   // `contents:` names the blobs this folder holds. Everything else about them
@@ -123,12 +132,11 @@ for (const file of walk(TREE)) {
   }
   delete page.blobs;
 }
+return { items, order };
+}
 
 // --------------------------------------------------------------- diff ----
-if (!process.argv.includes('--diff')) {
-  console.log(`read ${items.size} items from ${TREE}`);
-  process.exit(0);
-}
+
 
 function walkSrc(dir, hits = []) {
   for (const name of readdirSync(dir)) {
@@ -138,37 +146,53 @@ function walkSrc(dir, hits = []) {
   }
   return hits;
 }
-const src = new Map();
-let ROOT_ID = null;
-for (const f of walkSrc(SRC)) {
-  const d = JSON.parse(readFileSync(f, 'utf8'));
-  if (d['@type'] === 'Plone Site') ROOT_ID = d['@id'];
-  src.set(d['@id'], d);
-}
-if (ROOT_ID && src.has(ROOT_ID)) { src.set('/', src.get(ROOT_ID)); src.delete(ROOT_ID); }
+const BLOB_KEYS = ['UID', 'id', 'title', 'description', 'rights', 'exclude_from_nav'];
 
-const IMAGE_KEYS = ['UID', 'id', 'title', 'description', 'rights', 'exclude_from_nav'];
-let ok = 0, bad = [];
-for (const [id, want] of src) {
-  const got = items.get(id);
-  if (!got) { bad.push(`${id}: missing from the tree`); continue; }
-  if (BLOB_FIELD[want['@type']]) {
-    const diffs = IMAGE_KEYS.filter((k) => JSON.stringify(want[k]) !== JSON.stringify(got[k]));
-    for (const k of ['filename', 'content-type', 'size', 'width', 'height']) {
-      const f = BLOB_FIELD[want['@type']];
-      if (JSON.stringify(want[f]?.[k]) !== JSON.stringify(got[f]?.[k])) diffs.push(`${f}.${k}`);
+/** Compare one tree against the JSON the frontend would have been served. */
+function diffTree(name, { tree, src: SRC }) {
+  const { items } = readTree(tree);
+  const src = new Map();
+  let ROOT_ID = null;
+  for (const f of walkSrc(SRC)) {
+    const d = JSON.parse(readFileSync(f, 'utf8'));
+    if (d['@type'] === 'Plone Site') ROOT_ID = d['@id'];
+    src.set(d['@id'], d);
+  }
+  if (ROOT_ID && src.has(ROOT_ID)) { src.set('/', src.get(ROOT_ID)); src.delete(ROOT_ID); }
+
+  let ok = 0;
+  const bad = [];
+  for (const [id, want] of src) {
+    const got = items.get(id);
+    if (!got) { bad.push(`${id}: missing from the tree`); continue; }
+    const field = BLOB_FIELD[want['@type']];
+    if (field) {
+      const diffs = BLOB_KEYS.filter((k) => JSON.stringify(want[k]) !== JSON.stringify(got[k]));
+      for (const k of ['filename', 'content-type', 'size', 'width', 'height']) {
+        if (JSON.stringify(want[field]?.[k]) !== JSON.stringify(got[field]?.[k])) diffs.push(`${field}.${k}`);
+      }
+      if (diffs.length) bad.push(`${id}: ${diffs.join(', ')}`);
+      else ok++;
+      continue;
     }
-    if (diffs.length) bad.push(`${id}: ${diffs.join(', ')}`);
-    else ok++;
+    ok++;
+  }
+  console.log(`${name}: ${ok}/${src.size} items match (${items.size} read from markdown)`);
+  for (const b of bad.slice(0, 10)) console.log(`    ${b}`);
+  if (bad.length > 10) console.log(`    …and ${bad.length - 10} more`);
+  return bad.length;
+}
+
+let failures = 0;
+for (const [name, cfg] of Object.entries(TREES)) {
+  if (which && which !== name) continue;
+  if (!existsSync(cfg.tree)) {
+    console.log(`${name}: no markdown tree at ${cfg.tree} — run export-tree.mjs`);
+    failures++;
     continue;
   }
-  ok++;
+  failures += process.argv.includes('--diff')
+    ? diffTree(name, cfg)
+    : (console.log(`${name}: read ${readTree(cfg.tree).items.size} items`), 0);
 }
-console.log(`items in tree : ${items.size}`);
-console.log(`items in JSON : ${src.size}`);
-console.log(`matched       : ${ok}`);
-if (bad.length) {
-  console.log(`\nmismatches (${bad.length}):`);
-  for (const b of bad.slice(0, 12)) console.log(`  ${b}`);
-}
-process.exit(bad.length ? 1 : 0);
+process.exit(failures ? 1 : 0);

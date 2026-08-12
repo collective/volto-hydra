@@ -49,6 +49,13 @@ jobs:
         # Nothing verified that it matched, so a markdown edit without a
         # re-sync shipped stale content to the site.
         run: pnpm sync:docs:check
+      - name: Check the markdown tree agrees with the content JSON
+        # Both formats are committed while the markdown is being adopted, so
+        # something has to hold them together. This reconstructs every content
+        # item from the markdown and compares it against the JSON the frontend
+        # would be served -- not a file diff, which would pass on output that
+        # no longer loads.
+        run: pnpm check:content-md
       - name: Run mock-api unit tests (node:test)
         # Plone 6.2 fidelity coverage (@aliases, SearchableText prefix
         # match, navigation, folder ordering). Was not previously wired
