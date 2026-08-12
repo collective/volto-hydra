@@ -71,14 +71,31 @@ function inlineToSlate(nodes) {
         out.push({ type: 'link', data: { url: n.url }, children: inlineToSlate(n.children) });
         break;
       case 'break':
-        out.push({ text: '\n' });
+        // Inverse of the hard-break emit: fold back into the previous leaf so
+        // the text node matches what was stored.
+        if (out.length && out[out.length - 1].text !== undefined && !out[out.length - 1].type) {
+          out[out.length - 1].text += '\n';
+        } else {
+          out.push({ text: '\n' });
+        }
         break;
       default:
         if (n.children) out.push(...inlineToSlate(n.children));
         else if (n.value != null) out.push({ text: String(n.value) });
     }
   }
-  return out.length ? out : [{ text: '' }];
+  // Merge adjacent plain leaves. Folding hard breaks back into text produces
+  // several leaves where storage had one, which is semantically identical but
+  // does not compare equal.
+  const merged = [];
+  for (const n of out) {
+    const prev = merged[merged.length - 1];
+    if (prev && prev.text !== undefined && !prev.type && n.text !== undefined && !n.type
+        && Object.keys(prev).length === 1 && Object.keys(n).length === 1) {
+      prev.text += n.text;
+    } else merged.push(n);
+  }
+  return merged.length ? merged : [{ text: '' }];
 }
 
 function listToSlate(node) {
@@ -130,6 +147,20 @@ function slateInlineToMdast(nodes) {
   const out = [];
   for (const n of nodes || []) {
     if (n.text !== undefined && !n.type) {
+      // A newline inside a text leaf would reparse as a paragraph break.
+      // markdown's hard break keeps it inside the same node.
+      if (n.text.includes('\n') && !n.code) {
+        const parts = n.text.split('\n');
+        // Drop a trailing empty part: a newline at the very end of a paragraph
+        // carries no meaning and would serialise to a dangling "\" that
+        // reparses as a literal backslash.
+        while (parts.length > 1 && parts[parts.length - 1] === '') parts.pop();
+        parts.forEach((part, idx) => {
+          if (idx) out.push({ type: 'break' });
+          if (part) out.push({ type: 'text', value: part });
+        });
+        continue;
+      }
       let node = { type: 'text', value: n.text };
       // Marks nest outward; order is fixed so serialisation is stable.
       for (const [mdType, slateKey] of Object.entries(MARK_KEYS)) {
@@ -139,6 +170,10 @@ function slateInlineToMdast(nodes) {
       out.push(node);
       continue;
     }
+    // An inline element with no content serialises to a bare "**" or "*",
+    // which markdown reads back as literal asterisks. Stored content contains
+    // several of these (empty strong/em left behind by editing).
+    if (n.children && !plaintextOf(n.children) && n.type !== 'link' && n.type !== 'a') continue;
     switch (n.type) {
       case 'strong': case 'b':
         out.push({ type: 'strong', children: slateInlineToMdast(n.children) }); break;
@@ -261,7 +296,11 @@ function blockToMd(uid, b, schema, depth = 0) {
     lines.push(`::::${f}`);
     for (const item of b[f]) {
       if (item && typeof item === 'object') {
-        lines.push(blockToMd(item['@id'] ?? '', { ...item, '@type': item['@type'] ?? singular(f) }, schema, depth + 1));
+        // form.subblocks items have no @id; inventing "" adds a field that
+        // was never there.
+        const itemId = item['@id'] ?? '';
+        const emitted = blockToMd(itemId, { ...item, '@type': item['@type'] ?? singular(f) }, schema, depth + 1);
+        lines.push(itemId ? emitted : emitted.replace(/^(:::[\w-]+\{)uid="" ?/, '$1'));
       }
     }
     lines.push('::::');
@@ -361,6 +400,7 @@ export function mdToPage(md, schema = {}) {
       flushProse();
       const type = open[2];
       const attrs = parseAttrs(open[3]);
+      const attrsHadUid = attrs.uid !== undefined;
       const uid = attrs.uid ?? `${type}-${Object.keys(blocks).length}`;
       delete attrs.uid;
       const block = { '@type': type, ...attrs };
@@ -370,7 +410,7 @@ export function mdToPage(md, schema = {}) {
           // Push the SAME object that goes on the stack, never a copy: later
           // ```fields updates mutate the stack entry, and a copy loses them
           // silently (this is how every codeExample lost its `code`).
-          block['@id'] = uid;
+          if (attrsHadUid) block['@id'] = uid;
           block._objlist = parent.region;
           (parent.block[parent.region] ||= []).push(block);
         } else {

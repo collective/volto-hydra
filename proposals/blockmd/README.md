@@ -13,7 +13,11 @@ node convert.mjs --check   # report only
 |---|---|
 | page metadata | **74 / 74 — 100%** |
 | block order | **74 / 74 — 100%** |
-| blocks (semantic) | **1538 / 1546 — 99%** |
+| blocks (semantic) | **1545 / 1546** |
+
+The round-trip writes each file to disk and parses **that file back**, not the
+in-memory string — comparing a string against itself only proves the functions
+compose.
 
 Semantic = ignoring empty text leaves and the derived `plaintext`; see
 `../blockmd-prototype/FINDINGS.md` for why byte-equality is the wrong bar
@@ -106,15 +110,34 @@ agent being able to author `:::accordion` with `:::panel` children.
 `shared-block-schemas.js` is incomplete: `teaser.href`, `search.facets` and
 `socialLinks.links` are absent, so they fall back to the hatch.
 
-## The 8 blocks that don't round-trip
+## The one block that doesn't round-trip
 
-Not format limits — data quirks, each worth fixing at source:
+`docs/architecture` `ol-26` has two `em` nodes separated only by unspaced text.
+That serialises to `*a*outside* the template*`, which no markdown parser can
+read back unambiguously — emphasis and strong share the `*` delimiter and there
+is nothing to disambiguate against. Switching emphasis to `_` fixes this case
+and breaks a worse one (remark emits a broken `&#xNAN;` character reference when
+a paragraph *starts* with emphasis), so `*` stays.
 
-- **`<https://…>` in body text.** GFM reads it back as an autolink. The content
-  should use a real link node or escape the angle brackets.
-- **Nested lists.** A `li` containing a sub-list flattens.
-- **`a` vs `link`.** 110 `link` nodes and 2 `a` for the same concept.
-- **`form`** has a field ordering the escape hatch normalises.
+Fixable by editing that sentence to put a space around the emphasis. Not worth
+special-casing in the parser.
+
+## Content normalised to get here
+
+`normalise-content.mjs` fixed genuine editing debris — these were data quirks,
+not format limits, and each is worth fixing at source regardless of markdown:
+
+- **2 `{"type":"a"}` link nodes** where the other 110 use `"link"`.
+- **2 empty inline nodes** — an `<em>` or `<strong>` containing no text, which
+  renders nothing and serialises to stray asterisks.
+- **1 trailing newline** inside a text leaf at the end of a paragraph. Markdown
+  cannot express it and it renders as nothing.
+
+One content edit: `docs/index.md` said `Open <https://hydra.pretagov.com>`,
+which remark-gfm reads back as an autolink. It is now a proper markdown link,
+which it should have been anyway. Note remark-stringify *does* escape the angle
+bracket correctly (`\<https\://…`) — gfm's autolink-literal extension matches
+the URL regardless, so escaping is not a fix.
 
 ## What this does not do yet
 

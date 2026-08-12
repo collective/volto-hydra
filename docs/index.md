@@ -44,7 +44,7 @@ examples/README
 
 The fastest way to feel what Inka does is to log into the hosted demo and edit a real page against a real frontend.
 
-Open <https://hydra.pretagov.com>, log in, then:
+Open [hydra.pretagov.com](https://hydra.pretagov.com), log in, then:
 
 - Open user preferences (bottom-left).
 - Pick one of the preset frontends, or paste in your own frontend URL.

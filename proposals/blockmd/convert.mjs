@@ -78,14 +78,20 @@ for (const root of [SITE, DOCS]) {
     pages++;
 
     const md = pageToMd(page, schema);
-    const back = mdToPage(md, schema);
 
-    if (!CHECK) {
-      const rel = relative(root, dirname(file));
-      const dest = join(OUT, root === SITE ? 'site' : 'docs', `${rel || 'root'}.md`);
-      mkdirSync(dirname(dest), { recursive: true });
-      writeFileSync(dest, md);
+    // Write, then read the file back off disk and parse THAT. Comparing the
+    // in-memory string against itself only proves the functions compose; it
+    // says nothing about what actually landed in the file.
+    const rel = relative(root, dirname(file));
+    const dest = join(OUT, root === SITE ? 'site' : 'docs', `${rel || 'root'}.md`);
+    mkdirSync(dirname(dest), { recursive: true });
+    writeFileSync(dest, md);
+    const onDisk = readFileSync(dest, 'utf8');
+    if (onDisk !== md) {
+      console.error(`  !! file on disk differs from generated markdown: ${dest}`);
     }
+    const back = mdToPage(onDisk, schema);
+    if (CHECK) rmSync(dest, { force: true });
 
     if ([...AUTHORED, ...IDENTITY].every((k) => !(k in page) || eq(page[k], back[k]))) metaOk++;
     if (JSON.stringify(page.blocks_layout?.items || []) === JSON.stringify(back.blocks_layout.items)) orderOk++;
@@ -120,5 +126,5 @@ if (byType.size) {
     console.log(`     got: ${String(JSON.stringify(sem(f.b))).slice(0, 120)}`);
   }
 }
-if (!CHECK) console.log(`\nmarkdown written to ${relative(process.cwd(), OUT)}/`);
+console.log(`\nmarkdown ${CHECK ? 'checked' : 'written'} in ${relative(process.cwd(), OUT)}/`);
 process.exit(blocksOk === blocks && metaOk === pages && orderOk === pages ? 0 : 1);

@@ -218,13 +218,27 @@
     },
     "p-6": {
       "@type": "slate",
-      "plaintext": "Open <https://hydra.pretagov.com>, log in, then:",
+      "plaintext": "Open [hydra.pretagov.com](https://hydra.pretagov.com), log in, then:",
       "value": [
         {
           "type": "p",
           "children": [
             {
-              "text": "Open <https://hydra.pretagov.com>, log in, then:"
+              "text": "Open "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "https://hydra.pretagov.com"
+              },
+              "children": [
+                {
+                  "text": "hydra.pretagov.com"
+                }
+              ]
+            },
+            {
+              "text": ", log in, then:"
             }
           ]
         }
