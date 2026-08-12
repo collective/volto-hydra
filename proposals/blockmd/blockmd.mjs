@@ -454,19 +454,20 @@ function constructsOf(md) {
 
 /**
  * Repeating groups: from construct `from`, a new group at every heading of
- * `level`. A group's parts are its heading's, merged with those of everything
- * under it -- so a heading followed by a fence exposes text, level, lang and
- * code together.
+ * `level`.
+ *
+ * A group is a LIST of constructs, not a merged bag, so `${N/part}` means the
+ * same thing inside a group as it does at page level: the Nth construct's
+ * part. `${1/text}` is the heading's text; `${2/lang}` is the language of the
+ * code block under it. A reference that named no position would say nothing
+ * about where the value lives.
  */
 function sectionsOf(md, from, level) {
   const nodes = (mdParser.parse(md || '').children || []).slice(from);
   const out = [];
   for (const n of nodes) {
-    if (n.type === 'heading' && n.depth === level) out.push({ ...partsOf(n), body: [] });
-    else if (out.length) {
-      out[out.length - 1].body.push(n);
-      Object.assign(out[out.length - 1], { ...partsOf(n), ...out[out.length - 1] });
-    }
+    if (n.type === 'heading' && n.depth === level) out.push([partsOf(n)]);
+    else if (out.length) out[out.length - 1].push(partsOf(n));
   }
   return out;
 }
@@ -506,11 +507,11 @@ function resolveRefs(block, md) {
     if (whole?.repeatAt) {
       const ids = block[`${k}@ids`] || [];
       delete block[`${k}@ids`];
-      block[k] = sectionsOf(md, whole.index, whole.repeatAt).map((sec, i) => {
+      block[k] = sectionsOf(md, whole.index, whole.repeatAt).map((constructs, i) => {
         const item = {};
         if (ids[i] !== undefined) item['@id'] = ids[i];
         for (const [field, tpl] of Object.entries(itemMap[k] || {})) {
-          item[field] = resolveOne(tpl, [sec]);
+          item[field] = resolveOne(tpl, constructs);
         }
         return item;
       });
@@ -573,6 +574,31 @@ function constructBody(role, b) {
   return { md, attrs };
 }
 
+/**
+ * One construct of a repeating group, from the parts that reference it.
+ *
+ * The kind follows from which parts are named — a `code` part means a fenced
+ * block, `src` an image, `href` a link — so no block type is named here.
+ * Position 0 is the group's boundary and is therefore always the heading.
+ */
+function renderAt(idx, parts, level) {
+  if (idx === 0) {
+    const t = parts.text;
+    if (typeof t !== 'string' || !t.trim() || t !== t.trim()) return null;
+    return `${'#'.repeat(level)} ${t}`;
+  }
+  if ('code' in parts) {
+    const code = parts.code;
+    if (typeof code !== 'string') return null;
+    const fence = '`'.repeat(fenceLen(code));
+    return `${fence}${parts.lang ?? ''}\n${code}\n${fence}`;
+  }
+  if ('src' in parts) return `![${parts.alt ?? ''}](${parts.src})`;
+  if ('href' in parts) return `[${parts.text}](${parts.href})`;
+  if (typeof parts.text === 'string') return parts.text;
+  return null;
+}
+
 /** A repeating field: codeExample tabs, accordion panels. */
 function sectionsBody(sec, b) {
   const items = b[sec.field];
@@ -582,32 +608,36 @@ function sectionsBody(sec, b) {
   const level = Number(String(sec.at).replace(/^h/i, ''));
   if (!(level >= 1 && level <= 6)) return null;
 
-  // Invert the item mapping: which item FIELD supplies each construct PART.
-  const fieldFor = {};
+  // Invert the mapping, keeping the POSITION: which item field supplies
+  // construct N's part P. `${2/lang}` is the language of the second construct
+  // in the group, so the emitter has to put it there.
+  const byIndex = new Map();
+  const covered = new Set(['@id']);
   for (const [field, spec] of Object.entries(sec.item)) {
     const whole = new Template(spec).whole;
-    if (!whole) return null;            // interpolated item fields: not supported
-    fieldFor[whole.part] = field;
+    if (!whole || whole.index == null) return null;
+    if (!byIndex.has(whole.index)) byIndex.set(whole.index, {});
+    byIndex.get(whole.index)[whole.part] = field;
+    covered.add(field);
   }
-  if (!fieldFor.text) return null;
+  // The group is delimited by a heading, so construct 1 must be one.
+  if (!byIndex.get(0)?.text) return null;
 
-  // Each item is one chunk, joined by a blank line. The fence's own lines must
+  // Each item is one chunk, joined by a blank line. A fence's own lines must
   // stay adjacent — blank-separating them puts empty lines INSIDE the code.
   const chunks = [];
   for (const item of items) {
-    const text = item[fieldFor.text];
-    if (typeof text !== 'string' || !text.trim() || text !== text.trim()) return null;
-    const lines = [`${'#'.repeat(level)} ${text}`];
-    if (fieldFor.code) {
-      const code = item[fieldFor.code];
-      if (typeof code !== 'string') return null;
-      const lang = fieldFor.lang ? (item[fieldFor.lang] ?? '') : '';
-      const fence = '`'.repeat(fenceLen(code));
-      lines.push('', fence + lang, code, fence);
-    }
     // Any item field the mapping does not cover would be silently dropped.
-    const covered = new Set([...Object.values(fieldFor), '@id']);
     if (Object.keys(item).some((k) => !covered.has(k))) return null;
+    const lines = [];
+    for (const idx of [...byIndex.keys()].sort((x, y) => x - y)) {
+      const parts = {};
+      for (const [part, field] of Object.entries(byIndex.get(idx))) parts[part] = item[field];
+      const rendered = renderAt(idx, parts, level);
+      if (rendered === null) return null;
+      if (lines.length) lines.push('');
+      lines.push(rendered);
+    }
     chunks.push(lines.join('\n'));
   }
   const md = chunks.join('\n\n');
