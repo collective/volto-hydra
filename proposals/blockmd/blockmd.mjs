@@ -283,8 +283,8 @@ function attrable(v) {
 
 function fmtAttrs(o) {
   return Object.entries(o).map(([k, v]) => {
-    if (v instanceof Ref) return `${k}=$${v.index != null ? `${v.index + 1}.` : ''}${v.part}`;
     if (v instanceof Template) return `${k}="${v.text}"`;
+    if (Array.isArray(v) || (v && typeof v === 'object')) return `${k}=${JSON.stringify(v)}`;
     return typeof v === 'string' ? `${k}="${v}"` : `${k}=${v}`;
   }).join(' ');
 }
@@ -292,11 +292,11 @@ function fmtAttrs(o) {
 const ATTR_RE = /([\w@.-]+)=(?:"([^"]*)"|(\S+))/g;
 
 /**
- * An attribute value is a JSON scalar, or a reference into the block's body.
+ * An attribute value is a JSON scalar, or a `${...}` reference into the body.
  *
- * Those two spaces do not overlap: `$src` is not a valid JSON token, so a
- * reference can never be mistaken for data and a literal never needs escaping
- * (`title="$5.00"` is quoted, therefore a string).
+ * Those two spaces cannot overlap: `${` is not a valid start to any JSON
+ * token, so a reference can never be mistaken for data and a literal never
+ * needs escaping (`title="$5.00"` has no braces, so it is just a string).
  *
  * Anything else is an error. It used to fall through to `out[k] = bare`, so a
  * typo, a stray sigil, or syntax this reader predates all became plausible
@@ -310,11 +310,11 @@ function parseAttrs(s) {
     else if (bare === 'true' || bare === 'false') out[k] = bare === 'true';
     else if (bare === 'null') out[k] = null;
     else if (/^-?\d+(\.\d+)?$/.test(bare)) out[k] = Number(bare);
-    else if (bare.startsWith('$')) out[k] = new Ref(bare.slice(1));
+    else if (bare.startsWith('[') || bare.startsWith('{')) out[k] = JSON.parse(bare);
     else {
       throw new Error(
         `Bad attribute value ${k}=${bare}: expected a quoted string, a number, `
-        + 'true/false/null, or a $reference.',
+        + 'true/false/null, or a quoted "${reference}".',
       );
     }
   }
@@ -322,80 +322,101 @@ function parseAttrs(s) {
 }
 
 /**
- * A quoted attribute carrying `${part}` interpolation.
+ * A quoted attribute carrying one or more `${...}` references.
  *
- * This is a distinct kind decided at PARSE time, not any string that happens
- * to contain `${`. Source code in a fenced field is full of JS template
- * literals; treating those as interpolation rewrote 11 codeExample blocks.
+ * There is one syntax, always quoted:
+ *
+ *   title="${1/text}"       construct 1's `text`. The whole value is a single
+ *                           reference, so the referenced type is preserved.
+ *   tag="h${1/level}"       interpolation -- text around it, so the result is
+ *                           a string, which is how level 2 becomes "h2"
+ *                           without anything hardcoding the letter h.
+ *   tabs="${1.../h3}"       repeating groups from construct 1, split at each
+ *                           h3. Yields an array.
+ *
+ * A Template is a kind established where it appears, never inferred from a
+ * string's contents: source code in a fenced field is full of JS template
+ * literals, and treating those as interpolation rewrote 11 codeExample blocks.
  */
 class Template {
   constructor(text) { this.text = text; }
+  /** The whole value is one reference — hand back the referenced type. */
+  get whole() {
+    const m = /^\$\{([^}]+)\}$/.exec(this.text);
+    return m ? new Ref(m[1]) : null;
+  }
 }
 
-/** A `$part` / `$N.part` reference, resolved against the body once it is read. */
+/**
+ * A reference: `part`, `N/part`, or `N.../hK`.
+ *
+ * The part vocabulary belongs to markdown's constructs, not to any block type,
+ * which is what keeps the mechanism general.
+ */
 class Ref {
   constructor(spec) {
-    const m = /^(?:(\d+)\.)?([A-Za-z]\w*)$/.exec(spec);
-    if (!m) throw new Error(`Bad reference $${spec}: expected $part or $N.part.`);
-    this.index = m[1] ? Number(m[1]) - 1 : null;
-    this.part = m[2];
+    const rep = /^(\d+)\.\.\.\/h([1-6])$/.exec(spec);
+    if (rep) {
+      this.index = Number(rep[1]) - 1;
+      this.repeatAt = Number(rep[2]);
+      return;
+    }
+    const one = /^(?:(\d+)\/)?([A-Za-z]\w*)$/.exec(spec);
+    if (!one) {
+      throw new Error(`Bad reference "${spec}": expected part, N/part or N.../hK.`);
+    }
+    this.index = one[1] ? Number(one[1]) - 1 : null;
+    this.part = one[2];
   }
 }
 
 
 // ------------------------------------------------- native markdown fields ---
 /**
- * Some fields have a native markdown spelling: a heading block IS a heading, an
- * image block IS an image. Writing them as attributes or fenced JSON is the
- * format failing at its one job.
+ * Some fields have a native markdown spelling: a heading block IS a heading, a
+ * codeExample tab IS a heading plus a fenced code block. Writing them as
+ * attributes or fenced JSON is the format failing at its one job.
  *
- * The mapping is not built in per block type -- that would need this file to
- * know every block that will ever exist. Instead the schema declares a role per
- * field, and the DOCUMENT carries the mapping in its own attributes, so a
- * reader needs no schema:
+ * How to lay a block out is decided at CONVERSION time, from markdown-roles
+ * (which names block types). What comes out records that decision in its own
+ * attributes, so reading it needs nothing:
  *
- *     :::heading{uid="…" heading=$text tag="h${level}"}
- *     ## Button Block
+ *     :::codeExample{uid="ce-8" tabs="${1.../h3}" tabs.label="${text}"
+ *                    tabs.language="${lang}" tabs.code="${code}"}
+ *     ### Nuxt.js
+ *     ```vue
+ *     <template>…</template>
+ *     ```
  *     :::
- *
- * `$text` is a reference (bare, outside the JSON value space). `"h${level}"` is
- * a quoted string with interpolation, which is how a level of 2 becomes "h2"
- * without anything hardcoding the letter h.
  */
 
-/** Split "h${level}" into literal and named segments. */
-function templateParts(t) {
-  const out = [];
-  let last = 0;
-  for (const m of t.matchAll(/\$\{([A-Za-z]\w*)\}/g)) {
-    out.push({ lit: t.slice(last, m.index) });
-    out.push({ name: m[1] });
-    last = m.index + m[0].length;
-  }
-  out.push({ lit: t.slice(last) });
-  return out;
-}
+const isTemplate = (v) => typeof v === 'string' && /\$\{[^}]+\}/.test(v);
 
-const isTemplate = (v) => typeof v === 'string' && /\$\{[A-Za-z]\w*\}/.test(v);
-
-/** Forward: "h${level}" + {level: 2} -> "h2". */
-function render(t, parts) {
-  return t.replace(/\$\{([A-Za-z]\w*)\}/g, (_, n) => String(parts[n] ?? ''));
+/** Forward: "h${1/level}" + constructs -> "h2". */
+function interpolate(text, constructs) {
+  return text.replace(/\$\{([^}]+)\}/g, (_, spec) => String(lookup(constructs, new Ref(spec)) ?? ''));
 }
 
 /**
- * Backward: "h${level}" + "h2" -> {level: "2"}.
+ * Backward: "h${1/level}" + "h2" -> {level: "2"}.
  *
  * Interpolation is not generally invertible ("${a}${b}" = "h2" has several
- * solutions), so this is only ever used by the EMITTER, which then checks that
+ * solutions), so only the EMITTER runs it backwards, and then checks that
  * rendering the result reproduces the stored value. The parser only runs
  * forward.
  */
-function invert(t, value) {
+function invert(template, value) {
   if (typeof value !== 'string') return null;
-  const parts = templateParts(t);
+  const parts = [];
+  let last = 0;
+  for (const m of template.matchAll(/\$\{([^}]+)\}/g)) {
+    parts.push({ lit: template.slice(last, m.index) });
+    parts.push({ name: m[1] });
+    last = m.index + m[0].length;
+  }
+  parts.push({ lit: template.slice(last) });
   const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const re = new RegExp(`^${parts.map((p) => ('name' in p ? '(.+?)' : esc(p.lit))).join('')}$`);
+  const re = new RegExp(`^${parts.map((x) => ('name' in x ? '(.+?)' : esc(x.lit))).join('')}$`);
   const m = re.exec(value);
   if (!m) return null;
   const out = {};
@@ -408,44 +429,98 @@ function mdText(nodes) {
   return (nodes || []).map((n) => (n.value != null ? n.value : mdText(n.children))).join('');
 }
 
-/**
- * The body's block-level constructs, each exposing named parts. This is the
- * whole vocabulary a `$ref` can name -- it is tied to markdown's constructs,
- * not to any block type, which is what keeps the mechanism generic.
- */
-function constructsOf(md) {
-  return (mdParser.parse(md || '').children || []).map((n) => {
-    if (n.type === 'heading') return { text: mdText(n.children), level: n.depth };
-    if (n.type === 'paragraph') {
-      const kids = n.children || [];
-      const only = kids.length === 1 ? kids[0] : null;
-      if (only?.type === 'image') return { src: only.url, alt: only.alt || '' };
-      if (only?.type === 'link') return { text: mdText(only.children), href: only.url };
-      return { text: mdText(kids) };
-    }
-    return {};
-  });
+/** One mdast node -> the parts a reference can name. */
+function partsOf(n) {
+  if (n.type === 'heading') return { text: mdText(n.children), level: n.depth };
+  if (n.type === 'code') return { lang: n.lang || '', code: n.value ?? '' };
+  if (n.type === 'paragraph') {
+    const kids = n.children || [];
+    const only = kids.length === 1 ? kids[0] : null;
+    if (only?.type === 'image') return { src: only.url, alt: only.alt || '' };
+    if (only?.type === 'link') return { text: mdText(only.children), href: only.url };
+    return { text: mdText(kids) };
+  }
+  return {};
 }
 
-/** `$part` searches the constructs in order; `$N.part` indexes one. */
+/**
+ * The body's block-level constructs. This is the whole vocabulary a reference
+ * can name -- tied to markdown's constructs, not to any block type, which is
+ * what keeps the mechanism general.
+ */
+function constructsOf(md) {
+  return (mdParser.parse(md || '').children || []).map(partsOf);
+}
+
+/**
+ * Repeating groups: from construct `from`, a new group at every heading of
+ * `level`. A group's parts are its heading's, merged with those of everything
+ * under it -- so a heading followed by a fence exposes text, level, lang and
+ * code together.
+ */
+function sectionsOf(md, from, level) {
+  const nodes = (mdParser.parse(md || '').children || []).slice(from);
+  const out = [];
+  for (const n of nodes) {
+    if (n.type === 'heading' && n.depth === level) out.push({ ...partsOf(n), body: [] });
+    else if (out.length) {
+      out[out.length - 1].body.push(n);
+      Object.assign(out[out.length - 1], { ...partsOf(n), ...out[out.length - 1] });
+    }
+  }
+  return out;
+}
+
+/** `${part}` searches the constructs in order; `${N/part}` indexes one. */
 function lookup(constructs, ref) {
   if (ref.index != null) return constructs[ref.index]?.[ref.part];
   return constructs.find((c) => c[ref.part] !== undefined)?.[ref.part];
 }
 
-/** Resolve every reference and template in a block against its own body. */
+/** Resolve one attribute value against a construct list. */
+function resolveOne(tpl, constructs) {
+  const whole = tpl.whole;
+  if (whole) return lookup(constructs, whole);
+  return interpolate(tpl.text, constructs);
+}
+
+/**
+ * Resolve every reference in a block against its own body.
+ *
+ * `field.sub` attributes describe one repeating item, so they are collected
+ * and applied per group rather than set on the block.
+ */
 function resolveRefs(block, md) {
   const constructs = constructsOf(md);
+  const itemMap = {};
   for (const [k, v] of Object.entries(block)) {
-    if (v instanceof Ref) block[k] = lookup(constructs, v);
-    else if (v instanceof Template) {
-      block[k] = v.text.replace(/\$\{([A-Za-z]\w*)\}/g,
-        (_, spec) => String(lookup(constructs, new Ref(spec)) ?? ''));
+    const dot = k.indexOf('.');
+    if (dot > 0 && v instanceof Template) {
+      (itemMap[k.slice(0, dot)] ||= {})[k.slice(dot + 1)] = v;
+      delete block[k];
     }
+  }
+  for (const [k, v] of Object.entries(block)) {
+    if (!(v instanceof Template)) continue;
+    const whole = v.whole;
+    if (whole?.repeatAt) {
+      const ids = block[`${k}@ids`] || [];
+      delete block[`${k}@ids`];
+      block[k] = sectionsOf(md, whole.index, whole.repeatAt).map((sec, i) => {
+        const item = {};
+        if (ids[i] !== undefined) item['@id'] = ids[i];
+        for (const [field, tpl] of Object.entries(itemMap[k] || {})) {
+          item[field] = resolveOne(tpl, [sec]);
+        }
+        return item;
+      });
+      continue;
+    }
+    block[k] = resolveOne(v, constructs);
   }
 }
 
-/** Build the markdown for a construct from its parts. */
+/** Build the markdown for one construct from its parts. */
 function renderConstruct(kind, parts) {
   if (kind === 'heading') {
     const level = Math.min(6, Math.max(1, Number(parts.level) || 2));
@@ -458,40 +533,90 @@ function renderConstruct(kind, parts) {
 
 /**
  * Lift a block's mapped fields into the body, returning the markdown and the
- * attribute values that replace them -- or null when it would not survive the
- * round trip, in which case the caller leaves the fields as ordinary attrs.
+ * attributes that replace them -- or null when it would not survive the round
+ * trip, in which case the caller leaves the fields as ordinary attributes.
  */
 function nativeBody(type, b, roles) {
   const role = roles?.[type];
   if (!role) return null;
+  return role.sections ? sectionsBody(role.sections, b) : constructBody(role, b);
+}
+
+/** A single construct: heading block, image block. */
+function constructBody(role, b) {
   const parts = {}, attrs = {};
   for (const [field, spec] of Object.entries(role.fields)) {
     const v = b[field];
     if (v == null || v === '') continue;
-    if (isTemplate(spec)) {
-      const got = invert(spec, v);
-      if (!got || render(spec, got) !== v) return null;
-      Object.assign(parts, got);
-    } else if (typeof spec === 'string' && spec.startsWith('$')) {
+    const tpl = new Template(spec);
+    const whole = tpl.whole;
+    if (whole) {
       if (typeof v !== 'string') return null;
-      parts[spec.slice(1)] = v;
-    } else return null;
+      parts[whole.part] = v;
+    } else {
+      const got = invert(spec, v);
+      if (!got) return null;
+      for (const [k, x] of Object.entries(got)) parts[new Ref(k).part] = x;
+    }
     attrs[field] = spec;
   }
   if (parts.text === undefined && parts.src === undefined) return null;
   const md = renderConstruct(role.construct, parts);
 
-  // Same contract as slate: check, do not assume. A value the construct cannot
-  // carry (a heading whose text ends in a space) keeps its literal attribute
-  // rather than being silently rewritten.
-  const back = {};
+  // Check, do not assume. A value the construct cannot carry (a heading whose
+  // text ends in a space) keeps its literal attribute instead of being
+  // silently rewritten.
+  const back = constructsOf(md);
   for (const [field, spec] of Object.entries(attrs)) {
-    const c = constructsOf(md);
-    back[field] = isTemplate(spec)
-      ? spec.replace(/\$\{([A-Za-z]\w*)\}/g, (_, n) => String(lookup(c, new Ref(n)) ?? ''))
-      : lookup(c, new Ref(spec.slice(1)));
+    if (resolveOne(new Template(spec), back) !== b[field]) return null;
   }
-  if (Object.entries(back).some(([f, v]) => v !== b[f])) return null;
+  return { md, attrs };
+}
+
+/** A repeating field: codeExample tabs, accordion panels. */
+function sectionsBody(sec, b) {
+  const items = b[sec.field];
+  if (!Array.isArray(items) || !items.length) return null;
+  // The role writes the boundary the way it appears in the document ("h3");
+  // the heading depth is the number inside it.
+  const level = Number(String(sec.at).replace(/^h/i, ''));
+  if (!(level >= 1 && level <= 6)) return null;
+
+  // Invert the item mapping: which item FIELD supplies each construct PART.
+  const fieldFor = {};
+  for (const [field, spec] of Object.entries(sec.item)) {
+    const whole = new Template(spec).whole;
+    if (!whole) return null;            // interpolated item fields: not supported
+    fieldFor[whole.part] = field;
+  }
+  if (!fieldFor.text) return null;
+
+  // Each item is one chunk, joined by a blank line. The fence's own lines must
+  // stay adjacent — blank-separating them puts empty lines INSIDE the code.
+  const chunks = [];
+  for (const item of items) {
+    const text = item[fieldFor.text];
+    if (typeof text !== 'string' || !text.trim() || text !== text.trim()) return null;
+    const lines = [`${'#'.repeat(level)} ${text}`];
+    if (fieldFor.code) {
+      const code = item[fieldFor.code];
+      if (typeof code !== 'string') return null;
+      const lang = fieldFor.lang ? (item[fieldFor.lang] ?? '') : '';
+      const fence = '`'.repeat(fenceLen(code));
+      lines.push('', fence + lang, code, fence);
+    }
+    // Any item field the mapping does not cover would be silently dropped.
+    const covered = new Set([...Object.values(fieldFor), '@id']);
+    if (Object.keys(item).some((k) => !covered.has(k))) return null;
+    chunks.push(lines.join('\n'));
+  }
+  const md = chunks.join('\n\n');
+
+  const attrs = { [sec.field]: `\${1.../h${level}}` };
+  for (const [field, spec] of Object.entries(sec.item)) attrs[`${sec.field}.${field}`] = spec;
+  if (items.some((i) => i['@id'] !== undefined)) {
+    attrs[`${sec.field}@ids`] = items.map((i) => i['@id'] ?? null);
+  }
   return { md, attrs };
 }
 
@@ -517,8 +642,7 @@ function blockToMd(uid, b, schema, depth = 0) {
 
   const refAttrs = {};
   if (native) for (const [f, spec] of Object.entries(native.attrs)) {
-    refAttrs[f] = spec.startsWith('$') && !isTemplate(spec)
-      ? new Ref(spec.slice(1)) : new Template(spec);
+    refAttrs[f] = typeof spec === 'string' ? new Template(spec) : spec;
   }
   const lines = [`:::${type}{${fmtAttrs({ uid, ...attrs, ...refAttrs })}}`];
 
@@ -545,6 +669,10 @@ function blockToMd(uid, b, schema, depth = 0) {
 
   for (const f of kidFields) {
     if (!Array.isArray(b[f])) continue;
+    // Already lifted into the body as repeating sections; emitting the
+    // container too would give the field two sources and the parser would
+    // push children onto a value that is not an array.
+    if (native && f in native.attrs) continue;
     // `[]` says these children are items in a field array, not blocks in a
     // region. The schema is consulted here, on the way out; the reader never
     // needs it because the marker is in the document.

@@ -1,5 +1,15 @@
 {
-  "_comment": "Which fields have a native markdown spelling. Belongs in the block schema next to `widget` -- it lives here while the shape is settled. The value is literally what gets written in the attribute, so the role IS the mapping: `$text` takes the construct's text, `h${level}` composes its level.",
-  "heading": { "construct": "heading", "fields": { "heading": "$text", "tag": "h${level}" } },
-  "image":   { "construct": "image",   "fields": { "url": "$src", "alt": "$alt" } }
+  "_comment": "Conversion-time only. This says how to LAY OUT a block as markdown; the markdown that comes out records the decision in its own attributes, so nothing needs this file to read it. Values are literally what gets written into the attribute.",
+
+  "heading": { "construct": "heading", "fields": { "heading": "${text}", "tag": "h${level}" } },
+  "image":   { "construct": "image",   "fields": { "url": "${src}", "alt": "${alt}" } },
+
+  "codeExample": {
+    "sections": { "field": "tabs", "at": "h3",
+                  "item": { "label": "${text}", "language": "${lang}", "code": "${code}" } }
+  },
+  "accordion": {
+    "sections": { "field": "panels", "at": "h2",
+                  "item": { "title": "${text}", "blocks": "${body}" } }
+  }
 }
