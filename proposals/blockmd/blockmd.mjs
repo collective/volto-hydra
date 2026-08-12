@@ -10,7 +10,8 @@
  *   1. Frame layer (here). A line-anchored scanner for `:::type{attrs}` … `:::`.
  *      This grammar is ours and is always block-level at line start, so a
  *      scanner is exact and needs no dependency. It nests, and `::::name`
- *      opens a named region (a blocks_layout region, or an object_list field).
+ *      opens a blocks_layout region while `::::name[]` opens an object_list
+ *      field — the document states which, so the READER needs no schema.
  *
  *   2. Prose layer (remark). mdast <-> slate. Markdown parsing is where
  *      hand-rolling goes wrong — the python prototype's regexes lost inline
@@ -544,7 +545,10 @@ function blockToMd(uid, b, schema, depth = 0) {
 
   for (const f of kidFields) {
     if (!Array.isArray(b[f])) continue;
-    lines.push(`::::${f}`);
+    // `[]` says these children are items in a field array, not blocks in a
+    // region. The schema is consulted here, on the way out; the reader never
+    // needs it because the marker is in the document.
+    lines.push(`::::${f}[]`);
     for (const item of b[f]) {
       if (item && typeof item === 'object') {
         // form.subblocks items have no @id; inventing "" adds a field that
@@ -613,9 +617,33 @@ export function pageToMd(page, schema = {}) {
 }
 
 // --------------------------------------------------------------- parsing ---
-const OPEN_RE = /^(:{3,4})([\w-]*)(?:\{(.*)\})?\s*$/;
+/**
+ * `:::type{attrs}` opens a block; `::::name` opens a container.
+ *
+ * A container is one of two different storage shapes, and the document says
+ * which rather than the reader asking a schema:
+ *
+ *   ::::items      a blocks_layout region -- children are blocks in the
+ *                  shared `blocks` dict, and the region records their order
+ *   ::::panels[]   an object_list field  -- children are items inside a
+ *                  field array; there is no shared dict and no ordering key
+ *
+ * `[]` cannot occur in a field or region name, so the two namespaces cannot
+ * collide even when the names are identical. This is what lets mdToPage run
+ * with no schema at all.
+ */
+const OPEN_RE = /^(:{3,4})([\w-]*)(\[\])?(?:\{(.*)\})?\s*$/;
 
-export function mdToPage(md, schema = {}) {
+/**
+ * markdown -> a page.
+ *
+ * Takes NO schema. Everything that used to need one is carried by the
+ * document: `::::name[]` says a container holds field items rather than
+ * blocks, and `${...}` references say which field a construct fills. That is
+ * what makes a markdown mount possible -- the mock API can serve these files
+ * without knowing any block type.
+ */
+export function mdToPage(md) {
   const m = /^---\n([\s\S]*?)\n---\n?/.exec(md);
   const meta = m ? YAML.parse(m[1]) || {} : {};
   const body = m ? md.slice(m[0].length) : md;
@@ -647,17 +675,17 @@ export function mdToPage(md, schema = {}) {
     const line = raw.trim();
     const open = OPEN_RE.exec(line);
 
-    if (open && open[2] && open[3] !== undefined) {
+    if (open && open[2] && open[4] !== undefined) {
       flushProse();
       const type = open[2];
-      const attrs = parseAttrs(open[3]);
+      const attrs = parseAttrs(open[4]);
       const attrsHadUid = attrs.uid !== undefined;
       const uid = attrs.uid ?? `${type}-${Object.keys(blocks).length}`;
       delete attrs.uid;
       const block = { '@type': type, ...attrs };
       const parent = stack[stack.length - 1];
       if (parent) {
-        if (parent.region && childFields(schema, parent.block['@type']).includes(parent.region)) {
+        if (parent.regionIsField) {
           // Push the SAME object that goes on the stack, never a copy: later
           // ```fields updates mutate the stack entry, and a copy loses them
           // silently (this is how every codeExample lost its `code`).
@@ -678,14 +706,22 @@ export function mdToPage(md, schema = {}) {
       continue;
     }
 
-    if (open && open[1] === '::::' && open[2] && open[3] === undefined) {
-      if (stack.length) stack[stack.length - 1].region = open[2];
+    if (open && open[1] === '::::' && open[2] && open[4] === undefined) {
+      if (stack.length) {
+        const top = stack[stack.length - 1];
+        top.region = open[2];
+        top.regionIsField = open[3] === '[]';
+      }
       continue;
     }
 
     if (line === ':::' || line === '::::') {
       const top = stack[stack.length - 1];
-      if (line === '::::' && top?.region) { top.region = null; continue; }
+      if (line === '::::' && top?.region) {
+        top.region = null;
+        top.regionIsField = false;
+        continue;
+      }
       const frame = stack.pop();
       if (frame) {
         const { block, regions } = frame;

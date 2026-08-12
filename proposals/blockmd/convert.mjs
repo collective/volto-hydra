@@ -94,7 +94,7 @@ for (const root of [SITE, DOCS]) {
     if (onDisk !== md) {
       console.error(`  !! file on disk differs from generated markdown: ${dest}`);
     }
-    const back = mdToPage(onDisk, schema);
+    const back = mdToPage(onDisk);
     if (CHECK) rmSync(dest, { force: true });
 
     if ([...AUTHORED, ...IDENTITY].every((k) => !(k in page) || eq(page[k], back[k]))) metaOk++;

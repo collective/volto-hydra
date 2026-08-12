@@ -91,7 +91,7 @@ const items = new Map();
 for (const file of walk(TREE)) {
   if (!file.endsWith('.md')) continue;
   const text = readFileSync(file, 'utf8');
-  const page = mdToPage(text, schema);
+  const page = mdToPage(text);
   const id = idFor(file);
   page['@id'] = id;
   items.set(id, page);
