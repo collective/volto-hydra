@@ -44,6 +44,11 @@ jobs:
         run: pnpm build:deps
       - name: Run volto-hydra addon unit tests (vitest)
         run: pnpm test
+      - name: Check docs content is in sync with the markdown
+        # docs/content/**/data.json is generated from docs/*.md by sync.mjs.
+        # Nothing verified that it matched, so a markdown edit without a
+        # re-sync shipped stale content to the site.
+        run: pnpm sync:docs:check
       - name: Run mock-api unit tests (node:test)
         # Plone 6.2 fidelity coverage (@aliases, SearchableText prefix
         # match, navigation, folder ordering). Was not previously wired
