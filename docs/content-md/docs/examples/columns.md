@@ -34,7 +34,7 @@ A horizontal multi-column container. The block has one slot — columns — rest
 
 <block type="codeExample" uid="ref-columns-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-columns" slotId="schema">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-columns-schema-javascript-45206c"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-columns-schema-javascript-45206c"}]}'>
 
 ### Schema
 
@@ -84,7 +84,7 @@ A horizontal multi-column container. The block has one slot — columns — rest
 
 <block type="codeExample" uid="ref-columns-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-columns" slotId="json-data">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-columns-json-data-json-9ddfde"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-columns-json-data-json-9ddfde"}]}'>
 
 ### JSON Block Data
 
@@ -157,7 +157,7 @@ A horizontal multi-column container. The block has one slot — columns — rest
 
 <block type="codeExample" uid="ref-columns-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-columns" slotId="rendering">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-columns-rendering-jsx-a52cb0","ref-columns-rendering-vue-526eec","ref-columns-rendering-svelte-9b4eec"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-columns-rendering-jsx-a52cb0"},{"@id":"ref-columns-rendering-vue-526eec"},{"@id":"ref-columns-rendering-svelte-9b4eec"}]}'>
 
 ### React
 

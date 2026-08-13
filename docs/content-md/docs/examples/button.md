@@ -165,7 +165,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidu
 
 <block type="codeExample" uid="ref-button-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-button" slotId="schema">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-button-schema-javascript-8aa182"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-button-schema-javascript-8aa182"}]}'>
 
 ### Schema
 
@@ -213,7 +213,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidu
 
 <block type="codeExample" uid="ref-button-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-button" slotId="json-data">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-button-json-data-json-ed3030"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-button-json-data-json-ed3030"}]}'>
 
 ### JSON Block Data
 
@@ -235,7 +235,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidu
 
 <block type="codeExample" uid="ref-button-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-button" slotId="rendering">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-button-rendering-jsx-ab4e0b","ref-button-rendering-vue-e704dd","ref-button-rendering-svelte-a8e495"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-button-rendering-jsx-ab4e0b"},{"@id":"ref-button-rendering-vue-e704dd"},{"@id":"ref-button-rendering-svelte-a8e495"}]}'>
 
 ### React
 

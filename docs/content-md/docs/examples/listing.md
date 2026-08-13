@@ -67,7 +67,7 @@ Displays a list of content items from a query. The listing block fetches items f
 
 <block type="codeExample" uid="ref-listing-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="schema">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-listing-schema-javascript-bd0476"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-listing-schema-javascript-bd0476"}]}'>
 
 ### Schema
 
@@ -151,7 +151,7 @@ Displays a list of content items from a query. The listing block fetches items f
 
 <block type="codeExample" uid="ref-listing-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="json-data">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-listing-json-data-json-829696"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-listing-json-data-json-829696"}]}'>
 
 ### JSON Block Data
 
@@ -190,7 +190,7 @@ Displays a list of content items from a query. The listing block fetches items f
 
 <block type="codeExample" uid="ref-listing-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="rendering">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-listing-rendering-jsx-f33c73","ref-listing-rendering-vue-3c4a00","ref-listing-rendering-svelte-aca768"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-listing-rendering-jsx-f33c73"},{"@id":"ref-listing-rendering-vue-3c4a00"},{"@id":"ref-listing-rendering-svelte-aca768"}]}'>
 
 ### React
 

@@ -92,7 +92,7 @@ The editor screen has three regions:
 
 <block type="codeExample" uid="ce-8">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-8-text-6b4738"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-8-text-6b4738"}]}'>
 
 ### Text
 

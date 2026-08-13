@@ -42,7 +42,7 @@ Renders the current page's related items relation field (default relatedItems). 
 
 <block type="codeExample" uid="ref-relatedItemsListing-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="schema">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-relatedItemsListing-schema-javascript-a1a504"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-relatedItemsListing-schema-javascript-a1a504"}]}'>
 
 ### Schema
 
@@ -94,7 +94,7 @@ Renders the current page's related items relation field (default relatedItems). 
 
 <block type="codeExample" uid="ref-relatedItemsListing-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="json-data">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-relatedItemsListing-json-data-json-ba9577"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-relatedItemsListing-json-data-json-ba9577"}]}'>
 
 ### JSON Block Data
 
@@ -118,7 +118,7 @@ This block has no bespoke renderer. Add its fetcher to your fetchItems map (keye
 
 <block type="codeExample" uid="ref-relatedItemsListing-fetcher" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="rendering">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-relatedItemsListing-fetcher-javascript-1c975d"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-relatedItemsListing-fetcher-javascript-1c975d"}]}'>
 
 ### Fetcher
 
@@ -139,7 +139,7 @@ export function relatedItemsFetcher({ apiUrl, contextPath }) {
 
 <block type="codeExample" uid="ref-relatedItemsListing-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="rendering">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-relatedItemsListing-rendering-javascript-2b9d44"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-relatedItemsListing-rendering-javascript-2b9d44"}]}'>
 
 ### Render
 

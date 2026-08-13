@@ -102,7 +102,7 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 <block type="codeExample" uid="ref-teaser-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="schema">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-teaser-schema-javascript-bfff08"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-teaser-schema-javascript-bfff08"}]}'>
 
 ### Schema
 
@@ -151,7 +151,7 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 <block type="codeExample" uid="ref-teaser-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="json-data">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-teaser-json-data-json-7f117c"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-teaser-json-data-json-7f117c"}]}'>
 
 ### JSON Block Data
 
@@ -179,7 +179,7 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 <block type="codeExample" uid="ref-teaser-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="rendering">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-teaser-rendering-jsx-d1dd76","ref-teaser-rendering-vue-fc123a","ref-teaser-rendering-svelte-bf19cf"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-teaser-rendering-jsx-d1dd76"},{"@id":"ref-teaser-rendering-vue-fc123a"},{"@id":"ref-teaser-rendering-svelte-bf19cf"}]}'>
 
 ### React
 

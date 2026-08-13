@@ -76,7 +76,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="codeExample" uid="ref-introduction-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction" slotId="schema">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-introduction-schema-javascript-e14a03"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-introduction-schema-javascript-e14a03"}]}'>
 
 ### Schema
 
@@ -101,7 +101,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="codeExample" uid="ref-introduction-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction" slotId="json-data">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-introduction-json-data-json-d959f7"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-introduction-json-data-json-d959f7"}]}'>
 
 ### JSON Block Data
 
@@ -127,7 +127,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="codeExample" uid="ref-introduction-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction" slotId="rendering">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-introduction-rendering-jsx-599242","ref-introduction-rendering-vue-53106b","ref-introduction-rendering-svelte-9e2b59"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-introduction-rendering-jsx-599242"},{"@id":"ref-introduction-rendering-vue-53106b"},{"@id":"ref-introduction-rendering-svelte-9e2b59"}]}'>
 
 ### React
 

@@ -41,7 +41,7 @@ Renders entries from an external RSS feed. Its items are fetched at render time 
 
 <block type="codeExample" uid="ref-rssFeed-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="schema">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-rssFeed-schema-javascript-d79cf2"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-rssFeed-schema-javascript-d79cf2"}]}'>
 
 ### Schema
 
@@ -98,7 +98,7 @@ Renders entries from an external RSS feed. Its items are fetched at render time 
 
 <block type="codeExample" uid="ref-rssFeed-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="json-data">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-rssFeed-json-data-json-c55bf4"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-rssFeed-json-data-json-c55bf4"}]}'>
 
 ### JSON Block Data
 
@@ -123,7 +123,7 @@ This block has no bespoke renderer. Add its fetcher to your fetchItems map (keye
 
 <block type="codeExample" uid="ref-rssFeed-fetcher" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="rendering">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-rssFeed-fetcher-javascript-7f0034"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-rssFeed-fetcher-javascript-7f0034"}]}'>
 
 ### Fetcher
 
@@ -161,7 +161,7 @@ function parseRssEntries(xml) {
 
 <block type="codeExample" uid="ref-rssFeed-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="rendering">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-rssFeed-rendering-javascript-df4061"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-rssFeed-rendering-javascript-df4061"}]}'>
 
 ### Render
 

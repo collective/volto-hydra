@@ -143,7 +143,7 @@ https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d22634.237371369458!2d11.58
 
 <block type="codeExample" uid="ref-maps-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-maps" slotId="schema">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-maps-schema-javascript-45f9f0"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-maps-schema-javascript-45f9f0"}]}'>
 
 ### Schema
 
@@ -171,7 +171,7 @@ https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d22634.237371369458!2d11.58
 
 <block type="codeExample" uid="ref-maps-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-maps" slotId="json-data">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-maps-json-data-json-04466f"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-maps-json-data-json-04466f"}]}'>
 
 ### JSON Block Data
 
@@ -189,7 +189,7 @@ https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d22634.237371369458!2d11.58
 
 <block type="codeExample" uid="ref-maps-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-maps" slotId="rendering">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-maps-rendering-jsx-7fbc14","ref-maps-rendering-vue-85ab6d","ref-maps-rendering-svelte-4d9083"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-maps-rendering-jsx-7fbc14"},{"@id":"ref-maps-rendering-vue-85ab6d"},{"@id":"ref-maps-rendering-svelte-4d9083"}]}'>
 
 ### React
 

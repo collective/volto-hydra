@@ -113,7 +113,7 @@ The slot a block lives in is identified by its `slotId`. This is the field name 
 
 <block type="codeExample" uid="ce-9">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-9-json-da054f"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-9-json-da054f"}]}'>
 
 ### Json
 
@@ -187,7 +187,7 @@ The merge identifies object\_list items by their **id field**, and it varies per
 
 <block type="codeExample" uid="ce-32">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-32-javascript-403dc6"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-32-javascript-403dc6"}]}'>
 
 ### Javascript
 
@@ -213,7 +213,7 @@ Configure templates in `page.schema.properties` on the blocks field:
 
 <block type="codeExample" uid="ce-36">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-36-javascript-336b9b"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-36-javascript-336b9b"}]}'>
 
 ### Javascript
 
@@ -257,7 +257,7 @@ Use `expandTemplates` (async) or `expandTemplatesSync` (sync with pre-fetched te
 
 <block type="codeExample" uid="ce-45">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-45-javascript-f2cdf9"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-45-javascript-f2cdf9"}]}'>
 
 ### Javascript
 
@@ -322,7 +322,7 @@ When a layout is applied, the rules are the same but applied across a whole bloc
 
 <block type="codeExample" uid="ce-53">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-53-bash-8d3958"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-53-bash-8d3958"}]}'>
 
 ### Diagram
 
@@ -344,7 +344,7 @@ Pass a static layout to always force one (e.g. a footer):
 
 <block type="codeExample" uid="ce-57">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-57-javascript-4b24e8"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-57-javascript-4b24e8"}]}'>
 
 ### Javascript
 
@@ -372,7 +372,7 @@ const items = await expandTemplates(layout, {
 
 <block type="codeExample" uid="ce-60">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-60-javascript-0dbe99"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-60-javascript-0dbe99"}]}'>
 
 ### Javascript
 

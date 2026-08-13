@@ -38,7 +38,7 @@ A vertical navigation list for grouped pages — a left sidebar on desktop and a
 
 <block type="codeExample" uid="ref-contextNavigation-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-contextNavigation" slotId="schema">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-contextNavigation-schema-javascript-38f58f"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-contextNavigation-schema-javascript-38f58f"}]}'>
 
 ### Schema
 
@@ -95,7 +95,7 @@ A vertical navigation list for grouped pages — a left sidebar on desktop and a
 
 <block type="codeExample" uid="ref-contextNavigation-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-contextNavigation" slotId="json-data">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-contextNavigation-json-data-json-62b3b4"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-contextNavigation-json-data-json-62b3b4"}]}'>
 
 ### JSON Block Data
 
@@ -191,7 +191,7 @@ A vertical navigation list for grouped pages — a left sidebar on desktop and a
 
 <block type="codeExample" uid="ref-contextNavigation-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-contextNavigation" slotId="rendering">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-contextNavigation-rendering-jsx-25968a","ref-contextNavigation-rendering-vue-af752b","ref-contextNavigation-rendering-svelte-a27836"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-contextNavigation-rendering-jsx-25968a"},{"@id":"ref-contextNavigation-rendering-vue-af752b"},{"@id":"ref-contextNavigation-rendering-svelte-a27836"}]}'>
 
 ### React
 

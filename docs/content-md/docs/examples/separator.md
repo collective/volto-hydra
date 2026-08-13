@@ -153,7 +153,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="codeExample" uid="ref-separator-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="schema">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-separator-schema-javascript-3157d9"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-separator-schema-javascript-3157d9"}]}'>
 
 ### Schema
 
@@ -177,7 +177,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="codeExample" uid="ref-separator-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="json-data">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-separator-json-data-json-9d890c"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-separator-json-data-json-9d890c"}]}'>
 
 ### JSON Block Data
 
@@ -196,7 +196,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="codeExample" uid="ref-separator-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="rendering">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-separator-rendering-jsx-470901","ref-separator-rendering-vue-4281a1","ref-separator-rendering-svelte-8c1d19"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-separator-rendering-jsx-470901"},{"@id":"ref-separator-rendering-vue-4281a1"},{"@id":"ref-separator-rendering-svelte-8c1d19"}]}'>
 
 ### React
 

@@ -280,7 +280,7 @@ When the page loads inside Inka's edit iframe, you initialise the bridge and dec
 
 <block type="codeExample" uid="ce-8">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-8-js-bf605e"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-8-js-bf605e"}]}'>
 
 ### Js
 
@@ -330,7 +330,7 @@ Page data ends up shaped like this — one shared `blocks` dict, and a region pe
 
 <block type="codeExample" uid="ce-10">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-10-js-2e9648"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-10-js-2e9648"}]}'>
 
 ### Js
 
@@ -358,7 +358,7 @@ Then you augment the rendered HTML with `data-` attributes (or `<!-- hydra ... -
 
 <block type="codeExample" uid="ce-12">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-12-html-e0187e"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-12-html-e0187e"}]}'>
 
 ### Html
 
@@ -388,7 +388,7 @@ To let editors link to a spot *inside* a page, mark the element with a real `id`
 
 <block type="codeExample" uid="ce-16">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-16-html-5cddab"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-16-html-5cddab"}]}'>
 
 ### Html
 

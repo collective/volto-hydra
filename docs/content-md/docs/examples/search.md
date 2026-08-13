@@ -72,7 +72,7 @@ A search interface with faceted filtering. Contains a child listing block for re
 
 <block type="codeExample" uid="ref-search-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-search" slotId="schema">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-search-schema-javascript-8711ec"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-search-schema-javascript-8711ec"}]}'>
 
 ### Schema
 
@@ -191,7 +191,7 @@ A search interface with faceted filtering. Contains a child listing block for re
 
 <block type="codeExample" uid="ref-search-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-search" slotId="json-data">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-search-json-data-json-155258"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-search-json-data-json-155258"}]}'>
 
 ### JSON Block Data
 
@@ -248,7 +248,7 @@ A search interface with faceted filtering. Contains a child listing block for re
 
 <block type="codeExample" uid="ref-search-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-search" slotId="rendering">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-search-rendering-jsx-dd082e","ref-search-rendering-vue-3c1873","ref-search-rendering-svelte-7ba7ad"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-search-rendering-jsx-dd082e"},{"@id":"ref-search-rendering-vue-3c1873"},{"@id":"ref-search-rendering-svelte-7ba7ad"}]}'>
 
 ### React
 

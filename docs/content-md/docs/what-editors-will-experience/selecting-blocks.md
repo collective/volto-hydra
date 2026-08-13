@@ -201,7 +201,7 @@ When a block is selected, the sidebar shows the **chain of parent containers** f
 
 <block type="codeExample" uid="ce-21">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-21-text-3d139a"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-21-text-3d139a"}]}'>
 
 ### Text
 
@@ -236,7 +236,7 @@ When a container block is selected, the sidebar shows that container's **childre
 
 <block type="codeExample" uid="ce-27">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-27-text-19ff8a"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-27-text-19ff8a"}]}'>
 
 ### Text
 

@@ -125,7 +125,7 @@ Each child has its own `@type` and schema (from `blocks`). The blocks live in th
 
 <block type="codeExample" uid="ce-8">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-8-javascript-d2f77e"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-8-javascript-d2f77e"}]}'>
 
 ### Javascript
 
@@ -319,7 +319,7 @@ Storage is a property of **each region, not the container**: every region indepe
 
 <block type="codeExample" uid="ce-14">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-14-javascript-3ea062"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-14-javascript-3ea062"}]}'>
 
 ### Javascript
 
@@ -364,7 +364,7 @@ The other storage choice for a region. Instead of ordering in the shared `blocks
 
 <block type="codeExample" uid="ce-21">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-21-javascript-83a0dc"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-21-javascript-83a0dc"}]}'>
 
 ### Javascript
 
@@ -403,7 +403,7 @@ When `allowedBlocks` is set on an `object_list`, items can have different types 
 
 <block type="codeExample" uid="ce-24">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-24-javascript-6781ed"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-24-javascript-6781ed"}]}'>
 
 ### Javascript
 
@@ -442,7 +442,7 @@ An **`object_list`** inside an object stores its array at `object.<field>`:
 
 <block type="codeExample" uid="ce-29">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-29-javascript-dd9f7e"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-29-javascript-dd9f7e"}]}'>
 
 ### Javascript
 
@@ -467,7 +467,7 @@ A **`blocks_layout`** inside an object makes the object its own mini-container: 
 
 <block type="codeExample" uid="ce-31">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-31-javascript-f90eb4"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-31-javascript-f90eb4"}]}'>
 
 ### Javascript
 
@@ -504,7 +504,7 @@ Add `data-block-uid` to each child element. You don't need to mark the container
 
 <block type="codeExample" uid="ce-41">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-41-javascript-85a3e1"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-41-javascript-85a3e1"}]}'>
 
 ### Html
 
@@ -538,7 +538,7 @@ Set `addMode: 'table'` for table-like structures (rows containing cells). This l
 
 <block type="codeExample" uid="ce-45">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-45-javascript-1cff8e"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-45-javascript-1cff8e"}]}'>
 
 ### Javascript
 
@@ -586,7 +586,7 @@ The rules above mean a region with a `defaultBlockType`, or a single-entry `allo
 
 <block type="codeExample" uid="ce-53">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-53-javascript-f4d972"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-53-javascript-f4d972"}]}'>
 
 ### Javascript
 
@@ -623,7 +623,7 @@ The trap is a **custom** container renderer that only expects specific child typ
 
 <block type="codeExample" uid="ce-62">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-62-javascript-4ebff8"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-62-javascript-4ebff8"}]}'>
 
 ### Javascript
 
@@ -653,7 +653,7 @@ Declare `itemTypeField` on the *blocks field* — its value names a sibling fiel
 
 <block type="codeExample" uid="ce-68">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-68-javascript-cdad0c"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-68-javascript-cdad0c"}]}'>
 
 ### Javascript
 
@@ -698,7 +698,7 @@ On top of type syncing you can also have field *values* centrally controlled at 
 
 <block type="codeExample" uid="ce-72">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-72-javascript-521655"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-72-javascript-521655"}]}'>
 
 ### Javascript
 
@@ -727,7 +727,7 @@ The parent declares **what it claims** per child block type via `parentControlle
 
 <block type="codeExample" uid="ce-76">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-76-javascript-6b52c5"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-76-javascript-6b52c5"}]}'>
 
 ### Javascript
 

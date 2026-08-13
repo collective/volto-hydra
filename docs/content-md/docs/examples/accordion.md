@@ -43,7 +43,7 @@ A collapsible panel group. Each panel is an object\_list item with a title and a
 
 <block type="accordion" uid="41a82a93-c00c-4a40-bac8-53a3e3420c8e" data='{"collapsed":false,"filtering":false,"non_exclusive":false,"right_arrows":true,"styles":{}}'>
 
-<region name="panels" widget="object_list" repeat="h2" title="${1/text}" blocks="${2.../blocks_layout}" data='{"@ids":["bc2c120e-51df-4c47-b4d0-5a11311d020d","d2168440-888d-4081-8409-b59392abc189","b58c92b4-6604-4408-9039-a147965fa4bd","262a2478-3a63-445a-aab7-edf55cceebcf","d80e4d6f-b708-4f45-8c3a-fc8f8ccc07c0"]}'>
+<region name="panels" widget="object_list" repeat="h2" title="${1/text}" blocks="${2.../blocks_layout}" data='{"items":[{"@id":"bc2c120e-51df-4c47-b4d0-5a11311d020d","blocks_layout":{"items":["c85ec1d2-f371-4ed4-be65-8fa0a091b833"]}},{"@id":"d2168440-888d-4081-8409-b59392abc189","blocks_layout":{"items":["6e94c839-855c-43ff-92fa-a2f9dfac2bc9","1da28f76-9d9c-4a98-af0b-2e8c7abc1c35","ee0d02f1-ff2c-4dee-a79f-a1ed105cc84c","d754b95e-7fa8-4cbd-9997-f2bb6cde26df","b4536f61-92a1-4b65-aa40-c142d799f0ba","725bfc52-49f6-4e70-8d11-48c537cfb5ff","773db1b3-7504-40e2-bf09-ce96e31249b2","c0b3b08e-c350-43e6-84e9-787903d91f8c","1eb2924b-8de0-4152-8ae0-50eb27c3fad8","c3d2c41a-8e53-45a4-b212-cb54dad6045d","1060e842-2b14-43dc-9e43-c25022029a94","da31d046-9d5f-48db-9368-c5a943c35aa1","1becedb6-65f6-4bee-9b36-5c38deaa4141","11af3b59-7720-4875-b0b9-90be5807d476","89d2ea6e-b8fb-4d13-a251-37cc3bbb5961","05ee41f0-e8b8-4181-a773-366ca209dbc8","d77557e0-793a-408f-9940-a0ad80d3be8f","8f1ad076-32b9-432b-9308-8b0972a8f57e","c3344b1c-89b9-4119-993e-58ef6bece880","76ab99ce-789c-41b2-9df8-4322c8c8c1ad"]}},{"@id":"b58c92b4-6604-4408-9039-a147965fa4bd","blocks_layout":{"items":["eb600a9b-7400-4b4e-bb40-70ddb6911749","1b91cfac-d8a1-4327-9896-e8e3ee7a9c03","2b7a6783-7323-4fbd-b0a1-3d304b8a526a"]}},{"@id":"262a2478-3a63-445a-aab7-edf55cceebcf","blocks_layout":{"items":["c9580c7a-ab67-44f7-8532-59a4ba9fd846"]}},{"@id":"d80e4d6f-b708-4f45-8c3a-fc8f8ccc07c0","blocks_layout":{"items":["f56375fe-70a1-4ac1-a94c-adc9998db548"]}}]}'>
 
 ## Accordion with text
 
@@ -209,7 +209,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="accordion" uid="8f68209e-220e-4230-9d42-8b0602573bd9" data='{"collapsed":false,"filtering":false,"non_exclusive":false,"right_arrows":true,"styles":{"backgroundColor":"grey"}}'>
 
-<region name="panels" widget="object_list" repeat="h2" title="${1/text}" blocks="${2.../blocks_layout}" data='{"@ids":["39f75787-bd7a-42dc-ab40-a6c9dfd2a8f1","d2168440-888d-4081-8409-b59392abc189","b58c92b4-6604-4408-9039-a147965fa4bd","262a2478-3a63-445a-aab7-edf55cceebcf","d80e4d6f-b708-4f45-8c3a-fc8f8ccc07c0"]}'>
+<region name="panels" widget="object_list" repeat="h2" title="${1/text}" blocks="${2.../blocks_layout}" data='{"items":[{"@id":"39f75787-bd7a-42dc-ab40-a6c9dfd2a8f1","blocks_layout":{"items":["afacd5e4-5914-46b6-b9f9-ebd8bbda9d35"]}},{"@id":"d2168440-888d-4081-8409-b59392abc189","blocks_layout":{"items":["6e94c839-855c-43ff-92fa-a2f9dfac2bc9","1da28f76-9d9c-4a98-af0b-2e8c7abc1c35","ee0d02f1-ff2c-4dee-a79f-a1ed105cc84c","d754b95e-7fa8-4cbd-9997-f2bb6cde26df","b4536f61-92a1-4b65-aa40-c142d799f0ba","725bfc52-49f6-4e70-8d11-48c537cfb5ff","773db1b3-7504-40e2-bf09-ce96e31249b2","c0b3b08e-c350-43e6-84e9-787903d91f8c","1eb2924b-8de0-4152-8ae0-50eb27c3fad8","c3d2c41a-8e53-45a4-b212-cb54dad6045d","1060e842-2b14-43dc-9e43-c25022029a94","da31d046-9d5f-48db-9368-c5a943c35aa1","1becedb6-65f6-4bee-9b36-5c38deaa4141","11af3b59-7720-4875-b0b9-90be5807d476","89d2ea6e-b8fb-4d13-a251-37cc3bbb5961","05ee41f0-e8b8-4181-a773-366ca209dbc8","d77557e0-793a-408f-9940-a0ad80d3be8f","8f1ad076-32b9-432b-9308-8b0972a8f57e","c3344b1c-89b9-4119-993e-58ef6bece880","76ab99ce-789c-41b2-9df8-4322c8c8c1ad"]}},{"@id":"b58c92b4-6604-4408-9039-a147965fa4bd","blocks_layout":{"items":["eb600a9b-7400-4b4e-bb40-70ddb6911749","1b91cfac-d8a1-4327-9896-e8e3ee7a9c03","2b7a6783-7323-4fbd-b0a1-3d304b8a526a"]}},{"@id":"262a2478-3a63-445a-aab7-edf55cceebcf","blocks_layout":{"items":["c9580c7a-ab67-44f7-8532-59a4ba9fd846"]}},{"@id":"d80e4d6f-b708-4f45-8c3a-fc8f8ccc07c0","blocks_layout":{"items":["f56375fe-70a1-4ac1-a94c-adc9998db548"]}}]}'>
 
 ## Accordion with text
 
@@ -375,7 +375,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="codeExample" uid="ref-accordion-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-accordion" slotId="schema">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-accordion-schema-javascript-105cd5"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-accordion-schema-javascript-105cd5"}]}'>
 
 ### Schema
 
@@ -416,7 +416,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="codeExample" uid="ref-accordion-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-accordion" slotId="json-data">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-accordion-json-data-json-f4f899"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-accordion-json-data-json-f4f899"}]}'>
 
 ### JSON Block Data
 
@@ -458,7 +458,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="codeExample" uid="ref-accordion-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-accordion" slotId="rendering">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-accordion-rendering-jsx-951c40","ref-accordion-rendering-vue-e897ff","ref-accordion-rendering-svelte-a58cd5"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-accordion-rendering-jsx-951c40"},{"@id":"ref-accordion-rendering-vue-e897ff"},{"@id":"ref-accordion-rendering-svelte-a58cd5"}]}'>
 
 ### React
 

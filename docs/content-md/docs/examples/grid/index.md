@@ -70,7 +70,7 @@ A responsive grid that lays out child blocks in equal-width cells. The block use
 
 <block type="codeExample" uid="ref-grid-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="schema">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-grid-schema-javascript-af1095"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-grid-schema-javascript-af1095"}]}'>
 
 ### Schema
 
@@ -97,7 +97,7 @@ A responsive grid that lays out child blocks in equal-width cells. The block use
 
 <block type="codeExample" uid="ref-grid-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="json-data">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-grid-json-data-json-5ff79e"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-grid-json-data-json-5ff79e"}]}'>
 
 ### JSON Block Data
 
@@ -135,7 +135,7 @@ A responsive grid that lays out child blocks in equal-width cells. The block use
 
 <block type="codeExample" uid="ref-grid-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="rendering">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-grid-rendering-jsx-f30d80","ref-grid-rendering-vue-1d61ab","ref-grid-rendering-svelte-8158ec"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-grid-rendering-jsx-f30d80"},{"@id":"ref-grid-rendering-vue-1d61ab"},{"@id":"ref-grid-rendering-svelte-8158ec"}]}'>
 
 ### React
 

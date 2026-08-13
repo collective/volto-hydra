@@ -35,7 +35,7 @@ A carousel/slider that cycles through slides. Slides are stored as an object\_li
 
 <block type="codeExample" uid="ref-slider-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-slider" slotId="schema">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-slider-schema-javascript-ce9b5a"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-slider-schema-javascript-ce9b5a"}]}'>
 
 ### Schema
 
@@ -129,7 +129,7 @@ A carousel/slider that cycles through slides. Slides are stored as an object\_li
 
 <block type="codeExample" uid="ref-slider-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-slider" slotId="json-data">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-slider-json-data-json-c5167b"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-slider-json-data-json-c5167b"}]}'>
 
 ### JSON Block Data
 
@@ -175,7 +175,7 @@ A carousel/slider that cycles through slides. Slides are stored as an object\_li
 
 <block type="codeExample" uid="ref-slider-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-slider" slotId="rendering">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-slider-rendering-jsx-87bcad","ref-slider-rendering-vue-6e69c4","ref-slider-rendering-svelte-586973"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-slider-rendering-jsx-87bcad"},{"@id":"ref-slider-rendering-vue-6e69c4"},{"@id":"ref-slider-rendering-svelte-586973"}]}'>
 
 ### React
 

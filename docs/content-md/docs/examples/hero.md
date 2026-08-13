@@ -34,7 +34,7 @@ A full-width hero section with heading, subheading, image, rich text description
 
 <block type="codeExample" uid="ref-hero-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-hero" slotId="schema">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-hero-schema-javascript-698e6b"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-hero-schema-javascript-698e6b"}]}'>
 
 ### Schema
 
@@ -87,7 +87,7 @@ A full-width hero section with heading, subheading, image, rich text description
 
 <block type="codeExample" uid="ref-hero-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-hero" slotId="json-data">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-hero-json-data-json-fc17f8"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-hero-json-data-json-fc17f8"}]}'>
 
 ### JSON Block Data
 
@@ -122,7 +122,7 @@ A full-width hero section with heading, subheading, image, rich text description
 
 <block type="codeExample" uid="ref-hero-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-hero" slotId="rendering">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-hero-rendering-jsx-46a2e5","ref-hero-rendering-vue-337205","ref-hero-rendering-svelte-a2ecf7"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-hero-rendering-jsx-46a2e5"},{"@id":"ref-hero-rendering-vue-337205"},{"@id":"ref-hero-rendering-svelte-a2ecf7"}]}'>
 
 ### React
 

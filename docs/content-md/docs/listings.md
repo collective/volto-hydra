@@ -90,7 +90,7 @@ You tell it which block types need fetching via a `fetchItems` map — keys are 
 
 <block type="codeExample" uid="ce-4">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-4-javascript-17afd4"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-4-javascript-17afd4"}]}'>
 
 ### Javascript
 
@@ -118,7 +118,7 @@ A grid can have a mix of listing and static blocks sharing a single paging. The 
 
 <block type="codeExample" uid="ce-8">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-8-jsx-37efcc"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-8-jsx-37efcc"}]}'>
 
 ### Jsx
 
@@ -190,7 +190,7 @@ A listing with no `querystring` defaults to showing the current folder's content
 
 <block type="codeExample" uid="ce-16">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-16-json-38bb3a"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-16-json-38bb3a"}]}'>
 
 ### Json
 
@@ -220,7 +220,7 @@ Register them alongside `listing` in the `fetchItems` map:
 
 <block type="codeExample" uid="ce-23">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-23-json-6d0894"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-23-json-6d0894"}]}'>
 
 ### Javascript
 
@@ -252,7 +252,7 @@ Built-in item types and the fields they expose:
 
 <block type="codeExample" uid="ce-29">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-29-json-a7c4dc"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-29-json-a7c4dc"}]}'>
 
 ### Json
 
@@ -277,7 +277,7 @@ Use `variation` on the listing block to control what `@type` expanded items get.
 
 <block type="codeExample" uid="ce-32">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-32-javascript-f6757f"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-32-javascript-f6757f"}]}'>
 
 ### Javascript
 
@@ -319,7 +319,7 @@ A container (e.g. `gridBlock`) can mix **manual children** AND **a listing** as 
 
 <block type="codeExample" uid="ce-37">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-37-javascript-2ec596"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-37-javascript-2ec596"}]}'>
 
 ### Javascript
 
@@ -361,7 +361,7 @@ If your frontend embeds state in the URL path (like pagination), you need to tel
 
 <block type="codeExample" uid="ce-44">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-44-javascript-82ad8e"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-44-javascript-82ad8e"}]}'>
 
 ### Javascript
 

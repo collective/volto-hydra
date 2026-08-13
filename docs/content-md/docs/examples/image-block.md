@@ -134,7 +134,7 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 <block type="codeExample" uid="ref-image-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-image" slotId="schema">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-image-schema-javascript-979df6"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-image-schema-javascript-979df6"}]}'>
 
 ### Schema
 
@@ -174,7 +174,7 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 <block type="codeExample" uid="ref-image-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-image" slotId="json-data">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-image-json-data-json-ddd34d"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-image-json-data-json-ddd34d"}]}'>
 
 ### JSON Block Data
 
@@ -197,7 +197,7 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 <block type="codeExample" uid="ref-image-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-image" slotId="rendering">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-image-rendering-jsx-a59bc5","ref-image-rendering-vue-c3dead","ref-image-rendering-svelte-52a7e2"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-image-rendering-jsx-a59bc5"},{"@id":"ref-image-rendering-vue-c3dead"},{"@id":"ref-image-rendering-svelte-52a7e2"}]}'>
 
 ### React
 

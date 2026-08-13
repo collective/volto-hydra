@@ -71,7 +71,7 @@ The fix is to update only the smallest block that changed, and let the rest of t
 
 <block type="codeExample" uid="ce-7">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-7-text-316e7d"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-7-text-316e7d"}]}'>
 
 ### Text
 
@@ -125,7 +125,7 @@ That dispatch must also handle `@type: "empty"` — the placeholder Inka seeds i
 
 <block type="codeExample" uid="ce-17">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-17-astro-6cfb06"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-17-astro-6cfb06"}]}'>
 
 ### Js
 
@@ -147,7 +147,7 @@ initBridge({
 
 <block type="codeExample" uid="ce-18">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-18-ts-ad6a37"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-18-ts-ad6a37"}]}'>
 
 ### Astro
 
@@ -175,7 +175,7 @@ const uid  = block?.['@uid'];
 
 <block type="codeExample" uid="ce-19">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-19-ts-892388"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-19-ts-892388"}]}'>
 
 ### Ts
 
@@ -221,7 +221,7 @@ The full working example lives at [`docs/examples/test-astro/`](https://github.c
 
 <block type="codeExample" uid="ce-22">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-22-php-e87720"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-22-php-e87720"}]}'>
 
 ### Php
 
@@ -241,7 +241,7 @@ The full working example lives at [`docs/examples/test-astro/`](https://github.c
 
 <block type="codeExample" uid="ce-23">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-23-php-9a04e4"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-23-php-9a04e4"}]}'>
 
 ### Php
 
@@ -258,7 +258,7 @@ The full working example lives at [`docs/examples/test-astro/`](https://github.c
 
 <block type="codeExample" uid="ce-24">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-24-php-ebbd45"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-24-php-ebbd45"}]}'>
 
 ### Php
 
@@ -302,7 +302,7 @@ The HTML page that loads in the editor iframe just needs to pull in the bridge a
 
 <block type="codeExample" uid="ce-26">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-26-html-476b8c"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-26-html-476b8c"}]}'>
 
 ### Html
 

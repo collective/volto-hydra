@@ -125,7 +125,7 @@ Define custom block types directly in your frontend configuration via the `block
 
 <block type="codeExample" uid="ce-4">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-4-js-dec45b"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-4-js-dec45b"}]}'>
 
 ### Js
 
@@ -152,7 +152,7 @@ Defines the **blocks fields of a page** where blocks can live. `page.schema.prop
 
 <block type="codeExample" uid="ce-7">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-7-javascript-f817db"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-7-javascript-f817db"}]}'>
 
 ### Js
 
@@ -194,7 +194,7 @@ Defines or overrides individual block types. Each key is the block type name (ma
 
 <block type="codeExample" uid="ce-14">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-14-js-c5449c"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-14-js-c5449c"}]}'>
 
 ### Js
 
@@ -248,7 +248,7 @@ The `Bridge` instance, which exposes additional API methods you can call from th
 
 <block type="codeExample" uid="ce-23">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-23-javascript-a47dd8"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-23-javascript-a47dd8"}]}'>
 
 ### Javascript
 
@@ -324,7 +324,7 @@ Schema enhancers modify block schemas dynamically:
 
 <block type="codeExample" uid="ce-29">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-29-javascript-f2ef0c"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-29-javascript-f2ef0c"}]}'>
 
 ### Javascript
 
@@ -379,7 +379,7 @@ Two extras drive **position-** and \*\*type-\*\*aware rules:
 
 <block type="codeExample" uid="ce-38">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-38-javascript-4acd08"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-38-javascript-4acd08"}]}'>
 
 ### Javascript
 
@@ -407,7 +407,7 @@ For a **region** (an `object_list` field, or a single `blocks_layout` region nam
 
 <block type="codeExample" uid="ce-40">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-40-javascript-c0236e"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-40-javascript-c0236e"}]}'>
 
 ### Javascript
 
@@ -432,7 +432,7 @@ To condition on a block's **position** rather than a field value, use the virtua
 
 <block type="codeExample" uid="ce-42">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-42-javascript-bdaefa"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-42-javascript-bdaefa"}]}'>
 
 ### Javascript
 
@@ -479,7 +479,7 @@ Use these when blocks share fields that aren't part of the `@default` set — fo
 
 <block type="codeExample" uid="ce-53">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-53-javascript-6ea81c"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-53-javascript-6ea81c"}]}'>
 
 ### Javascript
 
@@ -514,7 +514,7 @@ checkboxFacet: { fieldMappings: { selectFacet: { /* ... */ }, daterangeFacet: { 
 
 <block type="codeExample" uid="ce-56">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-56-javascript-46bfa7"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-56-javascript-46bfa7"}]}'>
 
 ### Javascript
 
@@ -548,7 +548,7 @@ A `fieldMappings` value is usually a sibling **field name**. It may instead be a
 
 <block type="codeExample" uid="ce-61">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-61-javascript-9a6e0e"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-61-javascript-9a6e0e"}]}'>
 
 ### Javascript
 
@@ -582,7 +582,7 @@ The bridge converts on demand; a **`@type` rule** on a typed `object_list` field
 
 <block type="codeExample" uid="ce-66">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-66-javascript-11d07c"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-66-javascript-11d07c"}]}'>
 
 ### Javascript
 
@@ -633,7 +633,7 @@ A mapping value is either a string (simple field rename) or `{ field, type }` (r
 
 <block type="codeExample" uid="ce-79">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-79-json-1fc605"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-79-json-1fc605"}]}'>
 
 ### Json
 
@@ -671,7 +671,7 @@ When the editor pastes rich HTML into the page, Inka will eventually be able to 
 
 <block type="codeExample" uid="ce-88">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-88-javascript-e562d7"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-88-javascript-e562d7"}]}'>
 
 ### Javascript
 

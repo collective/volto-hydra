@@ -42,7 +42,7 @@ Pass this object inside the `blocks` option when calling `initBridge()` to regis
 
 <block type="codeExample" uid="tpl-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="schema">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["tpl-schema-javascript-000000"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"tpl-schema-javascript-000000"}]}'>
 
 ### Schema
 
@@ -68,7 +68,7 @@ Example JSON as stored in the Plone content API. This is the data structure your
 
 <block type="codeExample" uid="tpl-json" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-data">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["tpl-json-json-000000"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"tpl-json-json-000000"}]}'>
 
 ### JSON Block Data
 
@@ -94,7 +94,7 @@ How this block renders in your frontend. Add its handling to your renderer, or â
 
 <block type="codeExample" uid="tpl-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["tpl-rendering-jsx-000000","tpl-rendering-vue-000000","tpl-rendering-svelte-000000"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"tpl-rendering-jsx-000000"},{"@id":"tpl-rendering-vue-000000"},{"@id":"tpl-rendering-svelte-000000"}]}'>
 
 ### React
 

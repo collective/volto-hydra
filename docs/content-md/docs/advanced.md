@@ -65,7 +65,7 @@ This persists across SPA navigation within the iframe, allowing your frontend to
 
 <block type="codeExample" uid="ce-7">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-7-javascript-f6a08c"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-7-javascript-f6a08c"}]}'>
 
 ### Javascript
 
@@ -114,7 +114,7 @@ The `access_token` is passed as a URL parameter on initial load and automaticall
 
 <block type="codeExample" uid="ce-11">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-11-javascript-060e3a"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-11-javascript-060e3a"}]}'>
 
 ### Javascript
 
@@ -134,7 +134,7 @@ Example using Next.js 14 and ploneClient:
 
 <block type="codeExample" uid="ce-13">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-13-javascript-852336"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-13-javascript-852336"}]}'>
 
 ### Javascript
 

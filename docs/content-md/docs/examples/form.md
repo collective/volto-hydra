@@ -73,7 +73,7 @@ A multi-field form with configurable field types, validation, and email submissi
 
 <block type="codeExample" uid="ref-form-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form" slotId="schema">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-form-schema-javascript-2285e7"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-form-schema-javascript-2285e7"}]}'>
 
 ### Schema
 
@@ -564,7 +564,7 @@ A multi-field form with configurable field types, validation, and email submissi
 
 <block type="codeExample" uid="ref-form-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form" slotId="json-data">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-form-json-data-json-6e9c29"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-form-json-data-json-6e9c29"}]}'>
 
 ### JSON Block Data
 
@@ -622,7 +622,7 @@ A multi-field form with configurable field types, validation, and email submissi
 
 <block type="codeExample" uid="ref-form-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form" slotId="rendering">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-form-rendering-jsx-29590c","ref-form-rendering-vue-3f1bde","ref-form-rendering-svelte-f8f39b"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-form-rendering-jsx-29590c"},{"@id":"ref-form-rendering-vue-3f1bde"},{"@id":"ref-form-rendering-svelte-f8f39b"}]}'>
 
 ### React
 

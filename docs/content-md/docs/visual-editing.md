@@ -98,7 +98,7 @@ Example of a fully annotated slide block:
 
 <block type="codeExample" uid="ce-5">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-5-html-6481c1"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-5-html-6481c1"}]}'>
 
 ### Html
 
@@ -125,7 +125,7 @@ If you can't modify the markup (e.g., using a 3rd party component library), use 
 
 <block type="codeExample" uid="ce-8">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-8-html-5005a4"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-8-html-5005a4"}]}'>
 
 ### Html
 
@@ -159,7 +159,7 @@ Render optional fields **data-driven**: no data, no element. Don't render an emp
 
 <block type="codeExample" uid="ce-13">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-13-html-20bcae"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-13-html-20bcae"}]}'>
 
 ### Jsx
 
@@ -186,7 +186,7 @@ Add `data-linkable-allow` to elements that should navigate during edit mode (pag
 
 <block type="codeExample" uid="ce-20">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-20-html-da86a1"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-20-html-da86a1"}]}'>
 
 ### Html
 
@@ -220,7 +220,7 @@ The two compose: `../content/headline` is "the parent block, its `content.headli
 
 <block type="codeExample" uid="ce-29">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-29-html-a5e4fc"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-29-html-a5e4fc"}]}'>
 
 ### Html
 
@@ -250,7 +250,7 @@ Add `data-block-readonly` (or `<!-- hydra block-readonly -->` comment) to disabl
 
 <block type="codeExample" uid="ce-33">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-33-html-6eefe4"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-33-html-6eefe4"}]}'>
 
 ### Html
 
@@ -271,7 +271,7 @@ Or using comment syntax:
 
 <block type="codeExample" uid="ce-35">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-35-html-9626f2"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-35-html-9626f2"}]}'>
 
 ### Html
 
@@ -299,7 +299,7 @@ hydra.js uses node-ids to map between Slate's data model and your DOM. When rest
 
 <block type="codeExample" uid="ce-42">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-42-html-7ddfd5"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-42-html-7ddfd5"}]}'>
 
 ### Html
 
@@ -328,7 +328,7 @@ hydra's DOM→Slate reader skips any child (without a `data-node-id`) that carri
 
 <block type="codeExample" uid="ce-47">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-47-html-a67f8c"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-47-html-a67f8c"}]}'>
 
 ### Html
 
@@ -361,7 +361,7 @@ Slate data structure (value is an array but always contains a single root node):
 
 <block type="codeExample" uid="ce-56">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-56-json-a0b37e"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-56-json-a0b37e"}]}'>
 
 ### Json
 
@@ -392,7 +392,7 @@ Renderer:
 
 <block type="codeExample" uid="ce-58">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-58-javascript-3cee82"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-58-javascript-3cee82"}]}'>
 
 ### Javascript
 
@@ -417,7 +417,7 @@ Usage:
 
 <block type="codeExample" uid="ce-60">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-60-html-7e15f3"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-60-html-7e15f3"}]}'>
 
 ### Html
 

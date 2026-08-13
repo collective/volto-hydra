@@ -91,7 +91,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="codeExample" uid="ref-heading-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="schema">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-heading-schema-javascript-f00bc9"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-heading-schema-javascript-f00bc9"}]}'>
 
 ### Schema
 
@@ -145,7 +145,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="codeExample" uid="ref-heading-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="json-data">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-heading-json-data-json-87c435"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-heading-json-data-json-87c435"}]}'>
 
 ### JSON Block Data
 
@@ -163,7 +163,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="codeExample" uid="ref-heading-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="rendering">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-heading-rendering-jsx-eb01a3","ref-heading-rendering-vue-754dc2","ref-heading-rendering-svelte-f5f71c"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-heading-rendering-jsx-eb01a3"},{"@id":"ref-heading-rendering-vue-754dc2"},{"@id":"ref-heading-rendering-svelte-f5f71c"}]}'>
 
 ### React
 

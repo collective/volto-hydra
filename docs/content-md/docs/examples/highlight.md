@@ -66,7 +66,7 @@ A prominent content section with a background image, overlay, title, rich text b
 
 <block type="codeExample" uid="ref-highlight-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-highlight" slotId="schema">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-highlight-schema-javascript-80590c"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-highlight-schema-javascript-80590c"}]}'>
 
 ### Schema
 
@@ -106,7 +106,7 @@ A prominent content section with a background image, overlay, title, rich text b
 
 <block type="codeExample" uid="ref-highlight-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-highlight" slotId="json-data">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-highlight-json-data-json-a2bfa3"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-highlight-json-data-json-a2bfa3"}]}'>
 
 ### JSON Block Data
 
@@ -140,7 +140,7 @@ A prominent content section with a background image, overlay, title, rich text b
 
 <block type="codeExample" uid="ref-highlight-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-highlight" slotId="rendering">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-highlight-rendering-jsx-659b6c","ref-highlight-rendering-vue-dd8730","ref-highlight-rendering-svelte-d3a4c8"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ref-highlight-rendering-jsx-659b6c"},{"@id":"ref-highlight-rendering-vue-dd8730"},{"@id":"ref-highlight-rendering-svelte-d3a4c8"}]}'>
 
 ### React
 

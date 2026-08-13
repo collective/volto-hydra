@@ -50,7 +50,7 @@ Call `initBridge()` with an `onEditChange` callback to receive live content upda
 
 <block type="codeExample" uid="ce-5">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-5-javascript-3259a0"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-5-javascript-3259a0"}]}'>
 
 ### Javascript
 
@@ -81,7 +81,7 @@ Iterate `blocks_layout.items` and render each block by type. Add `data-block-uid
 
 <block type="codeExample" uid="ce-10">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-10-javascript-23153e"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-10-javascript-23153e"}]}'>
 
 ### Javascript
 
@@ -138,7 +138,7 @@ When initialising the bridge, you can configure rules for what blocks can be add
 
 <block type="codeExample" uid="ce-13">
 
-<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-13-javascript-4aeb0d"]}'>
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"items":[{"@id":"ce-13-javascript-4aeb0d"}]}'>
 
 ### Javascript
 
