@@ -56,6 +56,13 @@ jobs:
         # would be served -- not a file diff, which would pass on output that
         # no longer loads.
         run: pnpm check:content-md
+      - name: Check markdown and JSON serve the same content
+        # The stronger check: serve both formats and diff every path through
+        # the API. The item-level check above compares a fixed list of keys and
+        # passed while a Link's remoteUrl and every Event's start/end/location
+        # were being dropped -- comparing what is actually served has no list
+        # to be wrong about.
+        run: pnpm check:content-parity
       - name: Run mock-api unit tests (node:test)
         # Plone 6.2 fidelity coverage (@aliases, SearchableText prefix
         # match, navigation, folder ordering). Was not previously wired

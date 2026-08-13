@@ -395,6 +395,13 @@ function transformBlobPaths(content, fullUrl) {
       };
     }
   }
+  // A File's `file` field needs the same treatment. It was left out, so
+  // blob_path — an export-layout detail no client should see — was served
+  // raw, where real Plone returns a download URL.
+  if (result.file?.blob_path) {
+    const { blob_path, ...rest } = result.file;
+    result.file = { ...rest, download: `${fullUrl}/@@download/file` };
+  }
   return result;
 }
 

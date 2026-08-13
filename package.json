@@ -50,7 +50,8 @@
     "build-storybook": "VOLTOCONFIG=$(pwd)/volto.config.js storybook build -c $(pwd)/.storybook",
     "example:nextjs": "pnpm --filter hydra-nextjs run dev",
     "example:nuxt": "pnpm --filter nuxt-blog-starter install && pnpm --filter nuxt-blog-starter run dev",
-    "check:content-md": "node proposals/blockmd/import-tree.mjs --diff"
+    "check:content-md": "node proposals/blockmd/import-tree.mjs --diff",
+    "check:content-parity": "node proposals/blockmd/check-parity.mjs"
   },
   "dependencies": {
     "@plone/volto": "workspace:*",
