@@ -41,7 +41,7 @@ A multi-field form with configurable field types, validation, and email submissi
 :::
 
 :::form{uid="3687103d-0766-4d5e-8aae-fc7e65c457a6" default_from="noreply@plone.org" lastChange=1710238630312 remove_data_after_days=-1 send_email=true show_cancel=false store=true title="A simple form"}
-::::subblocks[items]
+::::subblocks[object_list]
 :::subblock{field_id="1709833577467" field_type="text" id="1709833577467" label="Name" required=true}
 :::
 :::subblock{field_id="1709833592544" field_type="from" id="1709833592544" label="Email" required=false use_as_bcc=false use_as_reply_to=false}
@@ -83,7 +83,7 @@ A multi-field form with configurable field types, validation, and email submissi
 :::
 
 :::codeExample{uid="ref-form-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form" slotId="schema"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-form-schema-javascript-2285e7"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-form-schema-javascript-2285e7"]}
 ### Schema
 
 ```javascript
@@ -570,7 +570,7 @@ A multi-field form with configurable field types, validation, and email submissi
 :::
 
 :::codeExample{uid="ref-form-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form" slotId="json-data"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-form-json-data-json-6e9c29"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-form-json-data-json-6e9c29"]}
 ### JSON Block Data
 
 ```json
@@ -624,7 +624,7 @@ A multi-field form with configurable field types, validation, and email submissi
 :::
 
 :::codeExample{uid="ref-form-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form" slotId="rendering"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-form-rendering-jsx-29590c","ref-form-rendering-vue-3f1bde","ref-form-rendering-svelte-f8f39b"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-form-rendering-jsx-29590c","ref-form-rendering-vue-3f1bde","ref-form-rendering-svelte-f8f39b"]}
 ### React
 
 ```jsx

@@ -152,7 +152,7 @@ Displays a list of content items from a query. The listing block fetches items f
  "styles": {}
 }
 ```
-::::slides[items]
+::::slides[object_list]
 :::listing{uid="slider-listing-1" variation="image"}
 ```fields
 {
@@ -180,7 +180,7 @@ Displays a list of content items from a query. The listing block fetches items f
 :::
 
 :::codeExample{uid="ref-listing-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="schema"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-listing-schema-javascript-bd0476"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-listing-schema-javascript-bd0476"]}
 ### Schema
 
 ```javascript
@@ -260,7 +260,7 @@ Displays a list of content items from a query. The listing block fetches items f
 :::
 
 :::codeExample{uid="ref-listing-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="json-data"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-listing-json-data-json-829696"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-listing-json-data-json-829696"]}
 ### JSON Block Data
 
 ```json
@@ -295,7 +295,7 @@ Displays a list of content items from a query. The listing block fetches items f
 :::
 
 :::codeExample{uid="ref-listing-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="rendering"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-listing-rendering-jsx-f33c73","ref-listing-rendering-vue-3c4a00","ref-listing-rendering-svelte-aca768"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-listing-rendering-jsx-f33c73","ref-listing-rendering-vue-3c4a00","ref-listing-rendering-svelte-aca768"]}
 ### React
 
 ```jsx

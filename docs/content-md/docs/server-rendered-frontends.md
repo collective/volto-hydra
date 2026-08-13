@@ -71,7 +71,7 @@ The fix is to update only the smallest block that changed, and let the rest of t
 ## How it works
 
 :::codeExample{uid="ce-7"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-7-text-316e7d"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-7-text-316e7d"]}
 ### Text
 
 ```text
@@ -121,7 +121,7 @@ That dispatch must also handle `@type: "empty"` — the placeholder Inka seeds i
 ## Worked example: Astro
 
 :::codeExample{uid="ce-17"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-17-astro-6cfb06"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-17-astro-6cfb06"]}
 ### Js
 
 ```js
@@ -139,7 +139,7 @@ initBridge({
 :::
 
 :::codeExample{uid="ce-18"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-18-ts-ad6a37"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-18-ts-ad6a37"]}
 ### Astro
 
 ```astro
@@ -163,7 +163,7 @@ const uid  = block?.['@uid'];
 :::
 
 :::codeExample{uid="ce-19"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-19-ts-892388"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-19-ts-892388"]}
 ### Ts
 
 ```ts
@@ -205,7 +205,7 @@ The full working example lives at [`docs/examples/test-astro/`](https://github.c
 ## Worked example: PHP
 
 :::codeExample{uid="ce-22"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-22-php-e87720"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-22-php-e87720"]}
 ### Php
 
 ```php
@@ -221,7 +221,7 @@ The full working example lives at [`docs/examples/test-astro/`](https://github.c
 :::
 
 :::codeExample{uid="ce-23"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-23-php-9a04e4"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-23-php-9a04e4"]}
 ### Php
 
 ```php
@@ -234,7 +234,7 @@ The full working example lives at [`docs/examples/test-astro/`](https://github.c
 :::
 
 :::codeExample{uid="ce-24"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-24-php-ebbd45"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-24-php-ebbd45"]}
 ### Php
 
 ```php
@@ -274,7 +274,7 @@ function find_block_by_id($data, $blockId) {
 The HTML page that loads in the editor iframe just needs to pull in the bridge and call `initBridge` with the endpoint:
 
 :::codeExample{uid="ce-26"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-26-html-476b8c"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-26-html-476b8c"]}
 ### Html
 
 ```html

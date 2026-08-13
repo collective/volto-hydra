@@ -51,7 +51,7 @@ To make your site editable with Inka you load hydra.js in your frontend and call
 Call `initBridge()` with an `onEditChange` callback to receive live content updates as the user edits. Your frontend re-renders in real time. Outside edit mode, fetch content from the API as normal.
 
 :::codeExample{uid="ce-5"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-5-javascript-3259a0"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-5-javascript-3259a0"]}
 ### Javascript
 
 ```javascript
@@ -78,7 +78,7 @@ Either hashbang (`/#!/path`) or normal (`/path`) style paths are supported.
 Iterate `blocks_layout.items` and render each block by type. Add `data-block-uid` so Inka knows which block the user clicked.
 
 :::codeExample{uid="ce-10"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-10-javascript-23153e"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-10-javascript-23153e"]}
 ### Javascript
 
 ```javascript
@@ -131,7 +131,7 @@ Iterate `blocks_layout.items` and render each block by type. Add `data-block-uid
 When initialising the bridge, you can configure rules for what blocks can be added to the page and where. Pages can have multiple blocks fields for different regions (e.g., header, content, footer), each with its own allowed block types and limits. These show as separate sections in the sidebar when no block is selected:
 
 :::codeExample{uid="ce-13"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-13-javascript-4aeb0d"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-13-javascript-4aeb0d"]}
 ### Javascript
 
 ```javascript

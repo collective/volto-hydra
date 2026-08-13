@@ -43,7 +43,7 @@ Pass this object inside the `blocks` option when calling `initBridge()` to regis
 :::
 
 :::codeExample{uid="tpl-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="schema"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["tpl-schema-javascript-000000"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["tpl-schema-javascript-000000"]}
 ### Schema
 
 ```javascript
@@ -61,7 +61,7 @@ Example JSON as stored in the Plone content API. This is the data structure your
 :::
 
 :::codeExample{uid="tpl-json" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-data"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["tpl-json-json-000000"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["tpl-json-json-000000"]}
 ### JSON Block Data
 
 ```json
@@ -79,7 +79,7 @@ How this block renders in your frontend. Add its handling to your renderer, or â
 :::
 
 :::codeExample{uid="tpl-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["tpl-rendering-jsx-000000","tpl-rendering-vue-000000","tpl-rendering-svelte-000000"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["tpl-rendering-jsx-000000","tpl-rendering-vue-000000","tpl-rendering-svelte-000000"]}
 ### React
 
 ```jsx

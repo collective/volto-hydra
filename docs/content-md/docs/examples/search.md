@@ -90,7 +90,7 @@ A search interface with faceted filtering. Contains a child listing block for re
  }
 }
 ```
-::::listing[blocks]
+::::listing[blocks_layout]
 :::listing{uid="facet-listing" variation="summary"}
 ```fields
 {
@@ -128,7 +128,7 @@ A search interface with faceted filtering. Contains a child listing block for re
  }
 }
 ```
-::::listing[blocks]
+::::listing[blocks_layout]
 :::listing{uid="simple-listing" variation="default"}
 ```fields
 {
@@ -150,7 +150,7 @@ A search interface with faceted filtering. Contains a child listing block for re
 :::
 
 :::codeExample{uid="ref-search-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-search" slotId="schema"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-search-schema-javascript-8711ec"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-search-schema-javascript-8711ec"]}
 ### Schema
 
 ```javascript
@@ -265,7 +265,7 @@ A search interface with faceted filtering. Contains a child listing block for re
 :::
 
 :::codeExample{uid="ref-search-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-search" slotId="json-data"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-search-json-data-json-155258"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-search-json-data-json-155258"]}
 ### JSON Block Data
 
 ```json
@@ -318,7 +318,7 @@ A search interface with faceted filtering. Contains a child listing block for re
 :::
 
 :::codeExample{uid="ref-search-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-search" slotId="rendering"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-search-rendering-jsx-dd082e","ref-search-rendering-vue-3c1873","ref-search-rendering-svelte-7ba7ad"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-search-rendering-jsx-dd082e","ref-search-rendering-vue-3c1873","ref-search-rendering-svelte-7ba7ad"]}
 ### React
 
 ```jsx

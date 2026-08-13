@@ -131,7 +131,7 @@ Secure, scalable Plone backend. Host anywhere, control your costs and security.
 ## Quick Start
 
 :::codeExample{uid="quickstart-code"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["tab-nuxt","tab-nextjs","tab-svelte","tab-vanilla","tab-astro"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["tab-nuxt","tab-nextjs","tab-svelte","tab-vanilla","tab-astro"]}
 ### Nuxt.js
 
 ```vue
@@ -427,7 +427,7 @@ export const POST = async ({ request }) => {
  "styles": {}
 }
 ```
-::::slides[items]
+::::slides[object_list]
 :::slide{uid="b09f39ea-36c3-4f09-9a18-30aef3565a22" buttonText="See all Content Types" description="You can log in and experience currently working features (Volto like but on any frontend)" flagAlign="left" head_title="Welcome to Inka" title="You can use this site to test Inka"}
 ```fields
 {

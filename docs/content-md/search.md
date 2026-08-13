@@ -38,7 +38,7 @@ blocks:
  ]
 }
 ```
-::::listing[blocks]
+::::listing[blocks_layout]
 :::listing{uid="results-listing" variation="default"}
 ```fields
 {

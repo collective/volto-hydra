@@ -499,7 +499,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidu
 :::
 
 :::codeExample{uid="ref-button-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-button" slotId="schema"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-button-schema-javascript-8aa182"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-button-schema-javascript-8aa182"]}
 ### Schema
 
 ```javascript
@@ -543,7 +543,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidu
 :::
 
 :::codeExample{uid="ref-button-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-button" slotId="json-data"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-button-json-data-json-ed3030"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-button-json-data-json-ed3030"]}
 ### JSON Block Data
 
 ```json
@@ -561,7 +561,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidu
 :::
 
 :::codeExample{uid="ref-button-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-button" slotId="rendering"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-button-rendering-jsx-ab4e0b","ref-button-rendering-vue-e704dd","ref-button-rendering-svelte-a8e495"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-button-rendering-jsx-ab4e0b","ref-button-rendering-vue-e704dd","ref-button-rendering-svelte-a8e495"]}
 ### React
 
 ```jsx

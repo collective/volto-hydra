@@ -114,7 +114,7 @@ Templates are analogous to blocks themselves but are made up of blocks with spec
 The slot a block lives in is identified by its `slotId`. This is the field name used by `expandTemplates` / `expandTemplatesSync` and by the merge rules below — not `placeholder`.
 
 :::codeExample{uid="ce-9"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-9-json-da054f"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-9-json-da054f"]}
 ### Json
 
 ```json
@@ -497,7 +497,7 @@ Everything else is identical: every object\_list item still needs a `slotId` (pl
 The merge identifies object\_list items by their **id field**, and it varies per field — a form's `subblocks` key on `field_id`, a slider's `slides` on `@id`, a table's `rows` on `key`. A frontend has no schema, so whenever you expand a template or layout that contains an object\_list container you MUST tell the merge each field's id field via an **`idFieldMap`** (`{ blockType: { field: idField } }`). Without it the merge falls back to `@id` — and for a `field_id`-keyed field that mints a broken id and the item is dropped on the next merge.
 
 :::codeExample{uid="ce-32"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-32-javascript-403dc6"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-32-javascript-403dc6"]}
 ### Javascript
 
 ```javascript
@@ -519,7 +519,7 @@ const items = expandTemplatesSync(layout, {
 Configure templates in `page.schema.properties` on the blocks field:
 
 :::codeExample{uid="ce-36"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-36-javascript-336b9b"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-36-javascript-336b9b"]}
 ### Javascript
 
 ```javascript
@@ -559,7 +559,7 @@ Use `expandTemplates` (async) or `expandTemplatesSync` (sync with pre-fetched te
 **`loadTemplates(data, loadTemplate)`** scans page data for `templateId` references and loads them all in parallel. It follows nested references (templates referencing other templates) and has a 5s per-template timeout. It only loads templates actually in the page data — `allowedLayouts` options are loaded on demand when a forced layout is applied.
 
 :::codeExample{uid="ce-45"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-45-javascript-f2cdf9"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-45-javascript-f2cdf9"]}
 ### Javascript
 
 ```javascript
@@ -620,7 +620,7 @@ When a layout is applied, the rules are the same but applied across a whole bloc
 - Otherwise it is dropped
 
 :::codeExample{uid="ce-53"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-53-bash-8d3958"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-53-bash-8d3958"]}
 ### Diagram
 
 ```bash
@@ -638,7 +638,7 @@ A **forced layout** (`allowedLayouts`) is applied **automatically across a whole
 Pass a static layout to always force one (e.g. a footer):
 
 :::codeExample{uid="ce-57"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-57-javascript-4b24e8"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-57-javascript-4b24e8"]}
 ### Javascript
 
 ```javascript
@@ -662,7 +662,7 @@ const items = await expandTemplates(layout, {
 `allowedLayouts` is just a value you compute, so apply whatever rule you like — content type, metadata, route, A/B bucket — then pass the result. Pass `undefined` (or omit it) to force nothing; pass **several** to let the editor pick from the Layout dropdown (include `null` for a "no layout" option).
 
 :::codeExample{uid="ce-60"}
-::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-60-javascript-0dbe99"]}
+::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-60-javascript-0dbe99"]}
 ### Javascript
 
 ```javascript
