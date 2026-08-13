@@ -115,7 +115,16 @@ This works across pages — copy a block on one page, navigate to another, paste
 
 In block mode (after pressing `Escape`):
 
-<block type="slateTable" uid="tbl-26" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-26-r0","cells":[{"key":"tbl-26-r0c0","type":"header","value":[{"type":"p","children":[{"text":"Key"}]}]},{"key":"tbl-26-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Effect"}]}]}]},{"key":"tbl-26-r1","cells":[{"key":"tbl-26-r1c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"Arrow Up"}]},{"text":" / "},{"type":"code","children":[{"text":"Arrow Down"}]}]}]},{"key":"tbl-26-r1c1","type":"data","value":[{"type":"p","children":[{"text":"Move selection to previous / next sibling"}]}]}]},{"key":"tbl-26-r2","cells":[{"key":"tbl-26-r2c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"Enter"}]}]}]},{"key":"tbl-26-r2c1","type":"data","value":[{"type":"p","children":[{"text":"Add a new block after this one"}]}]}]},{"key":"tbl-26-r3","cells":[{"key":"tbl-26-r3c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"Delete"}]},{"text":" / "},{"type":"code","children":[{"text":"Backspace"}]}]}]},{"key":"tbl-26-r3c1","type":"data","value":[{"type":"p","children":[{"text":"Remove the selected block(s)"}]}]}]},{"key":"tbl-26-r4","cells":[{"key":"tbl-26-r4c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"Escape"}]}]}]},{"key":"tbl-26-r4c1","type":"data","value":[{"type":"p","children":[{"text":"Go up to the parent container (or deselect)"}]}]}]}]}}' />
+<block type="slateTable" uid="tbl-26" table.rows="${1/rows}" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-26-r0","cells":[{"key":"tbl-26-r0c0"},{"key":"tbl-26-r0c1"}]},{"key":"tbl-26-r1","cells":[{"key":"tbl-26-r1c0"},{"key":"tbl-26-r1c1"}]},{"key":"tbl-26-r2","cells":[{"key":"tbl-26-r2c0"},{"key":"tbl-26-r2c1"}]},{"key":"tbl-26-r3","cells":[{"key":"tbl-26-r3c0"},{"key":"tbl-26-r3c1"}]},{"key":"tbl-26-r4","cells":[{"key":"tbl-26-r4c0"},{"key":"tbl-26-r4c1"}]}]}}'>
+
+| Key | Effect |
+| --- | --- |
+| `Arrow Up` / `Arrow Down` | Move selection to previous / next sibling |
+| `Enter` | Add a new block after this one |
+| `Delete` / `Backspace` | Remove the selected block(s) |
+| `Escape` | Go up to the parent container (or deselect) |
+
+</block>
 
 `Arrow Up/Down` is **container-aware** — it walks across container boundaries. Pressing Down on the last block of a column jumps into the next column rather than getting stuck.
 

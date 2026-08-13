@@ -45,5 +45,10 @@
         "description": "${3/text}"
       }
     }
+  },
+  "slateTable": {
+    "table": {
+      "field": "table"
+    }
   }
 }

@@ -74,11 +74,30 @@ When you're typing in a slate field, certain markdown patterns are converted aut
 
 ### Block-level (start of a line, then space)
 
-<block type="slateTable" uid="tbl-10" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-10-r0","cells":[{"key":"tbl-10-r0c0","type":"header","value":[{"type":"p","children":[{"text":"Type"}]}]},{"key":"tbl-10-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Becomes"}]}]}]},{"key":"tbl-10-r1","cells":[{"key":"tbl-10-r1c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"## "}]}]}]},{"key":"tbl-10-r1c1","type":"data","value":[{"type":"p","children":[{"text":"Heading 2"}]}]}]},{"key":"tbl-10-r2","cells":[{"key":"tbl-10-r2c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"### "}]}]}]},{"key":"tbl-10-r2c1","type":"data","value":[{"type":"p","children":[{"text":"Heading 3"}]}]}]},{"key":"tbl-10-r3","cells":[{"key":"tbl-10-r3c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"> "}]}]}]},{"key":"tbl-10-r3c1","type":"data","value":[{"type":"p","children":[{"text":"Blockquote"}]}]}]},{"key":"tbl-10-r4","cells":[{"key":"tbl-10-r4c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"- "}]},{"text":", "},{"type":"code","children":[{"text":"+ "}]},{"text":", "},{"type":"code","children":[{"text":"* "}]}]}]},{"key":"tbl-10-r4c1","type":"data","value":[{"type":"p","children":[{"text":"Bulleted list"}]}]}]},{"key":"tbl-10-r5","cells":[{"key":"tbl-10-r5c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"1. "}]},{"text":", "},{"type":"code","children":[{"text":"1) "}]}]}]},{"key":"tbl-10-r5c1","type":"data","value":[{"type":"p","children":[{"text":"Numbered list"}]}]}]}]}}' />
+<block type="slateTable" uid="tbl-10" table.rows="${1/rows}" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-10-r0","cells":[{"key":"tbl-10-r0c0"},{"key":"tbl-10-r0c1"}]},{"key":"tbl-10-r1","cells":[{"key":"tbl-10-r1c0"},{"key":"tbl-10-r1c1"}]},{"key":"tbl-10-r2","cells":[{"key":"tbl-10-r2c0"},{"key":"tbl-10-r2c1"}]},{"key":"tbl-10-r3","cells":[{"key":"tbl-10-r3c0"},{"key":"tbl-10-r3c1"}]},{"key":"tbl-10-r4","cells":[{"key":"tbl-10-r4c0"},{"key":"tbl-10-r4c1"}]},{"key":"tbl-10-r5","cells":[{"key":"tbl-10-r5c0"},{"key":"tbl-10-r5c1"}]}]}}'>
+
+| Type | Becomes |
+| --- | --- |
+| `## ` | Heading 2 |
+| `### ` | Heading 3 |
+| `> ` | Blockquote |
+| `- `, `+ `, `* ` | Bulleted list |
+| `1. `, `1) ` | Numbered list |
+
+</block>
 
 ### Inline (around selected/typed text)
 
-<block type="slateTable" uid="tbl-12" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-12-r0","cells":[{"key":"tbl-12-r0c0","type":"header","value":[{"type":"p","children":[{"text":"Type"}]}]},{"key":"tbl-12-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Becomes"}]}]}]},{"key":"tbl-12-r1","cells":[{"key":"tbl-12-r1c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"`code`"}]}]}]},{"key":"tbl-12-r1c1","type":"data","value":[{"type":"p","children":[{"text":"inline code"}]}]}]},{"key":"tbl-12-r2","cells":[{"key":"tbl-12-r2c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"**bold**"}]},{"text":" or "},{"type":"code","children":[{"text":"__bold__"}]}]}]},{"key":"tbl-12-r2c1","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"bold"}]}]}]}]},{"key":"tbl-12-r3","cells":[{"key":"tbl-12-r3c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"*italic*"}]},{"text":" or "},{"type":"code","children":[{"text":"_italic_"}]}]}]},{"key":"tbl-12-r3c1","type":"data","value":[{"type":"p","children":[{"type":"em","children":[{"text":"italic"}]}]}]}]},{"key":"tbl-12-r4","cells":[{"key":"tbl-12-r4c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"~~strikethrough~~"}]}]}]},{"key":"tbl-12-r4c1","type":"data","value":[{"type":"p","children":[{"type":"del","children":[{"text":"strikethrough"}]}]}]}]}]}}' />
+<block type="slateTable" uid="tbl-12" table.rows="${1/rows}" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-12-r0","cells":[{"key":"tbl-12-r0c0"},{"key":"tbl-12-r0c1"}]},{"key":"tbl-12-r1","cells":[{"key":"tbl-12-r1c0"},{"key":"tbl-12-r1c1"}]},{"key":"tbl-12-r2","cells":[{"key":"tbl-12-r2c0"},{"key":"tbl-12-r2c1"}]},{"key":"tbl-12-r3","cells":[{"key":"tbl-12-r3c0"},{"key":"tbl-12-r3c1"}]},{"key":"tbl-12-r4","cells":[{"key":"tbl-12-r4c0"},{"key":"tbl-12-r4c1"}]}]}}'>
+
+| Type | Becomes |
+| --- | --- |
+| `` `code` `` | inline code |
+| `**bold**` or `__bold__` | **bold** |
+| `*italic*` or `_italic_` | *italic* |
+| `~~strikethrough~~` | ~~strikethrough~~ |
+
+</block>
 
 ### Backspace-at-start: unwrap
 

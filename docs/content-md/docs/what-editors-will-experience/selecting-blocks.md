@@ -176,7 +176,16 @@ Press `Escape` again to **deselect** (or go up to the parent container if this b
 
 You can select multiple blocks at once and operate on the group.
 
-<block type="slateTable" uid="tbl-13" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-13-r0","cells":[{"key":"tbl-13-r0c0","type":"header","value":[{"type":"p","children":[{"text":"Action"}]}]},{"key":"tbl-13-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Result"}]}]}]},{"key":"tbl-13-r1","cells":[{"key":"tbl-13-r1c0","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"Shift+Click"}]},{"text":" (in block mode)"}]}]},{"key":"tbl-13-r1c1","type":"data","value":[{"type":"p","children":[{"text":"Select range from currently-selected block to the clicked one"}]}]}]},{"key":"tbl-13-r2","cells":[{"key":"tbl-13-r2c0","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"Ctrl+Click / Cmd+Click"}]},{"text":" (any mode)"}]}]},{"key":"tbl-13-r2c1","type":"data","value":[{"type":"p","children":[{"text":"Toggle the clicked block in/out of the selection"}]}]}]},{"key":"tbl-13-r3","cells":[{"key":"tbl-13-r3c0","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"Shift+Arrow Up/Down"}]},{"text":" (block mode)"}]}]},{"key":"tbl-13-r3c1","type":"data","value":[{"type":"p","children":[{"text":"Extend or shrink the selection by one block"}]}]}]},{"key":"tbl-13-r4","cells":[{"key":"tbl-13-r4c0","type":"data","value":[{"type":"p","children":[{"text":"Plain click"}]}]},{"key":"tbl-13-r4c1","type":"data","value":[{"type":"p","children":[{"text":"Clears multi-selection, selects only the clicked block"}]}]}]}]}}' />
+<block type="slateTable" uid="tbl-13" table.rows="${1/rows}" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-13-r0","cells":[{"key":"tbl-13-r0c0"},{"key":"tbl-13-r0c1"}]},{"key":"tbl-13-r1","cells":[{"key":"tbl-13-r1c0"},{"key":"tbl-13-r1c1"}]},{"key":"tbl-13-r2","cells":[{"key":"tbl-13-r2c0"},{"key":"tbl-13-r2c1"}]},{"key":"tbl-13-r3","cells":[{"key":"tbl-13-r3c0"},{"key":"tbl-13-r3c1"}]},{"key":"tbl-13-r4","cells":[{"key":"tbl-13-r4c0"},{"key":"tbl-13-r4c1"}]}]}}'>
+
+| Action | Result |
+| --- | --- |
+| **Shift+Click** (in block mode) | Select range from currently-selected block to the clicked one |
+| **Ctrl+Click / Cmd+Click** (any mode) | Toggle the clicked block in/out of the selection |
+| **Shift+Arrow Up/Down** (block mode) | Extend or shrink the selection by one block |
+| Plain click | Clears multi-selection, selects only the clicked block |
+
+</block>
 
 While multiple blocks are selected:
 

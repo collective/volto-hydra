@@ -182,7 +182,15 @@ async function ListingItems({ id, blocks, paging, seen, fetchItems, onPaging }) 
 
 `ploneFetchItems({ apiUrl, contextPath, extraCriteria })` creates a fetcher function for Plone's `@querystring-search` endpoint, suitable as a value in the `fetchItems` map.
 
-<block type="slateTable" uid="tbl-13" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-13-r0","cells":[{"key":"tbl-13-r0c0","type":"header","value":[{"type":"p","children":[{"text":"Option"}]}]},{"key":"tbl-13-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Default"}]}]},{"key":"tbl-13-r0c2","type":"header","value":[{"type":"p","children":[{"text":"Description"}]}]}]},{"key":"tbl-13-r1","cells":[{"key":"tbl-13-r1c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"apiUrl"}]}]}]},{"key":"tbl-13-r1c1","type":"data","value":[{"type":"p","children":[{"text":"—"}]}]},{"key":"tbl-13-r1c2","type":"data","value":[{"type":"p","children":[{"text":"Plone site URL (e.g. "},{"type":"code","children":[{"text":"&#39;http://localhost:8080/Plone&#39;"}]},{"text":")"}]}]}]},{"key":"tbl-13-r2","cells":[{"key":"tbl-13-r2c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"contextPath"}]}]}]},{"key":"tbl-13-r2c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"&#39;/&#39;"}]}]}]},{"key":"tbl-13-r2c2","type":"data","value":[{"type":"p","children":[{"text":"Path for relative queries"}]}]}]},{"key":"tbl-13-r3","cells":[{"key":"tbl-13-r3c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"extraCriteria"}]}]}]},{"key":"tbl-13-r3c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"{}"}]}]}]},{"key":"tbl-13-r3c2","type":"data","value":[{"type":"p","children":[{"text":"Additional query params — "},{"type":"code","children":[{"text":"SearchableText"}]},{"text":", "},{"type":"code","children":[{"text":"sort_on"}]},{"text":", "},{"type":"code","children":[{"text":"sort_order"}]},{"text":", "},{"type":"code","children":[{"text":"facet.*"}]},{"text":" keys"}]}]}]}]}}' />
+<block type="slateTable" uid="tbl-13" table.rows="${1/rows}" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-13-r0","cells":[{"key":"tbl-13-r0c0"},{"key":"tbl-13-r0c1"},{"key":"tbl-13-r0c2"}]},{"key":"tbl-13-r1","cells":[{"key":"tbl-13-r1c0"},{"key":"tbl-13-r1c1"},{"key":"tbl-13-r1c2"}]},{"key":"tbl-13-r2","cells":[{"key":"tbl-13-r2c0"},{"key":"tbl-13-r2c1"},{"key":"tbl-13-r2c2"}]},{"key":"tbl-13-r3","cells":[{"key":"tbl-13-r3c0"},{"key":"tbl-13-r3c1"},{"key":"tbl-13-r3c2"}]}]}}'>
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `apiUrl` | — | Plone site URL (e.g. `'http://localhost:8080/Plone'`) |
+| `contextPath` | `'/'` | Path for relative queries |
+| `extraCriteria` | `{}` | Additional query params — `SearchableText`, `sort_on`, `sort_order`, `facet.*` keys |
+
+</block>
 
 A listing with no `querystring` defaults to showing the current folder's contents in folder order.
 
@@ -214,7 +222,15 @@ For non-Plone backends (RSS feeds, external APIs, etc.), write your own fetcher:
 
 The same `fetchItems` seam powers other "collection" blocks — each is just a fetcher that returns raw result objects (`expandListingBlocks` maps `@id → href` etc. and repeats an item block per result, so they need **no bespoke renderer**; they render via the standard item types on every frontend). `@hydra-js/helpers` ships three reference fetchers:
 
-<block type="slateTable" uid="tbl-21" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-21-r0","cells":[{"key":"tbl-21-r0c0","type":"header","value":[{"type":"p","children":[{"text":"Fetcher"}]}]},{"key":"tbl-21-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Block"}]}]},{"key":"tbl-21-r0c2","type":"header","value":[{"type":"p","children":[{"text":"What it returns"}]}]}]},{"key":"tbl-21-r1","cells":[{"key":"tbl-21-r1c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"relatedItemsFetcher({ apiUrl, contextPath })"}]}]}]},{"key":"tbl-21-r1c1","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"Related Items"}]}]}]},{"key":"tbl-21-r1c2","type":"data","value":[{"type":"p","children":[{"text":"the current page&#39;s relation field (default "},{"type":"code","children":[{"text":"relatedItems"}]},{"text":") — its summaries, paged"}]}]}]},{"key":"tbl-21-r2","cells":[{"key":"tbl-21-r2c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"searchShortcutsFetcher({ apiUrl, contextPath })"}]}]}]},{"key":"tbl-21-r2c1","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"Search Shortcuts"}]}]}]},{"key":"tbl-21-r2c2","type":"data","value":[{"type":"p","children":[{"text":"one link per value, each "},{"type":"code","children":[{"text":"@id"}]},{"text":" set to "},{"type":"code","children":[{"text":"${searchUrl}?facet.${index}=${value}"}]},{"text":" (a shortcut into a search page&#39;s facet). A linked "},{"type":"code","children":[{"text":"pageField"}]},{"text":" → this page&#39;s values; none → the index&#39;s site-wide unique values (e.g. "},{"type":"code","children":[{"text":"Keywords"}]},{"text":" for "},{"type":"code","children":[{"text":"Subject"}]},{"text":")"}]}]}]},{"key":"tbl-21-r3","cells":[{"key":"tbl-21-r3c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"rssFetcher()"}]}]}]},{"key":"tbl-21-r3c1","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"RSS Feed"}]}]}]},{"key":"tbl-21-r3c2","type":"data","value":[{"type":"p","children":[{"text":"entries from "},{"type":"code","children":[{"text":"block.feedUrl"}]},{"text":", client-side "},{"type":"code","children":[{"text":"fetch"}]},{"text":" (best-effort — a CORS/parse error degrades to an empty feed); each entry&#39;s "},{"type":"code","children":[{"text":"@id"}]},{"text":" is its link"}]}]}]}]}}' />
+<block type="slateTable" uid="tbl-21" table.rows="${1/rows}" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-21-r0","cells":[{"key":"tbl-21-r0c0"},{"key":"tbl-21-r0c1"},{"key":"tbl-21-r0c2"}]},{"key":"tbl-21-r1","cells":[{"key":"tbl-21-r1c0"},{"key":"tbl-21-r1c1"},{"key":"tbl-21-r1c2"}]},{"key":"tbl-21-r2","cells":[{"key":"tbl-21-r2c0"},{"key":"tbl-21-r2c1"},{"key":"tbl-21-r2c2"}]},{"key":"tbl-21-r3","cells":[{"key":"tbl-21-r3c0"},{"key":"tbl-21-r3c1"},{"key":"tbl-21-r3c2"}]}]}}'>
+
+| Fetcher | Block | What it returns |
+| --- | --- | --- |
+| `relatedItemsFetcher({ apiUrl, contextPath })` | **Related Items** | the current page's relation field (default `relatedItems`) — its summaries, paged |
+| `searchShortcutsFetcher({ apiUrl, contextPath })` | **Search Shortcuts** | one link per value, each `@id` set to `${searchUrl}?facet.${index}=${value}` (a shortcut into a search page's facet). A linked `pageField` → this page's values; none → the index's site-wide unique values (e.g. `Keywords` for `Subject`) |
+| `rssFetcher()` | **RSS Feed** | entries from `block.feedUrl`, client-side `fetch` (best-effort — a CORS/parse error degrades to an empty feed); each entry's `@id` is its link |
+
+</block>
 
 Register them alongside `listing` in the `fetchItems` map:
 
@@ -248,7 +264,15 @@ The **Search Shortcuts** link target reads Volto's search-block facet params —
 
 Built-in item types and the fields they expose:
 
-<block type="slateTable" uid="tbl-28" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-28-r0","cells":[{"key":"tbl-28-r0c0","type":"header","value":[{"type":"p","children":[{"text":"Type"}]}]},{"key":"tbl-28-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Fields"}]}]}]},{"key":"tbl-28-r1","cells":[{"key":"tbl-28-r1c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"default"}]}]}]},{"key":"tbl-28-r1c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"title"}]},{"text":", "},{"type":"code","children":[{"text":"description"}]},{"text":", "},{"type":"code","children":[{"text":"href"}]}]}]}]},{"key":"tbl-28-r2","cells":[{"key":"tbl-28-r2c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"summary"}]}]}]},{"key":"tbl-28-r2c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"title"}]},{"text":", "},{"type":"code","children":[{"text":"description"}]},{"text":", "},{"type":"code","children":[{"text":"href"}]},{"text":", "},{"type":"code","children":[{"text":"image"}]}]}]}]},{"key":"tbl-28-r3","cells":[{"key":"tbl-28-r3c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"teaser"}]}]}]},{"key":"tbl-28-r3c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"title"}]},{"text":", "},{"type":"code","children":[{"text":"description"}]},{"text":", "},{"type":"code","children":[{"text":"href"}]},{"text":", "},{"type":"code","children":[{"text":"preview_image"}]}]}]}]}]}}' />
+<block type="slateTable" uid="tbl-28" table.rows="${1/rows}" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-28-r0","cells":[{"key":"tbl-28-r0c0"},{"key":"tbl-28-r0c1"}]},{"key":"tbl-28-r1","cells":[{"key":"tbl-28-r1c0"},{"key":"tbl-28-r1c1"}]},{"key":"tbl-28-r2","cells":[{"key":"tbl-28-r2c0"},{"key":"tbl-28-r2c1"}]},{"key":"tbl-28-r3","cells":[{"key":"tbl-28-r3c0"},{"key":"tbl-28-r3c1"}]}]}}'>
+
+| Type | Fields |
+| --- | --- |
+| `default` | `title`, `description`, `href` |
+| `summary` | `title`, `description`, `href`, `image` |
+| `teaser` | `title`, `description`, `href`, `preview_image` |
+
+</block>
 
 <block type="codeExample" uid="ce-29">
 

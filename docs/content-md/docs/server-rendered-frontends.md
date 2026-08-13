@@ -333,7 +333,19 @@ The HTML page that loads in the editor iframe just needs to pull in the bridge a
 
 The recipe is the same in every framework — only the rendering call changes:
 
-<block type="slateTable" uid="tbl-29" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-29-r0","cells":[{"key":"tbl-29-r0c0","type":"header","value":[{"type":"p","children":[{"text":"Framework"}]}]},{"key":"tbl-29-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Render call"}]}]}]},{"key":"tbl-29-r1","cells":[{"key":"tbl-29-r1c0","type":"data","value":[{"type":"p","children":[{"text":"Astro"}]}]},{"key":"tbl-29-r1c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"AstroContainer.renderToString(Component, { props })"}]}]}]}]},{"key":"tbl-29-r2","cells":[{"key":"tbl-29-r2c0","type":"data","value":[{"type":"p","children":[{"text":"PHP"}]}]},{"key":"tbl-29-r2c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"ob_start(); include \"blocks/{$type}.php\"; return ob_get_clean();"}]}]}]}]},{"key":"tbl-29-r3","cells":[{"key":"tbl-29-r3c0","type":"data","value":[{"type":"p","children":[{"text":"Django"}]}]},{"key":"tbl-29-r3c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"render_to_string(f&#39;blocks/{type}.html&#39;, {&#39;block&#39;: data})"}]}]}]}]},{"key":"tbl-29-r4","cells":[{"key":"tbl-29-r4c0","type":"data","value":[{"type":"p","children":[{"text":"Rails"}]}]},{"key":"tbl-29-r4c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"render_to_string(\"blocks/#{type}\", locals: { block: data })"}]}]}]}]},{"key":"tbl-29-r5","cells":[{"key":"tbl-29-r5c0","type":"data","value":[{"type":"p","children":[{"text":"Laravel"}]}]},{"key":"tbl-29-r5c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"view(\"blocks.{$type}\", [&#39;block&#39; => $data])->render()"}]}]}]}]},{"key":"tbl-29-r6","cells":[{"key":"tbl-29-r6c0","type":"data","value":[{"type":"p","children":[{"text":"Symfony (Twig)"}]}]},{"key":"tbl-29-r6c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"$twig->render(\"blocks/{$type}.html.twig\", [&#39;block&#39; => $data])"}]}]}]}]},{"key":"tbl-29-r7","cells":[{"key":"tbl-29-r7c0","type":"data","value":[{"type":"p","children":[{"text":"Go templates"}]}]},{"key":"tbl-29-r7c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"tpl.ExecuteTemplate(buf, type, data); return buf.String()"}]}]}]}]}]}}' />
+<block type="slateTable" uid="tbl-29" table.rows="${1/rows}" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-29-r0","cells":[{"key":"tbl-29-r0c0"},{"key":"tbl-29-r0c1"}]},{"key":"tbl-29-r1","cells":[{"key":"tbl-29-r1c0"},{"key":"tbl-29-r1c1"}]},{"key":"tbl-29-r2","cells":[{"key":"tbl-29-r2c0"},{"key":"tbl-29-r2c1"}]},{"key":"tbl-29-r3","cells":[{"key":"tbl-29-r3c0"},{"key":"tbl-29-r3c1"}]},{"key":"tbl-29-r4","cells":[{"key":"tbl-29-r4c0"},{"key":"tbl-29-r4c1"}]},{"key":"tbl-29-r5","cells":[{"key":"tbl-29-r5c0"},{"key":"tbl-29-r5c1"}]},{"key":"tbl-29-r6","cells":[{"key":"tbl-29-r6c0"},{"key":"tbl-29-r6c1"}]},{"key":"tbl-29-r7","cells":[{"key":"tbl-29-r7c0"},{"key":"tbl-29-r7c1"}]}]}}'>
+
+| Framework | Render call |
+| --- | --- |
+| Astro | `AstroContainer.renderToString(Component, { props })` |
+| PHP | `ob_start(); include "blocks/{$type}.php"; return ob_get_clean();` |
+| Django | `render_to_string(f'blocks/{type}.html', {'block': data})` |
+| Rails | `render_to_string("blocks/#{type}", locals: { block: data })` |
+| Laravel | `view("blocks.{$type}", ['block' => $data])->render()` |
+| Symfony (Twig) | `$twig->render("blocks/{$type}.html.twig", ['block' => $data])` |
+| Go templates | `tpl.ExecuteTemplate(buf, type, data); return buf.String()` |
+
+</block>
 
 Everything else — the diff, the POST, the swap, the `data-block-uid` contract — is identical because the bridge handles it.
 
