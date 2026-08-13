@@ -211,7 +211,7 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 :::
 
 :::codeExample{uid="ref-teaser-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="schema"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-teaser-schema-javascript-bfff08"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-teaser-schema-javascript-bfff08"]}
 ### Schema
 
 ```javascript
@@ -256,7 +256,7 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 :::
 
 :::codeExample{uid="ref-teaser-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="json-data"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-teaser-json-data-json-7f117c"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-teaser-json-data-json-7f117c"]}
 ### JSON Block Data
 
 ```json
@@ -280,7 +280,7 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 :::
 
 :::codeExample{uid="ref-teaser-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="rendering"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-teaser-rendering-jsx-d1dd76","ref-teaser-rendering-vue-fc123a","ref-teaser-rendering-svelte-bf19cf"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-teaser-rendering-jsx-d1dd76","ref-teaser-rendering-vue-fc123a","ref-teaser-rendering-svelte-bf19cf"]}
 ### React
 
 ```jsx

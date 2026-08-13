@@ -242,7 +242,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 :::
 
 :::codeExample{uid="ref-separator-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="schema"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-separator-schema-javascript-3157d9"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-separator-schema-javascript-3157d9"]}
 ### Schema
 
 ```javascript
@@ -262,7 +262,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 :::
 
 :::codeExample{uid="ref-separator-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="json-data"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-separator-json-data-json-9d890c"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-separator-json-data-json-9d890c"]}
 ### JSON Block Data
 
 ```json
@@ -277,7 +277,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 :::
 
 :::codeExample{uid="ref-separator-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="rendering"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-separator-rendering-jsx-470901","ref-separator-rendering-vue-4281a1","ref-separator-rendering-svelte-8c1d19"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-separator-rendering-jsx-470901","ref-separator-rendering-vue-4281a1","ref-separator-rendering-svelte-8c1d19"]}
 ### React
 
 ```jsx

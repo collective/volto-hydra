@@ -92,7 +92,7 @@ If something in this guide doesn't match what you see, it's almost always becaus
 The editor screen has three regions:
 
 :::codeExample{uid="ce-8"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-8-text-6b4738"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-8-text-6b4738"]}
 ### Text
 
 ```text

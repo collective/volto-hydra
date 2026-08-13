@@ -43,7 +43,7 @@ Renders the current page's related items relation field (default relatedItems). 
 :::
 
 :::codeExample{uid="ref-relatedItemsListing-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="schema"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-relatedItemsListing-schema-javascript-a1a504"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-relatedItemsListing-schema-javascript-a1a504"]}
 ### Schema
 
 ```javascript
@@ -91,7 +91,7 @@ Renders the current page's related items relation field (default relatedItems). 
 :::
 
 :::codeExample{uid="ref-relatedItemsListing-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="json-data"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-relatedItemsListing-json-data-json-ba9577"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-relatedItemsListing-json-data-json-ba9577"]}
 ### JSON Block Data
 
 ```json
@@ -109,7 +109,7 @@ This block has no bespoke renderer. Add its fetcher to your fetchItems map (keye
 :::
 
 :::codeExample{uid="ref-relatedItemsListing-fetcher" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="rendering"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-relatedItemsListing-fetcher-javascript-1c975d"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-relatedItemsListing-fetcher-javascript-1c975d"]}
 ### Fetcher
 
 ```javascript
@@ -126,7 +126,7 @@ export function relatedItemsFetcher({ apiUrl, contextPath }) {
 :::
 
 :::codeExample{uid="ref-relatedItemsListing-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="rendering"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-relatedItemsListing-rendering-javascript-2b9d44"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-relatedItemsListing-rendering-javascript-2b9d44"]}
 ### Render
 
 ```javascript

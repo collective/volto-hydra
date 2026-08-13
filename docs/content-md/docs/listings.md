@@ -90,7 +90,7 @@ A listing block fetches content from the server (e.g. latest news) and renders e
 You tell it which block types need fetching via a `fetchItems` map — keys are block types, values are fetcher functions. This means you can have different kinds of listings (Plone queries, RSS feeds, etc.) each with their own fetcher:
 
 :::codeExample{uid="ce-4"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-4-javascript-17afd4"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-4-javascript-17afd4"]}
 ### Javascript
 
 ```javascript
@@ -115,7 +115,7 @@ const { items, paging } = await expandListingBlocks(layout, {
 A grid can have a mix of listing and static blocks sharing a single paging. The `staticBlocks` helper wraps non-listing blocks so they participate in the shared page window. The listings use Suspense so they load client-side:
 
 :::codeExample{uid="ce-8"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-8-jsx-37efcc"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-8-jsx-37efcc"]}
 ### Jsx
 
 ```jsx
@@ -466,7 +466,7 @@ A listing with no `querystring` defaults to showing the current folder's content
 `ploneFetchItems` also normalizes Plone's image data — packaging `image_field` + `image_scales` into a self-contained `image` object with `@id` duplicated inside (needed for URL resolution):
 
 :::codeExample{uid="ce-16"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-16-json-38bb3a"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-16-json-38bb3a"]}
 ### Json
 
 ```json
@@ -824,7 +824,7 @@ The same `fetchItems` seam powers other "collection" blocks — each is just a f
 Register them alongside `listing` in the `fetchItems` map:
 
 :::codeExample{uid="ce-23"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-23-json-6d0894"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-23-json-6d0894"]}
 ### Javascript
 
 ```javascript
@@ -1117,7 +1117,7 @@ Built-in item types and the fields they expose:
 :::
 
 :::codeExample{uid="ce-29"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-29-json-a7c4dc"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-29-json-a7c4dc"]}
 ### Json
 
 ```json
@@ -1138,7 +1138,7 @@ Types: string (array→join, image→URL), link (→[{@id}]), image (pass throug
 Use `variation` on the listing block to control what `@type` expanded items get. Listings reuse the same `inheritSchemaFrom` recipe as container blocks (see [Container Blocks › Synchronised Block Types](container-blocks.md#synchronised-block-types-in-a-container)) but differ in one structural way: there's no blocks field to declare `itemTypeField` on, since listing children are *virtual* (produced from query results at render time, not authored as page data). Instead, declare the typeField directly on the `inheritSchemaFrom` recipe:
 
 :::codeExample{uid="ce-32"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-32-javascript-f6757f"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-32-javascript-f6757f"]}
 ### Javascript
 
 ```javascript
@@ -1176,7 +1176,7 @@ The widget saves its output as `fieldMapping` (singular) on the block data. `exp
 A container (e.g. `gridBlock`) can mix **manual children** AND **a listing** as children. Add `'listing'` to the blocks field's `allowedBlocks`, and the parent's typeField propagates everywhere:
 
 :::codeExample{uid="ce-37"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-37-javascript-2ec596"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-37-javascript-2ec596"]}
 ### Javascript
 
 ```javascript
@@ -1214,7 +1214,7 @@ The sync walks recursively — if the listing held nested containers with their 
 If your frontend embeds state in the URL path (like pagination), you need to tell hydra.js how to transform the frontend path to the API/admin path. Otherwise, the admin will try to navigate to URLs that don't exist in the CMS.
 
 :::codeExample{uid="ce-44"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-44-javascript-82ad8e"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-44-javascript-82ad8e"]}
 ### Javascript
 
 ```javascript

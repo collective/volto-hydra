@@ -187,7 +187,7 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 :::
 
 :::codeExample{uid="ref-video-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-video" slotId="schema"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-video-schema-javascript-104794"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-video-schema-javascript-104794"]}
 ### Schema
 
 ```javascript
@@ -227,7 +227,7 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 :::
 
 :::codeExample{uid="ref-video-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-video" slotId="json-data"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-video-json-data-json-9ce28f"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-video-json-data-json-9ce28f"]}
 ### JSON Block Data
 
 ```json
@@ -240,7 +240,7 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 :::
 
 :::codeExample{uid="ref-video-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-video" slotId="rendering"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-video-rendering-jsx-b3c5ea","ref-video-rendering-vue-160de2","ref-video-rendering-svelte-b4e8ba"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-video-rendering-jsx-b3c5ea","ref-video-rendering-vue-160de2","ref-video-rendering-svelte-b4e8ba"]}
 ### React
 
 ```jsx

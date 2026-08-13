@@ -43,7 +43,7 @@ Renders a set of values as links into a faceted search — a "tag cloud" of shor
 :::
 
 :::codeExample{uid="ref-searchShortcuts-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-searchShortcuts" slotId="schema"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-searchShortcuts-schema-javascript-980727"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-searchShortcuts-schema-javascript-980727"]}
 ### Schema
 
 ```javascript
@@ -105,7 +105,7 @@ Renders a set of values as links into a faceted search — a "tag cloud" of shor
 :::
 
 :::codeExample{uid="ref-searchShortcuts-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-searchShortcuts" slotId="json-data"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-searchShortcuts-json-data-json-b402fc"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-searchShortcuts-json-data-json-b402fc"]}
 ### JSON Block Data
 
 ```json
@@ -125,7 +125,7 @@ This block has no bespoke renderer. Add its fetcher to your fetchItems map (keye
 :::
 
 :::codeExample{uid="ref-searchShortcuts-fetcher" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-searchShortcuts" slotId="rendering"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-searchShortcuts-fetcher-javascript-e7f760"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-searchShortcuts-fetcher-javascript-e7f760"]}
 ### Fetcher
 
 ```javascript
@@ -156,7 +156,7 @@ export function searchShortcutsFetcher({ apiUrl, contextPath }) {
 :::
 
 :::codeExample{uid="ref-searchShortcuts-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-searchShortcuts" slotId="rendering"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-searchShortcuts-rendering-javascript-ab7111"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-searchShortcuts-rendering-javascript-ab7111"]}
 ### Render
 
 ```javascript

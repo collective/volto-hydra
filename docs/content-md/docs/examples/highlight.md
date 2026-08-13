@@ -249,7 +249,7 @@ A prominent content section with a background image, overlay, title, rich text b
 :::
 
 :::codeExample{uid="ref-highlight-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-highlight" slotId="schema"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-highlight-schema-javascript-80590c"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-highlight-schema-javascript-80590c"]}
 ### Schema
 
 ```javascript
@@ -285,7 +285,7 @@ A prominent content section with a background image, overlay, title, rich text b
 :::
 
 :::codeExample{uid="ref-highlight-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-highlight" slotId="json-data"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-highlight-json-data-json-a2bfa3"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-highlight-json-data-json-a2bfa3"]}
 ### JSON Block Data
 
 ```json
@@ -315,7 +315,7 @@ A prominent content section with a background image, overlay, title, rich text b
 :::
 
 :::codeExample{uid="ref-highlight-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-highlight" slotId="rendering"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-highlight-rendering-jsx-659b6c","ref-highlight-rendering-vue-dd8730","ref-highlight-rendering-svelte-d3a4c8"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-highlight-rendering-jsx-659b6c","ref-highlight-rendering-vue-dd8730","ref-highlight-rendering-svelte-d3a4c8"]}
 ### React
 
 ```jsx

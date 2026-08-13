@@ -278,7 +278,7 @@ To make a site editable with Inka you break a page into:
 When the page loads inside Inka's edit iframe, you initialise the bridge and declare your blocks; otherwise you render normally from the API:
 
 :::codeExample{uid="ce-8"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-8-js-bf605e"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-8-js-bf605e"]}
 ### Js
 
 ```js
@@ -324,7 +324,7 @@ else {
 Page data ends up shaped like this — one shared `blocks` dict, and a region per named list inside `blocks_layout`:
 
 :::codeExample{uid="ce-10"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-10-js-2e9648"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-10-js-2e9648"]}
 ### Js
 
 ```js
@@ -348,7 +348,7 @@ Page data ends up shaped like this — one shared `blocks` dict, and a region pe
 Then you augment the rendered HTML with `data-` attributes (or `<!-- hydra ... -->` comments) so Inka can find your blocks and editable fields:
 
 :::codeExample{uid="ce-12"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-12-html-e0187e"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-12-html-e0187e"]}
 ### Html
 
 ```html
@@ -374,7 +374,7 @@ To let editors link to a spot *inside* a page, mark the element with a real `id`
 - `data-linkable-id="Label"` — a **level-less** anchor (a figure, a defined term, any non-heading target).
 
 :::codeExample{uid="ce-16"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-16-html-5cddab"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-16-html-5cddab"]}
 ### Html
 
 ```html

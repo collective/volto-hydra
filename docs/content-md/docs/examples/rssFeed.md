@@ -42,7 +42,7 @@ Renders entries from an external RSS feed. Its items are fetched at render time 
 :::
 
 :::codeExample{uid="ref-rssFeed-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="schema"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-rssFeed-schema-javascript-d79cf2"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-rssFeed-schema-javascript-d79cf2"]}
 ### Schema
 
 ```javascript
@@ -95,7 +95,7 @@ Renders entries from an external RSS feed. Its items are fetched at render time 
 :::
 
 :::codeExample{uid="ref-rssFeed-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="json-data"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-rssFeed-json-data-json-c55bf4"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-rssFeed-json-data-json-c55bf4"]}
 ### JSON Block Data
 
 ```json
@@ -114,7 +114,7 @@ This block has no bespoke renderer. Add its fetcher to your fetchItems map (keye
 :::
 
 :::codeExample{uid="ref-rssFeed-fetcher" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="rendering"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-rssFeed-fetcher-javascript-7f0034"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-rssFeed-fetcher-javascript-7f0034"]}
 ### Fetcher
 
 ```javascript
@@ -148,7 +148,7 @@ function parseRssEntries(xml) {
 :::
 
 :::codeExample{uid="ref-rssFeed-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="rendering"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-rssFeed-rendering-javascript-df4061"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-rssFeed-rendering-javascript-df4061"]}
 ### Render
 
 ```javascript

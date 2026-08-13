@@ -397,7 +397,7 @@ The sidebar is the other way to navigate selection — useful when the block you
 When a block is selected, the sidebar shows the **chain of parent containers** from the root down to the block — one collapsible section per level. Each level has a `‹` arrow on the left.
 
 :::codeExample{uid="ce-21"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-21-text-3d139a"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-21-text-3d139a"]}
 ### Text
 
 ```text
@@ -426,7 +426,7 @@ This works for any depth — nested columns, slider with templated children, acc
 When a container block is selected, the sidebar shows that container's **children** as a list, one row per child:
 
 :::codeExample{uid="ce-27"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-27-text-19ff8a"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-27-text-19ff8a"]}
 ### Text
 
 ```text

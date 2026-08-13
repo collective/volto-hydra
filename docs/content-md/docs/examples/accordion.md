@@ -46,7 +46,7 @@ A collapsible panel group. Each panel is an object\_list item with a title and a
  "styles": {}
 }
 ```
-::::panels[]
+::::panels[items]
 :::panel{uid="bc2c120e-51df-4c47-b4d0-5a11311d020d" title="Accordion with text"}
 :::slate{uid="c85ec1d2-f371-4ed4-be65-8fa0a091b833"}
 ```fields
@@ -1036,7 +1036,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
  }
 }
 ```
-::::panels[]
+::::panels[items]
 :::panel{uid="39f75787-bd7a-42dc-ab40-a6c9dfd2a8f1" title="Accordion with text"}
 :::slate{uid="afacd5e4-5914-46b6-b9f9-ebd8bbda9d35"}
 ```fields
@@ -2019,7 +2019,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 :::
 
 :::codeExample{uid="ref-accordion-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-accordion" slotId="schema"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-accordion-schema-javascript-105cd5"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-accordion-schema-javascript-105cd5"]}
 ### Schema
 
 ```javascript
@@ -2056,7 +2056,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 :::
 
 :::codeExample{uid="ref-accordion-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-accordion" slotId="json-data"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-accordion-json-data-json-f4f899"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-accordion-json-data-json-f4f899"]}
 ### JSON Block Data
 
 ```json
@@ -2094,7 +2094,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 :::
 
 :::codeExample{uid="ref-accordion-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-accordion" slotId="rendering"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-accordion-rendering-jsx-951c40","ref-accordion-rendering-vue-e897ff","ref-accordion-rendering-svelte-a58cd5"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-accordion-rendering-jsx-951c40","ref-accordion-rendering-vue-e897ff","ref-accordion-rendering-svelte-a58cd5"]}
 ### React
 
 ```jsx

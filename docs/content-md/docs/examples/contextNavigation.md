@@ -38,7 +38,7 @@ blocks:
 A vertical navigation list for grouped pages — a left sidebar on desktop and a collapsible disclosure at the top on mobile. Each row is a navItem (hand-added link) and/or a listing (auto-populated from a path query). The active link is detected from the current URL and gets aria-current="page" plus a .current class. Named after Plone's @contextnavigation endpoint, which serves the same purpose.
 
 :::codeExample{uid="ref-contextNavigation-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-contextNavigation" slotId="schema"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-contextNavigation-schema-javascript-38f58f"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-contextNavigation-schema-javascript-38f58f"]}
 ### Schema
 
 ```javascript
@@ -91,7 +91,7 @@ A vertical navigation list for grouped pages — a left sidebar on desktop and a
 :::
 
 :::codeExample{uid="ref-contextNavigation-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-contextNavigation" slotId="json-data"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-contextNavigation-json-data-json-62b3b4"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-contextNavigation-json-data-json-62b3b4"]}
 ### JSON Block Data
 
 ```json
@@ -183,7 +183,7 @@ A vertical navigation list for grouped pages — a left sidebar on desktop and a
 :::
 
 :::codeExample{uid="ref-contextNavigation-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-contextNavigation" slotId="rendering"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-contextNavigation-rendering-jsx-25968a","ref-contextNavigation-rendering-vue-af752b","ref-contextNavigation-rendering-svelte-a27836"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-contextNavigation-rendering-jsx-25968a","ref-contextNavigation-rendering-vue-af752b","ref-contextNavigation-rendering-svelte-a27836"]}
 ### React
 
 ```jsx

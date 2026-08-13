@@ -126,7 +126,7 @@ Both look and behave the same in the editor — selecting, dragging, nesting —
 Each child has its own `@type` and schema (from `blocks`). The blocks live in the parent's shared `blocks` dict; the region's name is a key in the parent's shared `blocks_layout` dict that holds the ordering:
 
 :::codeExample{uid="ce-8"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-8-javascript-d2f77e"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-8-javascript-d2f77e"]}
 ### Javascript
 
 ```javascript
@@ -314,7 +314,7 @@ A container (or the page) can declare more than one **region** — each a schema
 Storage is a property of **each region, not the container**: every region independently chooses `widget: 'blocks_layout'` or `widget: 'object_list'`, and a single container may **mix** them — e.g. a `blocks_layout` region for body content alongside an `object_list` region for a set of inline cards. A blocks\_layout region keys its ordering inside the shared `blocks_layout` dict (its children in the shared `blocks` dict); an object\_list region stores its items inline on its own field. So "is this container object\_list or blocks\_layout?" is never a meaningful question — you look at the region. Every blocks\_layout region's children still share the one `blocks` dict; the regions only partition *ordering*.
 
 :::codeExample{uid="ce-14"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-14-javascript-3ea062"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-14-javascript-3ea062"]}
 ### Javascript
 
 ```javascript
@@ -355,7 +355,7 @@ The backend deserializer only saves values for **registered fields**. `blocks` a
 The other storage choice for a region. Instead of ordering in the shared `blocks_layout` dict, all items share one inline schema and are stored as an array with an ID field, at the field itself. (To place the array deeper — e.g. `block.table.rows` — nest the field inside a `widget: 'object'`; see below.)
 
 :::codeExample{uid="ce-21"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-21-javascript-83a0dc"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-21-javascript-83a0dc"]}
 ### Javascript
 
 ```javascript
@@ -390,7 +390,7 @@ slides: {
 When `allowedBlocks` is set on an `object_list`, items can have different types (like `blocks_layout`) but are still stored as an array. Each item's type is stored in the field specified by `typeField` (defaults to `'@type'`) and its schema is looked up from `blocks`:
 
 :::codeExample{uid="ce-24"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-24-javascript-6781ed"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-24-javascript-6781ed"]}
 ### Javascript
 
 ```javascript
@@ -425,7 +425,7 @@ A `widget: 'object'` field groups sub-fields under one key. Its `schema.properti
 An **`object_list`** inside an object stores its array at `object.<field>`:
 
 :::codeExample{uid="ce-29"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-29-javascript-dd9f7e"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-29-javascript-dd9f7e"]}
 ### Javascript
 
 ```javascript
@@ -446,7 +446,7 @@ table: {
 A **`blocks_layout`** inside an object makes the object its own mini-container: it holds its own `blocks` dict + `blocks_layout`, just like a columns/grid container block, one level deeper:
 
 :::codeExample{uid="ce-31"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-31-javascript-f90eb4"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-31-javascript-f90eb4"]}
 ### Javascript
 
 ```javascript
@@ -838,7 +838,7 @@ All three can nest inside `object`, and a container may mix a `blocks_layout` re
 Add `data-block-uid` to each child element. You don't need to mark the container element itself:
 
 :::codeExample{uid="ce-41"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-41-javascript-85a3e1"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-41-javascript-85a3e1"]}
 ### Html
 
 ```html
@@ -868,7 +868,7 @@ Add `data-block-uid` to each child element. You don't need to mark the container
 Set `addMode: 'table'` for table-like structures (rows containing cells). This lets users add and remove columns as easily as rows. The rows live inside a `table` object field (`block.table.rows`) — no `dataPath`:
 
 :::codeExample{uid="ce-45"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-45-javascript-1cff8e"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-45-javascript-1cff8e"]}
 ### Javascript
 
 ```javascript
@@ -912,7 +912,7 @@ Empty blocks are stripped before saving. Render them as empty space; Inka puts a
 The rules above mean a region with a `defaultBlockType`, or a single-entry `allowedBlocks`, is *never* empty — it always seeds a block of that type. To declare a region that should sit **empty until an editor adds something**, while still restricting **what** they can add, set **`defaultBlockType: "empty"`** and do **not** list `"empty"` in `allowedBlocks`:
 
 :::codeExample{uid="ce-53"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-53-javascript-f4d972"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-53-javascript-f4d972"]}
 ### Javascript
 
 ```javascript
@@ -945,7 +945,7 @@ If your container renders its children by delegating each one to your central bl
 The trap is a **custom** container renderer that only expects specific child types — a `contextNavigation` that walks `navItem`/`listing` children, say. Don't hand-roll an allow-list that rejects anything else, or a seeded `empty` will throw and break the whole container. Route non-special children through your central dispatch instead of throwing:
 
 :::codeExample{uid="ce-62"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-62-javascript-4ebff8"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-62-javascript-4ebff8"]}
 ### Javascript
 
 ```javascript
@@ -971,7 +971,7 @@ You can have one container type whose children are all kept the same `@type`, wi
 Declare `itemTypeField` on the *blocks field* — its value names a sibling field on the same schema whose value drives every child's `@type`. The sibling field is typically rendered with `widget: 'blockTypeSelect'`, which computes its `choices` from the blocks field's `allowedBlocks` at render time:
 
 :::codeExample{uid="ce-68"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-68-javascript-cdad0c"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-68-javascript-cdad0c"]}
 ### Javascript
 
 ```javascript
@@ -1012,7 +1012,7 @@ The relationship is local: read the schema and you can see "the children of `sli
 On top of type syncing you can also have field *values* centrally controlled at the parent — set once on the parent, applied to every child. Add ONE enhancer on the parent:
 
 :::codeExample{uid="ce-72"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-72-javascript-521655"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-72-javascript-521655"]}
 ### Javascript
 
 ```javascript
@@ -1037,7 +1037,7 @@ gridBlock: {
 The parent declares **what it claims** per child block type via `parentControlled`. If absent, the default is: parent claims everything *not* listed in the child's `fieldMappings['@default']` mapping. The default works for typical cases; set `parentControlled` only when you want a different split (e.g. keep a meta-toggle field editable per-child):
 
 :::codeExample{uid="ce-76"}
-::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-76-javascript-6b52c5"]}
+::::tabs[items]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-76-javascript-6b52c5"]}
 ### Javascript
 
 ```javascript
