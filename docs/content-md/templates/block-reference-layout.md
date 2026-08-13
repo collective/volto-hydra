@@ -1,11 +1,11 @@
 ---
-title: Block Reference Layout
-description: Template for code examples at the bottom of block reference pages
-review_state: published
-effective: 2025-01-01T00:00:00
-id: block-reference-layout
-UID: tpl-block-reference-layout
 "@type": Document
+UID: tpl-block-reference-layout
+id: block-reference-layout
+title: Block Reference Layout
+review_state: published
+description: Template for code examples at the bottom of block reference pages
+effective: 2025-01-01T00:00:00
 blocks:
   - tpl-sep: separator
   - tpl-examples-heading: slate

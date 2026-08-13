@@ -1,20 +1,25 @@
 ---
-title: Hero Block
+"@type": Document
+UID: docs-examples-hero-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: "A full-width hero section with heading, subheading, image, rich
   text description, and a call-to-action button. Demonstrates multiple field
   types in a single block: string, textarea, slate, image, and object_browser."
-review_state: published
+effective: null
 exclude_from_nav: false
+expires: null
+id: hero
+language: "##DEFAULT##"
+layout: document_view
+review_state: published
+rights: ""
 subjects:
   - blocks
   - media
-language: "##DEFAULT##"
-rights: ""
-effective: null
-expires: null
-id: hero
-UID: docs-examples-hero-001
-"@type": Document
+title: Hero Block
 blocks:
   - title-1: title
   - ref-hero-description: slate

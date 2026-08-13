@@ -1,21 +1,28 @@
 ---
-title: Button
+"@type": Document
+UID: 405582582e70493c96a6c549444a1eaa
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: >-
   
   The button block shows a button for which a link (internal or external) can be
   stored. The button can be displayed left, right or center and have a
   background color.
-review_state: published
-exclude_from_nav: false
-subjects:
-  - blocks
-language: "##DEFAULT##"
-rights: ""
 effective: 2023-07-06T18:35:00
+exclude_from_nav: false
 expires: null
 id: button
-UID: 405582582e70493c96a6c549444a1eaa
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
+subjects:
+  - blocks
+title: Button
 blocks:
   - f3ee132b-6215-4e42-b26b-713f668eea61: title
   - ref-button-description: slate

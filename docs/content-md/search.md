@@ -1,16 +1,21 @@
 ---
+"@type": Document
+UID: 120c479717b248a8b28c3556ee63e054
+id: search
 title: Search
 description: Search the site
-review_state: published
-exclude_from_nav: true
-subjects: []
-language: ""
-rights: null
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 effective: null
+exclude_from_nav: true
 expires: null
-id: search
-UID: 120c479717b248a8b28c3556ee63e054
-"@type": Document
+language: ""
+review_state: published
+rights: null
+subjects: []
+table_of_contents: false
 blocks:
   - search-block: search
 ---

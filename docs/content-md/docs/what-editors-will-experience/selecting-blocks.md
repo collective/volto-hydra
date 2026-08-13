@@ -1,18 +1,25 @@
 ---
-title: Selecting blocks
+"@type": Document
+UID: docs-what-editors-will-experience-selecting-blocks-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: "The editor has two modes when a block is selected: text mode
   (you're editing inside the block) and block mode (the whole block is selected
   as a unit)."
-review_state: published
-exclude_from_nav: false
-subjects: []
-language: "##DEFAULT##"
-rights: ""
 effective: 2025-01-01T00:00:00
+exclude_from_nav: false
 expires: null
 id: selecting-blocks
-UID: docs-what-editors-will-experience-selecting-blocks-001
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
+subjects: []
+title: Selecting blocks
 blocks:
   - title-1: title
   - p-1: slate

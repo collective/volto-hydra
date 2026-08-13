@@ -1,21 +1,28 @@
 ---
-title: Container Blocks
+"@type": Document
+UID: docs-container-blocks-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: A block — or the page itself — is divided into regions, and each
   region holds an ordered list of blocks. Sliders have a slides region, grids
   have columns, accordions have panels; a page has its main items region (and
   optionally a header, footer, …).
-review_state: published
+effective: 2025-01-01T00:00:00
 exclude_from_nav: false
+expires: null
+id: container-blocks
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
 subjects:
   - containers
   - frontend
-language: "##DEFAULT##"
-rights: ""
-effective: 2025-01-01T00:00:00
-expires: null
-id: container-blocks
-UID: docs-container-blocks-001
-"@type": Document
+title: Container Blocks
 blocks:
   - title-1: title
   - p-1: slate

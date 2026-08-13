@@ -1,18 +1,25 @@
 ---
-title: Docs
+"@type": Document
+UID: docs-folder-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: A design-system-first page-builder toolkit. Strike the right
   balance for your site — make it easy for editors to create engagement while
   staying compliant.
-review_state: published
-exclude_from_nav: false
-subjects: []
-language: "##DEFAULT##"
-rights: ""
 effective: 2025-01-01T00:00:00
+exclude_from_nav: false
 expires: null
 id: docs
-UID: docs-folder-001
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
+subjects: []
+title: Docs
 blocks:
   - title-1: title
   - p-1: slate

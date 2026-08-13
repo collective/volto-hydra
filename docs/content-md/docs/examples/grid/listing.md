@@ -1,20 +1,33 @@
 ---
-title: Grid-Listing
+"@type": Document
+UID: 3ac4a2c6c4034a1686bc0ee2d2072fd6
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: >-
   
   The Grid block allows adding multi-column blocks. A grid block can contain
   between one and four columns of different blocks. This is a grid block with
   multiple listing blocks.
-review_state: published
-exclude_from_nav: false
-subjects: []
-language: "##DEFAULT##"
-rights: ""
 effective: 2023-07-06T18:35:00
+exclude_from_nav: false
 expires: null
 id: listing
-UID: 3ac4a2c6c4034a1686bc0ee2d2072fd6
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image:
+  blob_path: docs/examples/grid/listing/preview_image/black-starry-night.jpg
+  content-type: image/jpeg
+  filename: black-starry-night.jpg
+  height: 1708
+  size: 693013
+  width: 2400
+review_state: published
+rights: ""
+subjects: []
+title: Grid-Listing
 blocks:
   - fc7973d9-34e3-484c-a20b-1af7eecd9879: title
   - 5a361b25-3e19-4c06-866f-a2db6feed983: gridBlock

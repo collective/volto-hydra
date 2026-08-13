@@ -1,18 +1,25 @@
 ---
-title: Containers
+"@type": Document
+UID: docs-what-editors-will-experience-containers-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: A container block holds other blocks inside it — sliders, columns,
   accordions, grids, generic sections. The blocks inside are called its
   children. Containers can be nested (a column inside a row inside a section).
-review_state: published
-exclude_from_nav: false
-subjects: []
-language: "##DEFAULT##"
-rights: ""
 effective: 2025-01-01T00:00:00
+exclude_from_nav: false
 expires: null
 id: containers
-UID: docs-what-editors-will-experience-containers-001
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
+subjects: []
+title: Containers
 blocks:
   - title-1: title
   - p-1: slate

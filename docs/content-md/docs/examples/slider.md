@@ -1,21 +1,26 @@
 ---
-title: Slider Block
+"@type": Document
+UID: docs-examples-slider-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: A carousel/slider that cycles through slides. Slides are stored as
   an object_list — each slide has a title, description, image, and optional
   button.
-review_state: published
+effective: null
 exclude_from_nav: false
+expires: null
+id: slider
+language: "##DEFAULT##"
+layout: document_view
+review_state: published
+rights: ""
 subjects:
   - blocks
   - containers
   - media
-language: "##DEFAULT##"
-rights: ""
-effective: null
-expires: null
-id: slider
-UID: docs-examples-slider-001
-"@type": Document
+title: Slider Block
 blocks:
   - title-1: title
   - ref-slider-description: slate

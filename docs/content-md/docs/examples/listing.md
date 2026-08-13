@@ -1,20 +1,27 @@
 ---
-title: Listing
+"@type": Document
+UID: 6bd32a3367ea4254b295db642655b9d3
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: The listing block allows the display of various listings of
   content. Editors can configure a number of criteria for listing content (e.g.
   all news from 2022 with the keyword 'research').
-review_state: published
+effective: 2023-07-06T18:35:00
 exclude_from_nav: false
+expires: null
+id: listing
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
 subjects:
   - blocks
   - listings
-language: "##DEFAULT##"
-rights: ""
-effective: 2023-07-06T18:35:00
-expires: null
-id: listing
-UID: 6bd32a3367ea4254b295db642655b9d3
-"@type": Document
+title: Listing
 blocks:
   - 43068b6d-d8e9-4acc-912b-eabcdc650939: title
   - ref-listing-description: slate

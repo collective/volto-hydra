@@ -1,16 +1,23 @@
 ---
-title: Images
+"@type": Document
+UID: 342acac105fe4a43ae0a19d49d752e0b
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: ""
-review_state: published
-exclude_from_nav: true
-subjects: []
-language: "##DEFAULT##"
-rights: ""
 effective: 2024-03-08T15:35:00
+exclude_from_nav: true
 expires: null
 id: images
-UID: 342acac105fe4a43ae0a19d49d752e0b
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
+subjects: []
+title: Images
 blocks:
   - 55e93046-15ee-41f5-b63c-fde0d9b6ce52: title
   - 183bf050-57b7-4841-b9c8-f9b5a15fe086: listing

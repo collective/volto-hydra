@@ -1,19 +1,32 @@
 ---
-title: Teaser
+"@type": Document
+UID: bd2b39d2745847db82ed197a4eb1effc
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: The teaser block allows you to add an element that teases existing
   website content with an image, a title and a description.
-review_state: published
+effective: 2023-07-06T18:35:00
 exclude_from_nav: false
+expires: null
+id: teaser
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image:
+  blob_path: docs/examples/teaser/preview_image/black-starry-night.jpg
+  content-type: image/jpeg
+  filename: black-starry-night.jpg
+  height: 1708
+  size: 693013
+  width: 2400
+review_state: published
+rights: ""
 subjects:
   - blocks
   - media
-language: "##DEFAULT##"
-rights: ""
-effective: 2023-07-06T18:35:00
-expires: null
-id: teaser
-UID: bd2b39d2745847db82ed197a4eb1effc
-"@type": Document
+title: Teaser
 blocks:
   - b986b92c-e180-42d3-b755-4728854e5a50: title
   - ref-teaser-description: slate

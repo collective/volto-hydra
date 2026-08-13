@@ -1,18 +1,25 @@
 ---
-title: Another Page
+"@type": Document
+UID: 2e8ed811e2954e9882d561be8b25cb8c
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: Cultivar sweet irish and irish flavour cinnamon foam crema
   percolator caffeine aftertaste mountain.
-review_state: published
-exclude_from_nav: false
-subjects:
-  - content
-language: "##DEFAULT##"
-rights: ""
 effective: 2024-03-07T17:09:00
+exclude_from_nav: false
 expires: null
 id: copy_of_page
-UID: 2e8ed811e2954e9882d561be8b25cb8c
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
+subjects:
+  - content
+title: Another Page
 blocks:
   - af503055-b17f-4393-8f76-ee11b7b1aae8: title
   - 2e449c25-d897-4c7a-b5ac-793175ea55ee: description

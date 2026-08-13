@@ -1,18 +1,25 @@
 ---
-title: Build a frontend
+"@type": Document
+UID: docs-build-a-frontend-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: "The actual code you write will depend on the framework you choose.
   You can look at these examples to help you:"
-review_state: published
-exclude_from_nav: false
-subjects:
-  - frontend
-language: "##DEFAULT##"
-rights: ""
 effective: 2025-01-01T00:00:00
+exclude_from_nav: false
 expires: null
 id: build-a-frontend
-UID: docs-build-a-frontend-001
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
+subjects:
+  - frontend
+title: Build a frontend
 blocks:
   - title-1: title
   - p-1: slate

@@ -1,11 +1,11 @@
 ---
-title: News Item View
-description: Layout template for News Item content type pages
-review_state: published
-effective: 2025-01-01T00:00:00
-id: newsitem-view
-UID: tpl-ct-newsitem-view
 "@type": Document
+UID: tpl-ct-newsitem-view
+id: newsitem-view
+title: News Item View
+review_state: published
+description: Layout template for News Item content type pages
+effective: 2025-01-01T00:00:00
 blocks:
   - tpl-ni-date: dateField
   - tpl-ni-title: title

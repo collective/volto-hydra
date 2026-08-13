@@ -1,18 +1,25 @@
 ---
-title: Maps
+"@type": Document
+UID: e090d954d0a448bca81c1a646e673a12
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: The maps block can have embeded a Map (Google Maps, OpenMaps, etc).
-review_state: published
+effective: 2023-09-22T16:09:00
 exclude_from_nav: false
+expires: null
+id: maps
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
 subjects:
   - blocks
   - media
-language: "##DEFAULT##"
-rights: ""
-effective: 2023-09-22T16:09:00
-expires: null
-id: maps
-UID: e090d954d0a448bca81c1a646e673a12
-"@type": Document
+title: Maps
 blocks:
   - 68370edd-bfe5-47fb-937e-16a19a3a92ad: title
   - ref-maps-description: slate

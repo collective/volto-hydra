@@ -1,17 +1,31 @@
 ---
-title: Another News Item
+"@type": News Item
+UID: af85ff98cd6446eebcba56305ed89fed
+allow_discussion: false
+changeNote: null
+contributors: []
+creators:
+  - admin
 description: Cinnamon skinny medium panna americano spice affogato froth frappuccino that.
-review_state: published
-exclude_from_nav: false
-subjects:
-  - news
-language: "##DEFAULT##"
-rights: ""
 effective: 2024-03-07T17:09:00
+exclude_from_nav: false
 expires: null
 id: copy_of_news-item
-UID: af85ff98cd6446eebcba56305ed89fed
-"@type": News Item
+image:
+  blob_path: docs/examples/content-types/copy_of_news-item/image/sergio-martinez-rhNJJ4eD2zk-unsplash.jpg
+  content-type: image/jpeg
+  filename: sergio-martinez-rhNJJ4eD2zk-unsplash.jpg
+  height: 3456
+  size: 2231807
+  width: 5184
+image_caption: null
+language: "##DEFAULT##"
+layout: newsitem_view
+review_state: published
+rights: ""
+subjects:
+  - news
+title: Another News Item
 blocks:
   - ni-date-qrq6v50j: dateField
   - a0ac0f60-667b-4b22-a49f-989f2ae8c3cc: title

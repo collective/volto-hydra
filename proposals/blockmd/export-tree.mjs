@@ -25,7 +25,8 @@ import {
 import { join, dirname, resolve, extname, basename } from 'path';
 import { fileURLToPath } from 'url';
 import YAML from 'yaml';
-import { pageToMd, AUTHORED, IDENTITY } from './blockmd.mjs';
+import { pageToMd, SERVER_STATE } from '../../lib/blockmd.mjs';
+import { blobDefaults } from '../../lib/markdown-mount.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const INKA = resolve(HERE, '../..');
@@ -166,10 +167,13 @@ for (const { data, dir } of items) {
     // The content type is derived from the extension; record it when it isn't
     // what the extension implies, rather than making every entry carry it.
     if (data['@type'] !== typeForFile(file)) entry.type = data['@type'];
-    if (data.title && data.title !== meta.filename) entry.title = data.title;
-    if (data.description) entry.description = data.description;
-    if (data.exclude_from_nav === false) entry.exclude_from_nav = false;
-    if (data.rights) entry.rights = data.rights;
+    // Everything else that differs from the defaults. Comparing against the
+    // shared defaults rather than naming fields means a field nobody thought
+    // of is kept, not silently dropped.
+    const defaults = blobDefaults(data['@type'], meta.filename);
+    for (const [k, v] of Object.entries(defaults)) {
+      if (data[k] !== undefined && JSON.stringify(data[k]) !== JSON.stringify(v)) entry[k] = data[k];
+    }
     if (!blobsByFolder.has(parentId)) blobsByFolder.set(parentId, []);
     blobsByFolder.get(parentId).push(entry);
     continue;
@@ -182,7 +186,7 @@ for (const { data, dir } of items) {
   const md = data.blocks && Object.keys(data.blocks).length
     ? pageToMd(data, schema)
     : `---\n${YAML.stringify(Object.fromEntries(
-        [...AUTHORED, ...IDENTITY].filter((k) => k in data).map((k) => [k, data[k]]),
+        Object.entries(data).filter(([k]) => !SERVER_STATE.has(k)),
       )).trim()}\n---\n`;
   writeFileSync(dest, md);
   pages++;

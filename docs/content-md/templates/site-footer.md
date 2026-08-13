@@ -1,11 +1,11 @@
 ---
+"@type": Document
+UID: site-footer-uid
+id: site-footer
+review_state: published
 title: Site Footer
 description: Footer with social links and copyright
-review_state: published
 effective: 2025-01-01T00:00:00
-id: site-footer
-UID: site-footer-uid
-"@type": Document
 blocks:
   - footer-social: socialLinks
   - footer-copyright: slate

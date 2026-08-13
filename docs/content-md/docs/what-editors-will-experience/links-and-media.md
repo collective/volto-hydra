@@ -1,20 +1,27 @@
 ---
-title: Links and media
+"@type": Document
+UID: docs-what-editors-will-experience-links-and-media-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: "The link picker, image picker, and upload dialog are part of
   Inka's chrome — they look the same on every site. What varies by design system
   is which links and images are click-to-edit in the preview: a site might wire
   up every link inline, or only a few \"primary\" links, with everything else
   editable from the sidebar. Same applies to images."
-review_state: published
-exclude_from_nav: false
-subjects: []
-language: "##DEFAULT##"
-rights: ""
 effective: 2025-01-01T00:00:00
+exclude_from_nav: false
 expires: null
 id: links-and-media
-UID: docs-what-editors-will-experience-links-and-media-001
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
+subjects: []
+title: Links and media
 blocks:
   - title-1: title
   - p-1: slate

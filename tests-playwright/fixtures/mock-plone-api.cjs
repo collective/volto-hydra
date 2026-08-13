@@ -112,6 +112,24 @@ const sessionContent = {};
 // Map URL paths to source directories (for loading content from disk)
 const contentDirMap = {};
 
+// A mount may be a README-shaped markdown tree instead of a data.json tree.
+// Those are read once at startup into these maps; everything downstream --
+// enrichment, @components, search, @@images, resolveuid -- is unchanged,
+// because it all works on the raw content object.
+//
+// blockmd is ESM and this file is CommonJS, so the module is pulled in with a
+// single dynamic import during startup. `ready` resolves when the trees are
+// loaded; the server awaits it before listening.
+const MARKDOWN_BLOB_MIME = {
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
+  '.svg': 'image/svg+xml', '.webp': 'image/webp', '.avif': 'image/avif',
+  '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime',
+  '.pdf': 'application/pdf',
+};
+const markdownItems = new Map();   // url path -> raw content
+const markdownBlobs = new Map();   // url path -> absolute blob file
+let ready = Promise.resolve();
+
 // Map UIDs to URL paths (for resolveuid endpoint)
 const uidToPathMap = {};
 
@@ -512,6 +530,9 @@ function formatSearchItem(content, baseUrl) {
  * @returns {Object|null} The raw content object or null if not found
  */
 function loadRawContentFromDisk(urlPath) {
+  // A markdown mount is read whole at startup, so serve from that first.
+  if (markdownItems.has(urlPath)) return markdownItems.get(urlPath);
+
   // First check contentDirMap (for pre-scanned content)
   const dirInfo = contentDirMap[urlPath];
   if (dirInfo) {
@@ -1135,6 +1156,35 @@ function getSiteRoot() {
   };
 }
 
+/**
+ * Load every markdown mount. A markdown tree is one with an index.md at its
+ * root; a distribution tree has plone_site_root/data.json instead.
+ */
+async function initMarkdownMounts() {
+  const mounts = CONTENT_MOUNTS.filter(
+    ({ dirPath }) => fs.existsSync(path.join(dirPath, 'index.md')));
+  if (!mounts.length) return;
+  const { readTree } = await import('../../lib/markdown-mount.mjs');
+  for (const { mountPath, dirPath } of mounts) {
+    const { items, blobFiles } = readTree(dirPath);
+    const urlFor = (p) => (mountPath === '/' ? p : mountPath + (p === '/' ? '' : p));
+    for (const [p, item] of items) {
+      const urlPath = urlFor(p);
+      item['@id'] = urlPath;
+      markdownItems.set(urlPath, item);
+      contentDirMap[urlPath] = { dirPath, markdown: true };
+      if (item.UID) {
+        uidToPathMap[item.UID] = urlPath;
+        if (item.getObjPositionInParent !== undefined) {
+          uidPositionMap[item.UID] = item.getObjPositionInParent;
+        }
+      }
+    }
+    for (const [p, file] of blobFiles) markdownBlobs.set(urlFor(p), file);
+    console.log(`Registered ${items.size} markdown items from ${dirPath} at ${mountPath}`);
+  }
+}
+
 // Scan content directories on startup (content loaded on-demand)
 function initContentDirMap() {
   CONTENT_MOUNTS.forEach(({ mountPath, dirPath }) => {
@@ -1154,6 +1204,10 @@ function initContentDirMap() {
 
 // Initialize on startup
 initContentDirMap();
+// Markdown mounts need a dynamic import, so loading them is async. Anything
+// that serves requests must await `ready` first, or the first request can
+// arrive before the tree is in memory.
+ready = initMarkdownMounts();
 
 // Watch content mounts for additions/deletions/modifications and rebuild
 // contentDirMap. node --watch only restarts the JS process on .cjs edits —
@@ -2643,6 +2697,16 @@ app.get('*/@@images/*', (req, res) => {
   const fieldName = rawField.replace(/-\d+.*$/, '');
   const scale = pathMatch && pathMatch[3] ? pathMatch[3] : 'preview';
 
+  // A markdown mount keeps the blob as an ordinary file beside the markdown
+  // that references it, so there is nothing to resolve.
+  if (markdownBlobs.has(contentPath)) {
+    const file = markdownBlobs.get(contentPath);
+    res.set('Content-Type', MARKDOWN_BLOB_MIME[path.extname(file).toLowerCase()]
+      || 'application/octet-stream');
+    res.sendFile(file);
+    return;
+  }
+
   // Try to serve actual image file from content directory
   // Use contentDirMap to find actual directory for nested paths
   // If not found, rescan in case content was added after startup
@@ -2974,4 +3038,4 @@ if (require.main === module) {
 }
 
 // Export for use by test frontend server or test harnesses
-module.exports = { app, server, contentDirMap, CONTENT_MOUNTS };
+module.exports = { app, server, contentDirMap, CONTENT_MOUNTS, ready };

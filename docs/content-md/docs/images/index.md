@@ -1,16 +1,21 @@
 ---
-title: Images
+"@type": Document
+UID: docs-images-folder-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: Documentation screenshots referenced by editor-experience pages.
-review_state: published
-exclude_from_nav: true
-subjects: []
-language: "##DEFAULT##"
-rights: ""
 effective: null
+exclude_from_nav: true
 expires: null
 id: images
-UID: docs-images-folder-001
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+review_state: published
+rights: ""
+subjects: []
+title: Images
 blocks:
   - title-1: title
 order:

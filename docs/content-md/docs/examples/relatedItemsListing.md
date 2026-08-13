@@ -1,20 +1,25 @@
 ---
-title: Related Items Block
+"@type": Document
+UID: docs-examples-relatedItemsListing-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: Renders the current page's related items relation field (default
   relatedItems) as a list, reusing the listing machinery — each related item is
   rendered with a configurable item type (variation).
-review_state: published
+effective: null
 exclude_from_nav: false
+expires: null
+id: relatedItemsListing
+language: "##DEFAULT##"
+layout: document_view
+review_state: published
+rights: ""
 subjects:
   - blocks
   - listings
-language: "##DEFAULT##"
-rights: ""
-effective: null
-expires: null
-id: relatedItemsListing
-UID: docs-examples-relatedItemsListing-001
-"@type": Document
+title: Related Items Block
 blocks:
   - title-1: title
   - ref-relatedItemsListing-description: slate

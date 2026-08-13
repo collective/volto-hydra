@@ -1,21 +1,34 @@
 ---
-title: Introduction
+"@type": Document
+UID: 00cef5f245a342958288ace545e3c097
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: >-
   
   The introductory block allows the display of an introductory text, which is
   displayed larger than normal continuous text.
-review_state: published
+effective: 2023-07-06T18:35:00
 exclude_from_nav: false
+expires: null
+id: introduction
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image:
+  blob_path: docs/examples/introduction/preview_image/black-starry-night.jpg
+  content-type: image/jpeg
+  filename: black-starry-night.jpg
+  height: 1708
+  size: 693013
+  width: 2400
+review_state: published
+rights: ""
 subjects:
   - blocks
   - text
-language: "##DEFAULT##"
-rights: ""
-effective: 2023-07-06T18:35:00
-expires: null
-id: introduction
-UID: 00cef5f245a342958288ace545e3c097
-"@type": Document
+title: Introduction
 blocks:
   - 50727b9a-1f8a-4857-aab5-8acc6985bfc6: title
   - ref-introduction-description: slate

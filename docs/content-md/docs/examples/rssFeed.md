@@ -1,19 +1,24 @@
 ---
-title: RSS Feed Block
+"@type": Document
+UID: docs-examples-rssFeed-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: Renders entries from an external RSS feed, reusing the listing
   machinery. Each entry is rendered with a configurable item type (variation).
-review_state: published
+effective: null
 exclude_from_nav: false
+expires: null
+id: rssFeed
+language: "##DEFAULT##"
+layout: document_view
+review_state: published
+rights: ""
 subjects:
   - blocks
   - listings
-language: "##DEFAULT##"
-rights: ""
-effective: null
-expires: null
-id: rssFeed
-UID: docs-examples-rssFeed-001
-"@type": Document
+title: RSS Feed Block
 blocks:
   - title-1: title
   - ref-rssFeed-description: slate

@@ -1,18 +1,31 @@
 ---
-title: Page
+"@type": Document
+UID: 7ab9c48ede33415fa2a66a99549c8f70
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: The Page content type can be used to display content on a single
   page of the website. Pages can be structured using text, images and blocks.
-review_state: published
-exclude_from_nav: false
-subjects:
-  - content
-language: "##DEFAULT##"
-rights: ""
 effective: 2023-07-06T18:35:00
+exclude_from_nav: false
 expires: null
 id: page
-UID: 7ab9c48ede33415fa2a66a99549c8f70
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image:
+  blob_path: docs/examples/content-types/page/preview_image/black-starry-night.jpg
+  content-type: image/jpeg
+  filename: black-starry-night.jpg
+  height: 1708
+  size: 693013
+  width: 2400
+review_state: published
+rights: ""
+subjects:
+  - content
+title: Page
 blocks:
   - d3f1c443-583f-4e8e-a682-3bf25752a300: title
   - 7c36a063-bd02-487b-b49a-fcbf1b00fbda: image

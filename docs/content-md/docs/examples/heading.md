@@ -1,21 +1,28 @@
 ---
-title: Heading
+"@type": Document
+UID: 2f69aa417e894fd3bf23d393287b369e
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: >-
   
   The heading block allows you to display headings to group multiple blocks
   under one topic.
-review_state: published
+effective: 2023-07-06T18:35:00
 exclude_from_nav: false
+expires: null
+id: heading
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: null
 subjects:
   - blocks
   - text
-language: "##DEFAULT##"
-rights: null
-effective: 2023-07-06T18:35:00
-expires: null
-id: heading
-UID: 2f69aa417e894fd3bf23d393287b369e
-"@type": Document
+title: Heading
 blocks:
   - e58cca3c-95d4-4819-951d-48415706bf41: title
   - ref-heading-description: slate

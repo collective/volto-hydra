@@ -1,17 +1,30 @@
 ---
-title: Table
+"@type": Document
+UID: 102f648399914851951ffa3fefc8665c
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: The Table block allows you to add a table to a page.
-review_state: published
-exclude_from_nav: false
-subjects:
-  - blocks
-language: "##DEFAULT##"
-rights: ""
 effective: 2023-07-06T18:35:00
+exclude_from_nav: false
 expires: null
 id: table
-UID: 102f648399914851951ffa3fefc8665c
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image:
+  blob_path: docs/examples/table/preview_image/black-starry-night.jpg
+  content-type: image/jpeg
+  filename: black-starry-night.jpg
+  height: 1708
+  size: 693013
+  width: 2400
+review_state: published
+rights: ""
+subjects:
+  - blocks
+title: Table
 blocks:
   - fb451586-3dab-4b40-a5f8-f73056685165: title
   - ref-table-description: slate

@@ -1,20 +1,27 @@
 ---
-title: Custom Blocks
+"@type": Document
+UID: docs-custom-blocks-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: Define custom block types directly in your frontend configuration
   via the blocks option in initBridge. No Volto plugin deployment required. Each
   block type needs an id, title, and a blockSchema with its field properties.
-review_state: published
+effective: 2025-01-01T00:00:00
 exclude_from_nav: false
+expires: null
+id: custom-blocks
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
 subjects:
   - blocks
   - frontend
-language: "##DEFAULT##"
-rights: ""
-effective: 2025-01-01T00:00:00
-expires: null
-id: custom-blocks
-UID: docs-custom-blocks-001
-"@type": Document
+title: Custom Blocks
 blocks:
   - cb-title-1: title
   - p-1: slate

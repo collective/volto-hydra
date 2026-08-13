@@ -1,11 +1,11 @@
 ---
-title: Event View
-description: Layout template for Event content type pages
-review_state: published
-effective: 2025-01-01T00:00:00
-id: event-view
-UID: tpl-ct-event-view
 "@type": Document
+UID: tpl-ct-event-view
+id: event-view
+title: Event View
+review_state: published
+description: Layout template for Event content type pages
+effective: 2025-01-01T00:00:00
 blocks:
   - tpl-ev-title: title
   - tpl-ev-metadata: eventMetadata

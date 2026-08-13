@@ -1,17 +1,39 @@
 ---
-title: Another Event
+"@type": Event
+UID: a2f2c6a524094c9482cc5384883fd8e7
+allow_discussion: false
+attendees: []
+changeNote: null
+contact_email: null
+contact_name: null
+contact_phone: null
+contributors: []
+creators:
+  - admin
 description: Events can have recurrence :)
-review_state: published
-exclude_from_nav: false
-subjects:
-  - events
-language: "##DEFAULT##"
-rights: ""
 effective: 2024-03-07T17:09:00
+end: 2024-02-29T19:00:00+00:00
+event_url: null
+exclude_from_nav: false
 expires: null
 id: copy_of_event
-UID: a2f2c6a524094c9482cc5384883fd8e7
-"@type": Event
+language: "##DEFAULT##"
+layout: event_view
+location: null
+open_end: false
+preview_caption: null
+preview_image: null
+recurrence: |-
+  DTSTART:20240228T230000Z
+  RRULE:FREQ=MONTHLY;INTERVAL=1;COUNT=12;WKST=MO;BYDAY=-1TH
+review_state: published
+rights: ""
+start: 2024-02-28T23:00:00+00:00
+subjects:
+  - events
+sync_uid: null
+title: Another Event
+whole_day: true
 blocks:
   - dd8d27df-ded3-49f5-afdf-239623a6adba: title
   - d634fc64-0178-4e61-904c-c9963f8c0c7d: introduction

@@ -1,17 +1,24 @@
 ---
-title: Typography - Page Title (H1, 48/56px)
+"@type": Document
+UID: 49d22a94521c4883a1bb448ac7863cdd
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: This page has a sample of the typography available in the theme.
-review_state: published
-exclude_from_nav: false
-subjects:
-  - content
-language: "##DEFAULT##"
-rights: ""
 effective: 2023-07-06T18:35:00
+exclude_from_nav: false
 expires: null
 id: typography
-UID: 49d22a94521c4883a1bb448ac7863cdd
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
+subjects:
+  - content
+title: Typography - Page Title (H1, 48/56px)
 blocks:
   - a6cad3f3-57e8-4bb7-8ac2-b12096e974d2: title
   - 8fe8fc9b-221c-4c74-b66f-671d638222f3: heading

@@ -1,11 +1,11 @@
 ---
+"@type": Document
+UID: context-navigation-layout-uid
+id: context-navigation-layout
+review_state: published
 title: Context Navigation Layout
 description: Forced layout for 3rd-level pages — injects a contextNavigation
   (auto-populated from sibling pages via listing+depth) above the page content.
-review_state: published
-id: context-navigation-layout
-UID: context-navigation-layout-uid
-"@type": Document
 blocks:
   - tpl-context-nav: contextNavigation
   - tpl-default-slot: slate

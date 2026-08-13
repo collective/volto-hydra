@@ -1,7 +1,7 @@
 import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
 import { join, dirname, resolve, relative } from 'path';
 import { fileURLToPath } from 'url';
-import { pageToMd, mdToPage } from './blockmd.mjs';
+import { pageToMd, mdToPage } from '../../lib/blockmd.mjs';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const INKA = resolve(HERE, '../..');
 const schema = JSON.parse(readFileSync(join(HERE, 'schemas.json'), 'utf8'));

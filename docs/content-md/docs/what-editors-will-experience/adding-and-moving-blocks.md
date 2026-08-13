@@ -1,20 +1,27 @@
 ---
-title: Adding and moving blocks
+"@type": Document
+UID: docs-what-editors-will-experience-adding-and-moving-blocks-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: The block chooser, slash menu, and drag handles are part of Inka
   and look the same everywhere. What you can pick from those choosers — the list
   of block types — comes from your site's design system. One site might offer
   "Lead paragraph", "Pull quote", "Stat highlight"; another might just have
   "Text" and "Image". Mechanic is identical.
-review_state: published
-exclude_from_nav: false
-subjects: []
-language: "##DEFAULT##"
-rights: ""
 effective: 2025-01-01T00:00:00
+exclude_from_nav: false
 expires: null
 id: adding-and-moving-blocks
-UID: docs-what-editors-will-experience-adding-and-moving-blocks-001
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
+subjects: []
+title: Adding and moving blocks
 blocks:
   - title-1: title
   - p-1: slate

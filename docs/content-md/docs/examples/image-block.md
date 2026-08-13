@@ -1,22 +1,35 @@
 ---
-title: Image
+"@type": Document
+UID: 40a436ad604f4f80aeafe0977806760a
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: >-
   
   The image block allows images to be embedded in various display formats.
   Images can be displayed in different sizes (100%, L, M, S) and aligned left,
   right or center of the text flow.
-review_state: published
+effective: 2023-07-06T18:35:00
 exclude_from_nav: false
+expires: null
+id: image-block
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image:
+  blob_path: docs/examples/image-block/preview_image/black-starry-night.jpg
+  content-type: image/jpeg
+  filename: black-starry-night.jpg
+  height: 1708
+  size: 693013
+  width: 2400
+review_state: published
+rights: ""
 subjects:
   - blocks
   - media
-language: "##DEFAULT##"
-rights: ""
-effective: 2023-07-06T18:35:00
-expires: null
-id: image-block
-UID: 40a436ad604f4f80aeafe0977806760a
-"@type": Document
+title: Image
 blocks:
   - 4bfc973c-5fbf-45a3-819a-750a3eff4def: title
   - ref-image-description: slate

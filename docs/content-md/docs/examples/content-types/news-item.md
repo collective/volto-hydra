@@ -1,17 +1,25 @@
 ---
-title: News Item
+"@type": News Item
+UID: 8cc3e9af77c0452aa2278b0bfdcf9c85
+allow_discussion: false
+changeNote: null
+contributors: []
+creators:
+  - admin
 description: The News Item content type can be used to display News content on the website.
-review_state: published
-exclude_from_nav: false
-subjects:
-  - news
-language: "##DEFAULT##"
-rights: ""
 effective: 2023-01-01T10:42:00
+exclude_from_nav: false
 expires: null
 id: news-item
-UID: 8cc3e9af77c0452aa2278b0bfdcf9c85
-"@type": News Item
+image: null
+image_caption: null
+language: "##DEFAULT##"
+layout: newsitem_view
+review_state: published
+rights: ""
+subjects:
+  - news
+title: News Item
 blocks:
   - ni-date-m3i1uy1k: dateField
   - d3f1c443-583f-4e8e-a682-3bf25752a300: title

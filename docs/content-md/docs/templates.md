@@ -1,20 +1,27 @@
 ---
-title: Templates & Layouts
+"@type": Document
+UID: docs-templates-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: Templates allow editors to centrally control content and reuse
   content. They allow a developer to not have to hard code layout decisions and
   instead use rules to apply user layouts in template content stored separately
   from the page, or give the user a choice on which layout they want.
-review_state: published
-exclude_from_nav: false
-subjects:
-  - templates
-language: "##DEFAULT##"
-rights: ""
 effective: 2025-01-01T00:00:00
+exclude_from_nav: false
 expires: null
 id: templates
-UID: docs-templates-001
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
+subjects:
+  - templates
+title: Templates & Layouts
 blocks:
   - title-1: title
   - p-1: slate

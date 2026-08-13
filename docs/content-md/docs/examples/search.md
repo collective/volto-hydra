@@ -1,21 +1,34 @@
 ---
-title: Search
+"@type": Document
+UID: 928010d84e5d4df2b2282f3e179d6b1a
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: The search block allows the content of the website to be listed.
   Users can use so-called facets to select certain properties of the listed
   content in order to filter them (e.g. filtering the news of 2022).
-review_state: published
+effective: 2023-07-06T18:35:00
 exclude_from_nav: false
+expires: null
+id: search
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image:
+  blob_path: docs/examples/search/preview_image/black-starry-night.jpg
+  content-type: image/jpeg
+  filename: black-starry-night.jpg
+  height: 1708
+  size: 693013
+  width: 2400
+review_state: published
+rights: ""
 subjects:
   - blocks
   - listings
   - navigation
-language: "##DEFAULT##"
-rights: ""
-effective: 2023-07-06T18:35:00
-expires: null
-id: search
-UID: 928010d84e5d4df2b2282f3e179d6b1a
-"@type": Document
+title: Search
 blocks:
   - f6d35d7e-6422-4496-8a65-f7cfd42fb519: title
   - ref-search-description: slate

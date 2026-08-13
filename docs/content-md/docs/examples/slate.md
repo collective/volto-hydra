@@ -1,22 +1,35 @@
 ---
-title: Text
+"@type": Document
+UID: 2508797173824f0e9f82bb2e7cfe922d
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: >-
   
   The Text Block allows you to add text to a web page. The text can be formatted
   and structured in different ways (bold, headings, etc.).
-review_state: published
+effective: 2023-07-06T18:35:00
 exclude_from_nav: false
+expires: null
+id: slate
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image:
+  blob_path: docs/examples/slate/preview_image/black-starry-night.jpg
+  content-type: image/jpeg
+  filename: black-starry-night.jpg
+  height: 1708
+  size: 693013
+  width: 2400
+review_state: published
+rights: ""
 subjects:
   - blocks
   - text
   - editing
-language: "##DEFAULT##"
-rights: ""
-effective: 2023-07-06T18:35:00
-expires: null
-id: slate
-UID: 2508797173824f0e9f82bb2e7cfe922d
-"@type": Document
+title: Text
 blocks:
   - ccff41c6-b733-4b88-b02e-4c07460a19e2: title
   - ref-text-description: slate

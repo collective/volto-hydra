@@ -1,20 +1,25 @@
 ---
-title: Grid Block
+"@type": Document
+UID: docs-examples-columns-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: A responsive grid layout container. Each cell is a child block
   (teaser, slate, image, etc.) rendered inside the grid. This is the built-in
   Volto grid block (gridBlock).
-review_state: published
+effective: null
 exclude_from_nav: false
+expires: null
+id: columns
+language: "##DEFAULT##"
+layout: document_view
+review_state: published
+rights: ""
 subjects:
   - blocks
   - containers
-language: "##DEFAULT##"
-rights: ""
-effective: null
-expires: null
-id: columns
-UID: docs-examples-columns-001
-"@type": Document
+title: Grid Block
 blocks:
   - title-1: title
   - ref-columns-description: slate

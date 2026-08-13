@@ -1,20 +1,27 @@
 ---
-title: Video
+"@type": Document
+UID: 6d37dd19ef754344aaa254fa288e44b4
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: |-
   
   The video block can contain videos from YouTube.
-review_state: published
+effective: 2023-07-06T18:35:00
 exclude_from_nav: false
+expires: null
+id: video
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
 subjects:
   - blocks
   - media
-language: "##DEFAULT##"
-rights: ""
-effective: 2023-07-06T18:35:00
-expires: null
-id: video
-UID: 6d37dd19ef754344aaa254fa288e44b4
-"@type": Document
+title: Video
 blocks:
   - 604e5248-8521-403d-9e5f-3f50d1229454: title
   - ref-video-description: slate

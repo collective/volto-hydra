@@ -1,22 +1,35 @@
 ---
-title: Grid
+"@type": Document
+UID: 99c70917b6894af08dd306fdbc0eff6a
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: >-
   
   The Grid block allows adding multi-column blocks. A grid block can contain
   between one and four columns of different blocks. Teasers and images can be
   added in a grid block.
-review_state: published
+effective: 2023-07-06T18:35:00
 exclude_from_nav: false
+expires: null
+id: grid
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image:
+  blob_path: docs/examples/grid/preview_image/black-starry-night.jpg
+  content-type: image/jpeg
+  filename: black-starry-night.jpg
+  height: 1708
+  size: 693013
+  width: 2400
+review_state: published
+rights: ""
 subjects:
   - blocks
   - containers
-language: "##DEFAULT##"
-rights: ""
-effective: 2023-07-06T18:35:00
-expires: null
-id: grid
-UID: 99c70917b6894af08dd306fdbc0eff6a
-"@type": Document
+title: Grid
 blocks:
   - d3f1c443-583f-4e8e-a682-3bf25752a300: title
   - ref-grid-description: slate

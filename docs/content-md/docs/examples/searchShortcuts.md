@@ -1,20 +1,25 @@
 ---
-title: Search Shortcuts Block
+"@type": Document
+UID: docs-examples-searchShortcuts-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: Renders a set of values as links into a faceted search — a "tag
   cloud" of shortcuts. Each value links to a search page with
   ?facet.<index>=<value> pre-set, which a Search block reads from the URL.
-review_state: published
+effective: null
 exclude_from_nav: false
+expires: null
+id: searchShortcuts
+language: "##DEFAULT##"
+layout: document_view
+review_state: published
+rights: ""
 subjects:
   - blocks
   - listings
-language: "##DEFAULT##"
-rights: ""
-effective: null
-expires: null
-id: searchShortcuts
-UID: docs-examples-searchShortcuts-001
-"@type": Document
+title: Search Shortcuts Block
 blocks:
   - title-1: title
   - ref-searchShortcuts-description: slate

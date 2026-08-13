@@ -13,7 +13,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'fs';
 import { join, dirname, relative, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { readdirSync, statSync } from 'fs';
-import { pageToMd, mdToPage, AUTHORED, IDENTITY } from './blockmd.mjs';
+import { pageToMd, mdToPage, SERVER_STATE } from '../../lib/blockmd.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const INKA = resolve(HERE, '../..');
@@ -97,7 +97,7 @@ for (const root of [SITE, DOCS]) {
     const back = mdToPage(onDisk);
     if (CHECK) rmSync(dest, { force: true });
 
-    if ([...AUTHORED, ...IDENTITY].every((k) => !(k in page) || eq(page[k], back[k]))) metaOk++;
+    if (Object.keys(page).every((k) => SERVER_STATE.has(k) || eq(page[k], back[k]))) metaOk++;
     if (JSON.stringify(page.blocks_layout?.items || []) === JSON.stringify(back.blocks_layout.items)) orderOk++;
 
     const A = flatten(page.blocks), B = flatten(back.blocks);

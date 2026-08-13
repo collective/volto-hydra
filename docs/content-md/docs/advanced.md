@@ -1,18 +1,25 @@
 ---
-title: Advanced
+"@type": Document
+UID: docs-advanced-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: "Advanced topics for optimising your Inka integration: lazy loading
   the bridge, authentication, and preventing reloads."
-review_state: published
-exclude_from_nav: false
-subjects:
-  - frontend
-language: "##DEFAULT##"
-rights: ""
 effective: 2025-01-01T00:00:00
+exclude_from_nav: false
 expires: null
 id: advanced
-UID: docs-advanced-001
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
+subjects:
+  - frontend
+title: Advanced
 blocks:
   - title-1: title
   - p-1: slate

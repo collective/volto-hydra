@@ -1,20 +1,27 @@
 ---
-title: Templates and layouts
+"@type": Document
+UID: docs-what-editors-will-experience-templates-and-layouts-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: "A template is a piece of pre-built page structure that someone
   (often a developer or site admin) has saved separately. When you apply a
   template to a page, the page gets the template's structure overlaid: some
   blocks are fixed and can't be edited, some can be edited but not moved, and
   some are open slots where you fill in your own blocks."
-review_state: published
-exclude_from_nav: false
-subjects: []
-language: "##DEFAULT##"
-rights: ""
 effective: 2025-01-01T00:00:00
+exclude_from_nav: false
 expires: null
 id: templates-and-layouts
-UID: docs-what-editors-will-experience-templates-and-layouts-001
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
+subjects: []
+title: Templates and layouts
 blocks:
   - title-1: title
   - p-1: slate

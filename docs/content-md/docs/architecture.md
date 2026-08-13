@@ -1,23 +1,30 @@
 ---
-title: How Inka Works
+"@type": Document
+UID: docs-architecture-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: Instead of combining editing and rendering into one framework and
   codebase, these are separated and during editing a two way communication
   channel is opened across an iframe so that the editing UI is no longer part of
   the frontend code. Instead a small JS file called hydra.js is included in your
   frontend during editing that handles the iframe bridge communication to Inka
   which is running in the same browser window.
-review_state: published
+effective: 2025-01-01T00:00:00
 exclude_from_nav: false
+expires: null
+id: architecture
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
 subjects:
   - frontend
   - editing
-language: "##DEFAULT##"
-rights: ""
-effective: 2025-01-01T00:00:00
-expires: null
-id: architecture
-UID: docs-architecture-001
-"@type": Document
+title: How Inka Works
 blocks:
   - title-1: title
   - p-1: slate

@@ -1,19 +1,26 @@
 ---
-title: Live Preview
+"@type": Document
+UID: docs-live-preview-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: To make your site editable with Inka you load hydra.js in your
   frontend and call initBridge(). This sets up a two-way communication channel
   that handles authentication, page navigation, and live content updates.
-review_state: published
-exclude_from_nav: false
-subjects:
-  - editing
-language: "##DEFAULT##"
-rights: ""
 effective: 2025-01-01T00:00:00
+exclude_from_nav: false
 expires: null
 id: live-preview
-UID: docs-live-preview-001
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
+subjects:
+  - editing
+title: Live Preview
 blocks:
   - title-1: title
   - p-1: slate

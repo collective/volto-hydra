@@ -1,17 +1,24 @@
 ---
-title: Server-rendered frontends
+"@type": Document
+UID: docs-server-rendered-frontends-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: Inka works with any frontend, including ones that have no client-side
-review_state: published
-exclude_from_nav: false
-subjects:
-  - frontend
-language: "##DEFAULT##"
-rights: ""
 effective: 2025-01-01T00:00:00
+exclude_from_nav: false
 expires: null
 id: server-rendered-frontends
-UID: docs-server-rendered-frontends-001
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
+subjects:
+  - frontend
+title: Server-rendered frontends
 blocks:
   - title-1: title
   - p-1: slate

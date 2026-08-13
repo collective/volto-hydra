@@ -1,14 +1,21 @@
 ---
-title: External Link
+"@type": Link
+UID: 362783c333434d2f89a00bd48ea37e34
+allow_discussion: false
+changeNote: null
+contributors: []
+creators:
+  - admin
 description: ""
-review_state: published
-exclude_from_nav: false
-subjects: []
-language: "##DEFAULT##"
-rights: ""
 effective: 2024-03-07T17:09:00
+exclude_from_nav: false
 expires: null
 id: external-link
-UID: 362783c333434d2f89a00bd48ea37e34
-"@type": Link
+language: "##DEFAULT##"
+layout: link_redirect_view
+remoteUrl: https://plone.org
+review_state: published
+rights: ""
+subjects: []
+title: External Link
 ---

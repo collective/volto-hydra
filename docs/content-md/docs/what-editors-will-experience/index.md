@@ -1,20 +1,27 @@
 ---
-title: Editor Guide
+"@type": Document
+UID: docs-what-editors-will-experience-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: This guide is for content editors using an Inka-powered site. It
   covers how to use the editor — how to select things, edit text, add and move
   blocks, work with containers and templates — without assuming you know how the
   site was built.
-review_state: published
-exclude_from_nav: false
-subjects:
-  - editing
-language: "##DEFAULT##"
-rights: ""
 effective: 2025-01-01T00:00:00
+exclude_from_nav: false
 expires: null
 id: what-editors-will-experience
-UID: docs-what-editors-will-experience-001
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
+subjects:
+  - editing
+title: Editor Guide
 blocks:
   - title-1: title
   - p-1: slate

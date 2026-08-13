@@ -1,18 +1,25 @@
 ---
-title: Accordion
+"@type": Document
+UID: f8cd4a2d8d7c4703b4e41d2093b21aed
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: The accordion contains other blocks in an accordion behavior layout.
-review_state: published
+effective: 2023-09-22T16:09:00
 exclude_from_nav: false
+expires: null
+id: accordion
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
 subjects:
   - blocks
   - containers
-language: "##DEFAULT##"
-rights: ""
-effective: 2023-09-22T16:09:00
-expires: null
-id: accordion
-UID: f8cd4a2d8d7c4703b4e41d2093b21aed
-"@type": Document
+title: Accordion
 blocks:
   - fec13476-1231-42fc-84d5-b110e8e3c6e7: title
   - ref-accordion-description: slate

@@ -1,21 +1,28 @@
 ---
-title: Listings & Dynamic Blocks
+"@type": Document
+UID: docs-listings-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: A listing block fetches content from the server (e.g. latest news)
   and renders each result as a separate block, repeating each block once per
   result entry. This means a listing can be moved between containers and reuse
   normal blocks for what it repeats.
-review_state: published
+effective: 2025-01-01T00:00:00
 exclude_from_nav: false
+expires: null
+id: listings
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
 subjects:
   - listings
   - frontend
-language: "##DEFAULT##"
-rights: ""
-effective: 2025-01-01T00:00:00
-expires: null
-id: listings
-UID: docs-listings-001
-"@type": Document
+title: Listings & Dynamic Blocks
 blocks:
   - title-1: title
   - p-1: slate

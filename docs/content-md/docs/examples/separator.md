@@ -1,21 +1,28 @@
 ---
-title: Separator
+"@type": Document
+UID: 546e82cce6c842d0a4046a0131539bd2
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: >-
   
   The separator block allows blocks or groups of blocks to be visually separated
   by a horizontal line.
-review_state: published
+effective: 2023-07-06T18:35:00
 exclude_from_nav: false
+expires: null
+id: separator
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
 subjects:
   - blocks
   - text
-language: "##DEFAULT##"
-rights: ""
-effective: 2023-07-06T18:35:00
-expires: null
-id: separator
-UID: 546e82cce6c842d0a4046a0131539bd2
-"@type": Document
+title: Separator
 blocks:
   - 47b1e791-6f01-4b9b-a923-6658e7bc7871: title
   - ref-separator-description: slate

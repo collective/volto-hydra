@@ -1,20 +1,27 @@
 ---
-title: Grid-Teaser block
+"@type": Document
+UID: c2adb9f7b0824bd5a3e07048d887f48d
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: >-
   
   The Grid block allows adding multi-column blocks. A grid block can contain
   between one and four columns of different blocks. Text, teasers, images and
   videos can be added in a grid block.
-review_state: published
-exclude_from_nav: false
-subjects: []
-language: "##DEFAULT##"
-rights: ""
 effective: 2023-07-06T18:35:00
+exclude_from_nav: false
 expires: null
 id: teaser
-UID: c2adb9f7b0824bd5a3e07048d887f48d
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
+subjects: []
+title: Grid-Teaser block
 blocks:
   - 828a7be1-0ab3-4663-9069-4581f5be63c1: title
   - 54548b1e-b99f-4679-9fc6-567e940c4926: gridBlock

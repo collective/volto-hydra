@@ -1,18 +1,25 @@
 ---
-title: Form
+"@type": Document
+UID: 13de82575e16493fbc54514e548a9f3c
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: A form block can be used to create forms
-review_state: published
+effective: 2024-03-08T12:40:00
 exclude_from_nav: false
+expires: null
+id: form
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
 subjects:
   - blocks
   - forms
-language: "##DEFAULT##"
-rights: ""
-effective: 2024-03-08T12:40:00
-expires: null
-id: form
-UID: 13de82575e16493fbc54514e548a9f3c
-"@type": Document
+title: Form
 blocks:
   - 00e8d49b-5b99-4d2f-83b3-7d69bc80b893: title
   - ref-form-description: slate

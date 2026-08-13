@@ -1,19 +1,26 @@
 ---
-title: Editing text
+"@type": Document
+UID: docs-what-editors-will-experience-editing-text-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: "Click into any text in the preview that's marked inline-editable
   and start typing. There are two kinds of text fields: simple text (like a
   title) and slate (rich text — the body of a paragraph block, descriptions,
   etc.)."
-review_state: published
-exclude_from_nav: false
-subjects: []
-language: "##DEFAULT##"
-rights: ""
 effective: 2025-01-01T00:00:00
+exclude_from_nav: false
 expires: null
 id: editing-text
-UID: docs-what-editors-will-experience-editing-text-001
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
+subjects: []
+title: Editing text
 blocks:
   - title-1: title
   - p-1: slate

@@ -1,22 +1,35 @@
 ---
-title: Highlight
+"@type": Document
+UID: 8416628543f146ff9a18d281c03e2399
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: >-
   
   The highlight block allows you to highlight and tease a single piece of
   content. The content is displayed with a large image and a title and
   description in a banderole.
-review_state: published
+effective: 2023-07-06T18:35:00
 exclude_from_nav: false
+expires: null
+id: highlight
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image:
+  blob_path: docs/examples/highlight/preview_image/black-starry-night.jpg
+  content-type: image/jpeg
+  filename: black-starry-night.jpg
+  height: 1708
+  size: 693013
+  width: 2400
+review_state: published
+rights: ""
 subjects:
   - blocks
   - text
-language: "##DEFAULT##"
-rights: ""
-effective: 2023-07-06T18:35:00
-expires: null
-id: highlight
-UID: 8416628543f146ff9a18d281c03e2399
-"@type": Document
+title: Highlight
 blocks:
   - af3c704a-1f80-48c8-843b-dc29368d43d9: title
   - ref-highlight-description: slate

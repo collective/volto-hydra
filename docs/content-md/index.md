@@ -1,18 +1,23 @@
 ---
-title: Inka
+"@type": Plone Site
+UID: plone_site_root
+allow_discussion: null
+contributors: []
+creators:
+  - admin
 description: Design-system-first page building. Strike the right balance for
   your site — make it easy for editors to create engagement while staying
   compliant.
-review_state: null
-exclude_from_nav: false
-subjects: []
-language: "##DEFAULT##"
-rights: ""
 effective: null
+exclude_from_nav: false
 expires: null
 id: Plone
-UID: plone_site_root
-"@type": Plone Site
+language: "##DEFAULT##"
+review_state: null
+rights: ""
+subjects: []
+table_of_contents: null
+title: Inka
 blocks:
   - hero-headline: slate
   - hero-subhead: slate

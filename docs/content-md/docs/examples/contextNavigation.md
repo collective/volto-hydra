@@ -1,24 +1,29 @@
 ---
-title: Context Navigation Block
+"@type": Document
+UID: docs-examples-contextNavigation-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: A vertical navigation list for grouped pages — a left sidebar on
   desktop and a collapsible disclosure at the top on mobile. Each row is a
   navItem (hand-added link) and/or a listing (auto-populated from a path query).
   The active link is detected from the current URL and gets aria-current="page"
   plus a .current class. Named after Plone's @contextnavigation endpoint, which
   serves the same purpose.
-review_state: published
+effective: null
 exclude_from_nav: false
+expires: null
+id: contextNavigation
+language: "##DEFAULT##"
+layout: document_view
+review_state: published
+rights: ""
 subjects:
   - blocks
   - navigation
   - templates
-language: "##DEFAULT##"
-rights: ""
-effective: null
-expires: null
-id: contextNavigation
-UID: docs-examples-contextNavigation-001
-"@type": Document
+title: Context Navigation Block
 blocks:
   - title-1: title
   - ref-contextNavigation-description: slate

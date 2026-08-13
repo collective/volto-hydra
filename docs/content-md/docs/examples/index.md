@@ -1,17 +1,22 @@
 ---
-title: Examples
+"@type": Document
+UID: docs-examples-folder-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
 description: "Block reference: schema, JSON, and rendered examples for every
   block type Volto Hydra ships."
-review_state: published
-exclude_from_nav: false
-subjects: []
-language: "##DEFAULT##"
-rights: ""
 effective: null
+exclude_from_nav: false
 expires: null
 id: examples
-UID: docs-examples-folder-001
-"@type": Document
+language: "##DEFAULT##"
+layout: document_view
+review_state: published
+rights: ""
+subjects: []
+title: Examples
 blocks:
   - title-1: title
   - examples-listing: listing
