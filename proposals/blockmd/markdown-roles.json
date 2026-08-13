@@ -21,7 +21,7 @@
       "at": "h2",
       "item": {
         "title":  "${1/text}",
-        "blocks": "${2/body}"
+        "blocks": "${2.../blocks_layout}"
       }
     }
   }
