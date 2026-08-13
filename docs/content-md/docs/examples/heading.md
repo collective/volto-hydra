@@ -43,52 +43,29 @@ blocks:
   - ref-heading-rendering: codeExample
 ---
 
-:::title{uid="e58cca3c-95d4-4819-951d-48415706bf41"}
-:::
+<block type="title" uid="e58cca3c-95d4-4819-951d-48415706bf41" />
 
 A standalone heading block that renders as h1–h6 based on a configurable tag field. Unlike headings inside a slate block, this is a dedicated block type with its own heading text field.
 
-:::separator{uid="4a0352d5-89df-48aa-944e-7270e81351d4"}
-```fields
-{
- "styles": {
-  "align": "full",
-  "backgroundColor": "transparent",
-  "noLine": false
- }
-}
-```
-:::
+<block type="separator" uid="4a0352d5-89df-48aa-944e-7270e81351d4" data='{"styles":{"align":"full","backgroundColor":"transparent","noLine":false}}' />
 
-:::introduction{uid="faabad67-4aa2-4774-a48c-b1accf288700"}
+<block type="introduction" uid="faabad67-4aa2-4774-a48c-b1accf288700">
+
 Lorem ipsum vitae elit libero, a pharetra augue. Nulla vitae elit libero, a pharetra augue. Duis mollis, est non commodo luctus, nisi erat porttitor ligula, eget lacinia odio sem nec elit. Donec ullamcorper nulla non metus auctor fringilla. Vivamus sagittis lacus vel augue laoreet rutrum faucibus dolor auctor. Vestibulum id ligula porta felis euismod semper.
-:::
 
-:::separator{uid="fe637263-126e-4a7f-b4aa-36369c5155cc"}
-```fields
-{
- "styles": {
-  "align": "full"
- }
-}
-```
-:::
+</block>
 
-:::introduction{uid="36960cee-ec85-458b-b0be-d2e7a5a41e5f"}
+<block type="separator" uid="fe637263-126e-4a7f-b4aa-36369c5155cc" data='{"styles":{"align":"full"}}' />
+
+<block type="introduction" uid="36960cee-ec85-458b-b0be-d2e7a5a41e5f">
+
 ## Highlight Title H2&#x20;
-:::
+
+</block>
 
 Lorem ipsum vitae elit libero, a pharetra augue. Nulla vitae elit libero, a pharetra augue. Duis mollis, est non commodo luctus, nisi erat porttitor ligula, eget lacinia odio sem nec elit. Donec ullamcorper nulla non metus auctor fringilla. Vivamus sagittis lacus vel augue laoreet rutrum faucibus dolor auctor. Vestibulum id ligula porta felis euismod semper.
 
-:::separator{uid="e328753b-d914-4bcb-8b8b-2d5060476efe"}
-```fields
-{
- "styles": {
-  "align": "full"
- }
-}
-```
-:::
+<block type="separator" uid="e328753b-d914-4bcb-8b8b-2d5060476efe" data='{"styles":{"align":"full"}}' />
 
 ## Headline H2
 
@@ -98,52 +75,24 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
 
-:::separator{uid="0126e819-d955-41c5-a736-2f0b5ffda8a1"}
-```fields
-{
- "styles": {
-  "align": "full"
- }
-}
-```
-:::
+<block type="separator" uid="0126e819-d955-41c5-a736-2f0b5ffda8a1" data='{"styles":{"align":"full"}}' />
 
-:::gridBlock{uid="1bedcc9d-1c02-44e8-bb8e-5c46d6c67d3d" headline="Block Title"}
-```fields
-{
- "styles": {}
-}
-```
-:::teaser{uid="882e7872-bcf3-4234-a510-d1cff6bf2f7f" title="Teaser Title H2"}
-```fields
-{
- "head_title": null,
- "href": [
-  {
-   "@id": "/docs/examples/content-types/page",
-   "@type": "Document",
-   "Description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
-   "Title": "Page",
-   "getRemoteUrl": null,
-   "hasPreviewImage": true,
-   "head_title": null,
-   "image_field": "preview_image",
-   "title": "Page"
-  }
- ],
- "styles": {
-  "align": "left"
- }
-}
-```
+<block type="gridBlock" uid="1bedcc9d-1c02-44e8-bb8e-5c46d6c67d3d" headline="Block Title" data='{"styles":{}}'>
+
+<block type="teaser" uid="882e7872-bcf3-4234-a510-d1cff6bf2f7f" title="Teaser Title H2" data='{"head_title":null,"href":[{"@id":"/docs/examples/content-types/page","@type":"Document","Description":"The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.","Title":"Page","getRemoteUrl":null,"hasPreviewImage":true,"head_title":null,"image_field":"preview_image","title":"Page"}],"styles":{"align":"left"}}'>
+
 ```field:description
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
 ```
-:::
-:::
 
-:::codeExample{uid="ref-heading-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="schema"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-heading-schema-javascript-f00bc9"]}
+</block>
+
+</block>
+
+<block type="codeExample" uid="ref-heading-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="schema">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-heading-schema-javascript-f00bc9"]}'>
+
 ### Schema
 
 ```javascript
@@ -189,11 +138,15 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
   }
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-heading-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="json-data"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-heading-json-data-json-87c435"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-heading-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="json-data">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-heading-json-data-json-87c435"]}'>
+
 ### JSON Block Data
 
 ```json
@@ -203,11 +156,15 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
   "tag": "h2"
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-heading-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="rendering"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-heading-rendering-jsx-eb01a3","ref-heading-rendering-vue-754dc2","ref-heading-rendering-svelte-f5f71c"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-heading-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="rendering">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-heading-rendering-jsx-eb01a3","ref-heading-rendering-vue-754dc2","ref-heading-rendering-svelte-f5f71c"]}'>
+
 ### React
 
 ```jsx
@@ -248,5 +205,7 @@ defineProps({ block: Object });
   {block.heading}
 </svelte:element>
 ```
-::::
-:::
+
+</region>
+
+</block>

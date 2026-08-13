@@ -28,13 +28,14 @@ blocks:
   - ref-columns-rendering: codeExample
 ---
 
-:::title{uid="title-1"}
-:::
+<block type="title" uid="title-1" />
 
 A horizontal multi-column container. The block has one slot — columns — restricted to column children, capped at four. Each column is itself a container holding any of its allowed inner block types (slate, image, …).
 
-:::codeExample{uid="ref-columns-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-columns" slotId="schema"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-columns-schema-javascript-45206c"]}
+<block type="codeExample" uid="ref-columns-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-columns" slotId="schema">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-columns-schema-javascript-45206c"]}'>
+
 ### Schema
 
 ```javascript
@@ -76,11 +77,15 @@ A horizontal multi-column container. The block has one slot — columns — rest
   }
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-columns-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-columns" slotId="json-data"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-columns-json-data-json-9ddfde"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-columns-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-columns" slotId="json-data">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-columns-json-data-json-9ddfde"]}'>
+
 ### JSON Block Data
 
 ```json
@@ -145,11 +150,15 @@ A horizontal multi-column container. The block has one slot — columns — rest
   }
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-columns-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-columns" slotId="rendering"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-columns-rendering-jsx-a52cb0","ref-columns-rendering-vue-526eec","ref-columns-rendering-svelte-9b4eec"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-columns-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-columns" slotId="rendering">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-columns-rendering-jsx-a52cb0","ref-columns-rendering-vue-526eec","ref-columns-rendering-svelte-9b4eec"]}'>
+
 ### React
 
 ```jsx
@@ -219,5 +228,7 @@ defineProps({ block: Object });
   </div>
 </div>
 ```
-::::
-:::
+
+</region>
+
+</block>

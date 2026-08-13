@@ -55,8 +55,7 @@ blocks:
   - ul-32: slate
 ---
 
-:::title{uid="title-1"}
-:::
+<block type="title" uid="title-1" />
 
 Inka works with any frontend, including ones that have no client-side reactivity at all — pure server-rendered frameworks like **Astro**, **PHP**, **Django**, **Rails**, **Laravel**, **Symfony**, **Go html/template**. The bridge ships a built-in pattern for these: one config option on `initBridge` and one small endpoint on your server.
 
@@ -70,8 +69,10 @@ The fix is to update only the smallest block that changed, and let the rest of t
 
 ## How it works
 
-:::codeExample{uid="ce-7"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-7-text-316e7d"]}
+<block type="codeExample" uid="ce-7">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-7-text-316e7d"]}'>
+
 ### Text
 
 ```text
@@ -96,8 +97,10 @@ hydra.js bridge   ────►    FORM_DATA postMessage
                            bridge swaps [data-block-uid=X].outerHTML
                            (or renderContainer.innerHTML for page unit)
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 ### The diff rule (built into `hydra.js`)
 
@@ -120,8 +123,10 @@ That dispatch must also handle `@type: "empty"` — the placeholder Inka seeds i
 
 ## Worked example: Astro
 
-:::codeExample{uid="ce-17"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-17-astro-6cfb06"]}
+<block type="codeExample" uid="ce-17">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-17-astro-6cfb06"]}'>
+
 ### Js
 
 ```js
@@ -135,11 +140,15 @@ initBridge({
   renderContainer: '#content',   // optional, default '#content'
 });
 ```
-::::
-:::
 
-:::codeExample{uid="ce-18"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-18-ts-ad6a37"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ce-18">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-18-ts-ad6a37"]}'>
+
 ### Astro
 
 ```astro
@@ -159,11 +168,15 @@ const uid  = block?.['@uid'];
   {/* ...one branch per block type... */}
 </div>
 ```
-::::
-:::
 
-:::codeExample{uid="ce-19"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-19-ts-892388"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ce-19">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-19-ts-892388"]}'>
+
 ### Ts
 
 ```ts
@@ -197,15 +210,19 @@ function findBlockById(formData, blockId) {
   return null;
 }
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 The full working example lives at [`docs/examples/test-astro/`](https://github.com/collective/volto-hydra/tree/main/docs/examples/test-astro) with block components in [`docs/examples/examples/astro/`](https://github.com/collective/volto-hydra/tree/main/docs/examples/examples/astro).
 
 ## Worked example: PHP
 
-:::codeExample{uid="ce-22"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-22-php-e87720"]}
+<block type="codeExample" uid="ce-22">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-22-php-e87720"]}'>
+
 ### Php
 
 ```php
@@ -217,11 +234,15 @@ The full working example lives at [`docs/examples/test-astro/`](https://github.c
   ?>
 </div>
 ```
-::::
-:::
 
-:::codeExample{uid="ce-23"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-23-php-9a04e4"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ce-23">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-23-php-9a04e4"]}'>
+
 ### Php
 
 ```php
@@ -230,11 +251,15 @@ The full working example lives at [`docs/examples/test-astro/`](https://github.c
   <?php foreach ($block['value'] ?? [] as $node) include __DIR__ . '/_slate_node.php'; ?>
 </div>
 ```
-::::
-:::
 
-:::codeExample{uid="ce-24"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-24-php-ebbd45"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ce-24">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-24-php-ebbd45"]}'>
+
 ### Php
 
 ```php
@@ -268,13 +293,17 @@ function find_block_by_id($data, $blockId) {
     return null;
 }
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 The HTML page that loads in the editor iframe just needs to pull in the bridge and call `initBridge` with the endpoint:
 
-:::codeExample{uid="ce-26"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-26-html-476b8c"]}
+<block type="codeExample" uid="ce-26">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-26-html-476b8c"]}'>
+
 ### Html
 
 ```html
@@ -295,328 +324,16 @@ The HTML page that loads in the editor iframe just needs to pull in the bridge a
 </body>
 </html>
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 ## Adapting for Django / Rails / Laravel / Symfony / Go
 
 The recipe is the same in every framework — only the rendering call changes:
 
-:::slateTable{uid="tbl-29"}
-```fields
-{
- "table": {
-  "fixed": true,
-  "compact": false,
-  "basic": false,
-  "celled": true,
-  "inverted": false,
-  "striped": false,
-  "rows": [
-   {
-    "key": "tbl-29-r0",
-    "cells": [
-     {
-      "key": "tbl-29-r0c0",
-      "type": "header",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Framework"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-29-r0c1",
-      "type": "header",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Render call"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-29-r1",
-    "cells": [
-     {
-      "key": "tbl-29-r1c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Astro"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-29-r1c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "AstroContainer.renderToString(Component, { props })"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-29-r2",
-    "cells": [
-     {
-      "key": "tbl-29-r2c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "PHP"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-29-r2c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "ob_start(); include \"blocks/{$type}.php\"; return ob_get_clean();"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-29-r3",
-    "cells": [
-     {
-      "key": "tbl-29-r3c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Django"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-29-r3c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "render_to_string(f'blocks/{type}.html', {'block': data})"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-29-r4",
-    "cells": [
-     {
-      "key": "tbl-29-r4c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Rails"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-29-r4c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "render_to_string(\"blocks/#{type}\", locals: { block: data })"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-29-r5",
-    "cells": [
-     {
-      "key": "tbl-29-r5c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Laravel"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-29-r5c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "view(\"blocks.{$type}\", ['block' => $data])->render()"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-29-r6",
-    "cells": [
-     {
-      "key": "tbl-29-r6c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Symfony (Twig)"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-29-r6c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "$twig->render(\"blocks/{$type}.html.twig\", ['block' => $data])"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-29-r7",
-    "cells": [
-     {
-      "key": "tbl-29-r7c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Go templates"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-29-r7c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "tpl.ExecuteTemplate(buf, type, data); return buf.String()"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   }
-  ]
- }
-}
-```
-:::
+<block type="slateTable" uid="tbl-29" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-29-r0","cells":[{"key":"tbl-29-r0c0","type":"header","value":[{"type":"p","children":[{"text":"Framework"}]}]},{"key":"tbl-29-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Render call"}]}]}]},{"key":"tbl-29-r1","cells":[{"key":"tbl-29-r1c0","type":"data","value":[{"type":"p","children":[{"text":"Astro"}]}]},{"key":"tbl-29-r1c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"AstroContainer.renderToString(Component, { props })"}]}]}]}]},{"key":"tbl-29-r2","cells":[{"key":"tbl-29-r2c0","type":"data","value":[{"type":"p","children":[{"text":"PHP"}]}]},{"key":"tbl-29-r2c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"ob_start(); include \"blocks/{$type}.php\"; return ob_get_clean();"}]}]}]}]},{"key":"tbl-29-r3","cells":[{"key":"tbl-29-r3c0","type":"data","value":[{"type":"p","children":[{"text":"Django"}]}]},{"key":"tbl-29-r3c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"render_to_string(f&#39;blocks/{type}.html&#39;, {&#39;block&#39;: data})"}]}]}]}]},{"key":"tbl-29-r4","cells":[{"key":"tbl-29-r4c0","type":"data","value":[{"type":"p","children":[{"text":"Rails"}]}]},{"key":"tbl-29-r4c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"render_to_string(\"blocks/#{type}\", locals: { block: data })"}]}]}]}]},{"key":"tbl-29-r5","cells":[{"key":"tbl-29-r5c0","type":"data","value":[{"type":"p","children":[{"text":"Laravel"}]}]},{"key":"tbl-29-r5c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"view(\"blocks.{$type}\", [&#39;block&#39; => $data])->render()"}]}]}]}]},{"key":"tbl-29-r6","cells":[{"key":"tbl-29-r6c0","type":"data","value":[{"type":"p","children":[{"text":"Symfony (Twig)"}]}]},{"key":"tbl-29-r6c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"$twig->render(\"blocks/{$type}.html.twig\", [&#39;block&#39; => $data])"}]}]}]}]},{"key":"tbl-29-r7","cells":[{"key":"tbl-29-r7c0","type":"data","value":[{"type":"p","children":[{"text":"Go templates"}]}]},{"key":"tbl-29-r7c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"tpl.ExecuteTemplate(buf, type, data); return buf.String()"}]}]}]}]}]}}' />
 
 Everything else — the diff, the POST, the swap, the `data-block-uid` contract — is identical because the bridge handles it.
 

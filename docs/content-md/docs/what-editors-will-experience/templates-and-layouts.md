@@ -69,8 +69,7 @@ blocks:
   - p-43: slate
 ---
 
-:::title{uid="title-1"}
-:::
+<block type="title" uid="title-1" />
 
 A **template** is a piece of pre-built page structure that someone (often a developer or site admin) has saved separately. When you apply a template to a page, the page gets the template's structure overlaid: some blocks are fixed and can't be edited, some can be edited but not moved, and some are open slots where you fill in your own blocks.
 
@@ -115,9 +114,11 @@ Typical use: a "callout" block in the middle of a layout — every page has one,
 
 Regular blocks where you can do anything — add, edit, move, delete. The template marks regions as slots (with a `slotId`) and your existing content is placed into the matching slots when the template merges.
 
-:::image{uid="img-20" align="center" size="l" url="${src}" alt="${alt}"}
+<block type="image" uid="img-20" align="center" size="l" url="${src}" alt="${alt}">
+
 ![A snippet template applied to a page. The "Snippet Header" block is selected, rendered muted as a locked block. Its sidebar shows its content read-only — a "Text" field with the value "Snippet Header - From Template" — above the template's own read-only settings (Template Name, Save Location).](/docs/images/template-locked)
-:::
+
+</block>
 
 ## Inserting between fixed blocks
 
@@ -141,7 +142,8 @@ Locked and fixed template blocks are the exception: they can't be moved at all (
 
 When `allowedLayouts` is configured for a page (or a region), the sidebar shows a **Layout** dropdown. Pick a different layout and:
 
-:::slate{uid="ol-31"}
+<block type="slate" uid="ol-31">
+
 ```field-json:value
 [
  {
@@ -240,7 +242,8 @@ When `allowedLayouts` is configured for a page (or a region), the sidebar shows 
  }
 ]
 ```
-:::
+
+</block>
 
 The point of `slotId` is that two layouts can share the same set of region names — switch between them and your content lands in the right places automatically.
 
@@ -258,9 +261,11 @@ Unlocking one template unlocks only *that* template. The rest of the page stays 
 
 Templates are saved when you **lock** them, not when you save the page. If you save the page while a template is still unlocked, you're prompted to lock it first.
 
-:::image{uid="img-39" align="center" size="l" url="${src}" alt="${alt}"}
+<block type="image" uid="img-39" align="center" size="l" url="${src}" alt="${alt}">
+
 ![A template's sidebar bar, locked (🔒) — the Template Settings show as read-only text. Clicking the lock unlocks it (🔓) and makes the template editable.](/docs/images/template-edit-locked)
-:::
+
+</block>
 
 ## Template instances in the sidebar
 

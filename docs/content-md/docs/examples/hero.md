@@ -28,13 +28,14 @@ blocks:
   - ref-hero-rendering: codeExample
 ---
 
-:::title{uid="title-1"}
-:::
+<block type="title" uid="title-1" />
 
 A full-width hero section with heading, subheading, image, rich text description, and a call-to-action button. Demonstrates multiple field types in a single block: string, textarea, slate, image, and object\_browser.
 
-:::codeExample{uid="ref-hero-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-hero" slotId="schema"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-hero-schema-javascript-698e6b"]}
+<block type="codeExample" uid="ref-hero-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-hero" slotId="schema">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-hero-schema-javascript-698e6b"]}'>
+
 ### Schema
 
 ```javascript
@@ -79,11 +80,15 @@ A full-width hero section with heading, subheading, image, rich text description
   }
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-hero-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-hero" slotId="json-data"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-hero-json-data-json-fc17f8"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-hero-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-hero" slotId="json-data">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-hero-json-data-json-fc17f8"]}'>
+
 ### JSON Block Data
 
 ```json
@@ -110,11 +115,15 @@ A full-width hero section with heading, subheading, image, rich text description
   ]
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-hero-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-hero" slotId="rendering"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-hero-rendering-jsx-46a2e5","ref-hero-rendering-vue-337205","ref-hero-rendering-svelte-a2ecf7"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-hero-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-hero" slotId="rendering">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-hero-rendering-jsx-46a2e5","ref-hero-rendering-vue-337205","ref-hero-rendering-svelte-a2ecf7"]}'>
+
 ### React
 
 ```jsx
@@ -225,5 +234,7 @@ const heroImageSrc = computed(() => getImageUrl(props.block.image));
   {/if}
 </div>
 ```
-::::
-:::
+
+</region>
+
+</block>

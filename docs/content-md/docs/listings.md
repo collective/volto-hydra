@@ -80,8 +80,7 @@ blocks:
   - p-53: slate
 ---
 
-:::title{uid="title-1"}
-:::
+<block type="title" uid="title-1" />
 
 A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block, repeating each block once per result entry. This means a listing can be moved between containers and reuse normal blocks for what it repeats.
 
@@ -89,8 +88,10 @@ A listing block fetches content from the server (e.g. latest news) and renders e
 
 You tell it which block types need fetching via a `fetchItems` map — keys are block types, values are fetcher functions. This means you can have different kinds of listings (Plone queries, RSS feeds, etc.) each with their own fetcher:
 
-:::codeExample{uid="ce-4"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-4-javascript-17afd4"]}
+<block type="codeExample" uid="ce-4">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-4-javascript-17afd4"]}'>
+
 ### Javascript
 
 ```javascript
@@ -104,18 +105,21 @@ const { items, paging } = await expandListingBlocks(layout, {
 });
 // paging = { totalPages, totalItems, currentPage, prev, next, pages, seen }
 ```
-::::
-:::
 
-:::separator{uid="sep-5"}
-:::
+</region>
+
+</block>
+
+<block type="separator" uid="sep-5" />
 
 ## Example: Mixing Listings, Blocks and Paging
 
 A grid can have a mix of listing and static blocks sharing a single paging. The `staticBlocks` helper wraps non-listing blocks so they participate in the shared page window. The listings use Suspense so they load client-side:
 
-:::codeExample{uid="ce-8"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-8-jsx-37efcc"]}
+<block type="codeExample" uid="ce-8">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-8-jsx-37efcc"]}'>
+
 ### Jsx
 
 ```jsx
@@ -160,8 +164,10 @@ async function ListingItems({ id, blocks, paging, seen, fetchItems, onPaging }) 
   return result.items.map(item => <Block key={item['@uid']} block={item} />);
 }
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 ## expandListingBlocks Options
 
@@ -176,297 +182,16 @@ async function ListingItems({ id, blocks, paging, seen, fetchItems, onPaging }) 
 
 `ploneFetchItems({ apiUrl, contextPath, extraCriteria })` creates a fetcher function for Plone's `@querystring-search` endpoint, suitable as a value in the `fetchItems` map.
 
-:::slateTable{uid="tbl-13"}
-```fields
-{
- "table": {
-  "fixed": true,
-  "compact": false,
-  "basic": false,
-  "celled": true,
-  "inverted": false,
-  "striped": false,
-  "rows": [
-   {
-    "key": "tbl-13-r0",
-    "cells": [
-     {
-      "key": "tbl-13-r0c0",
-      "type": "header",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Option"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-13-r0c1",
-      "type": "header",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Default"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-13-r0c2",
-      "type": "header",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Description"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-13-r1",
-    "cells": [
-     {
-      "key": "tbl-13-r1c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "apiUrl"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-13-r1c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "—"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-13-r1c2",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Plone site URL (e.g. "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "'http://localhost:8080/Plone'"
-           }
-          ]
-         },
-         {
-          "text": ")"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-13-r2",
-    "cells": [
-     {
-      "key": "tbl-13-r2c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "contextPath"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-13-r2c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "'/'"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-13-r2c2",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Path for relative queries"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-13-r3",
-    "cells": [
-     {
-      "key": "tbl-13-r3c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "extraCriteria"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-13-r3c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "{}"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-13-r3c2",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Additional query params — "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "SearchableText"
-           }
-          ]
-         },
-         {
-          "text": ", "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "sort_on"
-           }
-          ]
-         },
-         {
-          "text": ", "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "sort_order"
-           }
-          ]
-         },
-         {
-          "text": ", "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "facet.*"
-           }
-          ]
-         },
-         {
-          "text": " keys"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   }
-  ]
- }
-}
-```
-:::
+<block type="slateTable" uid="tbl-13" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-13-r0","cells":[{"key":"tbl-13-r0c0","type":"header","value":[{"type":"p","children":[{"text":"Option"}]}]},{"key":"tbl-13-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Default"}]}]},{"key":"tbl-13-r0c2","type":"header","value":[{"type":"p","children":[{"text":"Description"}]}]}]},{"key":"tbl-13-r1","cells":[{"key":"tbl-13-r1c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"apiUrl"}]}]}]},{"key":"tbl-13-r1c1","type":"data","value":[{"type":"p","children":[{"text":"—"}]}]},{"key":"tbl-13-r1c2","type":"data","value":[{"type":"p","children":[{"text":"Plone site URL (e.g. "},{"type":"code","children":[{"text":"&#39;http://localhost:8080/Plone&#39;"}]},{"text":")"}]}]}]},{"key":"tbl-13-r2","cells":[{"key":"tbl-13-r2c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"contextPath"}]}]}]},{"key":"tbl-13-r2c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"&#39;/&#39;"}]}]}]},{"key":"tbl-13-r2c2","type":"data","value":[{"type":"p","children":[{"text":"Path for relative queries"}]}]}]},{"key":"tbl-13-r3","cells":[{"key":"tbl-13-r3c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"extraCriteria"}]}]}]},{"key":"tbl-13-r3c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"{}"}]}]}]},{"key":"tbl-13-r3c2","type":"data","value":[{"type":"p","children":[{"text":"Additional query params — "},{"type":"code","children":[{"text":"SearchableText"}]},{"text":", "},{"type":"code","children":[{"text":"sort_on"}]},{"text":", "},{"type":"code","children":[{"text":"sort_order"}]},{"text":", "},{"type":"code","children":[{"text":"facet.*"}]},{"text":" keys"}]}]}]}]}}' />
 
 A listing with no `querystring` defaults to showing the current folder's contents in folder order.
 
 `ploneFetchItems` also normalizes Plone's image data — packaging `image_field` + `image_scales` into a self-contained `image` object with `@id` duplicated inside (needed for URL resolution):
 
-:::codeExample{uid="ce-16"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-16-json-38bb3a"]}
+<block type="codeExample" uid="ce-16">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-16-json-38bb3a"]}'>
+
 ### Json
 
 ```json
@@ -476,8 +201,10 @@ A listing with no `querystring` defaults to showing the current folder's content
 // After normalization:
 { "@id": "/news/article", "image": { "@id": "/news/article", "image_field": "image", "image_scales": { "...": "..." } } }
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 This self-contained object has everything needed to resolve image URLs with scale support — see the Nuxt example's `composables/imageProps.js` for one approach.
 
@@ -487,344 +214,14 @@ For non-Plone backends (RSS feeds, external APIs, etc.), write your own fetcher:
 
 The same `fetchItems` seam powers other "collection" blocks — each is just a fetcher that returns raw result objects (`expandListingBlocks` maps `@id → href` etc. and repeats an item block per result, so they need **no bespoke renderer**; they render via the standard item types on every frontend). `@hydra-js/helpers` ships three reference fetchers:
 
-:::slateTable{uid="tbl-21"}
-```fields
-{
- "table": {
-  "fixed": true,
-  "compact": false,
-  "basic": false,
-  "celled": true,
-  "inverted": false,
-  "striped": false,
-  "rows": [
-   {
-    "key": "tbl-21-r0",
-    "cells": [
-     {
-      "key": "tbl-21-r0c0",
-      "type": "header",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Fetcher"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-21-r0c1",
-      "type": "header",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Block"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-21-r0c2",
-      "type": "header",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "What it returns"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-21-r1",
-    "cells": [
-     {
-      "key": "tbl-21-r1c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "relatedItemsFetcher({ apiUrl, contextPath })"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-21-r1c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "strong",
-          "children": [
-           {
-            "text": "Related Items"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-21-r1c2",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "the current page's relation field (default "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "relatedItems"
-           }
-          ]
-         },
-         {
-          "text": ") — its summaries, paged"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-21-r2",
-    "cells": [
-     {
-      "key": "tbl-21-r2c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "searchShortcutsFetcher({ apiUrl, contextPath })"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-21-r2c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "strong",
-          "children": [
-           {
-            "text": "Search Shortcuts"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-21-r2c2",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "one link per value, each "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "@id"
-           }
-          ]
-         },
-         {
-          "text": " set to "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "${searchUrl}?facet.${index}=${value}"
-           }
-          ]
-         },
-         {
-          "text": " (a shortcut into a search page's facet). A linked "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "pageField"
-           }
-          ]
-         },
-         {
-          "text": " → this page's values; none → the index's site-wide unique values (e.g. "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "Keywords"
-           }
-          ]
-         },
-         {
-          "text": " for "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "Subject"
-           }
-          ]
-         },
-         {
-          "text": ")"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-21-r3",
-    "cells": [
-     {
-      "key": "tbl-21-r3c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "rssFetcher()"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-21-r3c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "strong",
-          "children": [
-           {
-            "text": "RSS Feed"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-21-r3c2",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "entries from "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "block.feedUrl"
-           }
-          ]
-         },
-         {
-          "text": ", client-side "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "fetch"
-           }
-          ]
-         },
-         {
-          "text": " (best-effort — a CORS/parse error degrades to an empty feed); each entry's "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "@id"
-           }
-          ]
-         },
-         {
-          "text": " is its link"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   }
-  ]
- }
-}
-```
-:::
+<block type="slateTable" uid="tbl-21" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-21-r0","cells":[{"key":"tbl-21-r0c0","type":"header","value":[{"type":"p","children":[{"text":"Fetcher"}]}]},{"key":"tbl-21-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Block"}]}]},{"key":"tbl-21-r0c2","type":"header","value":[{"type":"p","children":[{"text":"What it returns"}]}]}]},{"key":"tbl-21-r1","cells":[{"key":"tbl-21-r1c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"relatedItemsFetcher({ apiUrl, contextPath })"}]}]}]},{"key":"tbl-21-r1c1","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"Related Items"}]}]}]},{"key":"tbl-21-r1c2","type":"data","value":[{"type":"p","children":[{"text":"the current page&#39;s relation field (default "},{"type":"code","children":[{"text":"relatedItems"}]},{"text":") — its summaries, paged"}]}]}]},{"key":"tbl-21-r2","cells":[{"key":"tbl-21-r2c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"searchShortcutsFetcher({ apiUrl, contextPath })"}]}]}]},{"key":"tbl-21-r2c1","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"Search Shortcuts"}]}]}]},{"key":"tbl-21-r2c2","type":"data","value":[{"type":"p","children":[{"text":"one link per value, each "},{"type":"code","children":[{"text":"@id"}]},{"text":" set to "},{"type":"code","children":[{"text":"${searchUrl}?facet.${index}=${value}"}]},{"text":" (a shortcut into a search page&#39;s facet). A linked "},{"type":"code","children":[{"text":"pageField"}]},{"text":" → this page&#39;s values; none → the index&#39;s site-wide unique values (e.g. "},{"type":"code","children":[{"text":"Keywords"}]},{"text":" for "},{"type":"code","children":[{"text":"Subject"}]},{"text":")"}]}]}]},{"key":"tbl-21-r3","cells":[{"key":"tbl-21-r3c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"rssFetcher()"}]}]}]},{"key":"tbl-21-r3c1","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"RSS Feed"}]}]}]},{"key":"tbl-21-r3c2","type":"data","value":[{"type":"p","children":[{"text":"entries from "},{"type":"code","children":[{"text":"block.feedUrl"}]},{"text":", client-side "},{"type":"code","children":[{"text":"fetch"}]},{"text":" (best-effort — a CORS/parse error degrades to an empty feed); each entry&#39;s "},{"type":"code","children":[{"text":"@id"}]},{"text":" is its link"}]}]}]}]}}' />
 
 Register them alongside `listing` in the `fetchItems` map:
 
-:::codeExample{uid="ce-23"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-23-json-6d0894"]}
+<block type="codeExample" uid="ce-23">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-23-json-6d0894"]}'>
+
 ### Javascript
 
 ```javascript
@@ -838,8 +235,10 @@ const { items } = await expandListingBlocks(layout, {
   },
 });
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 The **Search Shortcuts** link target reads Volto's search-block facet params — a page with a `search` block picks up `?facet.<index>=<value>` from the URL. The block's *index* uses the existing `select_querystring_field` widget; the optional *this-page field* uses `schemaFieldSelect` (a `/@types`-backed field dropdown, parameterized by `fieldType`), which **Related Items** also uses with `fieldType: 'relation'`.
 
@@ -849,275 +248,12 @@ The **Search Shortcuts** link target reads Volto's search-block facet params —
 
 Built-in item types and the fields they expose:
 
-:::slateTable{uid="tbl-28"}
-```fields
-{
- "table": {
-  "fixed": true,
-  "compact": false,
-  "basic": false,
-  "celled": true,
-  "inverted": false,
-  "striped": false,
-  "rows": [
-   {
-    "key": "tbl-28-r0",
-    "cells": [
-     {
-      "key": "tbl-28-r0c0",
-      "type": "header",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Type"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-28-r0c1",
-      "type": "header",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Fields"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-28-r1",
-    "cells": [
-     {
-      "key": "tbl-28-r1c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "default"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-28-r1c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "title"
-           }
-          ]
-         },
-         {
-          "text": ", "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "description"
-           }
-          ]
-         },
-         {
-          "text": ", "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "href"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-28-r2",
-    "cells": [
-     {
-      "key": "tbl-28-r2c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "summary"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-28-r2c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "title"
-           }
-          ]
-         },
-         {
-          "text": ", "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "description"
-           }
-          ]
-         },
-         {
-          "text": ", "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "href"
-           }
-          ]
-         },
-         {
-          "text": ", "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "image"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-28-r3",
-    "cells": [
-     {
-      "key": "tbl-28-r3c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "teaser"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-28-r3c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "title"
-           }
-          ]
-         },
-         {
-          "text": ", "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "description"
-           }
-          ]
-         },
-         {
-          "text": ", "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "href"
-           }
-          ]
-         },
-         {
-          "text": ", "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "preview_image"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   }
-  ]
- }
-}
-```
-:::
+<block type="slateTable" uid="tbl-28" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-28-r0","cells":[{"key":"tbl-28-r0c0","type":"header","value":[{"type":"p","children":[{"text":"Type"}]}]},{"key":"tbl-28-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Fields"}]}]}]},{"key":"tbl-28-r1","cells":[{"key":"tbl-28-r1c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"default"}]}]}]},{"key":"tbl-28-r1c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"title"}]},{"text":", "},{"type":"code","children":[{"text":"description"}]},{"text":", "},{"type":"code","children":[{"text":"href"}]}]}]}]},{"key":"tbl-28-r2","cells":[{"key":"tbl-28-r2c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"summary"}]}]}]},{"key":"tbl-28-r2c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"title"}]},{"text":", "},{"type":"code","children":[{"text":"description"}]},{"text":", "},{"type":"code","children":[{"text":"href"}]},{"text":", "},{"type":"code","children":[{"text":"image"}]}]}]}]},{"key":"tbl-28-r3","cells":[{"key":"tbl-28-r3c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"teaser"}]}]}]},{"key":"tbl-28-r3c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"title"}]},{"text":", "},{"type":"code","children":[{"text":"description"}]},{"text":", "},{"type":"code","children":[{"text":"href"}]},{"text":", "},{"type":"code","children":[{"text":"preview_image"}]}]}]}]}]}}' />
 
-:::codeExample{uid="ce-29"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-29-json-a7c4dc"]}
+<block type="codeExample" uid="ce-29">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-29-json-a7c4dc"]}'>
+
 ### Json
 
 ```json
@@ -1130,15 +266,19 @@ Built-in item types and the fields they expose:
 
 Types: string (array→join, image→URL), link (→[{@id}]), image (pass through)
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 ## Item Type Selection
 
 Use `variation` on the listing block to control what `@type` expanded items get. Listings reuse the same `inheritSchemaFrom` recipe as container blocks (see [Container Blocks › Synchronised Block Types](container-blocks.md#synchronised-block-types-in-a-container)) but differ in one structural way: there's no blocks field to declare `itemTypeField` on, since listing children are *virtual* (produced from query results at render time, not authored as page data). Instead, declare the typeField directly on the `inheritSchemaFrom` recipe:
 
-:::codeExample{uid="ce-32"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-32-javascript-f6757f"]}
+<block type="codeExample" uid="ce-32">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-32-javascript-f6757f"]}'>
+
 ### Javascript
 
 ```javascript
@@ -1164,8 +304,10 @@ listing: {
     },
 }
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 `filterConvertibleFrom: '@default'` restricts the dropdown to types that have a `fieldMappings['@default']` entry — i.e. types that can be populated from the canonical content fields (`@id`, `title`, `description`, `image`) that listing queries return. Each item type's `fieldMappings['@default']` (on its own block config) defines how those source fields land on its schema; that static mapping is enough to render listings. Adding `mappingField` to the enhancer exposes the `FieldMappingWidget` so the editor can override the mapping per listing instance.
 
@@ -1175,8 +317,10 @@ The widget saves its output as `fieldMapping` (singular) on the block data. `exp
 
 A container (e.g. `gridBlock`) can mix **manual children** AND **a listing** as children. Add `'listing'` to the blocks field's `allowedBlocks`, and the parent's typeField propagates everywhere:
 
-:::codeExample{uid="ce-37"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-37-javascript-2ec596"]}
+<block type="codeExample" uid="ce-37">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-37-javascript-2ec596"]}'>
+
 ### Javascript
 
 ```javascript
@@ -1197,8 +341,10 @@ gridBlock: {
     schemaEnhancer: { inheritSchemaFrom: {} },
 }
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 `filterConvertibleFrom: '@default'` keeps `'listing'` out of the dropdown (it's a structural container, not an item type, so it has no `fieldMappings['@default']`) but it stays in `allowedBlocks` so a listing block can still exist as a structural child. The editor sees "Teaser / Image / Summary" in the picker; the listing is a structural choice they don't have to think about.
 
@@ -1213,8 +359,10 @@ The sync walks recursively — if the listing held nested containers with their 
 
 If your frontend embeds state in the URL path (like pagination), you need to tell hydra.js how to transform the frontend path to the API/admin path. Otherwise, the admin will try to navigate to URLs that don't exist in the CMS.
 
-:::codeExample{uid="ce-44"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-44-javascript-82ad8e"]}
+<block type="codeExample" uid="ce-44">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-44-javascript-82ad8e"]}'>
+
 ### Javascript
 
 ```javascript
@@ -1225,8 +373,10 @@ const bridge = initBridge({
     pathToApiPath: (path) => path.replace(/\/@pg_[^/]+_\d+/, ''),
 });
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 The `pathToApiPath` function is called whenever hydra.js sends a `PATH_CHANGE` message to the admin, allowing your frontend to strip or transform URL segments that are frontend-specific (like pagination, filters, or other client-side state).
 

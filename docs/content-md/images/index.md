@@ -51,23 +51,12 @@ blobs:
     description: CMS landscape quadrant showing Visual Editing vs Frontend Freedom
 ---
 
-:::title{uid="55e93046-15ee-41f5-b63c-fde0d9b6ce52"}
-:::
+<block type="title" uid="55e93046-15ee-41f5-b63c-fde0d9b6ce52" />
 
-:::listing{uid="183bf050-57b7-4841-b9c8-f9b5a15fe086" headlineTag="h2" variation="imageGallery"}
-```fields
-{
- "styles": {}
-}
-```
-:::
+<block type="listing" uid="183bf050-57b7-4841-b9c8-f9b5a15fe086" headlineTag="h2" variation="imageGallery" data='{"styles":{}}' />
 
-:::slate{uid="2d181d1f-1fac-420a-b410-4f4d5379f8ea"}
-```fields
-{
- "styles": {}
-}
-```
+<block type="slate" uid="2d181d1f-1fac-420a-b410-4f4d5379f8ea" data='{"styles":{}}'>
+
 ```field-json:value
 [
  {
@@ -80,4 +69,5 @@ blobs:
  }
 ]
 ```
-:::
+
+</block>

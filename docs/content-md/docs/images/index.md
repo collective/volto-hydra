@@ -124,5 +124,4 @@ blobs:
     uid: docs-images-wrap-chooser-001
 ---
 
-:::title{uid="title-1"}
-:::
+<block type="title" uid="title-1" />

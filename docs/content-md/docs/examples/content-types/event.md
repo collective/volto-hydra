@@ -44,18 +44,12 @@ blocks:
   - 6e6979eb-af21-466f-b2de-3148144ac950: slate
 ---
 
-:::title{uid="d3f1c443-583f-4e8e-a682-3bf25752a300" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" fixed=true readOnly=true slotId="title"}
-:::
+<block type="title" uid="d3f1c443-583f-4e8e-a682-3bf25752a300" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="title" data='{"fixed":true,"readOnly":true}' />
 
-:::eventMetadata{uid="b539ed36-442b-4c7d-8b9b-8af01963c206" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" fixed=true slotId="event-metadata"}
-:::
+<block type="eventMetadata" uid="b539ed36-442b-4c7d-8b9b-8af01963c206" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="event-metadata" data='{"fixed":true}' />
 
-:::slate{uid="6e6979eb-af21-466f-b2de-3148144ac950" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="content"}
-```fields
-{
- "styles": {}
-}
-```
+<block type="slate" uid="6e6979eb-af21-466f-b2de-3148144ac950" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="content" data='{"styles":{}}'>
+
 ```field-json:value
 [
  {
@@ -68,4 +62,5 @@ blocks:
  }
 ]
 ```
-:::
+
+</block>

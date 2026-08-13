@@ -54,8 +54,7 @@ blocks:
   - ul-30: slate
 ---
 
-:::title{uid="title-1"}
-:::
+<block type="title" uid="title-1" />
 
 A **container block** holds other blocks inside it — sliders, columns, accordions, grids, generic sections. The blocks inside are called its **children**. Containers can be nested (a column inside a row inside a section).
 
@@ -70,9 +69,11 @@ Select one or more blocks (see [Selecting blocks](selecting-blocks.md)), then ch
 
 Pick one. The selected blocks are pulled out of their original positions and placed as children of the new container, in the original order. The new container takes the first selected block's position.
 
-:::image{uid="img-7" align="center" size="l" url="${src}" alt="${alt}"}
+<block type="image" uid="img-7" align="center" size="l" url="${src}" alt="${alt}">
+
 ![Two adjacent paragraphs multi-selected, "Wrap in..." chooser open showing container types in Most Used / Common groups.](/docs/images/wrap-chooser)
-:::
+
+</block>
 
 Use this to retroactively group content — e.g. wrap two paragraphs and an image into a card, or wrap three columns of content into a row.
 
@@ -93,9 +94,11 @@ When a container is selected (block mode), thin **edge handles** appear on the c
 
 Multiple blocks can cross in a single drag — keep dragging and a "ghost boundary" line shows where the new edge will land. Release to commit. Until release, the page DOM is unchanged; you can drag back across blocks to restore.
 
-:::image{uid="img-17" align="center" size="l" url="${src}" alt="${alt}"}
+<block type="image" uid="img-17" align="center" size="l" url="${src}" alt="${alt}">
+
 ![Container selected with edge handles visible. The bottom handle is being dragged toward the next sibling.](/docs/images/edge-drag-ghost)
-:::
+
+</block>
 
 This makes a container feel like a resizable divider: drag its edge to "grow" it across adjacent content rather than dragging blocks one at a time.
 
@@ -108,9 +111,11 @@ In the Quanta toolbar dropdown, **Convert to...** lists block types this block c
 - **Layout shape conversion** — children move into the new container's layout field automatically (whether the source uses `blocks_layout` or `object_list`).
 - **Recursive child conversion** — if some children's `@type` isn't in the target's `allowedBlocks`, those children are themselves converted (using their `fieldMappings`) so they fit. If no path exists, the conversion target is shown disabled with a tooltip.
 
-:::image{uid="img-23" align="center" size="l" url="${src}" alt="${alt}"}
+<block type="image" uid="img-23" align="center" size="l" url="${src}" alt="${alt}">
+
 ![A grid container selected, "Convert to..." chooser open showing compatible target container types.](/docs/images/container-convert)
-:::
+
+</block>
 
 Use this to reshape an existing layout — e.g. a 2-column row into a 3-column grid, or columns into an accordion.
 

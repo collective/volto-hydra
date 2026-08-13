@@ -48,146 +48,82 @@ blocks:
   - ref-video-rendering: codeExample
 ---
 
-:::title{uid="604e5248-8521-403d-9e5f-3f50d1229454"}
-:::
+<block type="title" uid="604e5248-8521-403d-9e5f-3f50d1229454" />
 
 Embeds a video from a URL. Detects YouTube links and renders an iframe embed; otherwise falls back to an HTML5 \<video> element.
 
-:::image{uid="editor-screenshot" align="center" size="l" url="${src}" alt="${alt}"}
+<block type="image" uid="editor-screenshot" align="center" size="l" url="${src}" alt="${alt}">
+
 ![The video example block being edited in Volto Hydra](/docs/images/video-edit)
-:::
+
+</block>
 
 ## Video-Block (Full Width)
 
-:::video{uid="c97a926c-b2d2-4a73-9691-fc6e1aca6c52" align="full" url="https://www.youtube.com/watch?v=_yaYy86jdk8"}
-```fields
-{
- "styles": {}
-}
-```
-:::
+<block type="video" uid="c97a926c-b2d2-4a73-9691-fc6e1aca6c52" align="full" url="https://www.youtube.com/watch?v=_yaYy86jdk8" data='{"styles":{}}' />
 
-:::slate{uid="30c476a0-65fe-4e3a-895e-f59f6695929b"}
-```fields
-{
- "styles": {}
-}
-```
+<block type="slate" uid="30c476a0-65fe-4e3a-895e-f59f6695929b" data='{"styles":{}}'>
+
 ## Video-Block (Standard Size)
-:::
 
-:::video{uid="42767d3a-3186-4e50-843d-3ea96c380943" align="wide" url="https://www.youtube.com/watch?v=_yaYy86jdk8"}
-```fields
-{
- "styles": {}
-}
-```
-:::
+</block>
 
-:::separator{uid="458576df-767e-4412-9e9f-2733e8334d5d"}
-```fields
-{
- "styles": {
-  "align": "full"
- }
-}
-```
-:::
+<block type="video" uid="42767d3a-3186-4e50-843d-3ea96c380943" align="wide" url="https://www.youtube.com/watch?v=_yaYy86jdk8" data='{"styles":{}}' />
 
-:::slate{uid="e6e1484a-c2c2-4788-a8c4-a26a979d18cd"}
-```fields
-{
- "styles": {}
-}
-```
+<block type="separator" uid="458576df-767e-4412-9e9f-2733e8334d5d" data='{"styles":{"align":"full"}}' />
+
+<block type="slate" uid="e6e1484a-c2c2-4788-a8c4-a26a979d18cd" data='{"styles":{}}'>
+
 ### Headline H2
-:::
 
-:::slate{uid="38e88a05-b1b0-4958-af71-b3bd6e37297f"}
-```fields
-{
- "styles": {}
-}
-```
+</block>
+
+<block type="slate" uid="38e88a05-b1b0-4958-af71-b3bd6e37297f" data='{"styles":{}}'>
+
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
-:::
 
-:::video{uid="70d958cb-14b6-4689-84ad-cd3aa4ac19ee" align="center" url="https://www.youtube.com/watch?v=_yaYy86jdk8"}
-```fields
-{
- "styles": {}
-}
-```
-:::
+</block>
 
-:::separator{uid="45a46c1b-f619-4e95-9b8c-932d524336af"}
-```fields
-{
- "styles": {
-  "align": "left"
- }
-}
-```
-:::
+<block type="video" uid="70d958cb-14b6-4689-84ad-cd3aa4ac19ee" align="center" url="https://www.youtube.com/watch?v=_yaYy86jdk8" data='{"styles":{}}' />
+
+<block type="separator" uid="45a46c1b-f619-4e95-9b8c-932d524336af" data='{"styles":{"align":"left"}}' />
 
 ### Video-Block (Align: Left)
 
 The Video-Block can be aligned to the left with text floating around it on the right side.
 
-:::video{uid="205fa3ab-9358-46f3-81d6-4ea90dc8c290" align="left" preview_image="http://localhost:8080/Plone/docs/examples/content-types/image-dark" url="https://www.youtube.com/watch?v=_yaYy86jdk8"}
-```fields
-{
- "styles": {}
-}
-```
-:::
+<block type="video" uid="205fa3ab-9358-46f3-81d6-4ea90dc8c290" align="left" preview_image="http://localhost:8080/Plone/docs/examples/content-types/image-dark" url="https://www.youtube.com/watch?v=_yaYy86jdk8" data='{"styles":{}}' />
 
-:::slate{uid="c9eb00a4-23c8-4a13-a19d-9ee056646e16"}
-```fields
-{
- "styles": {}
-}
-```
+<block type="slate" uid="c9eb00a4-23c8-4a13-a19d-9ee056646e16" data='{"styles":{}}'>
+
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam. Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat quis nostrud exerci tation ullamcorper ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat quis Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam.
-:::
 
-:::slate{uid="5212b457-984a-4666-ab67-7c9f6429b2a7"}
-```fields
-{
- "styles": {}
-}
-```
+</block>
+
+<block type="slate" uid="5212b457-984a-4666-ab67-7c9f6429b2a7" data='{"styles":{}}'>
+
 ### Video Block (Align Right)
-:::
 
-:::slate{uid="b75aeb62-6aca-440b-ab6d-66b063dbdab9"}
-```fields
-{
- "styles": {}
-}
-```
+</block>
+
+<block type="slate" uid="b75aeb62-6aca-440b-ab6d-66b063dbdab9" data='{"styles":{}}'>
+
 The Video-Block can be aligned to the right with text floating around it on the left side.
-:::
 
-:::video{uid="19a3d50a-a683-4e59-ac7c-d2ba2149cdd7" align="right" preview_image="http://localhost:8080/Plone/docs/examples/content-types/image-dark" url="https://www.youtube.com/watch?v=_yaYy86jdk8"}
-```fields
-{
- "styles": {}
-}
-```
-:::
+</block>
 
-:::slate{uid="49a61581-70ce-4810-84c2-1d91ac421197"}
-```fields
-{
- "styles": {}
-}
-```
+<block type="video" uid="19a3d50a-a683-4e59-ac7c-d2ba2149cdd7" align="right" preview_image="http://localhost:8080/Plone/docs/examples/content-types/image-dark" url="https://www.youtube.com/watch?v=_yaYy86jdk8" data='{"styles":{}}' />
+
+<block type="slate" uid="49a61581-70ce-4810-84c2-1d91ac421197" data='{"styles":{}}'>
+
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam. Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat quis nostrud exerci tation ullamcorper ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat quis Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam. Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt
-:::
 
-:::codeExample{uid="ref-video-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-video" slotId="schema"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-video-schema-javascript-104794"]}
+</block>
+
+<block type="codeExample" uid="ref-video-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-video" slotId="schema">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-video-schema-javascript-104794"]}'>
+
 ### Schema
 
 ```javascript
@@ -223,11 +159,15 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
   }
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-video-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-video" slotId="json-data"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-video-json-data-json-9ce28f"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-video-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-video" slotId="json-data">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-video-json-data-json-9ce28f"]}'>
+
 ### JSON Block Data
 
 ```json
@@ -236,11 +176,15 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
   "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-video-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-video" slotId="rendering"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-video-rendering-jsx-b3c5ea","ref-video-rendering-vue-160de2","ref-video-rendering-svelte-b4e8ba"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-video-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-video" slotId="rendering">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-video-rendering-jsx-b3c5ea","ref-video-rendering-vue-160de2","ref-video-rendering-svelte-b4e8ba"]}'>
+
 ### React
 
 ```jsx
@@ -318,5 +262,7 @@ const youtubeId = computed(() => {
   {/if}
 </div>
 ```
-::::
-:::
+
+</region>
+
+</block>

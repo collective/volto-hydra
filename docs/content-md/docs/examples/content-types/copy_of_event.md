@@ -43,19 +43,16 @@ blocks:
   - 1a9dbeac-4f8e-4a75-9859-fd8012bd2c1a: slate
 ---
 
-:::title{uid="dd8d27df-ded3-49f5-afdf-239623a6adba" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" fixed=true readOnly=true slotId="title"}
-:::
+<block type="title" uid="dd8d27df-ded3-49f5-afdf-239623a6adba" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="title" data='{"fixed":true,"readOnly":true}' />
 
-:::introduction{uid="d634fc64-0178-4e61-904c-c9963f8c0c7d" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="content"}
+<block type="introduction" uid="d634fc64-0178-4e61-904c-c9963f8c0c7d" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="content">
+
 Wings fair wings doppio sit irish americano galão eu variety affogato.
-:::
 
-:::slate{uid="b8adc074-62bd-42c1-98de-51d3551b4148" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="content"}
-```fields
-{
- "styles": {}
-}
-```
+</block>
+
+<block type="slate" uid="b8adc074-62bd-42c1-98de-51d3551b4148" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="content" data='{"styles":{}}'>
+
 ```field-json:value
 [
  {
@@ -68,19 +65,15 @@ Wings fair wings doppio sit irish americano galão eu variety affogato.
  }
 ]
 ```
-:::
 
-:::slate{uid="4564e5bf-3f00-491d-80f9-730d17da6990" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="content"}
-```fields
-{
- "styles": {}
-}
-```
+</block>
+
+<block type="slate" uid="4564e5bf-3f00-491d-80f9-730d17da6990" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="content" data='{"styles":{}}'>
+
 Percolator and extraction press luwak press aroma foam eu panna spoon espresso iced sit americano. Saucer beans kopi froth to au lait dark panna café iced cup instant au lait. Id origin decaffeinated aromatic in rich sit mocha caramelization café doppio spoon. Strong steamed crema mountain ristretto coffee sweet black aromatic white beans shop. Id pumpkin extraction robusta est white extra organic panna as turkish.
-:::
 
-:::eventMetadata{uid="7cc3f9dc-c91b-41ec-8a51-ce2cf7affe17" fixed=true required=true templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="event-metadata"}
-:::
+</block>
 
-:::slate{uid="1a9dbeac-4f8e-4a75-9859-fd8012bd2c1a" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="content"}
-:::
+<block type="eventMetadata" uid="7cc3f9dc-c91b-41ec-8a51-ce2cf7affe17" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="event-metadata" data='{"fixed":true,"required":true}' />
+
+<block type="slate" uid="1a9dbeac-4f8e-4a75-9859-fd8012bd2c1a" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="content" />

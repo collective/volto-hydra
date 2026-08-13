@@ -55,19 +55,19 @@ blocks:
   - ref-text-rendering: codeExample
 ---
 
-:::title{uid="ccff41c6-b733-4b88-b02e-4c07460a19e2"}
-:::
+<block type="title" uid="ccff41c6-b733-4b88-b02e-4c07460a19e2" />
 
 Rich text block powered by the Slate editor. Supports paragraphs, headings, lists, blockquotes, and inline formatting (bold, italic, strikethrough, underline, code, links).
 
-:::image{uid="editor-screenshot" align="center" size="l" url="${src}" alt="${alt}"}
+<block type="image" uid="editor-screenshot" align="center" size="l" url="${src}" alt="${alt}">
+
 ![The slate example block being edited in Volto Hydra](/docs/images/slate-edit)
-:::
+
+</block>
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
 
-:::separator{uid="244197b5-ac86-4d92-b235-18986a351580"}
-:::
+<block type="separator" uid="244197b5-ac86-4d92-b235-18986a351580" />
 
 **This is bold text.**
 
@@ -87,17 +87,17 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 - This is unordered list
 - This is unordered list
 
-:::separator{uid="55df52be-8681-4d09-a17b-f32f31632213"}
-:::
+<block type="separator" uid="55df52be-8681-4d09-a17b-f32f31632213" />
 
-:::heading{uid="cd44a7ba-b521-41fb-a609-0d1b8d9df592" alignment="left" tag="h2"}
+<block type="heading" uid="cd44a7ba-b521-41fb-a609-0d1b8d9df592" alignment="left" tag="h2">
+
 ```field:heading
  Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. 
 ```
-:::
 
-:::separator{uid="801d735a-2d81-428e-a4e9-85d1e82c3639"}
-:::
+</block>
+
+<block type="separator" uid="801d735a-2d81-428e-a4e9-85d1e82c3639" />
 
 ## Überschrift zweiter Ordnung (Headline H2)
 
@@ -107,8 +107,10 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet
 
-:::codeExample{uid="ref-text-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-text" slotId="schema"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-text-schema-javascript-6ffd2e"]}
+<block type="codeExample" uid="ref-text-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-text" slotId="schema">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-text-schema-javascript-6ffd2e"]}'>
+
 ### Schema
 
 ```javascript
@@ -125,11 +127,15 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
   }
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-text-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-text" slotId="json-data"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-text-json-data-json-f6d82b"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-text-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-text" slotId="json-data">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-text-json-data-json-f6d82b"]}'>
+
 ### JSON Block Data
 
 ```json
@@ -147,11 +153,15 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
   ]
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-text-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-text" slotId="rendering"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-text-rendering-jsx-076433","ref-text-rendering-vue-54b4b7","ref-text-rendering-svelte-2aa474"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-text-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-text" slotId="rendering">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-text-rendering-jsx-076433","ref-text-rendering-vue-54b4b7","ref-text-rendering-svelte-2aa474"]}'>
+
 ### React
 
 ```jsx
@@ -233,5 +243,7 @@ defineProps({ node: Object });
   <svelte:element this={node.type} data-node-id={node.nodeId}>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</svelte:element>
 {/if}
 ```
-::::
-:::
+
+</region>
+
+</block>

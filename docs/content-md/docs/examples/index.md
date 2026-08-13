@@ -48,43 +48,6 @@ order:
   - content-types
 ---
 
-:::title{uid="title-1"}
-:::
+<block type="title" uid="title-1" />
 
-:::listing{uid="examples-listing" headlineTag="h2" variation="summary"}
-```fields
-{
- "styles": {},
- "querystring": {
-  "query": [
-   {
-    "i": "path",
-    "o": "plone.app.querystring.operation.string.relativePath",
-    "v": "."
-   },
-   {
-    "i": "portal_type",
-    "o": "plone.app.querystring.operation.selection.none",
-    "v": [
-     "Image",
-     "File"
-    ]
-   },
-   {
-    "i": "exclude_from_nav",
-    "o": "plone.app.querystring.operation.boolean.isFalse",
-    "v": ""
-   }
-  ],
-  "sort_on": "getObjPositionInParent",
-  "depth": 1
- },
- "fieldMapping": {
-  "@id": "href",
-  "title": "title",
-  "description": "description",
-  "image": "image"
- }
-}
-```
-:::
+<block type="listing" uid="examples-listing" headlineTag="h2" variation="summary" data='{"styles":{},"querystring":{"query":[{"i":"path","o":"plone.app.querystring.operation.string.relativePath","v":"."},{"i":"portal_type","o":"plone.app.querystring.operation.selection.none","v":["Image","File"]},{"i":"exclude_from_nav","o":"plone.app.querystring.operation.boolean.isFalse","v":""}],"sort_on":"getObjPositionInParent","depth":1},"fieldMapping":{"@id":"href","title":"title","description":"description","image":"image"}}' />

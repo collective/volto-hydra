@@ -87,13 +87,11 @@ blocks:
   - p-61: slate
 ---
 
-:::title{uid="title-1"}
-:::
+<block type="title" uid="title-1" />
 
 Templates allow editors to centrally control content and reuse content. They allow a developer to not have to hard code layout decisions and instead use rules to apply user layouts in template content stored separately from the page, or give the user a choice on which layout they want.
 
-:::separator{uid="sep-2"}
-:::
+<block type="separator" uid="sep-2" />
 
 ## Template Concepts
 
@@ -113,8 +111,10 @@ Templates are analogous to blocks themselves but are made up of blocks with spec
 
 The slot a block lives in is identified by its `slotId`. This is the field name used by `expandTemplates` / `expandTemplatesSync` and by the merge rules below — not `placeholder`.
 
-:::codeExample{uid="ce-9"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-9-json-da054f"]}
+<block type="codeExample" uid="ce-9">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-9-json-da054f"]}'>
+
 ### Json
 
 ```json
@@ -128,8 +128,10 @@ The slot a block lives in is identified by its `slotId`. This is the field name 
   }
 }
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 ## Editing a template (central control)
 
@@ -153,320 +155,7 @@ What propagates and what doesn't:
 
 The two configurations below look similar but solve different problems. Pick by **who controls the structure** and **whether it repeats**:
 
-:::slateTable{uid="tbl-19"}
-```fields
-{
- "table": {
-  "fixed": true,
-  "compact": false,
-  "basic": false,
-  "celled": true,
-  "inverted": false,
-  "striped": false,
-  "rows": [
-   {
-    "key": "tbl-19-r0",
-    "cells": [
-     {
-      "key": "tbl-19-r0c0",
-      "type": "header",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "You want…"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-19-r0c1",
-      "type": "header",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Use"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-19-r0c2",
-      "type": "header",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "How it's applied"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-19-r1",
-    "cells": [
-     {
-      "key": "tbl-19-r1c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "A reusable snippet the editor "
-         },
-         {
-          "type": "strong",
-          "children": [
-           {
-            "text": "inserts"
-           }
-          ]
-         },
-         {
-          "text": " where they choose — e.g. a contact CTA reused across many pages"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-19-r1c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "strong",
-          "children": [
-           {
-            "type": "code",
-            "children": [
-             {
-              "text": "allowedTemplates"
-             }
-            ]
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-19-r1c2",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Offered in the BlockChooser's \"Templates\" group and inserted "
-         },
-         {
-          "type": "strong",
-          "children": [
-           {
-            "text": "as a block"
-           }
-          ]
-         },
-         {
-          "text": " (the block carries "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "templateId"
-           }
-          ]
-         },
-         {
-          "text": ")."
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-19-r2",
-    "cells": [
-     {
-      "key": "tbl-19-r2c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "A layout "
-         },
-         {
-          "type": "strong",
-          "children": [
-           {
-            "text": "forced across an entire field/region"
-           }
-          ]
-         },
-         {
-          "text": " — a branded header/footer, or a mandated page structure"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-19-r2c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "strong",
-          "children": [
-           {
-            "type": "code",
-            "children": [
-             {
-              "text": "allowedLayouts"
-             }
-            ]
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-19-r2c2",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Applied across the whole blocks field; the field's content is merged into the layout's slots. The editor can't restructure it."
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-19-r3",
-    "cells": [
-     {
-      "key": "tbl-19-r3c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "To let the editor "
-         },
-         {
-          "type": "strong",
-          "children": [
-           {
-            "text": "choose"
-           }
-          ]
-         },
-         {
-          "text": " between a few layouts"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-19-r3c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "strong",
-          "children": [
-           {
-            "type": "code",
-            "children": [
-             {
-              "text": "allowedLayouts"
-             }
-            ]
-           }
-          ]
-         },
-         {
-          "text": " (several, optionally "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "null"
-           }
-          ]
-         },
-         {
-          "text": ")"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-19-r3c2",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Offered in the Layout dropdown; "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "null"
-           }
-          ]
-         },
-         {
-          "text": " = \"no layout\"."
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   }
-  ]
- }
-}
-```
-:::
+<block type="slateTable" uid="tbl-19" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-19-r0","cells":[{"key":"tbl-19-r0c0","type":"header","value":[{"type":"p","children":[{"text":"You want…"}]}]},{"key":"tbl-19-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Use"}]}]},{"key":"tbl-19-r0c2","type":"header","value":[{"type":"p","children":[{"text":"How it&#39;s applied"}]}]}]},{"key":"tbl-19-r1","cells":[{"key":"tbl-19-r1c0","type":"data","value":[{"type":"p","children":[{"text":"A reusable snippet the editor "},{"type":"strong","children":[{"text":"inserts"}]},{"text":" where they choose — e.g. a contact CTA reused across many pages"}]}]},{"key":"tbl-19-r1c1","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"type":"code","children":[{"text":"allowedTemplates"}]}]}]}]},{"key":"tbl-19-r1c2","type":"data","value":[{"type":"p","children":[{"text":"Offered in the BlockChooser&#39;s \"Templates\" group and inserted "},{"type":"strong","children":[{"text":"as a block"}]},{"text":" (the block carries "},{"type":"code","children":[{"text":"templateId"}]},{"text":")."}]}]}]},{"key":"tbl-19-r2","cells":[{"key":"tbl-19-r2c0","type":"data","value":[{"type":"p","children":[{"text":"A layout "},{"type":"strong","children":[{"text":"forced across an entire field/region"}]},{"text":" — a branded header/footer, or a mandated page structure"}]}]},{"key":"tbl-19-r2c1","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"type":"code","children":[{"text":"allowedLayouts"}]}]}]}]},{"key":"tbl-19-r2c2","type":"data","value":[{"type":"p","children":[{"text":"Applied across the whole blocks field; the field&#39;s content is merged into the layout&#39;s slots. The editor can&#39;t restructure it."}]}]}]},{"key":"tbl-19-r3","cells":[{"key":"tbl-19-r3c0","type":"data","value":[{"type":"p","children":[{"text":"To let the editor "},{"type":"strong","children":[{"text":"choose"}]},{"text":" between a few layouts"}]}]},{"key":"tbl-19-r3c1","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"type":"code","children":[{"text":"allowedLayouts"}]}]},{"text":" (several, optionally "},{"type":"code","children":[{"text":"null"}]},{"text":")"}]}]},{"key":"tbl-19-r3c2","type":"data","value":[{"type":"p","children":[{"text":"Offered in the Layout dropdown; "},{"type":"code","children":[{"text":"null"}]},{"text":" = \"no layout\"."}]}]}]}]}}' />
 
 A **branded header/footer is the canonical `allowedLayouts` case**, *not* `allowedTemplates`: don't make the footer a `templateId` block the editor inserts — force a layout across the footer field. Within that layout, each block declares how locked it is:
 
@@ -496,8 +185,10 @@ Everything else is identical: every object\_list item still needs a `slotId` (pl
 
 The merge identifies object\_list items by their **id field**, and it varies per field — a form's `subblocks` key on `field_id`, a slider's `slides` on `@id`, a table's `rows` on `key`. A frontend has no schema, so whenever you expand a template or layout that contains an object\_list container you MUST tell the merge each field's id field via an **`idFieldMap`** (`{ blockType: { field: idField } }`). Without it the merge falls back to `@id` — and for a `field_id`-keyed field that mints a broken id and the item is dropped on the next merge.
 
-:::codeExample{uid="ce-32"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-32-javascript-403dc6"]}
+<block type="codeExample" uid="ce-32">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-32-javascript-403dc6"]}'>
+
 ### Javascript
 
 ```javascript
@@ -509,8 +200,10 @@ const items = expandTemplatesSync(layout, {
     },
 });
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 (On the admin this map is derived from the block schema automatically. When you re-enter to expand a **single** object\_list array on its own, the `idField` shorthand is enough: `expandTemplatesSync(block.slides, { templateState, templates, idField: '@id' })`.)
 
@@ -518,8 +211,10 @@ const items = expandTemplatesSync(layout, {
 
 Configure templates in `page.schema.properties` on the blocks field:
 
-:::codeExample{uid="ce-36"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-36-javascript-336b9b"]}
+<block type="codeExample" uid="ce-36">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-36-javascript-336b9b"]}'>
+
 ### Javascript
 
 ```javascript
@@ -536,8 +231,10 @@ initBridge({
     },
 });
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 - **`allowedTemplates`** — Templates shown in the BlockChooser's "Templates" group, inserted as blocks.
 - **`allowedLayouts`** — Templates shown in the Layout dropdown. They replace/merge the entire container content. A value of `null` allows for a no-template option. If none of those templates are already set as the layout then during editing, the first is applied automatically.
@@ -558,8 +255,10 @@ Use `expandTemplates` (async) or `expandTemplatesSync` (sync with pre-fetched te
 
 **`loadTemplates(data, loadTemplate)`** scans page data for `templateId` references and loads them all in parallel. It follows nested references (templates referencing other templates) and has a 5s per-template timeout. It only loads templates actually in the page data — `allowedLayouts` options are loaded on demand when a forced layout is applied.
 
-:::codeExample{uid="ce-45"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-45-javascript-f2cdf9"]}
+<block type="codeExample" uid="ce-45">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-45-javascript-f2cdf9"]}'>
+
 ### Javascript
 
 ```javascript
@@ -592,8 +291,10 @@ for (const item of items) {
     renderBlock(item['@uid'], item);
 }
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 Options:
 
@@ -619,8 +320,10 @@ When a layout is applied, the rules are the same but applied across a whole bloc
 - In the top slot outside the first fixed template block
 - Otherwise it is dropped
 
-:::codeExample{uid="ce-53"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-53-bash-8d3958"]}
+<block type="codeExample" uid="ce-53">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-53-bash-8d3958"]}'>
+
 ### Diagram
 
 ```bash
@@ -628,8 +331,10 @@ Before:  [User Block A] [User Block B]
 Layout:  [Fixed Header] [default] [Fixed Footer] [post_footer]
 After:   [Fixed Header] [User Block A] [User Block B] [Fixed Footer]
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 ## Forcing Layouts
 
@@ -637,8 +342,10 @@ A **forced layout** (`allowedLayouts`) is applied **automatically across a whole
 
 Pass a static layout to always force one (e.g. a footer):
 
-:::codeExample{uid="ce-57"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-57-javascript-4b24e8"]}
+<block type="codeExample" uid="ce-57">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-57-javascript-4b24e8"]}'>
+
 ### Javascript
 
 ```javascript
@@ -654,15 +361,19 @@ const items = await expandTemplates(layout, {
     allowedLayouts: ['/templates/footer-layout'],
 });
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 ### Choosing the layout with your own rules
 
 `allowedLayouts` is just a value you compute, so apply whatever rule you like — content type, metadata, route, A/B bucket — then pass the result. Pass `undefined` (or omit it) to force nothing; pass **several** to let the editor pick from the Layout dropdown (include `null` for a "no layout" option).
 
-:::codeExample{uid="ce-60"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-60-javascript-0dbe99"]}
+<block type="codeExample" uid="ce-60">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-60-javascript-0dbe99"]}'>
+
 ### Javascript
 
 ```javascript
@@ -679,7 +390,9 @@ const items = await expandTemplates(layout, {
     allowedLayouts: forced ? [forced] : undefined,
 });
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 Note: during editing the admin side will load the templates so in order to apply the same rules of forcing a layout you will need to set `allowedLayouts` in `page.schema.properties` to ensure the page loads with the right template.

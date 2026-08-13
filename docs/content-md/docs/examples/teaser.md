@@ -42,176 +42,68 @@ blocks:
   - ref-teaser-rendering: codeExample
 ---
 
-:::title{uid="b986b92c-e180-42d3-b755-4728854e5a50"}
-:::
+<block type="title" uid="b986b92c-e180-42d3-b755-4728854e5a50" />
 
 A content preview card that links to another page. Selecting a target page via the object browser auto-fills the title, description, and preview image from that page. Editors can toggle "overwrite" to customize these values.
 
-:::image{uid="editor-screenshot" align="center" size="l" url="${src}" alt="${alt}"}
+<block type="image" uid="editor-screenshot" align="center" size="l" url="${src}" alt="${alt}">
+
 ![The teaser example block being edited in Volto Hydra](/docs/images/teaser-edit)
-:::
 
-:::teaser{uid="61f0e286-0527-43a7-b8fe-29f1be40a8c3" head_title="Head title" title="Headline H2"}
-```fields
-{
- "href": [
-  {
-   "@id": "/docs/examples/content-types/page",
-   "@type": "Document",
-   "Description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
-   "Title": "Page",
-   "getRemoteUrl": null,
-   "hasPreviewImage": true,
-   "head_title": null,
-   "image_field": "preview_image",
-   "title": "Page"
-  }
- ],
- "styles": {
-  "align": "center"
- }
-}
-```
+</block>
+
+<block type="teaser" uid="61f0e286-0527-43a7-b8fe-29f1be40a8c3" head_title="Head title" title="Headline H2" data='{"href":[{"@id":"/docs/examples/content-types/page","@type":"Document","Description":"The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.","Title":"Page","getRemoteUrl":null,"hasPreviewImage":true,"head_title":null,"image_field":"preview_image","title":"Page"}],"styles":{"align":"center"}}'>
+
 ```field:description
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum.
 ```
-:::
 
-:::teaser{uid="03fd3352-0845-4c70-9d01-805996bd127b" head_title="Head title" title="Headline H2"}
-```fields
-{
- "href": [
-  {
-   "@id": "/docs/examples/content-types/page",
-   "@type": "Document",
-   "Description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
-   "Title": "Page",
-   "getRemoteUrl": null,
-   "hasPreviewImage": true,
-   "head_title": null,
-   "image_field": "preview_image",
-   "title": "Page"
-  }
- ],
- "styles": {
-  "align": "left"
- }
-}
-```
+</block>
+
+<block type="teaser" uid="03fd3352-0845-4c70-9d01-805996bd127b" head_title="Head title" title="Headline H2" data='{"href":[{"@id":"/docs/examples/content-types/page","@type":"Document","Description":"The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.","Title":"Page","getRemoteUrl":null,"hasPreviewImage":true,"head_title":null,"image_field":"preview_image","title":"Page"}],"styles":{"align":"left"}}'>
+
 ```field:description
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea.
 ```
-:::
 
-:::teaser{uid="530939e1-8579-4d37-a111-716475c00cac" head_title="Head title" title="Headline H2"}
-```fields
-{
- "href": [
-  {
-   "@id": "/docs/examples/content-types/page",
-   "@type": "Document",
-   "Description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
-   "Title": "Page",
-   "getRemoteUrl": null,
-   "hasPreviewImage": true,
-   "head_title": null,
-   "image_field": "preview_image",
-   "title": "Page"
-  }
- ],
- "styles": {
-  "align": "right"
- }
-}
-```
+</block>
+
+<block type="teaser" uid="530939e1-8579-4d37-a111-716475c00cac" head_title="Head title" title="Headline H2" data='{"href":[{"@id":"/docs/examples/content-types/page","@type":"Document","Description":"The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.","Title":"Page","getRemoteUrl":null,"hasPreviewImage":true,"head_title":null,"image_field":"preview_image","title":"Page"}],"styles":{"align":"right"}}'>
+
 ```field:description
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea.
 ```
-:::
 
-:::teaser{uid="95648579-7116-401f-a448-e48938c88246" title="Headline H2"}
-```fields
-{
- "href": [
-  {
-   "@id": "/docs/examples/content-types/page",
-   "@type": "Document",
-   "Description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
-   "Title": "Page",
-   "getRemoteUrl": null,
-   "hasPreviewImage": true,
-   "head_title": null,
-   "image_field": "preview_image",
-   "title": "Page"
-  }
- ],
- "styles": {
-  "align": "center",
-  "backgroundColor": "grey"
- }
-}
-```
+</block>
+
+<block type="teaser" uid="95648579-7116-401f-a448-e48938c88246" title="Headline H2" data='{"href":[{"@id":"/docs/examples/content-types/page","@type":"Document","Description":"The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.","Title":"Page","getRemoteUrl":null,"hasPreviewImage":true,"head_title":null,"image_field":"preview_image","title":"Page"}],"styles":{"align":"center","backgroundColor":"grey"}}'>
+
 ```field:description
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum.
 ```
-:::
 
-:::teaser{uid="b798dde4-6a5d-4cef-9e25-fd532e1ea9a7" title="Headline H2"}
-```fields
-{
- "href": [
-  {
-   "@id": "/docs/examples/content-types/page",
-   "@type": "Document",
-   "Description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
-   "Title": "Page",
-   "getRemoteUrl": null,
-   "hasPreviewImage": true,
-   "head_title": null,
-   "image_field": "preview_image",
-   "title": "Page"
-  }
- ],
- "styles": {
-  "align": "left",
-  "backgroundColor": "grey"
- }
-}
-```
+</block>
+
+<block type="teaser" uid="b798dde4-6a5d-4cef-9e25-fd532e1ea9a7" title="Headline H2" data='{"href":[{"@id":"/docs/examples/content-types/page","@type":"Document","Description":"The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.","Title":"Page","getRemoteUrl":null,"hasPreviewImage":true,"head_title":null,"image_field":"preview_image","title":"Page"}],"styles":{"align":"left","backgroundColor":"grey"}}'>
+
 ```field:description
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea.
 ```
-:::
 
-:::teaser{uid="620f0540-8c3d-422d-a1c6-47037b5dbfbc" title="Headline H2"}
-```fields
-{
- "href": [
-  {
-   "@id": "/docs/examples/content-types/page",
-   "@type": "Document",
-   "Description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
-   "Title": "Page",
-   "getRemoteUrl": null,
-   "hasPreviewImage": true,
-   "head_title": null,
-   "image_field": "preview_image",
-   "title": "Page"
-  }
- ],
- "styles": {
-  "align": "right",
-  "backgroundColor": "grey"
- }
-}
-```
+</block>
+
+<block type="teaser" uid="620f0540-8c3d-422d-a1c6-47037b5dbfbc" title="Headline H2" data='{"href":[{"@id":"/docs/examples/content-types/page","@type":"Document","Description":"The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.","Title":"Page","getRemoteUrl":null,"hasPreviewImage":true,"head_title":null,"image_field":"preview_image","title":"Page"}],"styles":{"align":"right","backgroundColor":"grey"}}'>
+
 ```field:description
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea.
 ```
-:::
 
-:::codeExample{uid="ref-teaser-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="schema"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-teaser-schema-javascript-bfff08"]}
+</block>
+
+<block type="codeExample" uid="ref-teaser-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="schema">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-teaser-schema-javascript-bfff08"]}'>
+
 ### Schema
 
 ```javascript
@@ -252,11 +144,15 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
   }
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-teaser-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="json-data"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-teaser-json-data-json-7f117c"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-teaser-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="json-data">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-teaser-json-data-json-7f117c"]}'>
+
 ### JSON Block Data
 
 ```json
@@ -276,11 +172,15 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
   "overwrite": true
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-teaser-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="rendering"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-teaser-rendering-jsx-d1dd76","ref-teaser-rendering-vue-fc123a","ref-teaser-rendering-svelte-bf19cf"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-teaser-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="rendering">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-teaser-rendering-jsx-d1dd76","ref-teaser-rendering-vue-fc123a","ref-teaser-rendering-svelte-bf19cf"]}'>
+
 ### React
 
 ```jsx
@@ -385,5 +285,7 @@ const imageSrc = computed(() => {
   </div>
 {/if}
 ```
-::::
-:::
+
+</region>
+
+</block>

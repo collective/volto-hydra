@@ -55,76 +55,65 @@ blocks:
   - ref-image-rendering: codeExample
 ---
 
-:::title{uid="4bfc973c-5fbf-45a3-819a-750a3eff4def"}
-:::
+<block type="title" uid="4bfc973c-5fbf-45a3-819a-750a3eff4def" />
 
 Displays an image with optional alt text and link. Supports the image picker widget for selecting images from the Plone content tree or uploading new ones.
 
-:::image{uid="editor-screenshot" align="center" size="l" url="${src}" alt="${alt}"}
+<block type="image" uid="editor-screenshot" align="center" size="l" url="${src}" alt="${alt}">
+
 ![The image-block example block being edited in Volto Hydra](/docs/images/image-block-edit)
-:::
+
+</block>
 
 ## Bild-block (Standard Size)
 
-:::image{uid="bcc07f9d-7f53-450a-b3f4-20286fd66692" align="wide" size="l" title="Headline H2" url="${src}"}
-```fields
-{
- "credit": {}
-}
-```
+<block type="image" uid="bcc07f9d-7f53-450a-b3f4-20286fd66692" align="wide" size="l" title="Headline H2" url="${src}" data='{"credit":{}}'>
+
 ```field:description
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum.
 ```
 ![](/docs/examples/content-types/image-dark)
-:::
+
+</block>
 
 ## Bild-Block (Full Width )
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
 
-:::image{uid="0f4f3139-9386-4023-9c50-add562acab5d" align="full" size="l" title="Headline H2" url="${src}"}
-```fields
-{
- "credit": {}
-}
-```
+<block type="image" uid="0f4f3139-9386-4023-9c50-add562acab5d" align="full" size="l" title="Headline H2" url="${src}" data='{"credit":{}}'>
+
 ```field:description
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum.
 ```
 ![](/docs/examples/content-types/image-dark)
-:::
+
+</block>
 
 ## Bild-Block (Align: center)
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
 
-:::image{uid="1bf3b6c3-8db1-4293-9088-00d1c5b8c91c" align="center" size="l" title="Headline H2" url="${src}"}
-```fields
-{
- "credit": {}
-}
-```
+<block type="image" uid="1bf3b6c3-8db1-4293-9088-00d1c5b8c91c" align="center" size="l" title="Headline H2" url="${src}" data='{"credit":{}}'>
+
 ```field:description
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit ata sanctus est Lorem ipsum dolor sit amet.
 ```
 ![](/docs/examples/content-types/image-dark)
-:::
+
+</block>
 
 ## Bild-Block (Align: Left)
 
 The Bild-Block can be aligned to the left with text floating around it on the right side.
 
-:::image{uid="d48b2411-07fd-4911-8185-56e8760abab5" align="left" size="l" title="Headline H2" url="${src}"}
-```fields
-{
- "credit": {}
-}
-```
+<block type="image" uid="d48b2411-07fd-4911-8185-56e8760abab5" align="left" size="l" title="Headline H2" url="${src}" data='{"credit":{}}'>
+
 ```field:description
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. 
 ```
 ![](/docs/examples/content-types/image-dark)
-:::
+
+</block>
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
 
@@ -132,22 +121,21 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 The Bild-Block can be aligned to the right with text floating around it on the left side.
 
-:::image{uid="b7d57c29-c082-4b41-b6e0-7ccf83d46b97" align="right" size="l" title="Headline H2" url="${src}"}
-```fields
-{
- "credit": {}
-}
-```
+<block type="image" uid="b7d57c29-c082-4b41-b6e0-7ccf83d46b97" align="right" size="l" title="Headline H2" url="${src}" data='{"credit":{}}'>
+
 ```field:description
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum.
 ```
 ![](/docs/examples/content-types/image-dark)
-:::
+
+</block>
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum.Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua.
 
-:::codeExample{uid="ref-image-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-image" slotId="schema"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-image-schema-javascript-979df6"]}
+<block type="codeExample" uid="ref-image-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-image" slotId="schema">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-image-schema-javascript-979df6"]}'>
+
 ### Schema
 
 ```javascript
@@ -179,11 +167,15 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
   }
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-image-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-image" slotId="json-data"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-image-json-data-json-ddd34d"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-image-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-image" slotId="json-data">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-image-json-data-json-ddd34d"]}'>
+
 ### JSON Block Data
 
 ```json
@@ -198,11 +190,15 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
   ]
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-image-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-image" slotId="rendering"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-image-rendering-jsx-a59bc5","ref-image-rendering-vue-c3dead","ref-image-rendering-svelte-52a7e2"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-image-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-image" slotId="rendering">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-image-rendering-jsx-a59bc5","ref-image-rendering-vue-c3dead","ref-image-rendering-svelte-52a7e2"]}'>
+
 ### React
 
 ```jsx
@@ -270,5 +266,7 @@ const imgSrc = computed(() => getImageUrl(props.block.url));
   {/if}
 </div>
 ```
-::::
-:::
+
+</region>
+
+</block>

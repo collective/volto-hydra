@@ -54,170 +54,112 @@ blocks:
   - ref-toc-rendering: codeExample
 ---
 
-:::title{uid="537a9742-95f1-4930-9df3-d38766f54a71"}
-:::
+<block type="title" uid="537a9742-95f1-4930-9df3-d38766f54a71" />
 
 Renders a table of contents generated from heading blocks on the current page. It scans sibling blocks for headings and builds a navigation list.
 
-:::image{uid="editor-screenshot" align="center" size="l" url="${src}" alt="${alt}"}
+<block type="image" uid="editor-screenshot" align="center" size="l" url="${src}" alt="${alt}">
+
 ![The toc example block being edited in Volto Hydra](/docs/images/toc-edit)
-:::
 
-:::toc{uid="22f22002-2159-4e42-942a-8ebc6e930ed5" title="Inhaltsverzeichnis" variation="default"}
-:::
+</block>
 
-:::separator{uid="60a17689-6437-4a88-bf2c-76a62351ca5b"}
-```fields
-{
- "styles": {
-  "align": "full"
- }
-}
-```
-:::
+<block type="toc" uid="22f22002-2159-4e42-942a-8ebc6e930ed5" title="Inhaltsverzeichnis" variation="default" />
 
-:::image{uid="89137ab1-3973-437f-be95-7e91586a4685" align="wide" copyright_and_sources="Copyright: unsplash.com" description="Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt." size="l" title="Title Image" url="${src}"}
-```fields
-{
- "styles": {
-  "size:noprefix": "large"
- }
-}
-```
+<block type="separator" uid="60a17689-6437-4a88-bf2c-76a62351ca5b" data='{"styles":{"align":"full"}}' />
+
+<block type="image" uid="89137ab1-3973-437f-be95-7e91586a4685" align="wide" copyright_and_sources="Copyright: unsplash.com" description="Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt." size="l" title="Title Image" url="${src}" data='{"styles":{"size:noprefix":"large"}}'>
+
 ![](/docs/examples/content-types/image-dark)
-:::
 
-:::introduction{uid="e83fea00-1714-4de7-9d79-8d0e749639a9"}
+</block>
+
+<block type="introduction" uid="e83fea00-1714-4de7-9d79-8d0e749639a9">
+
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat.&#x20;
-:::
 
-:::separator{uid="d91f58fa-4634-4aac-bd1d-5f2fc4b338ca"}
-```fields
-{
- "styles": {
-  "align": "full"
- }
-}
-```
-:::
+</block>
 
-:::slate{uid="b1cf3854-5836-4efc-897e-d003ceea19f0"}
-```fields
-{
- "styles": {}
-}
-```
+<block type="separator" uid="d91f58fa-4634-4aac-bd1d-5f2fc4b338ca" data='{"styles":{"align":"full"}}' />
+
+<block type="slate" uid="b1cf3854-5836-4efc-897e-d003ceea19f0" data='{"styles":{}}'>
+
 ## Text Heading H2&#x20;
-:::
 
-:::slate{uid="43dd5fcf-3f52-469b-8ccc-57b785cf65b1"}
-```fields
-{
- "styles": {}
-}
-```
+</block>
+
+<block type="slate" uid="43dd5fcf-3f52-469b-8ccc-57b785cf65b1" data='{"styles":{}}'>
+
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
-:::
 
-:::slate{uid="fde62278-7792-46be-ba68-0d4d19a3a677"}
-```fields
-{
- "styles": {}
-}
-```
+</block>
+
+<block type="slate" uid="fde62278-7792-46be-ba68-0d4d19a3a677" data='{"styles":{}}'>
+
 ### Text Heading H3
-:::
 
-:::slate{uid="9313e80c-65d1-4d72-863f-fc1c17aba444"}
-```fields
-{
- "styles": {}
-}
-```
+</block>
+
+<block type="slate" uid="9313e80c-65d1-4d72-863f-fc1c17aba444" data='{"styles":{}}'>
+
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
-:::
 
-:::slate{uid="741da11b-703b-43ab-a9df-a7c1087d059a"}
-```fields
-{
- "styles": {}
-}
-```
+</block>
+
+<block type="slate" uid="741da11b-703b-43ab-a9df-a7c1087d059a" data='{"styles":{}}'>
+
 ## Lists
-:::
 
-:::slate{uid="2e03fd8c-f334-400e-a3a9-d0446e3a1512"}
-```fields
-{
- "styles": {}
-}
-```
+</block>
+
+<block type="slate" uid="2e03fd8c-f334-400e-a3a9-d0446e3a1512" data='{"styles":{}}'>
+
 1. Ordered List Bullett Point One&#x20;
 2. Ordered List Bullett Point Two&#x20;
 3. Ordered List Bullett Point Three
 4. Ordered List Bullett Point Four
-:::
 
-:::slate{uid="372b9489-5dc4-44a7-a7a9-649c2bc282db"}
-```fields
-{
- "styles": {}
-}
-```
+</block>
+
+<block type="slate" uid="372b9489-5dc4-44a7-a7a9-649c2bc282db" data='{"styles":{}}'>
+
 - Ordered List Bullett Point One&#x20;
 - Ordered List Bullett Point Two&#x20;
 - Ordered List Bullett Point Three
 - Ordered List Bullett Point Four
-:::
 
-:::slate{uid="c08671c1-ca6c-4a5a-85b8-5c856bc112df"}
-```fields
-{
- "styles": {}
-}
-```
+</block>
+
+<block type="slate" uid="c08671c1-ca6c-4a5a-85b8-5c856bc112df" data='{"styles":{}}'>
+
 ### Inline Styles
-:::
 
-:::slate{uid="c95cd0fd-f914-4dca-9adb-f7438b0a3112"}
-```fields
-{
- "styles": {}
-}
-```
+</block>
+
+<block type="slate" uid="c95cd0fd-f914-4dca-9adb-f7438b0a3112" data='{"styles":{}}'>
+
 Text can be **bold** or *italic*.
-:::
 
-:::slate{uid="2b54caa5-1c1a-40f2-aacd-84abce141e79"}
-```fields
-{
- "styles": {}
-}
-```
+</block>
+
+<block type="slate" uid="2b54caa5-1c1a-40f2-aacd-84abce141e79" data='{"styles":{}}'>
+
 [Link internal](/docs/examples/heading)
-:::
 
-:::slate{uid="09460f92-723d-402d-a0a5-76a15f2678ad"}
-```fields
-{
- "styles": {}
-}
-```
+</block>
+
+<block type="slate" uid="09460f92-723d-402d-a0a5-76a15f2678ad" data='{"styles":{}}'>
+
 [Link external](https://www.google.com/)
-:::
 
-:::separator{uid="3e036171-0a20-47d0-a06a-a7f493b65186"}
-```fields
-{
- "styles": {
-  "align": "left"
- }
-}
-```
-:::
+</block>
 
-:::codeExample{uid="ref-toc-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc" slotId="schema"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-toc-schema-javascript-496d15"]}
+<block type="separator" uid="3e036171-0a20-47d0-a06a-a7f493b65186" data='{"styles":{"align":"left"}}' />
+
+<block type="codeExample" uid="ref-toc-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc" slotId="schema">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-toc-schema-javascript-496d15"]}'>
+
 ### Schema
 
 ```javascript
@@ -271,11 +213,15 @@ Text can be **bold** or *italic*.
   }
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-toc-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc" slotId="json-data"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-toc-json-data-json-aaa910"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-toc-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc" slotId="json-data">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-toc-json-data-json-aaa910"]}'>
+
 ### JSON Block Data
 
 ```json
@@ -290,11 +236,15 @@ Text can be **bold** or *italic*.
   ]
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-toc-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc" slotId="rendering"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-toc-rendering-jsx-ee2124","ref-toc-rendering-vue-12aef2","ref-toc-rendering-svelte-397c7f"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-toc-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc" slotId="rendering">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-toc-rendering-jsx-ee2124","ref-toc-rendering-vue-12aef2","ref-toc-rendering-svelte-397c7f"]}'>
+
 ### React
 
 ```jsx
@@ -410,5 +360,7 @@ const entries = computed(() => {
   {/if}
 </nav>
 ```
-::::
-:::
+
+</region>
+
+</block>

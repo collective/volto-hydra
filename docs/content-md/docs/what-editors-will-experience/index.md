@@ -73,8 +73,7 @@ order:
   - templates-and-layouts
 ---
 
-:::title{uid="title-1"}
-:::
+<block type="title" uid="title-1" />
 
 This guide is for **content editors** using an Inka-powered site. It covers how to use the editor — how to select things, edit text, add and move blocks, work with containers and templates — without assuming you know how the site was built.
 
@@ -91,8 +90,10 @@ If something in this guide doesn't match what you see, it's almost always becaus
 
 The editor screen has three regions:
 
-:::codeExample{uid="ce-8"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-8-text-6b4738"]}
+<block type="codeExample" uid="ce-8">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-8-text-6b4738"]}'>
+
 ### Text
 
 ```text
@@ -106,8 +107,10 @@ The editor screen has three regions:
 │           │                                  │              │
 └───────────┴──────────────────────────────────┴──────────────┘
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 - **Toolbar (left)** — saving, navigating to other pages, site settings. Standard Volto, plus the **Frontend switcher** (see below).
 - **Live preview (centre)** — your actual frontend, running inside an iframe. This is what readers will see. Click directly into the preview to edit.
@@ -122,9 +125,11 @@ A toolbar button opens the **Frontend switcher** panel with two sections:
 
 A **Settings** button at the bottom of the panel manages the saved URLs (add, remove, rename). The currently active frontend is highlighted in the list.
 
-:::image{uid="img-14" align="center" size="l" url="${src}" alt="${alt}"}
+<block type="image" uid="img-14" align="center" size="l" url="${src}" alt="${alt}">
+
 ![Frontend switcher panel — Viewport section with Mobile/Tablet/Desktop, Frontend section listing four saved frontends, Settings button at the bottom.](/docs/images/frontend-switcher)
-:::
+
+</block>
 
 ## Two ways to edit any field
 
@@ -155,284 +160,44 @@ So `Escape` repeatedly takes you up one level at a time. See [Selecting blocks](
 
 On narrow screens (≤767 px) the editor reshapes into a two-bar layout: the **Quanta toolbar** pins to the top of the viewport — always visible, never fades — and the **main toolbar** (Save, Cancel, Frontend switcher, Settings shortcut) sits as a compact bar at the bottom. The iframe canvas fills the space in between. There is no side panel: the sidebar opens as a full-screen sheet, popups slide up from the bottom, and the link editor takes over the top bar.
 
-:::image{uid="img-28" align="center" size="l" url="${src}" alt="${alt}"}
+<block type="image" uid="img-28" align="center" size="l" url="${src}" alt="${alt}">
+
 ![Mobile editing — Quanta toolbar pinned at the top with chevrons and format buttons, a slate block selected mid-screen with its selection outline, and the compact main toolbar at the bottom.](/docs/images/mobile-block-selected)
-:::
+
+</block>
 
 ### Bottom-sheet popups
 
 The `⋯` menu — and every other contextual chooser (block-type picker, frontend switcher, convert chooser) — slides up from the bottom of the screen with the canvas dimmed behind. Tap the back arrow at the bottom-left of the sheet to dismiss; the canvas underneath comes back unchanged.
 
-:::image{uid="img-31" align="center" size="l" url="${src}" alt="${alt}"}
+<block type="image" uid="img-31" align="center" size="l" url="${src}" alt="${alt}">
+
 ![Mobile ⋯ menu as a slide-up bottom sheet showing Settings, Make Template, Copy, Cut, Remove with a back arrow at the bottom-left and the canvas dimmed behind it.](/docs/images/mobile-dropdown-menu)
-:::
+
+</block>
 
 ### Sidebar as a full-screen sheet
 
 A side panel is impossible on a 375 px screen. Instead, opening the sidebar (via the **Settings** shortcut in the main toolbar, or by choosing **Settings** in the `⋯` menu) covers the entire viewport. The `X` button in the top-right closes it and brings you back to the canvas. While the sidebar is open, the iframe is hidden behind it — same source of truth, just a different surface.
 
-:::image{uid="img-34" align="center" size="l" url="${src}" alt="${alt}"}
+<block type="image" uid="img-34" align="center" size="l" url="${src}" alt="${alt}">
+
 ![Mobile sidebar as a full-screen sheet showing the Page header with an X close button, the DEFAULT section open with Title and Summary fields, and the DATES section below.](/docs/images/mobile-sidebar-fullscreen)
-:::
+
+</block>
 
 ### Escaping nested blocks with `⬆`
 
 Phones don't have an `Escape` key. To walk back up out of a nested block (a teaser inside a grid, a paragraph inside a column), the Quanta toolbar shows an extra **`⬆` button** to the left of `⋯` whenever the selected block has a parent. One tap selects the parent container; tap again to keep walking up.
 
-:::image{uid="img-37" align="center" size="l" url="${src}" alt="${alt}"}
+<block type="image" uid="img-37" align="center" size="l" url="${src}" alt="${alt}">
+
 ![Mobile Quanta toolbar with a nested teaser selected — the ⬆ select-parent button is visible to the left of ⋯, and the teaser's grid parent is highlighted with a dashed selection outline.](/docs/images/mobile-select-parent)
-:::
+
+</block>
 
 ### Differences from desktop in one place
 
-:::slateTable{uid="tbl-39"}
-```fields
-{
- "table": {
-  "fixed": true,
-  "compact": false,
-  "basic": false,
-  "celled": true,
-  "inverted": false,
-  "striped": false,
-  "rows": [
-   {
-    "key": "tbl-39-r0",
-    "cells": [
-     {
-      "key": "tbl-39-r0c0",
-      "type": "header",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Desktop / tablet"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-39-r0c1",
-      "type": "header",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Mobile (≤767 px)"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-39-r1",
-    "cells": [
-     {
-      "key": "tbl-39-r1c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Quanta floats near the block, can fade after idle"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-39-r1c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Quanta pinned to top, always visible"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-39-r2",
-    "cells": [
-     {
-      "key": "tbl-39-r2c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Main toolbar on the left, full height"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-39-r2c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Main toolbar at the bottom, 44 px compact"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-39-r3",
-    "cells": [
-     {
-      "key": "tbl-39-r3c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Sidebar on the right as a side panel"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-39-r3c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Sidebar covers the whole screen"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-39-r4",
-    "cells": [
-     {
-      "key": "tbl-39-r4c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "⋯"
-           }
-          ]
-         },
-         {
-          "text": " menu drops down inline"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-39-r4c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "⋯"
-           }
-          ]
-         },
-         {
-          "text": " menu slides up as a bottom sheet"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-39-r5",
-    "cells": [
-     {
-      "key": "tbl-39-r5c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "Escape"
-           }
-          ]
-         },
-         {
-          "text": " key walks selection up"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-39-r5c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Tap the "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "⬆"
-           }
-          ]
-         },
-         {
-          "text": " button in Quanta"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   }
-  ]
- }
-}
-```
-:::
+<block type="slateTable" uid="tbl-39" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-39-r0","cells":[{"key":"tbl-39-r0c0","type":"header","value":[{"type":"p","children":[{"text":"Desktop / tablet"}]}]},{"key":"tbl-39-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Mobile (≤767 px)"}]}]}]},{"key":"tbl-39-r1","cells":[{"key":"tbl-39-r1c0","type":"data","value":[{"type":"p","children":[{"text":"Quanta floats near the block, can fade after idle"}]}]},{"key":"tbl-39-r1c1","type":"data","value":[{"type":"p","children":[{"text":"Quanta pinned to top, always visible"}]}]}]},{"key":"tbl-39-r2","cells":[{"key":"tbl-39-r2c0","type":"data","value":[{"type":"p","children":[{"text":"Main toolbar on the left, full height"}]}]},{"key":"tbl-39-r2c1","type":"data","value":[{"type":"p","children":[{"text":"Main toolbar at the bottom, 44 px compact"}]}]}]},{"key":"tbl-39-r3","cells":[{"key":"tbl-39-r3c0","type":"data","value":[{"type":"p","children":[{"text":"Sidebar on the right as a side panel"}]}]},{"key":"tbl-39-r3c1","type":"data","value":[{"type":"p","children":[{"text":"Sidebar covers the whole screen"}]}]}]},{"key":"tbl-39-r4","cells":[{"key":"tbl-39-r4c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"⋯"}]},{"text":" menu drops down inline"}]}]},{"key":"tbl-39-r4c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"⋯"}]},{"text":" menu slides up as a bottom sheet"}]}]}]},{"key":"tbl-39-r5","cells":[{"key":"tbl-39-r5c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"Escape"}]},{"text":" key walks selection up"}]}]},{"key":"tbl-39-r5c1","type":"data","value":[{"type":"p","children":[{"text":"Tap the "},{"type":"code","children":[{"text":"⬆"}]},{"text":" button in Quanta"}]}]}]}]}}' />
 
 Otherwise everything works the same: tapping a block selects it, tapping into text starts editing, the same fields and the same blocks. The mechanics are unchanged — only the placement and gestures differ.

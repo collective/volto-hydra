@@ -115,8 +115,7 @@ blocks:
   - p-89: slate
 ---
 
-:::title{uid="cb-title-1"}
-:::
+<block type="title" uid="cb-title-1" />
 
 Define custom block types directly in your frontend configuration via the `blocks` option in `initBridge`. No Volto plugin deployment required. Each block type needs an `id`, `title`, and a `blockSchema` with its field properties.
 
@@ -124,8 +123,10 @@ Define custom block types directly in your frontend configuration via the `block
 
 `initBridge(options)` opens the iframe bridge and registers your frontend's page and block configuration with the admin. Call it once during page setup when running inside the admin iframe.
 
-:::codeExample{uid="ce-4"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-4-js-dec45b"]}
+<block type="codeExample" uid="ce-4">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-4-js-dec45b"]}'>
+
 ### Js
 
 ```js
@@ -140,15 +141,19 @@ const bridge = initBridge({
   debug: false,
 });
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 ### `page` — page-level blocks fields
 
 Defines the **blocks fields of a page** where blocks can live. `page.schema.properties` is keyed by field name; each `widget: 'blocks_layout'` entry is one blocks field. The field name is the key inside the page's `blocks_layout` dict (the default field is `items`), so they all persist inside the registered `blocks_layout` field.
 
-:::codeExample{uid="ce-7"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-7-javascript-f817db"]}
+<block type="codeExample" uid="ce-7">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-7-javascript-f817db"]}'>
+
 ### Js
 
 ```js
@@ -162,8 +167,10 @@ page: {
   },
 }
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 Per-field options:
 
@@ -185,8 +192,10 @@ Defaults and side effects:
 
 Defines or overrides individual block types. Each key is the block type name (matching what appears in `allowedBlocks` and `@type` on saved blocks).
 
-:::codeExample{uid="ce-14"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-14-js-c5449c"]}
+<block type="codeExample" uid="ce-14">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-14-js-c5449c"]}'>
+
 ### Js
 
 ```js
@@ -204,8 +213,10 @@ blocks: {
   },
 }
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 Per-block options (most are passed through to Volto's block config):
 
@@ -235,8 +246,10 @@ The `Bridge` instance, which exposes additional API methods you can call from th
 
 ## Defining a custom block
 
-:::codeExample{uid="ce-23"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-23-javascript-a47dd8"]}
+<block type="codeExample" uid="ce-23">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-23-javascript-a47dd8"]}'>
+
 ### Javascript
 
 ```javascript
@@ -291,8 +304,10 @@ const bridge = initBridge({
     },
 });
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 Child block types (like `slide` above) must be defined at the top level of `blocks`. You can also:
 
@@ -307,8 +322,10 @@ Child block types (like `slide` above) must be defined at the top level of `bloc
 
 Schema enhancers modify block schemas dynamically:
 
-:::codeExample{uid="ce-29"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-29-javascript-f2ef0c"]}
+<block type="codeExample" uid="ce-29">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-29-javascript-f2ef0c"]}'>
+
 ### Javascript
 
 ```javascript
@@ -333,8 +350,10 @@ const bridge = initBridge({
     },
 });
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 **`fieldRules`** — add, remove, or conditionally modify field definitions. The value for each rule key can be:
 
@@ -349,663 +368,7 @@ Condition operators: `is`, `isNot`, `isSet`, `isNotSet`, `oneOf`, `notOneOf`, `c
 
 Each operator is driven by the field's **declared type**, never the value shape. A field reduces to one of four **surfaces**, and an operator used off its surface raises an error (a mis-authored rule fails loudly rather than silently mismatching):
 
-:::slateTable{uid="tbl-34"}
-```fields
-{
- "table": {
-  "fixed": true,
-  "compact": false,
-  "basic": false,
-  "celled": true,
-  "inverted": false,
-  "striped": false,
-  "rows": [
-   {
-    "key": "tbl-34-r0",
-    "cells": [
-     {
-      "key": "tbl-34-r0c0",
-      "type": "header",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "surface"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-34-r0c1",
-      "type": "header",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "fields"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-34-r0c2",
-      "type": "header",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "operators"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-34-r1",
-    "cells": [
-     {
-      "key": "tbl-34-r1c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "strong",
-          "children": [
-           {
-            "text": "string"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-34-r1c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "text, textarea, url, Choice, "
-         },
-         {
-          "type": "strong",
-          "children": [
-           {
-            "text": "slate"
-           }
-          ]
-         },
-         {
-          "text": " (its plaintext)"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-34-r1c2",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "is"
-           }
-          ]
-         },
-         {
-          "text": "/"
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "isNot"
-           }
-          ]
-         },
-         {
-          "text": ", "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "isSet"
-           }
-          ]
-         },
-         {
-          "text": ", "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "oneOf"
-           }
-          ]
-         },
-         {
-          "text": "/"
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "notOneOf"
-           }
-          ]
-         },
-         {
-          "text": ", "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "contains"
-           }
-          ]
-         },
-         {
-          "text": "/"
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "notContains"
-           }
-          ]
-         },
-         {
-          "text": " = "
-         },
-         {
-          "type": "strong",
-          "children": [
-           {
-            "text": "substring"
-           }
-          ]
-         },
-         {
-          "text": ", "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "regex"
-           }
-          ]
-         },
-         {
-          "text": "/"
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "notRegex"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-34-r2",
-    "cells": [
-     {
-      "key": "tbl-34-r2c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "strong",
-          "children": [
-           {
-            "text": "number"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-34-r2c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "integer, float, number"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-34-r2c2",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "is"
-           }
-          ]
-         },
-         {
-          "text": "/"
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "isNot"
-           }
-          ]
-         },
-         {
-          "text": ", "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "oneOf"
-           }
-          ]
-         },
-         {
-          "text": ", "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "isSet"
-           }
-          ]
-         },
-         {
-          "text": ", "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "gt"
-           }
-          ]
-         },
-         {
-          "text": "/"
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "gte"
-           }
-          ]
-         },
-         {
-          "text": "/"
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "lt"
-           }
-          ]
-         },
-         {
-          "text": "/"
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "lte"
-           }
-          ]
-         },
-         {
-          "text": " = compare"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-34-r3",
-    "cells": [
-     {
-      "key": "tbl-34-r3c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "strong",
-          "children": [
-           {
-            "text": "boolean"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-34-r3c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "boolean"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-34-r3c2",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "is"
-           }
-          ]
-         },
-         {
-          "text": "/"
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "isNot"
-           }
-          ]
-         },
-         {
-          "text": ", "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "isSet"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-34-r4",
-    "cells": [
-     {
-      "key": "tbl-34-r4c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "strong",
-          "children": [
-           {
-            "text": "array"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-34-r4c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "multiselect (its values), "
-         },
-         {
-          "type": "strong",
-          "children": [
-           {
-            "text": "region"
-           }
-          ]
-         },
-         {
-          "text": " (its child block "
-         },
-         {
-          "type": "strong",
-          "children": [
-           {
-            "text": "types"
-           }
-          ]
-         },
-         {
-          "text": ")"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-34-r4c2",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "isSet"
-           }
-          ]
-         },
-         {
-          "text": ", "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "is"
-           }
-          ]
-         },
-         {
-          "text": "/"
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "isNot"
-           }
-          ]
-         },
-         {
-          "text": " = "
-         },
-         {
-          "type": "strong",
-          "children": [
-           {
-            "text": "set-equality"
-           }
-          ]
-         },
-         {
-          "text": ", "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "contains"
-           }
-          ]
-         },
-         {
-          "text": "/"
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "notContains"
-           }
-          ]
-         },
-         {
-          "text": " = membership, "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "containsAny"
-           }
-          ]
-         },
-         {
-          "text": "/"
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "containsAll"
-           }
-          ]
-         },
-         {
-          "text": " (+inverses), "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "gt"
-           }
-          ]
-         },
-         {
-          "text": "/"
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "gte"
-           }
-          ]
-         },
-         {
-          "text": "/"
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "lt"
-           }
-          ]
-         },
-         {
-          "text": "/"
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "lte"
-           }
-          ]
-         },
-         {
-          "text": " = "
-         },
-         {
-          "type": "strong",
-          "children": [
-           {
-            "text": "count"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   }
-  ]
- }
-}
-```
-:::
+<block type="slateTable" uid="tbl-34" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-34-r0","cells":[{"key":"tbl-34-r0c0","type":"header","value":[{"type":"p","children":[{"text":"surface"}]}]},{"key":"tbl-34-r0c1","type":"header","value":[{"type":"p","children":[{"text":"fields"}]}]},{"key":"tbl-34-r0c2","type":"header","value":[{"type":"p","children":[{"text":"operators"}]}]}]},{"key":"tbl-34-r1","cells":[{"key":"tbl-34-r1c0","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"string"}]}]}]},{"key":"tbl-34-r1c1","type":"data","value":[{"type":"p","children":[{"text":"text, textarea, url, Choice, "},{"type":"strong","children":[{"text":"slate"}]},{"text":" (its plaintext)"}]}]},{"key":"tbl-34-r1c2","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"is"}]},{"text":"/"},{"type":"code","children":[{"text":"isNot"}]},{"text":", "},{"type":"code","children":[{"text":"isSet"}]},{"text":", "},{"type":"code","children":[{"text":"oneOf"}]},{"text":"/"},{"type":"code","children":[{"text":"notOneOf"}]},{"text":", "},{"type":"code","children":[{"text":"contains"}]},{"text":"/"},{"type":"code","children":[{"text":"notContains"}]},{"text":" = "},{"type":"strong","children":[{"text":"substring"}]},{"text":", "},{"type":"code","children":[{"text":"regex"}]},{"text":"/"},{"type":"code","children":[{"text":"notRegex"}]}]}]}]},{"key":"tbl-34-r2","cells":[{"key":"tbl-34-r2c0","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"number"}]}]}]},{"key":"tbl-34-r2c1","type":"data","value":[{"type":"p","children":[{"text":"integer, float, number"}]}]},{"key":"tbl-34-r2c2","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"is"}]},{"text":"/"},{"type":"code","children":[{"text":"isNot"}]},{"text":", "},{"type":"code","children":[{"text":"oneOf"}]},{"text":", "},{"type":"code","children":[{"text":"isSet"}]},{"text":", "},{"type":"code","children":[{"text":"gt"}]},{"text":"/"},{"type":"code","children":[{"text":"gte"}]},{"text":"/"},{"type":"code","children":[{"text":"lt"}]},{"text":"/"},{"type":"code","children":[{"text":"lte"}]},{"text":" = compare"}]}]}]},{"key":"tbl-34-r3","cells":[{"key":"tbl-34-r3c0","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"boolean"}]}]}]},{"key":"tbl-34-r3c1","type":"data","value":[{"type":"p","children":[{"text":"boolean"}]}]},{"key":"tbl-34-r3c2","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"is"}]},{"text":"/"},{"type":"code","children":[{"text":"isNot"}]},{"text":", "},{"type":"code","children":[{"text":"isSet"}]}]}]}]},{"key":"tbl-34-r4","cells":[{"key":"tbl-34-r4c0","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"array"}]}]}]},{"key":"tbl-34-r4c1","type":"data","value":[{"type":"p","children":[{"text":"multiselect (its values), "},{"type":"strong","children":[{"text":"region"}]},{"text":" (its child block "},{"type":"strong","children":[{"text":"types"}]},{"text":")"}]}]},{"key":"tbl-34-r4c2","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"isSet"}]},{"text":", "},{"type":"code","children":[{"text":"is"}]},{"text":"/"},{"type":"code","children":[{"text":"isNot"}]},{"text":" = "},{"type":"strong","children":[{"text":"set-equality"}]},{"text":", "},{"type":"code","children":[{"text":"contains"}]},{"text":"/"},{"type":"code","children":[{"text":"notContains"}]},{"text":" = membership, "},{"type":"code","children":[{"text":"containsAny"}]},{"text":"/"},{"type":"code","children":[{"text":"containsAll"}]},{"text":" (+inverses), "},{"type":"code","children":[{"text":"gt"}]},{"text":"/"},{"type":"code","children":[{"text":"gte"}]},{"text":"/"},{"type":"code","children":[{"text":"lt"}]},{"text":"/"},{"type":"code","children":[{"text":"lte"}]},{"text":" = "},{"type":"strong","children":[{"text":"count"}]}]}]}]}]}}' />
 
 `oneOf` (scalar value ∈ set) and `containsAny` (array shares any with a set) differ only on the field side — `oneOf` is for a single-valued field, `containsAny` for a multiselect; `oneOf` on an array throws (use `containsAny`).
 
@@ -1014,8 +377,10 @@ Two extras drive **position-** and \*\*type-\*\*aware rules:
 - The virtual field **`@index`** reads a block's ordinal position within its parent `object_list` region (a `number` surface) — `{ '@index': { lt: 1 } }` means "first in my region", and `../@index` is the parent block's index. Distinct from a region's `count` (which counts children).
 - A rule whose **`set` is a block-type NAME** (a string) rather than a field definition is a **`@type` rule** — it changes the item's *type* by position, not a field. Declared as `typeRule` on a typed `object_list`; see [`typeRule` — position picks a typed item's `@type`](#typerule--position-picks-a-typed-items-type). The retype is applied by CONVERSION (a schema enhancer can't rewrite stored `@type`), which brings up the confirm described under [Drag / paste via conversion](#drag--paste-via-conversion).
 
-:::codeExample{uid="ce-38"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-38-javascript-4acd08"]}
+<block type="codeExample" uid="ce-38">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-38-javascript-4acd08"]}'>
+
 ### Javascript
 
 ```javascript
@@ -1033,13 +398,17 @@ schemaEnhancer: {
     },
 }
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 For a **region** (an `object_list` field, or a single `blocks_layout` region named by its region key), the array surface is its **child block types**, and the numeric operators **count** that region's children — only its own, never a cross-region total:
 
-:::codeExample{uid="ce-40"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-40-javascript-c0236e"]}
+<block type="codeExample" uid="ce-40">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-40-javascript-c0236e"]}'>
+
 ### Javascript
 
 ```javascript
@@ -1054,13 +423,17 @@ schemaEnhancer: {
     },
 }
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 To condition on a block's **position** rather than a field value, use the virtual field **`@index`** — a block's ordinal index within its parent `object_list` region (a `number` surface). It composes with the block-step grammar, so `../@index` is the parent block's index. Unlike the region's numeric ops (which *count* children), `@index` is *where this block sits*:
 
-:::codeExample{uid="ce-42"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-42-javascript-bdaefa"]}
+<block type="codeExample" uid="ce-42">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-42-javascript-bdaefa"]}'>
+
 ### Javascript
 
 ```javascript
@@ -1075,8 +448,10 @@ schemaEnhancer: {
     },
 }
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 A block that isn't an `object_list` item yields an unset `@index`, so comparisons are simply false (never an error). `lt: 1` is "first"; `lt: 2` is "first two", etc.
 
@@ -1102,8 +477,10 @@ Each key in `fieldMappings` is either a **specific block type name**, **`@defaul
 
 Use these when blocks share fields that aren't part of the `@default` set — for example, facet types sharing `{ title, field, hidden }` or form field types sharing `{ label, description, required }`.
 
-:::codeExample{uid="ce-53"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-53-javascript-6ea81c"]}
+<block type="codeExample" uid="ce-53">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-53-javascript-6ea81c"]}'>
+
 ### Javascript
 
 ```javascript
@@ -1126,15 +503,19 @@ image: {
 selectFacet:  { fieldMappings: { checkboxFacet: { title: 'title', field: 'field', hidden: 'hidden' } } },
 checkboxFacet: { fieldMappings: { selectFacet: { /* ... */ }, daterangeFacet: { /* ... */ } } },
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 ### `@target` — copy from a linked content item
 
 `@target` maps a **linked** content item's attributes onto this block's own fields — the generic version of the Volto teaser's "copy from target" button. It maps *source content attributes* (`title`, `description`, `image`, …) to *this block's fields*. The item is whichever the block's **link field** points at (the `object_browser mode: 'link'` field — its stored snapshot is the source), so you don't name a URL field separately: "the url is the link in the mapping".
 
-:::codeExample{uid="ce-56"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-56-javascript-46bfa7"]}
+<block type="codeExample" uid="ce-56">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-56-javascript-46bfa7"]}'>
+
 ### Javascript
 
 ```javascript
@@ -1151,8 +532,10 @@ button: {
     },
 },
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 Declaring `@target` is the **only** opt-in — no per-block enhancer wiring. Each mapped field then shows a small **🔗 pull from linked** toggle in the sidebar (only when a target is selected). Every mapped field is one of two states:
 
@@ -1163,8 +546,10 @@ Declaring `@target` is the **only** opt-in — no per-block enhancer wiring. Eac
 
 A `fieldMappings` value is usually a sibling **field name**. It may instead be a **region-crossing path** `<region>/<type|*>/<field>`, which reaches the `<field>` of a container region's children — the one place the path grammar crosses a region boundary. This bridges a **container** block (a region of child blocks) and a **value** block (a scalar field), so a block can convert between the two shapes:
 
-:::codeExample{uid="ce-61"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-61-javascript-9a6e0e"]}
+<block type="codeExample" uid="ce-61">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-61-javascript-9a6e0e"]}'>
+
 ### Javascript
 
 ```javascript
@@ -1180,8 +565,10 @@ tableCell: {                                         // the container form
     } },
 },
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 - **container → value (collapse)** — gather the region's matching children's `<field>`; slate values are **merged** into one (lossless), not truncated.
 - **value → container (expand)** — wrap the value in **one** child of `<type>` in the region.
@@ -1193,8 +580,10 @@ Non-region scalar fields (`key`, `width`, …) carry over unchanged. This is the
 
 The bridge converts on demand; a **`@type` rule** on a typed `object_list` field decides *when*, by **position**. It is an ordinary `when`-based fieldRule (same grammar — `@index`, `../@index`, `../../<field>`, `oneOf`, `lt`, …) whose `set` is a block-**type name** instead of a field definition:
 
-:::codeExample{uid="ce-66"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-66-javascript-11d07c"]}
+<block type="codeExample" uid="ce-66">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-66-javascript-11d07c"]}'>
+
 ### Javascript
 
 ```javascript
@@ -1209,8 +598,10 @@ cells: {
     ],
 },
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 The rule is evaluated in the same pass that applies field defaults (run on every edit): each typed item's target `@type` is re-resolved, and when it differs from the stored `@type` the item is **converted in place** via the bridge above. So moving a row to/from row 0 flips its cells between `tableHeaderCell` (a slate `value`) and `tableCell` (a `blocks` container), losslessly — no imperative "re-type the cells" code. Only meaningful on a **typed** object\_list (a `typeField` item has an `@type` to rewrite); it settles in one pass (the target type re-resolves to itself once the item is in place).
 
@@ -1240,8 +631,10 @@ The chooser popup survives only for the genuinely ambiguous case: a single block
 
 A mapping value is either a string (simple field rename) or `{ field, type }` (rename with type conversion):
 
-:::codeExample{uid="ce-79"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-79-json-1fc605"]}
+<block type="codeExample" uid="ce-79">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-79-json-1fc605"]}'>
+
 ### Json
 
 ```json
@@ -1252,291 +645,14 @@ A mapping value is either a string (simple field rename) or `{ field, type }` (r
     "image": "preview_image"
 }
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 When `type` is specified, the value is converted at runtime:
 
-:::slateTable{uid="tbl-81"}
-```fields
-{
- "table": {
-  "fixed": true,
-  "compact": false,
-  "basic": false,
-  "celled": true,
-  "inverted": false,
-  "striped": false,
-  "rows": [
-   {
-    "key": "tbl-81-r0",
-    "cells": [
-     {
-      "key": "tbl-81-r0c0",
-      "type": "header",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Type"
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-81-r0c1",
-      "type": "header",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Conversion"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-81-r1",
-    "cells": [
-     {
-      "key": "tbl-81-r1c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "string"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-81-r1c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Arrays joined with "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "\", \""
-           }
-          ]
-         },
-         {
-          "text": "; image objects resolved to URL string"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-81-r2",
-    "cells": [
-     {
-      "key": "tbl-81-r2c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "link"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-81-r2c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "String wrapped as "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "[{ \"@id\": value }]"
-           }
-          ]
-         },
-         {
-          "text": " (Volto link format)"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-81-r3",
-    "cells": [
-     {
-      "key": "tbl-81-r3c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "image"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-81-r3c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Pass through (expects "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "{ \"@id\", image_field, image_scales }"
-           }
-          ]
-         },
-         {
-          "text": ")"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-81-r4",
-    "cells": [
-     {
-      "key": "tbl-81-r4c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "array"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-81-r4c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Non-arrays wrapped in "
-         },
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "[value]"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   },
-   {
-    "key": "tbl-81-r5",
-    "cells": [
-     {
-      "key": "tbl-81-r5c0",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "type": "code",
-          "children": [
-           {
-            "text": "(none)"
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     {
-      "key": "tbl-81-r5c1",
-      "type": "data",
-      "value": [
-       {
-        "type": "p",
-        "children": [
-         {
-          "text": "Copied as-is"
-         }
-        ]
-       }
-      ]
-     }
-    ]
-   }
-  ]
- }
-}
-```
-:::
+<block type="slateTable" uid="tbl-81" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-81-r0","cells":[{"key":"tbl-81-r0c0","type":"header","value":[{"type":"p","children":[{"text":"Type"}]}]},{"key":"tbl-81-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Conversion"}]}]}]},{"key":"tbl-81-r1","cells":[{"key":"tbl-81-r1c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"string"}]}]}]},{"key":"tbl-81-r1c1","type":"data","value":[{"type":"p","children":[{"text":"Arrays joined with "},{"type":"code","children":[{"text":"\", \""}]},{"text":"; image objects resolved to URL string"}]}]}]},{"key":"tbl-81-r2","cells":[{"key":"tbl-81-r2c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"link"}]}]}]},{"key":"tbl-81-r2c1","type":"data","value":[{"type":"p","children":[{"text":"String wrapped as "},{"type":"code","children":[{"text":"[{ \"@id\": value }]"}]},{"text":" (Volto link format)"}]}]}]},{"key":"tbl-81-r3","cells":[{"key":"tbl-81-r3c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"image"}]}]}]},{"key":"tbl-81-r3c1","type":"data","value":[{"type":"p","children":[{"text":"Pass through (expects "},{"type":"code","children":[{"text":"{ \"@id\", image_field, image_scales }"}]},{"text":")"}]}]}]},{"key":"tbl-81-r4","cells":[{"key":"tbl-81-r4c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"array"}]}]}]},{"key":"tbl-81-r4c1","type":"data","value":[{"type":"p","children":[{"text":"Non-arrays wrapped in "},{"type":"code","children":[{"text":"[value]"}]}]}]}]},{"key":"tbl-81-r5","cells":[{"key":"tbl-81-r5c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"(none)"}]}]}]},{"key":"tbl-81-r5c1","type":"data","value":[{"type":"p","children":[{"text":"Copied as-is"}]}]}]}]}}' />
 
 ### FieldMappingWidget
 
@@ -1553,8 +669,10 @@ The saved `fieldMapping` is read at render time by `expandListingBlocks` — no 
 
 When the editor pastes rich HTML into the page, Inka will eventually be able to recognise it as a custom block by matching against a CSS selector mapping. The proposed shape:
 
-:::codeExample{uid="ce-88"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-88-javascript-e562d7"]}
+<block type="codeExample" uid="ce-88">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-88-javascript-e562d7"]}'>
+
 ### Javascript
 
 ```javascript
@@ -1564,7 +682,9 @@ video: {
     },
 }
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 The `css:<selector>` key in `fieldMappings` matches a pasted HTML element; the value maps element attributes to block fields. Not yet implemented — open question on whether this should run via `htmlTagsToSlate` (bypassing slate conversion) or be encoded into slate so attributes/classes survive.

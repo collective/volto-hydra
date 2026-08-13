@@ -31,43 +31,31 @@ blocks:
   - ref-form-rendering: codeExample
 ---
 
-:::title{uid="00e8d49b-5b99-4d2f-83b3-7d69bc80b893"}
-:::
+<block type="title" uid="00e8d49b-5b99-4d2f-83b3-7d69bc80b893" />
 
 A multi-field form with configurable field types, validation, and email submission. Fields are stored as a typed object\_list — each field has a field\_type that maps to a sub-block schema.
 
-:::image{uid="editor-screenshot" align="center" size="l" url="${src}" alt="${alt}"}
+<block type="image" uid="editor-screenshot" align="center" size="l" url="${src}" alt="${alt}">
+
 ![The form example block being edited in Volto Hydra](/docs/images/form-edit)
-:::
 
-:::form{uid="3687103d-0766-4d5e-8aae-fc7e65c457a6" default_from="noreply@plone.org" lastChange=1710238630312 remove_data_after_days=-1 send_email=true show_cancel=false store=true title="A simple form"}
-::::subblocks[object_list]
-:::subblock{field_id="1709833577467" field_type="text" id="1709833577467" label="Name" required=true}
-:::
-:::subblock{field_id="1709833592544" field_type="from" id="1709833592544" label="Email" required=false use_as_bcc=false use_as_reply_to=false}
-:::
-:::subblock{field_id="1709833604677" field_type="textarea" id="1709833604677" label="Message" required=false}
-:::
-:::subblock{field_id="1709833616406" field_type="multiple_choice" id="1709833616406" label="Select field" required=false}
-```fields
-{
- "input_values": [
-  "Red",
-  "Green",
-  "Blue"
- ]
-}
-```
-:::
-::::
-:::
+</block>
 
-:::slate{uid="eb25b89c-d64a-4566-8e6e-71fd0f371964"}
-```fields
-{
- "styles": {}
-}
-```
+<block type="form" uid="3687103d-0766-4d5e-8aae-fc7e65c457a6" default_from="noreply@plone.org" title="A simple form" data='{"lastChange":1710238630312,"remove_data_after_days":-1,"send_email":true,"show_cancel":false,"store":true}'>
+
+<region name="subblocks" widget="object_list">
+
+<block type="subblock" field_id="1709833577467" field_type="text" id="1709833577467" label="Name" data='{"required":true}' />
+<block type="subblock" field_id="1709833592544" field_type="from" id="1709833592544" label="Email" data='{"required":false,"use_as_bcc":false,"use_as_reply_to":false}' />
+<block type="subblock" field_id="1709833604677" field_type="textarea" id="1709833604677" label="Message" data='{"required":false}' />
+<block type="subblock" field_id="1709833616406" field_type="multiple_choice" id="1709833616406" label="Select field" data='{"required":false,"input_values":["Red","Green","Blue"]}' />
+
+</region>
+
+</block>
+
+<block type="slate" uid="eb25b89c-d64a-4566-8e6e-71fd0f371964" data='{"styles":{}}'>
+
 ```field-json:value
 [
  {
@@ -80,10 +68,13 @@ A multi-field form with configurable field types, validation, and email submissi
  }
 ]
 ```
-:::
 
-:::codeExample{uid="ref-form-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form" slotId="schema"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-form-schema-javascript-2285e7"]}
+</block>
+
+<block type="codeExample" uid="ref-form-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form" slotId="schema">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-form-schema-javascript-2285e7"]}'>
+
 ### Schema
 
 ```javascript
@@ -566,11 +557,15 @@ A multi-field form with configurable field types, validation, and email submissi
   }
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-form-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form" slotId="json-data"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-form-json-data-json-6e9c29"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-form-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form" slotId="json-data">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-form-json-data-json-6e9c29"]}'>
+
 ### JSON Block Data
 
 ```json
@@ -620,11 +615,15 @@ A multi-field form with configurable field types, validation, and email submissi
   ]
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-form-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form" slotId="rendering"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-form-rendering-jsx-29590c","ref-form-rendering-vue-3f1bde","ref-form-rendering-svelte-f8f39b"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-form-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form" slotId="rendering">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-form-rendering-jsx-29590c","ref-form-rendering-vue-3f1bde","ref-form-rendering-svelte-f8f39b"]}'>
+
 ### React
 
 ```jsx
@@ -832,5 +831,7 @@ const fields = computed(() => expandTemplatesSync(props.block.subblocks || [], {
   <button type="submit" data-edit-text="submit_label">{block.submit_label || 'Submit'}</button>
 </form>
 ```
-::::
-:::
+
+</region>
+
+</block>

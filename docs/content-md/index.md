@@ -49,89 +49,81 @@ blobs:
     exclude_from_nav: false
 ---
 
-:::slate{uid="hero-headline"}
-```fields
-{
- "styles": {}
-}
-```
+<block type="slate" uid="hero-headline" data='{"styles":{}}'>
+
 # Design-system-first page building
-:::
 
-:::slate{uid="hero-subhead"}
-```fields
-{
- "styles": {}
-}
-```
+</block>
+
+<block type="slate" uid="hero-subhead" data='{"styles":{}}'>
+
 Strike the right balance for your site. Make it easy for editors to create engagement — while staying compliant.
-:::
 
-:::slate{uid="hero-cta"}
-```fields
-{
- "styles": {
-  "backgroundColor": "grey"
- }
-}
-```
+</block>
+
+<block type="slate" uid="hero-cta" data='{"styles":{"backgroundColor":"grey"}}'>
+
 [Try the demo](https://hydra.pretagov.com/login?return_url=/)  ·  [Source on GitHub](https://github.com/collective/volto-hydra)
-:::
 
-:::slate{uid="why-hydra-heading"}
-```fields
-{
- "styles": {}
-}
-```
+</block>
+
+<block type="slate" uid="why-hydra-heading" data='{"styles":{}}'>
+
 ## Why Inka
-:::
 
-:::slate{uid="why-hydra-tagline"}
-```fields
-{
- "styles": {}
-}
-```
+</block>
+
+<block type="slate" uid="why-hydra-tagline" data='{"styles":{}}'>
+
 Compliance or engagement is a false choice. You decide where the dial sits for each site.
-:::
 
-:::image{uid="why-hydra-quadrant" align="center" size="l" url="${src}"}
+</block>
+
+<block type="image" uid="why-hydra-quadrant" align="center" size="l" url="${src}">
+
 ![](/images/quadrant/@@download/image/quadrant.svg)
-:::
 
-:::gridBlock{uid="why-hydra-grid"}
-```fields
-{
- "styles": {}
-}
-```
-:::slate{uid="box-visual"}
+</block>
+
+<block type="gridBlock" uid="why-hydra-grid" data='{"styles":{}}'>
+
+<block type="slate" uid="box-visual">
+
 **Visual Editing**
 
 True WYSIWYG with drag-and-drop blocks. No special frontend framework required — just HTML attributes.
-:::
-:::slate{uid="box-frontend"}
+
+</block>
+<block type="slate" uid="box-frontend">
+
 **Multi frontend, multi backend**
 
 Use React, Vue, Nuxt, Next.js or any stack, and switch channels mid-edit.
-:::
-:::slate{uid="box-enterprise"}
+
+</block>
+<block type="slate" uid="box-enterprise">
+
 **Truly Decoupled**
 
 Your frontend is independent code you own. Upgrade the CMS without rewriting your site; switch frameworks and get the same editing experience.
-:::
-:::slate{uid="box-opensource"}
+
+</block>
+<block type="slate" uid="box-opensource">
+
 **Open Source**
 
 Secure, scalable Plone backend. Host anywhere, control your costs and security.
-:::
-:::
+
+</block>
+
+</block>
 
 ## Quick Start
 
-:::codeExample{uid="quickstart-code"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["tab-nuxt","tab-nextjs","tab-svelte","tab-vanilla","tab-astro"]}
+<block type="codeExample" uid="quickstart-code">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["tab-nuxt","tab-nextjs","tab-svelte","tab-vanilla","tab-astro"]}'>
+
 ### Nuxt.js
 
 ```vue
@@ -418,93 +410,22 @@ export const POST = async ({ request }) => {
   return new Response(html, { headers: { 'Content-Type': 'text/html' } })
 }
 ```
-::::
-:::
 
-:::slider{uid="303984b4-693a-408f-83f7-5a88b243d7db" autoplayDelay=4000 autoplayEnabled=false autoplayJump=false}
-```fields
-{
- "styles": {}
-}
-```
-::::slides[object_list]{repeat="h2" head_title="${1/text}" title="${2/text}" description="${3/text}" @ids=["b09f39ea-36c3-4f09-9a18-30aef3565a22","ef8ceecc-7c1d-4e0a-9b67-a56e7d03f6e3"]}
+</region>
+
+</block>
+
+<block type="slider" uid="303984b4-693a-408f-83f7-5a88b243d7db" data='{"autoplayDelay":4000,"autoplayEnabled":false,"autoplayJump":false,"styles":{}}'>
+
+<region name="slides" widget="object_list" repeat="h2" head_title="${1/text}" title="${2/text}" description="${3/text}" data='{"@ids":["b09f39ea-36c3-4f09-9a18-30aef3565a22","ef8ceecc-7c1d-4e0a-9b67-a56e7d03f6e3"]}'>
+
 ## Welcome to Inka
 
 You can use this site to test Inka
 
 You can log in and experience currently working features (Volto like but on any frontend)
 
-:::@{buttonText="See all Content Types" flagAlign="left"}
-```fields
-{
- "href": [
-  {
-   "@id": "/docs/examples/content-types",
-   "@type": "Document",
-   "Description": "This section has a sample of content types available in this site.",
-   "Title": "Content Types",
-   "hasPreviewImage": null,
-   "head_title": null,
-   "image_field": "image",
-   "title": "Content Types"
-  }
- ],
- "preview_image": [
-  {
-   "@id": "/images/penguin1.jpg",
-   "@type": "Image",
-   "CreationDate": "2024-03-07T12:29:54+01:00",
-   "Creator": "admin",
-   "Date": "2024-03-07T12:30:08+01:00",
-   "Description": "",
-   "EffectiveDate": "None",
-   "ExpirationDate": "None",
-   "ModificationDate": "2024-03-07T12:30:08+01:00",
-   "Subject": [],
-   "Title": "testimage",
-   "Type": "Bild",
-   "UID": "9abc1a813bcf46388e565b277bd8c6bf",
-   "author_name": null,
-   "cmf_uid": null,
-   "commentators": [],
-   "created": "2024-03-07T11:29:54+00:00",
-   "description": "",
-   "effective": "1969-12-30T23:00:00+00:00",
-   "end": null,
-   "exclude_from_nav": false,
-   "expires": "2499-12-30T23:00:00+00:00",
-   "getIcon": true,
-   "getId": "testimage.jpg",
-   "getObjSize": "2.0 MB",
-   "getPath": "/Plone/testimage.jpg",
-   "getRemoteUrl": null,
-   "getURL": "http://localhost:3000/testimage.jpg",
-   "hasPreviewImage": null,
-   "head_title": null,
-   "id": "testimage.jpg",
-   "image_field": "image",
-   "in_response_to": null,
-   "is_folderish": false,
-   "last_comment_date": null,
-   "listCreators": [
-    "admin"
-   ],
-   "location": null,
-   "mime_type": "image/jpeg",
-   "modified": "2024-03-07T11:30:08+00:00",
-   "nav_title": null,
-   "portal_type": "Image",
-   "review_state": null,
-   "start": null,
-   "sync_uid": null,
-   "title": "testimage",
-   "total_comments": 0,
-   "type_title": "Bild"
-  }
- ]
-}
-```
-:::
+<field buttonText="See all Content Types" flagAlign="left" data='{"href":[{"@id":"/docs/examples/content-types","@type":"Document","Description":"This section has a sample of content types available in this site.","Title":"Content Types","hasPreviewImage":null,"head_title":null,"image_field":"image","title":"Content Types"}],"preview_image":[{"@id":"/images/penguin1.jpg","@type":"Image","CreationDate":"2024-03-07T12:29:54+01:00","Creator":"admin","Date":"2024-03-07T12:30:08+01:00","Description":"","EffectiveDate":"None","ExpirationDate":"None","ModificationDate":"2024-03-07T12:30:08+01:00","Subject":[],"Title":"testimage","Type":"Bild","UID":"9abc1a813bcf46388e565b277bd8c6bf","author_name":null,"cmf_uid":null,"commentators":[],"created":"2024-03-07T11:29:54+00:00","description":"","effective":"1969-12-30T23:00:00+00:00","end":null,"exclude_from_nav":false,"expires":"2499-12-30T23:00:00+00:00","getIcon":true,"getId":"testimage.jpg","getObjSize":"2.0 MB","getPath":"/Plone/testimage.jpg","getRemoteUrl":null,"getURL":"http://localhost:3000/testimage.jpg","hasPreviewImage":null,"head_title":null,"id":"testimage.jpg","image_field":"image","in_response_to":null,"is_folderish":false,"last_comment_date":null,"listCreators":["admin"],"location":null,"mime_type":"image/jpeg","modified":"2024-03-07T11:30:08+00:00","nav_title":null,"portal_type":"Image","review_state":null,"start":null,"sync_uid":null,"title":"testimage","total_comments":0,"type_title":"Bild"}]}' />
 
 ## Welcome to Inka's many frontends
 
@@ -512,145 +433,63 @@ You are enjoying one of many possible frontends
 
 Frontend freedom makes it easy to create beautiful and fast experiences
 
-:::@{buttonText="See all blocks" flagAlign="right" hideButton=false}
-```fields
-{
- "href": [
-  {
-   "@id": "/docs/examples",
-   "@type": "Document",
-   "Description": "",
-   "Title": "Blocks",
-   "hasPreviewImage": null,
-   "head_title": null,
-   "image_field": "",
-   "title": "Blocks"
-  }
- ],
- "preview_image": [
-  {
-   "@id": "/images/penguin2.jpg",
-   "@type": "Image",
-   "CreationDate": "2024-03-08T13:05:46+01:00",
-   "Creator": "admin",
-   "Date": "2024-03-08T13:05:46+01:00",
-   "Description": "",
-   "EffectiveDate": "None",
-   "ExpirationDate": "None",
-   "ModificationDate": "2024-03-08T13:05:46+01:00",
-   "Subject": [],
-   "Title": "penguin2.jpg",
-   "Type": "Bild",
-   "UID": "05bace45294c45d5ab93de883e7ce702",
-   "author_name": null,
-   "cmf_uid": null,
-   "commentators": [],
-   "created": "2024-03-08T12:05:46+00:00",
-   "description": "",
-   "effective": "1969-12-30T23:00:00+00:00",
-   "end": null,
-   "exclude_from_nav": false,
-   "expires": "2499-12-30T23:00:00+00:00",
-   "getIcon": true,
-   "getId": "penguin2.jpg",
-   "getObjSize": "2.8 MB",
-   "getPath": "/Plone/images/penguin2.jpg",
-   "getRemoteUrl": null,
-   "getURL": "http://localhost:3000/images/penguin2.jpg",
-   "hasPreviewImage": null,
-   "head_title": null,
-   "id": "penguin2.jpg",
-   "image_field": "image",
-   "in_response_to": null,
-   "is_folderish": false,
-   "last_comment_date": null,
-   "listCreators": [
-    "admin"
-   ],
-   "location": null,
-   "mime_type": "image/jpeg",
-   "modified": "2024-03-08T12:05:46+00:00",
-   "nav_title": null,
-   "portal_type": "Image",
-   "review_state": null,
-   "start": null,
-   "sync_uid": null,
-   "title": "penguin2.jpg",
-   "total_comments": 0,
-   "type_title": "Bild"
-  }
- ]
-}
-```
-:::
-::::
-:::
+<field buttonText="See all blocks" flagAlign="right" data='{"hideButton":false,"href":[{"@id":"/docs/examples","@type":"Document","Description":"","Title":"Blocks","hasPreviewImage":null,"head_title":null,"image_field":"","title":"Blocks"}],"preview_image":[{"@id":"/images/penguin2.jpg","@type":"Image","CreationDate":"2024-03-08T13:05:46+01:00","Creator":"admin","Date":"2024-03-08T13:05:46+01:00","Description":"","EffectiveDate":"None","ExpirationDate":"None","ModificationDate":"2024-03-08T13:05:46+01:00","Subject":[],"Title":"penguin2.jpg","Type":"Bild","UID":"05bace45294c45d5ab93de883e7ce702","author_name":null,"cmf_uid":null,"commentators":[],"created":"2024-03-08T12:05:46+00:00","description":"","effective":"1969-12-30T23:00:00+00:00","end":null,"exclude_from_nav":false,"expires":"2499-12-30T23:00:00+00:00","getIcon":true,"getId":"penguin2.jpg","getObjSize":"2.8 MB","getPath":"/Plone/images/penguin2.jpg","getRemoteUrl":null,"getURL":"http://localhost:3000/images/penguin2.jpg","hasPreviewImage":null,"head_title":null,"id":"penguin2.jpg","image_field":"image","in_response_to":null,"is_folderish":false,"last_comment_date":null,"listCreators":["admin"],"location":null,"mime_type":"image/jpeg","modified":"2024-03-08T12:05:46+00:00","nav_title":null,"portal_type":"Image","review_state":null,"start":null,"sync_uid":null,"title":"penguin2.jpg","total_comments":0,"type_title":"Bild"}]}' />
 
-:::gridBlock{uid="fae599f3-e7d4-451b-a413-84355c796b7e"}
-```fields
-{
- "styles": {}
-}
-```
-:::slate{uid="c9f92df8-81fd-4259-a149-5c8798735350"}
+</region>
+
+</block>
+
+<block type="gridBlock" uid="fae599f3-e7d4-451b-a413-84355c796b7e" data='{"styles":{}}'>
+
+<block type="slate" uid="c9f92df8-81fd-4259-a149-5c8798735350">
+
 You can use this site to test Inka Edit.
 
 **Disclaimer**: This instance is reset every night, so all changes will be lost afterwards.
-:::
-:::slate{uid="d78b666f-b07b-4036-9853-efe6263515aa"}
+
+</block>
+<block type="slate" uid="d78b666f-b07b-4036-9853-efe6263515aa">
+
 You can **log in** and use it as an admin user using these **credentials**:\
 \
 username: **admin**\
 password: **admin**
-:::
-:::slate{uid="d105783c-fa27-4c92-a3d9-6323adbe5e72"}
+
+</block>
+<block type="slate" uid="d105783c-fa27-4c92-a3d9-6323adbe5e72">
+
 This site uses some recommended **add-ons**:
 
 - Some blocks that are suitable to be used with volto-light-theme.
 - [volto-form-block](https://github.com/collective/volto-form-block)
-:::
-:::
 
-:::separator{uid="0ab1a8f7-2d26-4933-800c-2f10474afe63"}
-```fields
-{
- "styles": {
-  "align": "full"
- }
-}
-```
-:::
+</block>
 
-:::slate{uid="e972541f-b114-494b-a51e-cc8b11c8207d"}
-```fields
-{
- "styles": {}
-}
-```
+</block>
+
+<block type="separator" uid="0ab1a8f7-2d26-4933-800c-2f10474afe63" data='{"styles":{"align":"full"}}' />
+
+<block type="slate" uid="e972541f-b114-494b-a51e-cc8b11c8207d" data='{"styles":{}}'>
+
 ## View this site in other frameworks
-:::
 
-:::slate{uid="9567ae6d-191c-43f1-91cc-4288bbb98f88"}
-```fields
-{
- "styles": {}
-}
-```
+</block>
+
+<block type="slate" uid="9567ae6d-191c-43f1-91cc-4288bbb98f88" data='{"styles":{}}'>
+
 - [NUXT.js Example](https://hydra-nuxt-flowbrite.netlify.app/)
 - [Framework7 Example (mobile app)](https://hydra-vue-f7.netlify.app/)
 - [Next.js Example](https://hydra-blogsite-nextjs.vercel.app)
 - [Edit either of these frontends: hydra.pretagov.com](https://hydra.pretagov.com)
-:::
+
+</block>
 
 ## Find out more about Inka
 
-:::slate{uid="2fac7e5d-affb-4a8e-969f-2fac4d08e0fd"}
-```fields
-{
- "styles": {}
-}
-```
+<block type="slate" uid="2fac7e5d-affb-4a8e-969f-2fac4d08e0fd" data='{"styles":{}}'>
+
 - [Inka on GitHub — source code, issues, and documentation](https://github.com/collective/volto-hydra)
 - [Plone 6 Documentation](https://6.docs.plone.org)
 - [Plone Community Forum](https://community.plone.org)
-:::
+
+</block>

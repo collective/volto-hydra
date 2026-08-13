@@ -48,8 +48,7 @@ order:
   - images
 ---
 
-:::title{uid="title-1"}
-:::
+<block type="title" uid="title-1" />
 
 A design-system-first page-builder toolkit. Strike the right balance for your site — make it easy for editors to create engagement while staying compliant.
 
@@ -78,16 +77,4 @@ The default preset is a Nuxt.js frontend deployed as an [SSG](https://hydra-nuxt
 
 To run Inka locally against your own frontend, see the **Run Locally** section of the [project README](https://github.com/collective/volto-hydra#run-locally).
 
-:::listing{uid="listing-1" headlineTag="h2" variation="summary"}
-```fields
-{
- "styles": {},
- "fieldMapping": {
-  "@id": "href",
-  "title": "title",
-  "description": "description",
-  "image": "image"
- }
-}
-```
-:::
+<block type="listing" uid="listing-1" headlineTag="h2" variation="summary" data='{"styles":{},"fieldMapping":{"@id":"href","title":"title","description":"description","image":"image"}}' />

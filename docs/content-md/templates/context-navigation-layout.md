@@ -11,49 +11,14 @@ blocks:
   - tpl-default-slot: slate
 ---
 
-:::contextNavigation{uid="tpl-context-nav" fixed=true readOnly=true templateId="/templates/context-navigation-layout" templateInstanceId="context-navigation-layout-def-instance" slotId="context-navigation" ariaLabel="In this section"}
-:::listing{uid="tpl-cnav-listing" variation="navItem" fixed=true readOnly=true templateId="/templates/context-navigation-layout" templateInstanceId="context-navigation-layout-def-instance" slotId="context-navigation-listing"}
-```fields
-{
- "fieldMapping": {
-  "@id": {
-   "field": "href",
-   "type": "link"
-  },
-  "title": {
-   "field": "label"
-  }
- },
- "querystring": {
-  "query": [
-   {
-    "i": "path",
-    "o": "plone.app.querystring.operation.string.relativePath",
-    "v": ".."
-   },
-   {
-    "i": "portal_type",
-    "o": "plone.app.querystring.operation.selection.none",
-    "v": [
-     "Image",
-     "File"
-    ]
-   },
-   {
-    "i": "exclude_from_nav",
-    "o": "plone.app.querystring.operation.boolean.isFalse",
-    "v": ""
-   }
-  ],
-  "sort_on": "getObjPositionInParent",
-  "depth": 4
- }
-}
-```
-:::
-:::
+<block type="contextNavigation" uid="tpl-context-nav" templateId="/templates/context-navigation-layout" templateInstanceId="context-navigation-layout-def-instance" slotId="context-navigation" ariaLabel="In this section" data='{"fixed":true,"readOnly":true}'>
 
-:::slate{uid="tpl-default-slot" templateId="/templates/context-navigation-layout" templateInstanceId="context-navigation-layout-def-instance" slotId="default"}
+<block type="listing" uid="tpl-cnav-listing" variation="navItem" templateId="/templates/context-navigation-layout" templateInstanceId="context-navigation-layout-def-instance" slotId="context-navigation-listing" data='{"fixed":true,"readOnly":true,"fieldMapping":{"@id":{"field":"href","type":"link"},"title":{"field":"label"}},"querystring":{"query":[{"i":"path","o":"plone.app.querystring.operation.string.relativePath","v":".."},{"i":"portal_type","o":"plone.app.querystring.operation.selection.none","v":["Image","File"]},{"i":"exclude_from_nav","o":"plone.app.querystring.operation.boolean.isFalse","v":""}],"sort_on":"getObjPositionInParent","depth":4}}' />
+
+</block>
+
+<block type="slate" uid="tpl-default-slot" templateId="/templates/context-navigation-layout" templateInstanceId="context-navigation-layout-def-instance" slotId="default">
+
 ```field-json:value
 [
  {
@@ -66,4 +31,5 @@ blocks:
  }
 ]
 ```
-:::
+
+</block>

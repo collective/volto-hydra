@@ -83,8 +83,7 @@ blocks:
   - ce-60: codeExample
 ---
 
-:::title{uid="ve-title-1"}
-:::
+<block type="title" uid="ve-title-1" />
 
 ## HTML Annotations for Visual Editing
 
@@ -97,8 +96,10 @@ Add data attributes to your rendered HTML to enable progressively richer visual 
 
 Example of a fully annotated slide block:
 
-:::codeExample{uid="ce-5"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-5-html-6481c1"]}
+<block type="codeExample" uid="ce-5">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-5-html-6481c1"]}'>
+
 ### Html
 
 ```html
@@ -113,15 +114,19 @@ Example of a fully annotated slide block:
        href="/big_news">Read more</a>
 </div>
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 ## Comment Syntax
 
 If you can't modify the markup (e.g., using a 3rd party component library), use comment syntax to specify block attributes:
 
-:::codeExample{uid="ce-8"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-8-html-5005a4"]}
+<block type="codeExample" uid="ce-8">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-8-html-5005a4"]}'>
+
 ### Html
 
 ```html
@@ -136,8 +141,10 @@ If you can't modify the markup (e.g., using a 3rd party component library), use 
 </div>
 <!-- /hydra -->
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 - Attributes without selectors apply to the root element: `block-uid=xxx`
 - Attributes with selectors target child elements: `edit-text=title(.card-title)`
@@ -150,16 +157,20 @@ Supported attributes: `block-uid`, `block-readonly`, `edit-text`, `edit-link`, `
 
 Render optional fields **data-driven**: no data, no element. Don't render an empty element just to give the editor something to click — it leaks empty markup into your published page.
 
-:::codeExample{uid="ce-13"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-13-html-20bcae"]}
+<block type="codeExample" uid="ce-13">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-13-html-20bcae"]}'>
+
 ### Jsx
 
 ```jsx
 {block.heading && <h1 data-edit-text="heading">{block.heading}</h1>}
 {block.image && <img data-edit-media="image" src={block.image} />}
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 Plain truthiness is enough — you never need `.length` or a null-safe walk. Inka normalises a field the editor has cleared (widgets write `[]`, which is truthy) to absent before your renderer sees it.
 
@@ -173,16 +184,20 @@ Reveal replaces a per-block boolean only where "has data" and "should render" ar
 
 Add `data-linkable-allow` to elements that should navigate during edit mode (paging links, facet controls, etc.):
 
-:::codeExample{uid="ce-20"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-20-html-da86a1"]}
+<block type="codeExample" uid="ce-20">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-20-html-da86a1"]}'>
+
 ### Html
 
 ```html
 <a href="/page?pg=2" data-linkable-allow>Next</a>
 <select data-linkable-allow @change="handleFilter">...</select>
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 ## Field Path Syntax
 
@@ -203,8 +218,10 @@ Every `data-edit-*` attribute — `data-edit-text`, `data-edit-link`, `data-edit
 
 The two compose: `../content/headline` is "the parent block, its `content.headline`". `/` descends objects only — a region (`object_list` / `blocks_layout`) or a value is the end of a path (a region's children are separate blocks with their own `data-block-uid`).
 
-:::codeExample{uid="ce-29"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-29-html-a5e4fc"]}
+<block type="codeExample" uid="ce-29">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-29-html-a5e4fc"]}'>
+
 ### Html
 
 ```html
@@ -220,8 +237,10 @@ The two compose: `../content/headline` is "the parent block, its `content.headli
 <a  data-edit-link="content/href">…</a>
 <img data-edit-media="content/image" />
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 This lets fixed parts of the page (headers), parent-block fields, and fields grouped inside an object all be edited in place, with one addressing model.
 
@@ -229,8 +248,10 @@ This lets fixed parts of the page (headers), parent-block fields, and fields gro
 
 Add `data-block-readonly` (or `<!-- hydra block-readonly -->` comment) to disable inline editing for all fields inside an element:
 
-:::codeExample{uid="ce-33"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-33-html-6eefe4"]}
+<block type="codeExample" uid="ce-33">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-33-html-6eefe4"]}'>
+
 ### Html
 
 ```html
@@ -241,21 +262,27 @@ Add `data-block-readonly` (or `<!-- hydra block-readonly -->` comment) to disabl
   <a data-edit-link="href" href="/target">Read more</a>
 </div>
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 Or using comment syntax:
 
-:::codeExample{uid="ce-35"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-35-html-9626f2"]}
+<block type="codeExample" uid="ce-35">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-35-html-9626f2"]}'>
+
 ### Html
 
 ```html
 <!-- hydra block-readonly -->
 <div class="listing-item" data-block-uid="item-1">...</div>
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 `data-block-readonly` is *your* call — use it when your frontend wants to lock a block for its own reasons (a teaser mirroring another page, a listing item).
 
@@ -270,8 +297,10 @@ When rendering Slate nodes to DOM, your renderer must follow these rules for `da
 
 hydra.js uses node-ids to map between Slate's data model and your DOM. When restoring cursor position after formatting changes, it walks your DOM counting Slate children.
 
-:::codeExample{uid="ce-42"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-42-html-7ddfd5"]}
+<block type="codeExample" uid="ce-42">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-42-html-7ddfd5"]}'>
+
 ### Html
 
 ```html
@@ -283,8 +312,10 @@ Invalid (missing node-id on wrapper):
 <span class="my-style"><strong data-node-id="0.1">bold</strong></span>
 This breaks cursor positioning because hydra.js can't correlate DOM structure to Slate structure.
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 ## Non-editable content inside a slate field
 
@@ -295,8 +326,10 @@ Sometimes a renderer adds elements to slate output that are **not** part of the 
 
 hydra's DOM→Slate reader skips any child (without a `data-node-id`) that carries **either** attribute — treating it as chrome, not content. Without this, the element's text would be read back into the Slate value on every edit / select / delete over it, corrupting the value.
 
-:::codeExample{uid="ce-47"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-47-html-a67f8c"]}
+<block type="codeExample" uid="ce-47">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-47-html-a67f8c"]}'>
+
 ### Html
 
 ```html
@@ -304,8 +337,10 @@ An <a data-node-id="0.1">external link<span class="external-icon"
   aria-hidden="true" contenteditable="false">&#8599;</span></a>
 The icon is decoration: the caret skips it and it never enters the value.
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 Contrast this with the wrapper rule above: a wrapper that holds real content carries the inner node's `data-node-id` (and neither of these attributes), so it IS read; decorative / non-editable chrome carries these attributes and is skipped.
 
@@ -324,8 +359,10 @@ A frontend renderer can therefore always assume one top-level node per slate fie
 
 Slate data structure (value is an array but always contains a single root node):
 
-:::codeExample{uid="ce-56"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-56-json-a0b37e"]}
+<block type="codeExample" uid="ce-56">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-56-json-a0b37e"]}'>
+
 ### Json
 
 ```json
@@ -346,13 +383,17 @@ Slate data structure (value is an array but always contains a single root node):
   ]
 }
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 Renderer:
 
-:::codeExample{uid="ce-58"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-58-javascript-3cee82"]}
+<block type="codeExample" uid="ce-58">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-58-javascript-3cee82"]}'>
+
 ### Javascript
 
 ```javascript
@@ -367,13 +408,17 @@ function renderSlate(nodes) {
   }).join('');
 }
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 Usage:
 
-:::codeExample{uid="ce-60"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-60-html-7e15f3"]}
+<block type="codeExample" uid="ce-60">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-60-html-7e15f3"]}'>
+
 ### Html
 
 ```html
@@ -381,5 +426,7 @@ Usage:
   <!-- renderSlate(block.value) output goes here -->
 </div>
 ```
-::::
-:::
+
+</region>
+
+</block>

@@ -35,152 +35,40 @@ blocks:
   - ref-listing-rendering: codeExample
 ---
 
-:::title{uid="43068b6d-d8e9-4acc-912b-eabcdc650939"}
-:::
+<block type="title" uid="43068b6d-d8e9-4acc-912b-eabcdc650939" />
 
 Displays a list of content items from a query. The listing block fetches items from the Plone catalog based on a querystring and renders each item using a configurable item type (variation). Built-in item types are default (title + description) and summary (title + description + image).
 
-:::image{uid="editor-screenshot" align="center" size="l" url="${src}" alt="${alt}"}
+<block type="image" uid="editor-screenshot" align="center" size="l" url="${src}" alt="${alt}">
+
 ![The listing example block being edited in Volto Hydra](/docs/images/listing-edit)
-:::
 
-:::listing{uid="24280e07-e962-4414-8ee5-cdaf58ca5f35" block="24280e07-e962-4414-8ee5-cdaf58ca5f35" headline="Listing: Default" headlineTag="h2" variation="default"}
-```fields
-{
- "query": [],
- "querystring": {
-  "b_size": "4",
-  "limit": "10",
-  "query": [
-   {
-    "i": "portal_type",
-    "o": "plone.app.querystring.operation.selection.any",
-    "v": [
-     "Document"
-    ]
-   },
-   {
-    "i": "Subject",
-    "o": "plone.app.querystring.operation.selection.none",
-    "v": [
-     "main folder"
-    ]
-   }
-  ],
-  "sort_on": "getId",
-  "sort_order": "ascending"
- },
- "styles": {
-  "backgroundColor": "transparent"
- }
-}
-```
-:::
+</block>
 
-:::listing{uid="53ececaa-4219-42a9-861d-862be364fd60" block="24280e07-e962-4414-8ee5-cdaf58ca5f35" headline="Listing: Summary" headlineTag="h2" variation="summary"}
-```fields
-{
- "query": [],
- "querystring": {
-  "limit": "5",
-  "query": [
-   {
-    "i": "portal_type",
-    "o": "plone.app.querystring.operation.selection.any",
-    "v": [
-     "Document"
-    ]
-   },
-   {
-    "i": "Subject",
-    "o": "plone.app.querystring.operation.selection.none",
-    "v": [
-     "main folder"
-    ]
-   }
-  ],
-  "sort_on": "getId",
-  "sort_order": "ascending"
- },
- "styles": {
-  "backgroundColor": "grey"
- }
-}
-```
-:::
+<block type="listing" uid="24280e07-e962-4414-8ee5-cdaf58ca5f35" block="24280e07-e962-4414-8ee5-cdaf58ca5f35" headline="Listing: Default" headlineTag="h2" variation="default" data='{"query":[],"querystring":{"b_size":"4","limit":"10","query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Document"]},{"i":"Subject","o":"plone.app.querystring.operation.selection.none","v":["main folder"]}],"sort_on":"getId","sort_order":"ascending"},"styles":{"backgroundColor":"transparent"}}' />
 
-:::gridBlock{uid="2a597dde-dd2b-4c66-816c-09e243a188f5" headline="Listing: Grid (Teaser)" headlineTag="h2"}
-```fields
-{
- "styles": {
-  "backgroundColor": "transparent"
- }
-}
-```
-:::listing{uid="grid-listing-1" variation="teaser"}
-```fields
-{
- "querystring": {
-  "limit": "6",
-  "query": [
-   {
-    "i": "portal_type",
-    "o": "plone.app.querystring.operation.selection.any",
-    "v": [
-     "Document"
-    ]
-   },
-   {
-    "i": "Subject",
-    "o": "plone.app.querystring.operation.selection.none",
-    "v": [
-     "main folder"
-    ]
-   }
-  ],
-  "sort_on": "getId",
-  "sort_order": "ascending"
- }
-}
-```
-:::
-:::
+<block type="listing" uid="53ececaa-4219-42a9-861d-862be364fd60" block="24280e07-e962-4414-8ee5-cdaf58ca5f35" headline="Listing: Summary" headlineTag="h2" variation="summary" data='{"query":[],"querystring":{"limit":"5","query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Document"]},{"i":"Subject","o":"plone.app.querystring.operation.selection.none","v":["main folder"]}],"sort_on":"getId","sort_order":"ascending"},"styles":{"backgroundColor":"grey"}}' />
 
-:::slider{uid="c2eaacd0-4e96-4344-a0ac-26ed644fc503" headline="Listing: Image Slider" headlineTag="h2" autoplayDelay=4000 autoplayEnabled=false autoplayJump=false}
-```fields
-{
- "styles": {}
-}
-```
-::::slides[object_list]
-:::listing{uid="slider-listing-1" variation="image"}
-```fields
-{
- "fieldMapping": {
-  "@id": "href",
-  "title": "alt",
-  "image": "url"
- },
- "querystring": {
-  "query": [
-   {
-    "i": "portal_type",
-    "o": "plone.app.querystring.operation.selection.any",
-    "v": [
-     "Image"
-    ]
-   }
-  ],
-  "sort_order": "ascending"
- }
-}
-```
-:::
-::::
-:::
+<block type="gridBlock" uid="2a597dde-dd2b-4c66-816c-09e243a188f5" headline="Listing: Grid (Teaser)" headlineTag="h2" data='{"styles":{"backgroundColor":"transparent"}}'>
 
-:::codeExample{uid="ref-listing-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="schema"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-listing-schema-javascript-bd0476"]}
+<block type="listing" uid="grid-listing-1" variation="teaser" data='{"querystring":{"limit":"6","query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Document"]},{"i":"Subject","o":"plone.app.querystring.operation.selection.none","v":["main folder"]}],"sort_on":"getId","sort_order":"ascending"}}' />
+
+</block>
+
+<block type="slider" uid="c2eaacd0-4e96-4344-a0ac-26ed644fc503" headline="Listing: Image Slider" headlineTag="h2" data='{"autoplayDelay":4000,"autoplayEnabled":false,"autoplayJump":false,"styles":{}}'>
+
+<region name="slides" widget="object_list">
+
+<block type="listing" uid="slider-listing-1" variation="image" data='{"fieldMapping":{"@id":"href","title":"alt","image":"url"},"querystring":{"query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Image"]}],"sort_order":"ascending"}}' />
+
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-listing-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="schema">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-listing-schema-javascript-bd0476"]}'>
+
 ### Schema
 
 ```javascript
@@ -256,11 +144,15 @@ Displays a list of content items from a query. The listing block fetches items f
   }
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-listing-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="json-data"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-listing-json-data-json-829696"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-listing-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="json-data">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-listing-json-data-json-829696"]}'>
+
 ### JSON Block Data
 
 ```json
@@ -291,11 +183,15 @@ Displays a list of content items from a query. The listing block fetches items f
   "image": "/news/my-article/@@images/image-800x600.jpg"
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-listing-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="rendering"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-listing-rendering-jsx-f33c73","ref-listing-rendering-vue-3c4a00","ref-listing-rendering-svelte-aca768"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-listing-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="rendering">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-listing-rendering-jsx-f33c73","ref-listing-rendering-vue-3c4a00","ref-listing-rendering-svelte-aca768"]}'>
+
 ### React
 
 ```jsx
@@ -382,5 +278,7 @@ watch(() => props.block.querystring, async () => {
   {/each}
 </div>
 ```
-::::
-:::
+
+</region>
+
+</block>

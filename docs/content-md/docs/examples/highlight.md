@@ -44,212 +44,30 @@ blocks:
   - ref-highlight-rendering: codeExample
 ---
 
-:::title{uid="af3c704a-1f80-48c8-843b-dc29368d43d9"}
-:::
+<block type="title" uid="af3c704a-1f80-48c8-843b-dc29368d43d9" />
 
 A prominent content section with a background image, overlay, title, rich text body, and an optional call-to-action link. Used for feature callouts and banners.
 
-:::image{uid="editor-screenshot" align="center" size="l" url="${src}" alt="${alt}"}
+<block type="image" uid="editor-screenshot" align="center" size="l" url="${src}" alt="${alt}">
+
 ![The highlight example block being edited in Volto Hydra](/docs/images/highlight-edit)
-:::
 
-:::highlight{uid="8d932379-1247-4281-bd30-dfecd5b3c378" title="Highlight-Block" cta_title="Button" image="/docs/examples/content-types/image/@@images/image"}
-```fields
-{
- "styles": {
-  "descriptionColor": "highlight-custom-color-1"
- },
- "description": [
-  {
-   "children": [
-    {
-     "text": "Lorem ipsum dolor sit amet, "
-    },
-    {
-     "children": [
-      {
-       "text": "consetetur sadipscing"
-      }
-     ],
-     "data": {
-      "url": "/docs/examples/button"
-     },
-     "type": "link"
-    },
-    {
-     "text": " elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt."
-    }
-   ],
-   "type": "p"
-  }
- ],
- "cta_link": [
-  {
-   "@id": "/docs/examples/content-types/page"
-  }
- ]
-}
-```
-:::
+</block>
 
-:::highlight{uid="417e7343-af04-4da4-96bf-29321a3e0fc6" title="Highlight-Block" cta_title="Button" image="/docs/examples/content-types/image/@@images/image"}
-```fields
-{
- "styles": {
-  "descriptionColor": "highlight-custom-color-2"
- },
- "description": [
-  {
-   "children": [
-    {
-     "text": "Lorem ipsum dolor sit amet, "
-    },
-    {
-     "children": [
-      {
-       "text": "consetetur sadipscing"
-      }
-     ],
-     "data": {
-      "url": "/docs/examples/button"
-     },
-     "type": "link"
-    },
-    {
-     "text": " elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt."
-    }
-   ],
-   "type": "p"
-  }
- ],
- "cta_link": [
-  {
-   "@id": "/docs/examples/content-types/page"
-  }
- ]
-}
-```
-:::
+<block type="highlight" uid="8d932379-1247-4281-bd30-dfecd5b3c378" title="Highlight-Block" cta_title="Button" image="/docs/examples/content-types/image/@@images/image" data='{"styles":{"descriptionColor":"highlight-custom-color-1"},"description":[{"children":[{"text":"Lorem ipsum dolor sit amet, "},{"children":[{"text":"consetetur sadipscing"}],"data":{"url":"/docs/examples/button"},"type":"link"},{"text":" elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt."}],"type":"p"}],"cta_link":[{"@id":"/docs/examples/content-types/page"}]}' />
 
-:::highlight{uid="67a6a73a-5ae7-4e14-a11b-bd0139e56513" title="Highlight-Block" cta_title="Button" image="/docs/examples/content-types/image/@@images/image"}
-```fields
-{
- "styles": {
-  "descriptionColor": "highlight-custom-color-3"
- },
- "description": [
-  {
-   "children": [
-    {
-     "text": "Lorem ipsum dolor sit amet, "
-    },
-    {
-     "children": [
-      {
-       "text": "consetetur sadipscing"
-      }
-     ],
-     "data": {
-      "url": "/docs/examples/button"
-     },
-     "type": "link"
-    },
-    {
-     "text": " elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt."
-    }
-   ],
-   "type": "p"
-  }
- ],
- "cta_link": [
-  {
-   "@id": "/docs/examples/content-types/page"
-  }
- ]
-}
-```
-:::
+<block type="highlight" uid="417e7343-af04-4da4-96bf-29321a3e0fc6" title="Highlight-Block" cta_title="Button" image="/docs/examples/content-types/image/@@images/image" data='{"styles":{"descriptionColor":"highlight-custom-color-2"},"description":[{"children":[{"text":"Lorem ipsum dolor sit amet, "},{"children":[{"text":"consetetur sadipscing"}],"data":{"url":"/docs/examples/button"},"type":"link"},{"text":" elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt."}],"type":"p"}],"cta_link":[{"@id":"/docs/examples/content-types/page"}]}' />
 
-:::highlight{uid="25a0a1b5-3ce9-468f-8968-9a7f83ca4e53" title="Highlight-Block" cta_title="Button" image="/docs/examples/content-types/image/@@images/image"}
-```fields
-{
- "styles": {
-  "descriptionColor": "highlight-custom-color-4"
- },
- "description": [
-  {
-   "children": [
-    {
-     "text": "Lorem ipsum dolor sit amet, "
-    },
-    {
-     "children": [
-      {
-       "text": "consetetur sadipscing"
-      }
-     ],
-     "data": {
-      "url": "/docs/examples/button"
-     },
-     "type": "link"
-    },
-    {
-     "text": " elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt."
-    }
-   ],
-   "type": "p"
-  }
- ],
- "cta_link": [
-  {
-   "@id": "/docs/examples/content-types/page"
-  }
- ]
-}
-```
-:::
+<block type="highlight" uid="67a6a73a-5ae7-4e14-a11b-bd0139e56513" title="Highlight-Block" cta_title="Button" image="/docs/examples/content-types/image/@@images/image" data='{"styles":{"descriptionColor":"highlight-custom-color-3"},"description":[{"children":[{"text":"Lorem ipsum dolor sit amet, "},{"children":[{"text":"consetetur sadipscing"}],"data":{"url":"/docs/examples/button"},"type":"link"},{"text":" elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt."}],"type":"p"}],"cta_link":[{"@id":"/docs/examples/content-types/page"}]}' />
 
-:::highlight{uid="94655cc3-817d-48ba-bc20-6e9f7796dc46" title="Highlight-Block" cta_title="Button" image="/docs/examples/content-types/image/@@images/image"}
-```fields
-{
- "styles": {
-  "descriptionColor": "highlight-custom-color-5"
- },
- "description": [
-  {
-   "children": [
-    {
-     "text": "Lorem ipsum dolor sit amet, "
-    },
-    {
-     "children": [
-      {
-       "text": "consetetur sadipscing"
-      }
-     ],
-     "data": {
-      "url": "/docs/examples/button"
-     },
-     "type": "link"
-    },
-    {
-     "text": " elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt."
-    }
-   ],
-   "type": "p"
-  }
- ],
- "cta_link": [
-  {
-   "@id": "/docs/examples/content-types/page"
-  }
- ]
-}
-```
-:::
+<block type="highlight" uid="25a0a1b5-3ce9-468f-8968-9a7f83ca4e53" title="Highlight-Block" cta_title="Button" image="/docs/examples/content-types/image/@@images/image" data='{"styles":{"descriptionColor":"highlight-custom-color-4"},"description":[{"children":[{"text":"Lorem ipsum dolor sit amet, "},{"children":[{"text":"consetetur sadipscing"}],"data":{"url":"/docs/examples/button"},"type":"link"},{"text":" elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt."}],"type":"p"}],"cta_link":[{"@id":"/docs/examples/content-types/page"}]}' />
 
-:::codeExample{uid="ref-highlight-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-highlight" slotId="schema"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-highlight-schema-javascript-80590c"]}
+<block type="highlight" uid="94655cc3-817d-48ba-bc20-6e9f7796dc46" title="Highlight-Block" cta_title="Button" image="/docs/examples/content-types/image/@@images/image" data='{"styles":{"descriptionColor":"highlight-custom-color-5"},"description":[{"children":[{"text":"Lorem ipsum dolor sit amet, "},{"children":[{"text":"consetetur sadipscing"}],"data":{"url":"/docs/examples/button"},"type":"link"},{"text":" elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt."}],"type":"p"}],"cta_link":[{"@id":"/docs/examples/content-types/page"}]}' />
+
+<block type="codeExample" uid="ref-highlight-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-highlight" slotId="schema">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-highlight-schema-javascript-80590c"]}'>
+
 ### Schema
 
 ```javascript
@@ -281,11 +99,15 @@ A prominent content section with a background image, overlay, title, rich text b
   }
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-highlight-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-highlight" slotId="json-data"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-highlight-json-data-json-a2bfa3"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-highlight-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-highlight" slotId="json-data">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-highlight-json-data-json-a2bfa3"]}'>
+
 ### JSON Block Data
 
 ```json
@@ -311,11 +133,15 @@ A prominent content section with a background image, overlay, title, rich text b
   ]
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-highlight-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-highlight" slotId="rendering"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-highlight-rendering-jsx-659b6c","ref-highlight-rendering-vue-dd8730","ref-highlight-rendering-svelte-d3a4c8"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-highlight-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-highlight" slotId="rendering">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-highlight-rendering-jsx-659b6c","ref-highlight-rendering-vue-dd8730","ref-highlight-rendering-svelte-d3a4c8"]}'>
+
 ### React
 
 ```jsx
@@ -457,5 +283,7 @@ const bgStyle = computed(() => {
   </div>
 </section>
 ```
-::::
-:::
+
+</region>
+
+</block>

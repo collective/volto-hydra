@@ -12,13 +12,12 @@ blocks:
   - tpl-ev-content: slate
 ---
 
-:::title{uid="tpl-ev-title" fixed=true templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="title"}
-:::
+<block type="title" uid="tpl-ev-title" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="title" data='{"fixed":true}' />
 
-:::eventMetadata{uid="tpl-ev-metadata" fixed=true templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="event-metadata"}
-:::
+<block type="eventMetadata" uid="tpl-ev-metadata" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="event-metadata" data='{"fixed":true}' />
 
-:::slate{uid="tpl-ev-content" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="content"}
+<block type="slate" uid="tpl-ev-content" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="content">
+
 ```field-json:value
 [
  {
@@ -31,4 +30,5 @@ blocks:
  }
 ]
 ```
-:::
+
+</block>

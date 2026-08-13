@@ -20,66 +20,82 @@ blocks:
   - tpl-rendering: codeExample
 ---
 
-:::separator{uid="tpl-sep" fixed=true readOnly=true templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="sep"}
-```fields
-{
- "styles": {
-  "align": "full"
- }
-}
-```
-:::
+<block type="separator" uid="tpl-sep" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="sep" data='{"fixed":true,"readOnly":true,"styles":{"align":"full"}}' />
 
-:::slate{uid="tpl-examples-heading" fixed=true readOnly=true templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="examples-heading"}
+<block type="slate" uid="tpl-examples-heading" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="examples-heading" data='{"fixed":true,"readOnly":true}'>
+
 ## Developer Reference
-:::
 
-:::slate{uid="tpl-schema-heading" fixed=true readOnly=true templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="schema-heading"}
+</block>
+
+<block type="slate" uid="tpl-schema-heading" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="schema-heading" data='{"fixed":true,"readOnly":true}'>
+
 ### Schema
-:::
 
-:::slate{uid="tpl-schema-desc" fixed=true readOnly=true templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="schema-desc"}
+</block>
+
+<block type="slate" uid="tpl-schema-desc" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="schema-desc" data='{"fixed":true,"readOnly":true}'>
+
 Pass this object inside the `blocks` option when calling `initBridge()` to register this block type with the admin UI. See [Custom Blocks](/docs/live-preview) for the full setup guide.
-:::
 
-:::codeExample{uid="tpl-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="schema"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["tpl-schema-javascript-000000"]}
+</block>
+
+<block type="codeExample" uid="tpl-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="schema">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["tpl-schema-javascript-000000"]}'>
+
 ### Schema
 
 ```javascript
 
 ```
-::::
-:::
 
-:::slate{uid="tpl-json-heading" fixed=true readOnly=true templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-heading"}
+</region>
+
+</block>
+
+<block type="slate" uid="tpl-json-heading" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-heading" data='{"fixed":true,"readOnly":true}'>
+
 ### JSON Block Data
-:::
 
-:::slate{uid="tpl-json-desc" fixed=true readOnly=true templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-desc"}
+</block>
+
+<block type="slate" uid="tpl-json-desc" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-desc" data='{"fixed":true,"readOnly":true}'>
+
 Example JSON as stored in the Plone content API. This is the data structure your component will receive in the `block` prop.
-:::
 
-:::codeExample{uid="tpl-json" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-data"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["tpl-json-json-000000"]}
+</block>
+
+<block type="codeExample" uid="tpl-json" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-data">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["tpl-json-json-000000"]}'>
+
 ### JSON Block Data
 
 ```json
 
 ```
-::::
-:::
 
-:::slate{uid="tpl-rendering-heading" fixed=true readOnly=true templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering-heading"}
+</region>
+
+</block>
+
+<block type="slate" uid="tpl-rendering-heading" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering-heading" data='{"fixed":true,"readOnly":true}'>
+
 ### Rendering
-:::
 
-:::slate{uid="tpl-rendering-desc" fixed=true readOnly=true templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering-desc"}
+</block>
+
+<block type="slate" uid="tpl-rendering-desc" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering-desc" data='{"fixed":true,"readOnly":true}'>
+
 How this block renders in your frontend. Add its handling to your renderer, or — for list-style blocks — register a fetcher and reuse your list rendering.
-:::
 
-:::codeExample{uid="tpl-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["tpl-rendering-jsx-000000","tpl-rendering-vue-000000","tpl-rendering-svelte-000000"]}
+</block>
+
+<block type="codeExample" uid="tpl-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["tpl-rendering-jsx-000000","tpl-rendering-vue-000000","tpl-rendering-svelte-000000"]}'>
+
 ### React
 
 ```jsx
@@ -97,5 +113,7 @@ How this block renders in your frontend. Add its handling to your renderer, or �
 ```svelte
 
 ```
-::::
-:::
+
+</region>
+
+</block>

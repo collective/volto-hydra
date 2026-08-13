@@ -32,18 +32,18 @@ blocks:
   - ref-relatedItemsListing-rendering: codeExample
 ---
 
-:::title{uid="title-1"}
-:::
+<block type="title" uid="title-1" />
 
 Renders the current page's related items relation field (default relatedItems). Its items are fetched at render time and shown with a configurable item type (variation).
 
 ## Live example
 
-:::relatedItemsListing{uid="ri-live-1" relationField="relatedItems" variation="summary"}
-:::
+<block type="relatedItemsListing" uid="ri-live-1" relationField="relatedItems" variation="summary" />
 
-:::codeExample{uid="ref-relatedItemsListing-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="schema"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-relatedItemsListing-schema-javascript-a1a504"]}
+<block type="codeExample" uid="ref-relatedItemsListing-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="schema">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-relatedItemsListing-schema-javascript-a1a504"]}'>
+
 ### Schema
 
 ```javascript
@@ -87,11 +87,15 @@ Renders the current page's related items relation field (default relatedItems). 
   }
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-relatedItemsListing-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="json-data"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-relatedItemsListing-json-data-json-ba9577"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-relatedItemsListing-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="json-data">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-relatedItemsListing-json-data-json-ba9577"]}'>
+
 ### JSON Block Data
 
 ```json
@@ -101,15 +105,21 @@ Renders the current page's related items relation field (default relatedItems). 
   "relationField": "relatedItems"
 }
 ```
-::::
-:::
 
-:::slate{uid="ref-relatedItemsListing-rendering-intro" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="rendering"}
+</region>
+
+</block>
+
+<block type="slate" uid="ref-relatedItemsListing-rendering-intro" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="rendering">
+
 This block has no bespoke renderer. Add its fetcher to your fetchItems map (keyed by @type) and expandListingBlocks expands it in any region you render — the same seam that powers [listings](/docs/listings) and other collection blocks. See [Custom Blocks](/docs/custom-blocks) to define the block type. Only the fetcher below is block-specific.
-:::
 
-:::codeExample{uid="ref-relatedItemsListing-fetcher" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="rendering"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-relatedItemsListing-fetcher-javascript-1c975d"]}
+</block>
+
+<block type="codeExample" uid="ref-relatedItemsListing-fetcher" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="rendering">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-relatedItemsListing-fetcher-javascript-1c975d"]}'>
+
 ### Fetcher
 
 ```javascript
@@ -122,11 +132,15 @@ export function relatedItemsFetcher({ apiUrl, contextPath }) {
   };
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-relatedItemsListing-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="rendering"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-relatedItemsListing-rendering-javascript-2b9d44"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-relatedItemsListing-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="rendering">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-relatedItemsListing-rendering-javascript-2b9d44"]}'>
+
 ### Render
 
 ```javascript
@@ -142,5 +156,7 @@ const { items } = await expandListingBlocks(regionBlockIds, {
 });
 items.forEach((item) => renderBlock(item)); // your normal per-block renderer
 ```
-::::
-:::
+
+</region>
+
+</block>

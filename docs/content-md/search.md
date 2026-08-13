@@ -20,50 +20,12 @@ blocks:
   - search-block: search
 ---
 
-:::search{uid="search-block" headline="Search" variation="facetsLeftSide" showSearchInput=true showSortOn=true showTotalResults=true}
-```fields
-{
- "facets": [
-  {
-   "@id": "facet-type",
-   "title": "Content Type",
-   "field": "portal_type",
-   "type": "checkboxFacet",
-   "multiple": true
-  }
- ],
- "sortOnOptions": [
-  "effective",
-  "sortable_title"
- ]
-}
-```
-::::listing[blocks_layout]
-:::listing{uid="results-listing" variation="default"}
-```fields
-{
- "fieldMapping": {
-  "@id": {
-   "field": "href",
-   "type": "link"
-  },
-  "title": "title",
-  "description": "description",
-  "image": "preview_image"
- },
- "querystring": {
-  "query": [
-   {
-    "i": "path",
-    "o": "plone.app.querystring.operation.string.absolutePath",
-    "v": "/"
-   }
-  ],
-  "sort_on": "effective",
-  "sort_order": "descending"
- }
-}
-```
-:::
-::::
-:::
+<block type="search" uid="search-block" headline="Search" variation="facetsLeftSide" data='{"showSearchInput":true,"showSortOn":true,"showTotalResults":true,"facets":[{"@id":"facet-type","title":"Content Type","field":"portal_type","type":"checkboxFacet","multiple":true}],"sortOnOptions":["effective","sortable_title"]}'>
+
+<region name="listing" widget="blocks_layout">
+
+<block type="listing" uid="results-listing" variation="default" data='{"fieldMapping":{"@id":{"field":"href","type":"link"},"title":"title","description":"description","image":"preview_image"},"querystring":{"query":[{"i":"path","o":"plone.app.querystring.operation.string.absolutePath","v":"/"}],"sort_on":"effective","sort_order":"descending"}}' />
+
+</region>
+
+</block>

@@ -92,8 +92,7 @@ blocks:
   - p-68: slate
 ---
 
-:::title{uid="title-1"}
-:::
+<block type="title" uid="title-1" />
 
 The actual code you write will depend on the framework you choose. You can look at these examples to help you:
 
@@ -107,7 +106,8 @@ Before you dive into the steps, here's what your frontend ends up doing.
 
 To make a site editable with Inka you break a page into:
 
-:::slate{uid="ul-6"}
+<block type="slate" uid="ul-6">
+
 ```field-json:value
 [
  {
@@ -273,12 +273,15 @@ To make a site editable with Inka you break a page into:
  }
 ]
 ```
-:::
+
+</block>
 
 When the page loads inside Inka's edit iframe, you initialise the bridge and declare your blocks; otherwise you render normally from the API:
 
-:::codeExample{uid="ce-8"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-8-js-bf605e"]}
+<block type="codeExample" uid="ce-8">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-8-js-bf605e"]}'>
+
 ### Js
 
 ```js
@@ -318,13 +321,17 @@ else {
     renderPage(await fetchContent(path));
 }
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 Page data ends up shaped like this — one shared `blocks` dict, and a region per named list inside `blocks_layout`:
 
-:::codeExample{uid="ce-10"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-10-js-2e9648"]}
+<block type="codeExample" uid="ce-10">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-10-js-2e9648"]}'>
+
 ### Js
 
 ```js
@@ -342,13 +349,17 @@ Page data ends up shaped like this — one shared `blocks` dict, and a region pe
   }
 }
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 Then you augment the rendered HTML with `data-` attributes (or `<!-- hydra ... -->` comments) so Inka can find your blocks and editable fields:
 
-:::codeExample{uid="ce-12"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-12-html-e0187e"]}
+<block type="codeExample" uid="ce-12">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-12-html-e0187e"]}'>
+
 ### Html
 
 ```html
@@ -363,8 +374,10 @@ Then you augment the rendered HTML with `data-` attributes (or `<!-- hydra ... -
   </a>
 </div>
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 ### Deep-link anchors (fragments)
 
@@ -373,8 +386,10 @@ To let editors link to a spot *inside* a page, mark the element with a real `id`
 - `data-linkable-h1` … `data-linkable-h6="Label"` — a heading anchor **at that level**. Use these on your headings; the suffix is the level.
 - `data-linkable-id="Label"` — a **level-less** anchor (a figure, a defined term, any non-heading target).
 
-:::codeExample{uid="ce-16"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-16-html-5cddab"]}
+<block type="codeExample" uid="ce-16">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ce-16-html-5cddab"]}'>
+
 ### Html
 
 ```html
@@ -382,8 +397,10 @@ To let editors link to a spot *inside* a page, mark the element with a real `id`
 <h3 id="enterprise" data-linkable-h3="Enterprise plan">Enterprise plan</h3>
 <figure id="fig-1" data-linkable-id="Figure 1">…</figure>
 ```
-::::
-:::
+
+</region>
+
+</block>
 
 Inka harvests these per block on render as `{ id, name, level }` and stores them in the block's data, so the object browser offers them as `path#pricing` link targets — as a nested list reflecting the page's structure. Both attributes must survive into your **published** render for the anchor to resolve at runtime — Inka only reads them in edit mode.
 
@@ -395,7 +412,8 @@ It's your choice which elements are linkable — a common pattern is to tag ever
 
 To build something *from* the anchors — an in-page navigation ("On this page") block — **derive the list from the page content you already render**, the same way you stamp the heading `id`s. That works identically published (no bridge, JS off) and while editing: structural edits (adding, removing, reordering heading blocks) re-render your frontend with fresh content, so the nav follows them. There is no bridge callback for this — the anchors ride in the ordinary edit-form data (`block._linkableAnchors`), which is what the object browser's link picker reads; a nav rebuilds itself from content on the next render.
 
-:::slate{uid="bq-22"}
+<block type="slate" uid="bq-22">
+
 ```field-json:value
 [
  {
@@ -419,7 +437,8 @@ To build something *from* the anchors — an in-page navigation ("On this page")
  }
 ]
 ```
-:::
+
+</block>
 
 If your anchors carry levels, pair the derived list with `buildAnchorTree(anchors)` (from `@volto-hydra/hydra-js`) to render a nested contents list; no levels means a flat list.
 
@@ -441,7 +460,8 @@ The page has a template with the static parts of your theme like header and foot
 
 On page setup, take the path and make a [REST API call to the contents endpoint](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/content-types.html) to get the JSON for this page.
 
-:::slate{uid="ul-33"}
+<block type="slate" uid="ul-33">
+
 ```field-json:value
 [
  {
@@ -510,7 +530,8 @@ On page setup, take the path and make a [REST API call to the contents endpoint]
  }
 ]
 ```
-:::
+
+</block>
 
 ## 4. Render Page Metadata
 
@@ -535,7 +556,8 @@ Give `Block` an `@type: "empty"` case: a container region with no `defaultBlockT
 
 Several helper functions get reused in many blocks:
 
-:::slate{uid="ol-43"}
+<block type="slate" uid="ol-43">
+
 ```field-json:value
 [
  {
@@ -590,7 +612,8 @@ Several helper functions get reused in many blocks:
  }
 ]
 ```
-:::
+
+</block>
 
 ## 8. Listing Blocks
 

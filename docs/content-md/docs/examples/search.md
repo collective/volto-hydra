@@ -40,117 +40,40 @@ blocks:
   - ref-search-rendering: codeExample
 ---
 
-:::title{uid="f6d35d7e-6422-4496-8a65-f7cfd42fb519"}
-:::
+<block type="title" uid="f6d35d7e-6422-4496-8a65-f7cfd42fb519" />
 
 A search interface with faceted filtering. Contains a child listing block for results and typed facets (checkbox, select, date range, toggle) for filtering.
 
-:::image{uid="editor-screenshot" align="center" size="l" url="${src}" alt="${alt}"}
+<block type="image" uid="editor-screenshot" align="center" size="l" url="${src}" alt="${alt}">
+
 ![The search example block being edited in Volto Hydra](/docs/images/search-edit)
-:::
 
-:::search{uid="42b7d589-4d35-4b81-9fe9-ea17437beb81" headline="Search with Facets" listingBodyTemplate="summary" facetsTitle="Filter by" showSearchInput=true showSortOn=true showTotalResults=true}
-```fields
-{
- "facets": [
-  {
-   "@id": "facet-type",
-   "type": "checkboxFacet",
-   "title": "Content Type",
-   "field": {
-    "value": "portal_type",
-    "label": "Type"
-   },
-   "multiple": true,
-   "hidden": false
-  },
-  {
-   "@id": "facet-subject",
-   "type": "checkboxFacet",
-   "title": "Tags",
-   "field": {
-    "value": "Subject",
-    "label": "Tags"
-   },
-   "multiple": true,
-   "hidden": false
-  }
- ],
- "query": {
-  "b_size": "4",
-  "query": [
-   {
-    "i": "path",
-    "o": "plone.app.querystring.operation.string.absolutePath",
-    "v": "/"
-   }
-  ],
-  "sort_on": "effective",
-  "sort_order": "descending"
- }
-}
-```
-::::listing[blocks_layout]
-:::listing{uid="facet-listing" variation="summary"}
-```fields
-{
- "querystring": {
-  "query": [
-   {
-    "i": "path",
-    "o": "plone.app.querystring.operation.string.absolutePath",
-    "v": "/"
-   }
-  ],
-  "sort_on": "effective",
-  "sort_order": "descending"
- }
-}
-```
-:::
-::::
-:::
+</block>
 
-:::search{uid="518c46e7-9823-4e03-aa3a-d2a9ec1746dd" headline="Simple Search" showSearchInput=true showSortOn=true showTotalResults=true}
-```fields
-{
- "query": {
-  "b_size": "4",
-  "query": [
-   {
-    "i": "path",
-    "o": "plone.app.querystring.operation.string.absolutePath",
-    "v": "/"
-   }
-  ],
-  "sort_on": "effective",
-  "sort_order": "descending"
- }
-}
-```
-::::listing[blocks_layout]
-:::listing{uid="simple-listing" variation="default"}
-```fields
-{
- "querystring": {
-  "query": [
-   {
-    "i": "path",
-    "o": "plone.app.querystring.operation.string.absolutePath",
-    "v": "/"
-   }
-  ],
-  "sort_on": "effective",
-  "sort_order": "descending"
- }
-}
-```
-:::
-::::
-:::
+<block type="search" uid="42b7d589-4d35-4b81-9fe9-ea17437beb81" headline="Search with Facets" listingBodyTemplate="summary" facetsTitle="Filter by" data='{"showSearchInput":true,"showSortOn":true,"showTotalResults":true,"facets":[{"@id":"facet-type","type":"checkboxFacet","title":"Content Type","field":{"value":"portal_type","label":"Type"},"multiple":true,"hidden":false},{"@id":"facet-subject","type":"checkboxFacet","title":"Tags","field":{"value":"Subject","label":"Tags"},"multiple":true,"hidden":false}],"query":{"b_size":"4","query":[{"i":"path","o":"plone.app.querystring.operation.string.absolutePath","v":"/"}],"sort_on":"effective","sort_order":"descending"}}'>
 
-:::codeExample{uid="ref-search-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-search" slotId="schema"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-search-schema-javascript-8711ec"]}
+<region name="listing" widget="blocks_layout">
+
+<block type="listing" uid="facet-listing" variation="summary" data='{"querystring":{"query":[{"i":"path","o":"plone.app.querystring.operation.string.absolutePath","v":"/"}],"sort_on":"effective","sort_order":"descending"}}' />
+
+</region>
+
+</block>
+
+<block type="search" uid="518c46e7-9823-4e03-aa3a-d2a9ec1746dd" headline="Simple Search" data='{"showSearchInput":true,"showSortOn":true,"showTotalResults":true,"query":{"b_size":"4","query":[{"i":"path","o":"plone.app.querystring.operation.string.absolutePath","v":"/"}],"sort_on":"effective","sort_order":"descending"}}'>
+
+<region name="listing" widget="blocks_layout">
+
+<block type="listing" uid="simple-listing" variation="default" data='{"querystring":{"query":[{"i":"path","o":"plone.app.querystring.operation.string.absolutePath","v":"/"}],"sort_on":"effective","sort_order":"descending"}}' />
+
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-search-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-search" slotId="schema">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-search-schema-javascript-8711ec"]}'>
+
 ### Schema
 
 ```javascript
@@ -261,11 +184,15 @@ A search interface with faceted filtering. Contains a child listing block for re
   }
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-search-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-search" slotId="json-data"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-search-json-data-json-155258"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-search-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-search" slotId="json-data">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-search-json-data-json-155258"]}'>
+
 ### JSON Block Data
 
 ```json
@@ -314,11 +241,15 @@ A search interface with faceted filtering. Contains a child listing block for re
   }
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-search-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-search" slotId="rendering"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-search-rendering-jsx-dd082e","ref-search-rendering-vue-3c1873","ref-search-rendering-svelte-7ba7ad"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-search-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-search" slotId="rendering">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-search-rendering-jsx-dd082e","ref-search-rendering-vue-3c1873","ref-search-rendering-svelte-7ba7ad"]}'>
+
 ### React
 
 ```jsx
@@ -458,5 +389,7 @@ const listingBlock = computed(() => listingId.value ? props.block.blocks?.[listi
   {/if}
 </div>
 ```
-::::
-:::
+
+</region>
+
+</block>

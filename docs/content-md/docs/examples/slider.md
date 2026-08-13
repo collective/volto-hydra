@@ -29,13 +29,14 @@ blocks:
   - ref-slider-rendering: codeExample
 ---
 
-:::title{uid="title-1"}
-:::
+<block type="title" uid="title-1" />
 
 A carousel/slider that cycles through slides. Slides are stored as an object\_list — each slide has a title, description, image, and optional button.
 
-:::codeExample{uid="ref-slider-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-slider" slotId="schema"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-slider-schema-javascript-ce9b5a"]}
+<block type="codeExample" uid="ref-slider-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-slider" slotId="schema">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-slider-schema-javascript-ce9b5a"]}'>
+
 ### Schema
 
 ```javascript
@@ -121,11 +122,15 @@ A carousel/slider that cycles through slides. Slides are stored as an object\_li
   }
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-slider-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-slider" slotId="json-data"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-slider-json-data-json-c5167b"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-slider-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-slider" slotId="json-data">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-slider-json-data-json-c5167b"]}'>
+
 ### JSON Block Data
 
 ```json
@@ -163,11 +168,15 @@ A carousel/slider that cycles through slides. Slides are stored as an object\_li
   ]
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-slider-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-slider" slotId="rendering"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-slider-rendering-jsx-87bcad","ref-slider-rendering-vue-6e69c4","ref-slider-rendering-svelte-586973"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-slider-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-slider" slotId="rendering">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-slider-rendering-jsx-87bcad","ref-slider-rendering-vue-6e69c4","ref-slider-rendering-svelte-586973"]}'>
+
 ### React
 
 ```jsx
@@ -291,5 +300,7 @@ const slides = computed(() => expandTemplatesSync(props.block.slides || [], { id
   </div>
 </div>
 ```
-::::
-:::
+
+</region>
+
+</block>

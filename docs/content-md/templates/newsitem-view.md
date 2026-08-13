@@ -13,16 +13,14 @@ blocks:
   - tpl-ni-content: slate
 ---
 
-:::dateField{uid="tpl-ni-date" dateField="effective" showTime=false fixed=true templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="date"}
-:::
+<block type="dateField" uid="tpl-ni-date" dateField="effective" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="date" data='{"showTime":false,"fixed":true}' />
 
-:::title{uid="tpl-ni-title" fixed=true templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="title"}
-:::
+<block type="title" uid="tpl-ni-title" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="title" data='{"fixed":true}' />
 
-:::leadimage{uid="tpl-ni-leadimage" fixed=true templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="lead-image"}
-:::
+<block type="leadimage" uid="tpl-ni-leadimage" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="lead-image" data='{"fixed":true}' />
 
-:::slate{uid="tpl-ni-content" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content"}
+<block type="slate" uid="tpl-ni-content" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content">
+
 ```field-json:value
 [
  {
@@ -35,4 +33,5 @@ blocks:
  }
 ]
 ```
-:::
+
+</block>

@@ -45,20 +45,14 @@ order:
   - text
 ---
 
-:::title{uid="d3f1c443-583f-4e8e-a682-3bf25752a300"}
-:::
+<block type="title" uid="d3f1c443-583f-4e8e-a682-3bf25752a300" />
 
 A responsive grid that lays out child blocks in equal-width cells. The block uses Volto's standard shared-blocks shape — blocks is the dict of children, blocks\_layout.items is their order — and constrains the allowed types via allowedBlocks.
 
-:::listing{uid="616b625c-b79f-4881-8536-b67a9e401a7d" block="616b625c-b79f-4881-8536-b67a9e401a7d" headlineTag="h2" variation="default"}
-```fields
-{
- "query": []
-}
-```
-:::
+<block type="listing" uid="616b625c-b79f-4881-8536-b67a9e401a7d" block="616b625c-b79f-4881-8536-b67a9e401a7d" headlineTag="h2" variation="default" data='{"query":[]}' />
 
-:::slate{uid="7624cf59-05d0-4055-8f55-5fd6597d84b0"}
+<block type="slate" uid="7624cf59-05d0-4055-8f55-5fd6597d84b0">
+
 ```field-json:value
 [
  {
@@ -71,10 +65,13 @@ A responsive grid that lays out child blocks in equal-width cells. The block use
  }
 ]
 ```
-:::
 
-:::codeExample{uid="ref-grid-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="schema"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-grid-schema-javascript-af1095"]}
+</block>
+
+<block type="codeExample" uid="ref-grid-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="schema">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-grid-schema-javascript-af1095"]}'>
+
 ### Schema
 
 ```javascript
@@ -93,11 +90,15 @@ A responsive grid that lays out child blocks in equal-width cells. The block use
   }
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-grid-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="json-data"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-grid-json-data-json-5ff79e"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-grid-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="json-data">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-grid-json-data-json-5ff79e"]}'>
+
 ### JSON Block Data
 
 ```json
@@ -127,11 +128,15 @@ A responsive grid that lays out child blocks in equal-width cells. The block use
   }
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-grid-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="rendering"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-grid-rendering-jsx-f30d80","ref-grid-rendering-vue-1d61ab","ref-grid-rendering-svelte-8158ec"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-grid-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="rendering">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-grid-rendering-jsx-f30d80","ref-grid-rendering-vue-1d61ab","ref-grid-rendering-svelte-8158ec"]}'>
+
 ### React
 
 ```jsx
@@ -197,5 +202,7 @@ const items = computed(() => props.block.blocks_layout?.items || []);
   </div>
 </div>
 ```
-::::
-:::
+
+</region>
+
+</block>

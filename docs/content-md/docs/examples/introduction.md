@@ -44,54 +44,40 @@ blocks:
   - ref-introduction-rendering: codeExample
 ---
 
-:::title{uid="50727b9a-1f8a-4857-aab5-8acc6985bfc6"}
-:::
+<block type="title" uid="50727b9a-1f8a-4857-aab5-8acc6985bfc6" />
 
 Displays the page's title and description as a styled header. The introduction block has no content of its own — it reads title and description from the page metadata.
 
-:::image{uid="editor-screenshot" align="center" size="l" url="${src}" alt="${alt}"}
+<block type="image" uid="editor-screenshot" align="center" size="l" url="${src}" alt="${alt}">
+
 ![The introduction example block being edited in Volto Hydra](/docs/images/introduction-edit)
-:::
 
-:::separator{uid="d0438a28-aaaf-4db1-8887-c9b3351787d3"}
-```fields
-{
- "styles": {
-  "align": "full"
- }
-}
-```
-:::
+</block>
 
-:::introduction{uid="d35f209e-12c1-4a30-ae36-52f84a4a0b7b"}
+<block type="separator" uid="d0438a28-aaaf-4db1-8887-c9b3351787d3" data='{"styles":{"align":"full"}}' />
+
+<block type="introduction" uid="d35f209e-12c1-4a30-ae36-52f84a4a0b7b">
+
 ## Highlight Title H2&#x20;
-:::
+
+</block>
 
 Lorem ipsum vitae elit libero, a pharetra augue. Nulla vitae elit libero, a pharetra augue. Duis mollis, est non commodo luctus, nisi erat porttitor ligula, eget lacinia odio sem nec elit. Donec ullamcorper nulla non metus auctor fringilla. Vivamus sagittis lacus vel augue laoreet rutrum faucibus dolor auctor. Vestibulum id ligula porta felis euismod semper.
 
-:::separator{uid="cec08900-0334-4288-9ece-f5d15d4dd6f1"}
-```fields
-{
- "styles": {
-  "align": "full"
- }
-}
-```
-:::
+<block type="separator" uid="cec08900-0334-4288-9ece-f5d15d4dd6f1" data='{"styles":{"align":"full"}}' />
 
-:::slate{uid="26accd80-9715-43ea-9b7c-aa0b3be7d0da"}
-```fields
-{
- "styles": {}
-}
-```
+<block type="slate" uid="26accd80-9715-43ea-9b7c-aa0b3be7d0da" data='{"styles":{}}'>
+
 ## Headline H2
-:::
+
+</block>
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
 
-:::codeExample{uid="ref-introduction-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction" slotId="schema"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-introduction-schema-javascript-e14a03"]}
+<block type="codeExample" uid="ref-introduction-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction" slotId="schema">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-introduction-schema-javascript-e14a03"]}'>
+
 ### Schema
 
 ```javascript
@@ -108,11 +94,15 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
   }
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-introduction-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction" slotId="json-data"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-introduction-json-data-json-d959f7"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-introduction-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction" slotId="json-data">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-introduction-json-data-json-d959f7"]}'>
+
 ### JSON Block Data
 
 ```json
@@ -130,11 +120,15 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
   ]
 }
 ```
-::::
-:::
 
-:::codeExample{uid="ref-introduction-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction" slotId="rendering"}
-::::tabs[object_list]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-introduction-rendering-jsx-599242","ref-introduction-rendering-vue-53106b","ref-introduction-rendering-svelte-9e2b59"]}
+</region>
+
+</block>
+
+<block type="codeExample" uid="ref-introduction-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction" slotId="rendering">
+
+<region name="tabs" widget="object_list" repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" data='{"@ids":["ref-introduction-rendering-jsx-599242","ref-introduction-rendering-vue-53106b","ref-introduction-rendering-svelte-9e2b59"]}'>
+
 ### React
 
 ```jsx
@@ -184,5 +178,7 @@ defineProps({ block: Object });
   </div>
 </div>
 ```
-::::
-:::
+
+</region>
+
+</block>
