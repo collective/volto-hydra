@@ -142,7 +142,8 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 :::
 :::
 
-:::codeExample{uid="ref-heading-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="schema" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-heading-schema-javascript-f00bc9"]}
+:::codeExample{uid="ref-heading-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="schema"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-heading-schema-javascript-f00bc9"]}
 ### Schema
 
 ```javascript
@@ -188,9 +189,11 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
   }
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-heading-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="json-data" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-heading-json-data-json-87c435"]}
+:::codeExample{uid="ref-heading-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="json-data"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-heading-json-data-json-87c435"]}
 ### JSON Block Data
 
 ```json
@@ -200,9 +203,11 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
   "tag": "h2"
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-heading-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="rendering" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-heading-rendering-jsx-eb01a3","ref-heading-rendering-vue-754dc2","ref-heading-rendering-svelte-f5f71c"]}
+:::codeExample{uid="ref-heading-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="rendering"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-heading-rendering-jsx-eb01a3","ref-heading-rendering-vue-754dc2","ref-heading-rendering-svelte-f5f71c"]}
 ### React
 
 ```jsx
@@ -243,4 +248,5 @@ defineProps({ block: Object });
   {block.heading}
 </svelte:element>
 ```
+::::
 :::

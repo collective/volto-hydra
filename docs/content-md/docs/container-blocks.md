@@ -125,7 +125,8 @@ Both look and behave the same in the editor — selecting, dragging, nesting —
 
 Each child has its own `@type` and schema (from `blocks`). The blocks live in the parent's shared `blocks` dict; the region's name is a key in the parent's shared `blocks_layout` dict that holds the ordering:
 
-:::codeExample{uid="ce-8" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-8-javascript-d2f77e"]}
+:::codeExample{uid="ce-8"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-8-javascript-d2f77e"]}
 ### Javascript
 
 ```javascript
@@ -148,6 +149,7 @@ slides: {
   "blocks_layout": { "slides": ["slide-1", "slide-2"] }
 }
 ```
+::::
 :::
 
 A block can declare several `blocks_layout` regions; they all share the one `blocks` dict, and each region gets its own list under `blocks_layout`.
@@ -311,7 +313,8 @@ A container (or the page) can declare more than one **region** — each a schema
 
 Storage is a property of **each region, not the container**: every region independently chooses `widget: 'blocks_layout'` or `widget: 'object_list'`, and a single container may **mix** them — e.g. a `blocks_layout` region for body content alongside an `object_list` region for a set of inline cards. A blocks\_layout region keys its ordering inside the shared `blocks_layout` dict (its children in the shared `blocks` dict); an object\_list region stores its items inline on its own field. So "is this container object\_list or blocks\_layout?" is never a meaningful question — you look at the region. Every blocks\_layout region's children still share the one `blocks` dict; the regions only partition *ordering*.
 
-:::codeExample{uid="ce-14" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-14-javascript-3ea062"]}
+:::codeExample{uid="ce-14"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-14-javascript-3ea062"]}
 ### Javascript
 
 ```javascript
@@ -336,6 +339,7 @@ properties: {
   }
 }
 ```
+::::
 :::
 
 Each blocks field has its own `allowedBlocks` / `maxLength`. A declared field appears in the editor even when empty (it gets a seeded empty block so it is editable and a drop target).
@@ -350,7 +354,8 @@ The backend deserializer only saves values for **registered fields**. `blocks` a
 
 The other storage choice for a region. Instead of ordering in the shared `blocks_layout` dict, all items share one inline schema and are stored as an array with an ID field, at the field itself. (To place the array deeper — e.g. `block.table.rows` — nest the field inside a `widget: 'object'`; see below.)
 
-:::codeExample{uid="ce-21" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-21-javascript-83a0dc"]}
+:::codeExample{uid="ce-21"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-21-javascript-83a0dc"]}
 ### Javascript
 
 ```javascript
@@ -377,13 +382,15 @@ slides: {
   ]
 }
 ```
+::::
 :::
 
 ## object\_list with allowedBlocks: Typed Items
 
 When `allowedBlocks` is set on an `object_list`, items can have different types (like `blocks_layout`) but are still stored as an array. Each item's type is stored in the field specified by `typeField` (defaults to `'@type'`) and its schema is looked up from `blocks`:
 
-:::codeExample{uid="ce-24" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-24-javascript-6781ed"]}
+:::codeExample{uid="ce-24"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-24-javascript-6781ed"]}
 ### Javascript
 
 ```javascript
@@ -406,6 +413,7 @@ facets: {
   ]
 }
 ```
+::::
 :::
 
 Both `blocks_layout` and `object_list` look the same in the editing UI and blocks can be dragged between them — data is automatically adapted when moving between formats (ID fields added/stripped, type fields set appropriately).
@@ -416,7 +424,8 @@ A `widget: 'object'` field groups sub-fields under one key. Its `schema.properti
 
 An **`object_list`** inside an object stores its array at `object.<field>`:
 
-:::codeExample{uid="ce-29" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-29-javascript-dd9f7e"]}
+:::codeExample{uid="ce-29"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-29-javascript-dd9f7e"]}
 ### Javascript
 
 ```javascript
@@ -431,11 +440,13 @@ table: {
 // data
 { "@type": "slateTable", "table": { "rows": [ { "key": "r1", "cells": [ /* … */ ] } ] } }
 ```
+::::
 :::
 
 A **`blocks_layout`** inside an object makes the object its own mini-container: it holds its own `blocks` dict + `blocks_layout`, just like a columns/grid container block, one level deeper:
 
-:::codeExample{uid="ce-31" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-31-javascript-f90eb4"]}
+:::codeExample{uid="ce-31"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-31-javascript-f90eb4"]}
 ### Javascript
 
 ```javascript
@@ -446,6 +457,7 @@ table: { widget: 'object', schema: { properties: {
 { "@type": "slateTable",
   "table": { "blocks": { "b1": { /* … */ } }, "blocks_layout": { "body": ["b1"] } } }
 ```
+::::
 :::
 
 A **plain field** inside an object is edited in the canvas like any top-level field — address it inline with its `/`-path (`data-edit-text="content/headline"`, and the same for `data-edit-link` / `data-edit-media`). The object is *transparent*: `content/headline` writes back to `block.content.headline`, never a flat key. See [Field Path Syntax](visual-editing.md#field-path-syntax) for the full grammar (`/` object descent, `..` = parent block, `/field` = page).
@@ -825,7 +837,8 @@ All three can nest inside `object`, and a container may mix a `blocks_layout` re
 
 Add `data-block-uid` to each child element. You don't need to mark the container element itself:
 
-:::codeExample{uid="ce-41" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-41-javascript-85a3e1"]}
+:::codeExample{uid="ce-41"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-41-javascript-85a3e1"]}
 ### Html
 
 ```html
@@ -843,6 +856,7 @@ Add `data-block-uid` to each child element. You don't need to mark the container
   <a data-block-selector="+1">Next</a>
 </div>
 ```
+::::
 :::
 
 - **`data-block-add="bottom|right"`** — Controls where the '+' button appears. By default it will be the opposite of its parent. Use "bottom" for vertical stacking, "right" for horizontal.
@@ -853,7 +867,8 @@ Add `data-block-uid` to each child element. You don't need to mark the container
 
 Set `addMode: 'table'` for table-like structures (rows containing cells). This lets users add and remove columns as easily as rows. The rows live inside a `table` object field (`block.table.rows`) — no `dataPath`:
 
-:::codeExample{uid="ce-45" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-45-javascript-1cff8e"]}
+:::codeExample{uid="ce-45"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-45-javascript-1cff8e"]}
 ### Javascript
 
 ```javascript
@@ -877,6 +892,7 @@ table: {
     } },
 }
 ```
+::::
 :::
 
 ## Empty Blocks
@@ -895,7 +911,8 @@ Empty blocks are stripped before saving. Render them as empty space; Inka puts a
 
 The rules above mean a region with a `defaultBlockType`, or a single-entry `allowedBlocks`, is *never* empty — it always seeds a block of that type. To declare a region that should sit **empty until an editor adds something**, while still restricting **what** they can add, set **`defaultBlockType: "empty"`** and do **not** list `"empty"` in `allowedBlocks`:
 
-:::codeExample{uid="ce-53" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-53-javascript-f4d972"]}
+:::codeExample{uid="ce-53"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-53-javascript-f4d972"]}
 ### Javascript
 
 ```javascript
@@ -906,6 +923,7 @@ announcement: {
     defaultBlockType: 'empty',      // ...but empty by default (no band shown)
 }
 ```
+::::
 :::
 
 This is the one case where `"empty"` is a **configured** default rather than the fallback Inka inserts for an ambiguous region. The seed and the add diverge on purpose:
@@ -926,7 +944,8 @@ If your container renders its children by delegating each one to your central bl
 
 The trap is a **custom** container renderer that only expects specific child types — a `contextNavigation` that walks `navItem`/`listing` children, say. Don't hand-roll an allow-list that rejects anything else, or a seeded `empty` will throw and break the whole container. Route non-special children through your central dispatch instead of throwing:
 
-:::codeExample{uid="ce-62" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-62-javascript-4ebff8"]}
+:::codeExample{uid="ce-62"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-62-javascript-4ebff8"]}
 ### Javascript
 
 ```javascript
@@ -937,6 +956,7 @@ for (const childId of items) {
     else renderBlock(childId, child);   // empty (or anything else) → central dispatch, never throw
 }
 ```
+::::
 :::
 
 Two more things a renderer must survive once the user picks a type for a seeded empty:
@@ -950,7 +970,8 @@ You can have one container type whose children are all kept the same `@type`, wi
 
 Declare `itemTypeField` on the *blocks field* — its value names a sibling field on the same schema whose value drives every child's `@type`. The sibling field is typically rendered with `widget: 'blockTypeSelect'`, which computes its `choices` from the blocks field's `allowedBlocks` at render time:
 
-:::codeExample{uid="ce-68" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-68-javascript-cdad0c"]}
+:::codeExample{uid="ce-68"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-68-javascript-cdad0c"]}
 ### Javascript
 
 ```javascript
@@ -981,6 +1002,7 @@ blocks: {
     },
 }
 ```
+::::
 :::
 
 The relationship is local: read the schema and you can see "the children of `slides` get their `@type` from `variation`" right next to the field declaration. Works the same for `widget: 'blocks_layout'` and `widget: 'object_list'` children.
@@ -989,7 +1011,8 @@ The relationship is local: read the schema and you can see "the children of `sli
 
 On top of type syncing you can also have field *values* centrally controlled at the parent — set once on the parent, applied to every child. Add ONE enhancer on the parent:
 
-:::codeExample{uid="ce-72" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-72-javascript-521655"]}
+:::codeExample{uid="ce-72"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-72-javascript-521655"]}
 ### Javascript
 
 ```javascript
@@ -1003,6 +1026,7 @@ gridBlock: {
     schemaEnhancer: { inheritSchemaFrom: {} },
 }
 ```
+::::
 :::
 
 `inheritSchemaFrom` does two things automatically:
@@ -1012,7 +1036,8 @@ gridBlock: {
 
 The parent declares **what it claims** per child block type via `parentControlled`. If absent, the default is: parent claims everything *not* listed in the child's `fieldMappings['@default']` mapping. The default works for typical cases; set `parentControlled` only when you want a different split (e.g. keep a meta-toggle field editable per-child):
 
-:::codeExample{uid="ce-76" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-76-javascript-6b52c5"]}
+:::codeExample{uid="ce-76"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-76-javascript-6b52c5"]}
 ### Javascript
 
 ```javascript
@@ -1030,6 +1055,7 @@ listing: {
     },
 }
 ```
+::::
 :::
 
 When `parentControlled[childType]` is set, it **replaces** the `@default` fallback for that child type. Both sides — the parent's "Item Defaults" fieldset and the child's hidden fields — are computed from the same single rule, so they can never get out of sync.

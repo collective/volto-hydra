@@ -89,7 +89,8 @@ A listing block fetches content from the server (e.g. latest news) and renders e
 
 You tell it which block types need fetching via a `fetchItems` map — keys are block types, values are fetcher functions. This means you can have different kinds of listings (Plone queries, RSS feeds, etc.) each with their own fetcher:
 
-:::codeExample{uid="ce-4" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-4-javascript-17afd4"]}
+:::codeExample{uid="ce-4"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-4-javascript-17afd4"]}
 ### Javascript
 
 ```javascript
@@ -103,6 +104,7 @@ const { items, paging } = await expandListingBlocks(layout, {
 });
 // paging = { totalPages, totalItems, currentPage, prev, next, pages, seen }
 ```
+::::
 :::
 
 :::separator{uid="sep-5"}
@@ -112,7 +114,8 @@ const { items, paging } = await expandListingBlocks(layout, {
 
 A grid can have a mix of listing and static blocks sharing a single paging. The `staticBlocks` helper wraps non-listing blocks so they participate in the shared page window. The listings use Suspense so they load client-side:
 
-:::codeExample{uid="ce-8" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-8-jsx-37efcc"]}
+:::codeExample{uid="ce-8"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-8-jsx-37efcc"]}
 ### Jsx
 
 ```jsx
@@ -157,6 +160,7 @@ async function ListingItems({ id, blocks, paging, seen, fetchItems, onPaging }) 
   return result.items.map(item => <Block key={item['@uid']} block={item} />);
 }
 ```
+::::
 :::
 
 ## expandListingBlocks Options
@@ -461,7 +465,8 @@ A listing with no `querystring` defaults to showing the current folder's content
 
 `ploneFetchItems` also normalizes Plone's image data — packaging `image_field` + `image_scales` into a self-contained `image` object with `@id` duplicated inside (needed for URL resolution):
 
-:::codeExample{uid="ce-16" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-16-json-38bb3a"]}
+:::codeExample{uid="ce-16"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-16-json-38bb3a"]}
 ### Json
 
 ```json
@@ -471,6 +476,7 @@ A listing with no `querystring` defaults to showing the current folder's content
 // After normalization:
 { "@id": "/news/article", "image": { "@id": "/news/article", "image_field": "image", "image_scales": { "...": "..." } } }
 ```
+::::
 :::
 
 This self-contained object has everything needed to resolve image URLs with scale support — see the Nuxt example's `composables/imageProps.js` for one approach.
@@ -817,7 +823,8 @@ The same `fetchItems` seam powers other "collection" blocks — each is just a f
 
 Register them alongside `listing` in the `fetchItems` map:
 
-:::codeExample{uid="ce-23" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-23-json-6d0894"]}
+:::codeExample{uid="ce-23"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-23-json-6d0894"]}
 ### Javascript
 
 ```javascript
@@ -831,6 +838,7 @@ const { items } = await expandListingBlocks(layout, {
   },
 });
 ```
+::::
 :::
 
 The **Search Shortcuts** link target reads Volto's search-block facet params — a page with a `search` block picks up `?facet.<index>=<value>` from the URL. The block's *index* uses the existing `select_querystring_field` widget; the optional *this-page field* uses `schemaFieldSelect` (a `/@types`-backed field dropdown, parameterized by `fieldType`), which **Related Items** also uses with `fieldType: 'relation'`.
@@ -1108,7 +1116,8 @@ Built-in item types and the fields they expose:
 ```
 :::
 
-:::codeExample{uid="ce-29" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-29-json-a7c4dc"]}
+:::codeExample{uid="ce-29"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-29-json-a7c4dc"]}
 ### Json
 
 ```json
@@ -1121,13 +1130,15 @@ Built-in item types and the fields they expose:
 
 Types: string (array→join, image→URL), link (→[{@id}]), image (pass through)
 ```
+::::
 :::
 
 ## Item Type Selection
 
 Use `variation` on the listing block to control what `@type` expanded items get. Listings reuse the same `inheritSchemaFrom` recipe as container blocks (see [Container Blocks › Synchronised Block Types](container-blocks.md#synchronised-block-types-in-a-container)) but differ in one structural way: there's no blocks field to declare `itemTypeField` on, since listing children are *virtual* (produced from query results at render time, not authored as page data). Instead, declare the typeField directly on the `inheritSchemaFrom` recipe:
 
-:::codeExample{uid="ce-32" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-32-javascript-f6757f"]}
+:::codeExample{uid="ce-32"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-32-javascript-f6757f"]}
 ### Javascript
 
 ```javascript
@@ -1153,6 +1164,7 @@ listing: {
     },
 }
 ```
+::::
 :::
 
 `filterConvertibleFrom: '@default'` restricts the dropdown to types that have a `fieldMappings['@default']` entry — i.e. types that can be populated from the canonical content fields (`@id`, `title`, `description`, `image`) that listing queries return. Each item type's `fieldMappings['@default']` (on its own block config) defines how those source fields land on its schema; that static mapping is enough to render listings. Adding `mappingField` to the enhancer exposes the `FieldMappingWidget` so the editor can override the mapping per listing instance.
@@ -1163,7 +1175,8 @@ The widget saves its output as `fieldMapping` (singular) on the block data. `exp
 
 A container (e.g. `gridBlock`) can mix **manual children** AND **a listing** as children. Add `'listing'` to the blocks field's `allowedBlocks`, and the parent's typeField propagates everywhere:
 
-:::codeExample{uid="ce-37" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-37-javascript-2ec596"]}
+:::codeExample{uid="ce-37"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-37-javascript-2ec596"]}
 ### Javascript
 
 ```javascript
@@ -1184,6 +1197,7 @@ gridBlock: {
     schemaEnhancer: { inheritSchemaFrom: {} },
 }
 ```
+::::
 :::
 
 `filterConvertibleFrom: '@default'` keeps `'listing'` out of the dropdown (it's a structural container, not an item type, so it has no `fieldMappings['@default']`) but it stays in `allowedBlocks` so a listing block can still exist as a structural child. The editor sees "Teaser / Image / Summary" in the picker; the listing is a structural choice they don't have to think about.
@@ -1199,7 +1213,8 @@ The sync walks recursively — if the listing held nested containers with their 
 
 If your frontend embeds state in the URL path (like pagination), you need to tell hydra.js how to transform the frontend path to the API/admin path. Otherwise, the admin will try to navigate to URLs that don't exist in the CMS.
 
-:::codeExample{uid="ce-44" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-44-javascript-82ad8e"]}
+:::codeExample{uid="ce-44"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-44-javascript-82ad8e"]}
 ### Javascript
 
 ```javascript
@@ -1210,6 +1225,7 @@ const bridge = initBridge({
     pathToApiPath: (path) => path.replace(/\/@pg_[^/]+_\d+/, ''),
 });
 ```
+::::
 :::
 
 The `pathToApiPath` function is called whenever hydra.js sends a `PATH_CHANGE` message to the admin, allowing your frontend to strip or transform URL segments that are frontend-specific (like pagination, filters, or other client-side state).

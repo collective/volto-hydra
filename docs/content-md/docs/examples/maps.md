@@ -193,7 +193,8 @@ https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d22634.237371369458!2d11.58
 :::slate{uid="f9dec030-b72d-4940-af4c-6dc123cea7a6"}
 :::
 
-:::codeExample{uid="ref-maps-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-maps" slotId="schema" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-maps-schema-javascript-45f9f0"]}
+:::codeExample{uid="ref-maps-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-maps" slotId="schema"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-maps-schema-javascript-45f9f0"]}
 ### Schema
 
 ```javascript
@@ -213,9 +214,11 @@ https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d22634.237371369458!2d11.58
   }
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-maps-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-maps" slotId="json-data" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-maps-json-data-json-04466f"]}
+:::codeExample{uid="ref-maps-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-maps" slotId="json-data"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-maps-json-data-json-04466f"]}
 ### JSON Block Data
 
 ```json
@@ -225,9 +228,11 @@ https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d22634.237371369458!2d11.58
   "title": "Ploneconf 2022 was in Namur, Belgium"
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-maps-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-maps" slotId="rendering" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-maps-rendering-jsx-7fbc14","ref-maps-rendering-vue-85ab6d","ref-maps-rendering-svelte-4d9083"]}
+:::codeExample{uid="ref-maps-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-maps" slotId="rendering"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-maps-rendering-jsx-7fbc14","ref-maps-rendering-vue-85ab6d","ref-maps-rendering-svelte-4d9083"]}
 ### React
 
 ```jsx
@@ -295,4 +300,5 @@ defineProps({ block: Object });
   {/if}
 </div>
 ```
+::::
 :::

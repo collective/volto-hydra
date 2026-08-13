@@ -73,7 +73,8 @@ A responsive grid that lays out child blocks in equal-width cells. The block use
 ```
 :::
 
-:::codeExample{uid="ref-grid-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="schema" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-grid-schema-javascript-af1095"]}
+:::codeExample{uid="ref-grid-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="schema"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-grid-schema-javascript-af1095"]}
 ### Schema
 
 ```javascript
@@ -92,9 +93,11 @@ A responsive grid that lays out child blocks in equal-width cells. The block use
   }
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-grid-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="json-data" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-grid-json-data-json-5ff79e"]}
+:::codeExample{uid="ref-grid-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="json-data"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-grid-json-data-json-5ff79e"]}
 ### JSON Block Data
 
 ```json
@@ -124,9 +127,11 @@ A responsive grid that lays out child blocks in equal-width cells. The block use
   }
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-grid-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="rendering" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-grid-rendering-jsx-f30d80","ref-grid-rendering-vue-1d61ab","ref-grid-rendering-svelte-8158ec"]}
+:::codeExample{uid="ref-grid-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="rendering"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-grid-rendering-jsx-f30d80","ref-grid-rendering-vue-1d61ab","ref-grid-rendering-svelte-8158ec"]}
 ### React
 
 ```jsx
@@ -192,4 +197,5 @@ const items = computed(() => props.block.blocks_layout?.items || []);
   </div>
 </div>
 ```
+::::
 :::

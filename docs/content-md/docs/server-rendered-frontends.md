@@ -70,7 +70,8 @@ The fix is to update only the smallest block that changed, and let the rest of t
 
 ## How it works
 
-:::codeExample{uid="ce-7" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-7-text-316e7d"]}
+:::codeExample{uid="ce-7"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-7-text-316e7d"]}
 ### Text
 
 ```text
@@ -95,6 +96,7 @@ hydra.js bridge   ────►    FORM_DATA postMessage
                            bridge swaps [data-block-uid=X].outerHTML
                            (or renderContainer.innerHTML for page unit)
 ```
+::::
 :::
 
 ### The diff rule (built into `hydra.js`)
@@ -118,7 +120,8 @@ That dispatch must also handle `@type: "empty"` — the placeholder Inka seeds i
 
 ## Worked example: Astro
 
-:::codeExample{uid="ce-17" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-17-astro-6cfb06"]}
+:::codeExample{uid="ce-17"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-17-astro-6cfb06"]}
 ### Js
 
 ```js
@@ -132,9 +135,11 @@ initBridge({
   renderContainer: '#content',   // optional, default '#content'
 });
 ```
+::::
 :::
 
-:::codeExample{uid="ce-18" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-18-ts-ad6a37"]}
+:::codeExample{uid="ce-18"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-18-ts-ad6a37"]}
 ### Astro
 
 ```astro
@@ -154,9 +159,11 @@ const uid  = block?.['@uid'];
   {/* ...one branch per block type... */}
 </div>
 ```
+::::
 :::
 
-:::codeExample{uid="ce-19" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-19-ts-892388"]}
+:::codeExample{uid="ce-19"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-19-ts-892388"]}
 ### Ts
 
 ```ts
@@ -190,13 +197,15 @@ function findBlockById(formData, blockId) {
   return null;
 }
 ```
+::::
 :::
 
 The full working example lives at [`docs/examples/test-astro/`](https://github.com/collective/volto-hydra/tree/main/docs/examples/test-astro) with block components in [`docs/examples/examples/astro/`](https://github.com/collective/volto-hydra/tree/main/docs/examples/examples/astro).
 
 ## Worked example: PHP
 
-:::codeExample{uid="ce-22" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-22-php-e87720"]}
+:::codeExample{uid="ce-22"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-22-php-e87720"]}
 ### Php
 
 ```php
@@ -208,9 +217,11 @@ The full working example lives at [`docs/examples/test-astro/`](https://github.c
   ?>
 </div>
 ```
+::::
 :::
 
-:::codeExample{uid="ce-23" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-23-php-9a04e4"]}
+:::codeExample{uid="ce-23"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-23-php-9a04e4"]}
 ### Php
 
 ```php
@@ -219,9 +230,11 @@ The full working example lives at [`docs/examples/test-astro/`](https://github.c
   <?php foreach ($block['value'] ?? [] as $node) include __DIR__ . '/_slate_node.php'; ?>
 </div>
 ```
+::::
 :::
 
-:::codeExample{uid="ce-24" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-24-php-ebbd45"]}
+:::codeExample{uid="ce-24"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-24-php-ebbd45"]}
 ### Php
 
 ```php
@@ -255,11 +268,13 @@ function find_block_by_id($data, $blockId) {
     return null;
 }
 ```
+::::
 :::
 
 The HTML page that loads in the editor iframe just needs to pull in the bridge and call `initBridge` with the endpoint:
 
-:::codeExample{uid="ce-26" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-26-html-476b8c"]}
+:::codeExample{uid="ce-26"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-26-html-476b8c"]}
 ### Html
 
 ```html
@@ -280,6 +295,7 @@ The HTML page that loads in the editor iframe just needs to pull in the bridge a
 </body>
 </html>
 ```
+::::
 :::
 
 ## Adapting for Django / Rails / Laravel / Symfony / Go

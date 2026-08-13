@@ -65,7 +65,8 @@ Detect the admin iframe and load the bridge only when needed. `window.name` is s
 
 This persists across SPA navigation within the iframe, allowing your frontend to detect it's in the admin even after client-side route changes. In view mode, render from your API immediately but still load the bridge for navigation tracking. In edit mode, wait for `onEditChange` before rendering.
 
-:::codeExample{uid="ce-7" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-7-javascript-f6a08c"]}
+:::codeExample{uid="ce-7"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-7-javascript-f6a08c"]}
 ### Javascript
 
 ```javascript
@@ -100,6 +101,7 @@ if (inAdminIframe) {
     });
 }
 ```
+::::
 :::
 
 ## Authentication
@@ -108,7 +110,8 @@ As soon as the editor logs into the hydra editor, your frontend should use the s
 
 The `access_token` is passed as a URL parameter on initial load and automatically stored in `sessionStorage` by hydra.js. On SPA navigation, the URL param is gone but the token persists in `sessionStorage`. Use the `getAccessToken()` helper:
 
-:::codeExample{uid="ce-11" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-11-javascript-060e3a"]}
+:::codeExample{uid="ce-11"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-11-javascript-060e3a"]}
 ### Javascript
 
 ```javascript
@@ -118,11 +121,13 @@ const token = getAccessToken();
 // Returns token from URL param (if present)
 // or sessionStorage (for SPA navigation)
 ```
+::::
 :::
 
 Example using Next.js 14 and ploneClient:
 
-:::codeExample{uid="ce-13" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-13-javascript-852336"]}
+:::codeExample{uid="ce-13"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-13-javascript-852336"]}
 ### Javascript
 
 ```javascript
@@ -147,6 +152,7 @@ export default function Blog({ params }) {
   return <div>{data.title}</div>;
 }
 ```
+::::
 :::
 
 ## Preventing Reloads

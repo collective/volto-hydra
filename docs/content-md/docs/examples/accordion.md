@@ -2018,7 +2018,8 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 ::::
 :::
 
-:::codeExample{uid="ref-accordion-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-accordion" slotId="schema" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-accordion-schema-javascript-105cd5"]}
+:::codeExample{uid="ref-accordion-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-accordion" slotId="schema"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-accordion-schema-javascript-105cd5"]}
 ### Schema
 
 ```javascript
@@ -2051,9 +2052,11 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
   }
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-accordion-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-accordion" slotId="json-data" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-accordion-json-data-json-f4f899"]}
+:::codeExample{uid="ref-accordion-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-accordion" slotId="json-data"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-accordion-json-data-json-f4f899"]}
 ### JSON Block Data
 
 ```json
@@ -2087,9 +2090,11 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
   ]
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-accordion-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-accordion" slotId="rendering" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-accordion-rendering-jsx-951c40","ref-accordion-rendering-vue-e897ff","ref-accordion-rendering-svelte-a58cd5"]}
+:::codeExample{uid="ref-accordion-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-accordion" slotId="rendering"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-accordion-rendering-jsx-951c40","ref-accordion-rendering-vue-e897ff","ref-accordion-rendering-svelte-a58cd5"]}
 ### React
 
 ```jsx
@@ -2192,4 +2197,5 @@ function toggle(id) { openPanels[id] = !openPanels[id]; }
   {/each}
 </div>
 ```
+::::
 :::

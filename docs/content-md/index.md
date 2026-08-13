@@ -130,7 +130,8 @@ Secure, scalable Plone backend. Host anywhere, control your costs and security.
 
 ## Quick Start
 
-:::codeExample{uid="quickstart-code" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["tab-nuxt","tab-nextjs","tab-svelte","tab-vanilla","tab-astro"]}
+:::codeExample{uid="quickstart-code"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["tab-nuxt","tab-nextjs","tab-svelte","tab-vanilla","tab-astro"]}
 ### Nuxt.js
 
 ```vue
@@ -417,6 +418,7 @@ export const POST = async ({ request }) => {
   return new Response(html, { headers: { 'Content-Type': 'text/html' } })
 }
 ```
+::::
 :::
 
 :::slider{uid="303984b4-693a-408f-83f7-5a88b243d7db" autoplayDelay=4000 autoplayEnabled=false autoplayJump=false}

@@ -41,7 +41,8 @@ Renders entries from an external RSS feed. Its items are fetched at render time 
 :::rssFeed{uid="rss-live-1" feedUrl="https://pypi.org/rss/project/plone/releases.xml" variation="default"}
 :::
 
-:::codeExample{uid="ref-rssFeed-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="schema" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-rssFeed-schema-javascript-d79cf2"]}
+:::codeExample{uid="ref-rssFeed-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="schema"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-rssFeed-schema-javascript-d79cf2"]}
 ### Schema
 
 ```javascript
@@ -90,9 +91,11 @@ Renders entries from an external RSS feed. Its items are fetched at render time 
   }
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-rssFeed-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="json-data" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-rssFeed-json-data-json-c55bf4"]}
+:::codeExample{uid="ref-rssFeed-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="json-data"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-rssFeed-json-data-json-c55bf4"]}
 ### JSON Block Data
 
 ```json
@@ -103,13 +106,15 @@ Renders entries from an external RSS feed. Its items are fetched at render time 
   "variation": "summary"
 }
 ```
+::::
 :::
 
 :::slate{uid="ref-rssFeed-rendering-intro" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="rendering"}
 This block has no bespoke renderer. Add its fetcher to your fetchItems map (keyed by @type) and expandListingBlocks expands it in any region you render — the same seam that powers [listings](/docs/listings) and other collection blocks. See [Custom Blocks](/docs/custom-blocks) to define the block type. Only the fetcher below is block-specific.
 :::
 
-:::codeExample{uid="ref-rssFeed-fetcher" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="rendering" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-rssFeed-fetcher-javascript-7f0034"]}
+:::codeExample{uid="ref-rssFeed-fetcher" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="rendering"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-rssFeed-fetcher-javascript-7f0034"]}
 ### Fetcher
 
 ```javascript
@@ -139,9 +144,11 @@ function parseRssEntries(xml) {
   return out;
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-rssFeed-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="rendering" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-rssFeed-rendering-javascript-df4061"]}
+:::codeExample{uid="ref-rssFeed-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="rendering"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-rssFeed-rendering-javascript-df4061"]}
 ### Render
 
 ```javascript
@@ -157,4 +164,5 @@ const { items } = await expandListingBlocks(regionBlockIds, {
 });
 items.forEach((item) => renderBlock(item)); // your normal per-block renderer
 ```
+::::
 :::

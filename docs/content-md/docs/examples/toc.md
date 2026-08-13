@@ -216,7 +216,8 @@ Text can be **bold** or *italic*.
 ```
 :::
 
-:::codeExample{uid="ref-toc-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc" slotId="schema" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-toc-schema-javascript-496d15"]}
+:::codeExample{uid="ref-toc-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc" slotId="schema"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-toc-schema-javascript-496d15"]}
 ### Schema
 
 ```javascript
@@ -270,9 +271,11 @@ Text can be **bold** or *italic*.
   }
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-toc-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc" slotId="json-data" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-toc-json-data-json-aaa910"]}
+:::codeExample{uid="ref-toc-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc" slotId="json-data"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-toc-json-data-json-aaa910"]}
 ### JSON Block Data
 
 ```json
@@ -287,9 +290,11 @@ Text can be **bold** or *italic*.
   ]
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-toc-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc" slotId="rendering" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-toc-rendering-jsx-ee2124","ref-toc-rendering-vue-12aef2","ref-toc-rendering-svelte-397c7f"]}
+:::codeExample{uid="ref-toc-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc" slotId="rendering"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-toc-rendering-jsx-ee2124","ref-toc-rendering-vue-12aef2","ref-toc-rendering-svelte-397c7f"]}
 ### React
 
 ```jsx
@@ -405,4 +410,5 @@ const entries = computed(() => {
   {/if}
 </nav>
 ```
+::::
 :::

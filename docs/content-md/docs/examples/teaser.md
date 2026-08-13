@@ -210,7 +210,8 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 ```
 :::
 
-:::codeExample{uid="ref-teaser-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="schema" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-teaser-schema-javascript-bfff08"]}
+:::codeExample{uid="ref-teaser-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="schema"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-teaser-schema-javascript-bfff08"]}
 ### Schema
 
 ```javascript
@@ -251,9 +252,11 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
   }
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-teaser-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="json-data" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-teaser-json-data-json-7f117c"]}
+:::codeExample{uid="ref-teaser-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="json-data"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-teaser-json-data-json-7f117c"]}
 ### JSON Block Data
 
 ```json
@@ -273,9 +276,11 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
   "overwrite": true
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-teaser-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="rendering" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-teaser-rendering-jsx-d1dd76","ref-teaser-rendering-vue-fc123a","ref-teaser-rendering-svelte-bf19cf"]}
+:::codeExample{uid="ref-teaser-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="rendering"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-teaser-rendering-jsx-d1dd76","ref-teaser-rendering-vue-fc123a","ref-teaser-rendering-svelte-bf19cf"]}
 ### React
 
 ```jsx
@@ -380,4 +385,5 @@ const imageSrc = computed(() => {
   </div>
 {/if}
 ```
+::::
 :::

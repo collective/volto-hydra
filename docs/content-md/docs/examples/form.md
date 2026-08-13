@@ -82,7 +82,8 @@ A multi-field form with configurable field types, validation, and email submissi
 ```
 :::
 
-:::codeExample{uid="ref-form-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form" slotId="schema" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-form-schema-javascript-2285e7"]}
+:::codeExample{uid="ref-form-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form" slotId="schema"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-form-schema-javascript-2285e7"]}
 ### Schema
 
 ```javascript
@@ -565,9 +566,11 @@ A multi-field form with configurable field types, validation, and email submissi
   }
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-form-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form" slotId="json-data" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-form-json-data-json-6e9c29"]}
+:::codeExample{uid="ref-form-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form" slotId="json-data"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-form-json-data-json-6e9c29"]}
 ### JSON Block Data
 
 ```json
@@ -617,9 +620,11 @@ A multi-field form with configurable field types, validation, and email submissi
   ]
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-form-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form" slotId="rendering" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-form-rendering-jsx-29590c","ref-form-rendering-vue-3f1bde","ref-form-rendering-svelte-f8f39b"]}
+:::codeExample{uid="ref-form-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form" slotId="rendering"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-form-rendering-jsx-29590c","ref-form-rendering-vue-3f1bde","ref-form-rendering-svelte-f8f39b"]}
 ### React
 
 ```jsx
@@ -827,4 +832,5 @@ const fields = computed(() => expandTemplatesSync(props.block.subblocks || [], {
   <button type="submit" data-edit-text="submit_label">{block.submit_label || 'Submit'}</button>
 </form>
 ```
+::::
 :::

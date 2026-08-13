@@ -90,7 +90,8 @@ Lorem ipsum vitae elit libero, a pharetra augue. Nulla vitae elit libero, a phar
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
 
-:::codeExample{uid="ref-introduction-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction" slotId="schema" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-introduction-schema-javascript-e14a03"]}
+:::codeExample{uid="ref-introduction-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction" slotId="schema"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-introduction-schema-javascript-e14a03"]}
 ### Schema
 
 ```javascript
@@ -107,9 +108,11 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
   }
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-introduction-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction" slotId="json-data" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-introduction-json-data-json-d959f7"]}
+:::codeExample{uid="ref-introduction-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction" slotId="json-data"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-introduction-json-data-json-d959f7"]}
 ### JSON Block Data
 
 ```json
@@ -127,9 +130,11 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
   ]
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-introduction-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction" slotId="rendering" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-introduction-rendering-jsx-599242","ref-introduction-rendering-vue-53106b","ref-introduction-rendering-svelte-9e2b59"]}
+:::codeExample{uid="ref-introduction-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction" slotId="rendering"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-introduction-rendering-jsx-599242","ref-introduction-rendering-vue-53106b","ref-introduction-rendering-svelte-9e2b59"]}
 ### React
 
 ```jsx
@@ -179,4 +184,5 @@ defineProps({ block: Object });
   </div>
 </div>
 ```
+::::
 :::

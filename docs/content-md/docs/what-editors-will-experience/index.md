@@ -91,7 +91,8 @@ If something in this guide doesn't match what you see, it's almost always becaus
 
 The editor screen has three regions:
 
-:::codeExample{uid="ce-8" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-8-text-6b4738"]}
+:::codeExample{uid="ce-8"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-8-text-6b4738"]}
 ### Text
 
 ```text
@@ -105,6 +106,7 @@ The editor screen has three regions:
 │           │                                  │              │
 └───────────┴──────────────────────────────────┴──────────────┘
 ```
+::::
 :::
 
 - **Toolbar (left)** — saving, navigating to other pages, site settings. Standard Volto, plus the **Frontend switcher** (see below).

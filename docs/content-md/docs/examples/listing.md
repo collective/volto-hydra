@@ -179,7 +179,8 @@ Displays a list of content items from a query. The listing block fetches items f
 ::::
 :::
 
-:::codeExample{uid="ref-listing-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="schema" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-listing-schema-javascript-bd0476"]}
+:::codeExample{uid="ref-listing-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="schema"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-listing-schema-javascript-bd0476"]}
 ### Schema
 
 ```javascript
@@ -255,9 +256,11 @@ Displays a list of content items from a query. The listing block fetches items f
   }
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-listing-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="json-data" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-listing-json-data-json-829696"]}
+:::codeExample{uid="ref-listing-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="json-data"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-listing-json-data-json-829696"]}
 ### JSON Block Data
 
 ```json
@@ -288,9 +291,11 @@ Displays a list of content items from a query. The listing block fetches items f
   "image": "/news/my-article/@@images/image-800x600.jpg"
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-listing-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="rendering" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-listing-rendering-jsx-f33c73","ref-listing-rendering-vue-3c4a00","ref-listing-rendering-svelte-aca768"]}
+:::codeExample{uid="ref-listing-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="rendering"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-listing-rendering-jsx-f33c73","ref-listing-rendering-vue-3c4a00","ref-listing-rendering-svelte-aca768"]}
 ### React
 
 ```jsx
@@ -377,4 +382,5 @@ watch(() => props.block.querystring, async () => {
   {/each}
 </div>
 ```
+::::
 :::

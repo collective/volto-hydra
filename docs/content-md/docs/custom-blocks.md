@@ -124,7 +124,8 @@ Define custom block types directly in your frontend configuration via the `block
 
 `initBridge(options)` opens the iframe bridge and registers your frontend's page and block configuration with the admin. Call it once during page setup when running inside the admin iframe.
 
-:::codeExample{uid="ce-4" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-4-js-dec45b"]}
+:::codeExample{uid="ce-4"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-4-js-dec45b"]}
 ### Js
 
 ```js
@@ -139,13 +140,15 @@ const bridge = initBridge({
   debug: false,
 });
 ```
+::::
 :::
 
 ### `page` — page-level blocks fields
 
 Defines the **blocks fields of a page** where blocks can live. `page.schema.properties` is keyed by field name; each `widget: 'blocks_layout'` entry is one blocks field. The field name is the key inside the page's `blocks_layout` dict (the default field is `items`), so they all persist inside the registered `blocks_layout` field.
 
-:::codeExample{uid="ce-7" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-7-javascript-f817db"]}
+:::codeExample{uid="ce-7"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-7-javascript-f817db"]}
 ### Js
 
 ```js
@@ -159,6 +162,7 @@ page: {
   },
 }
 ```
+::::
 :::
 
 Per-field options:
@@ -181,7 +185,8 @@ Defaults and side effects:
 
 Defines or overrides individual block types. Each key is the block type name (matching what appears in `allowedBlocks` and `@type` on saved blocks).
 
-:::codeExample{uid="ce-14" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-14-js-c5449c"]}
+:::codeExample{uid="ce-14"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-14-js-c5449c"]}
 ### Js
 
 ```js
@@ -199,6 +204,7 @@ blocks: {
   },
 }
 ```
+::::
 :::
 
 Per-block options (most are passed through to Volto's block config):
@@ -229,7 +235,8 @@ The `Bridge` instance, which exposes additional API methods you can call from th
 
 ## Defining a custom block
 
-:::codeExample{uid="ce-23" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-23-javascript-a47dd8"]}
+:::codeExample{uid="ce-23"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-23-javascript-a47dd8"]}
 ### Javascript
 
 ```javascript
@@ -284,6 +291,7 @@ const bridge = initBridge({
     },
 });
 ```
+::::
 :::
 
 Child block types (like `slide` above) must be defined at the top level of `blocks`. You can also:
@@ -299,7 +307,8 @@ Child block types (like `slide` above) must be defined at the top level of `bloc
 
 Schema enhancers modify block schemas dynamically:
 
-:::codeExample{uid="ce-29" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-29-javascript-f2ef0c"]}
+:::codeExample{uid="ce-29"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-29-javascript-f2ef0c"]}
 ### Javascript
 
 ```javascript
@@ -324,6 +333,7 @@ const bridge = initBridge({
     },
 });
 ```
+::::
 :::
 
 **`fieldRules`** — add, remove, or conditionally modify field definitions. The value for each rule key can be:
@@ -1004,7 +1014,8 @@ Two extras drive **position-** and \*\*type-\*\*aware rules:
 - The virtual field **`@index`** reads a block's ordinal position within its parent `object_list` region (a `number` surface) — `{ '@index': { lt: 1 } }` means "first in my region", and `../@index` is the parent block's index. Distinct from a region's `count` (which counts children).
 - A rule whose **`set` is a block-type NAME** (a string) rather than a field definition is a **`@type` rule** — it changes the item's *type* by position, not a field. Declared as `typeRule` on a typed `object_list`; see [`typeRule` — position picks a typed item's `@type`](#typerule--position-picks-a-typed-items-type). The retype is applied by CONVERSION (a schema enhancer can't rewrite stored `@type`), which brings up the confirm described under [Drag / paste via conversion](#drag--paste-via-conversion).
 
-:::codeExample{uid="ce-38" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-38-javascript-4acd08"]}
+:::codeExample{uid="ce-38"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-38-javascript-4acd08"]}
 ### Javascript
 
 ```javascript
@@ -1022,11 +1033,13 @@ schemaEnhancer: {
     },
 }
 ```
+::::
 :::
 
 For a **region** (an `object_list` field, or a single `blocks_layout` region named by its region key), the array surface is its **child block types**, and the numeric operators **count** that region's children — only its own, never a cross-region total:
 
-:::codeExample{uid="ce-40" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-40-javascript-c0236e"]}
+:::codeExample{uid="ce-40"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-40-javascript-c0236e"]}
 ### Javascript
 
 ```javascript
@@ -1041,11 +1054,13 @@ schemaEnhancer: {
     },
 }
 ```
+::::
 :::
 
 To condition on a block's **position** rather than a field value, use the virtual field **`@index`** — a block's ordinal index within its parent `object_list` region (a `number` surface). It composes with the block-step grammar, so `../@index` is the parent block's index. Unlike the region's numeric ops (which *count* children), `@index` is *where this block sits*:
 
-:::codeExample{uid="ce-42" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-42-javascript-bdaefa"]}
+:::codeExample{uid="ce-42"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-42-javascript-bdaefa"]}
 ### Javascript
 
 ```javascript
@@ -1060,6 +1075,7 @@ schemaEnhancer: {
     },
 }
 ```
+::::
 :::
 
 A block that isn't an `object_list` item yields an unset `@index`, so comparisons are simply false (never an error). `lt: 1` is "first"; `lt: 2` is "first two", etc.
@@ -1086,7 +1102,8 @@ Each key in `fieldMappings` is either a **specific block type name**, **`@defaul
 
 Use these when blocks share fields that aren't part of the `@default` set — for example, facet types sharing `{ title, field, hidden }` or form field types sharing `{ label, description, required }`.
 
-:::codeExample{uid="ce-53" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-53-javascript-6ea81c"]}
+:::codeExample{uid="ce-53"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-53-javascript-6ea81c"]}
 ### Javascript
 
 ```javascript
@@ -1109,13 +1126,15 @@ image: {
 selectFacet:  { fieldMappings: { checkboxFacet: { title: 'title', field: 'field', hidden: 'hidden' } } },
 checkboxFacet: { fieldMappings: { selectFacet: { /* ... */ }, daterangeFacet: { /* ... */ } } },
 ```
+::::
 :::
 
 ### `@target` — copy from a linked content item
 
 `@target` maps a **linked** content item's attributes onto this block's own fields — the generic version of the Volto teaser's "copy from target" button. It maps *source content attributes* (`title`, `description`, `image`, …) to *this block's fields*. The item is whichever the block's **link field** points at (the `object_browser mode: 'link'` field — its stored snapshot is the source), so you don't name a URL field separately: "the url is the link in the mapping".
 
-:::codeExample{uid="ce-56" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-56-javascript-46bfa7"]}
+:::codeExample{uid="ce-56"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-56-javascript-46bfa7"]}
 ### Javascript
 
 ```javascript
@@ -1132,6 +1151,7 @@ button: {
     },
 },
 ```
+::::
 :::
 
 Declaring `@target` is the **only** opt-in — no per-block enhancer wiring. Each mapped field then shows a small **🔗 pull from linked** toggle in the sidebar (only when a target is selected). Every mapped field is one of two states:
@@ -1143,7 +1163,8 @@ Declaring `@target` is the **only** opt-in — no per-block enhancer wiring. Eac
 
 A `fieldMappings` value is usually a sibling **field name**. It may instead be a **region-crossing path** `<region>/<type|*>/<field>`, which reaches the `<field>` of a container region's children — the one place the path grammar crosses a region boundary. This bridges a **container** block (a region of child blocks) and a **value** block (a scalar field), so a block can convert between the two shapes:
 
-:::codeExample{uid="ce-61" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-61-javascript-9a6e0e"]}
+:::codeExample{uid="ce-61"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-61-javascript-9a6e0e"]}
 ### Javascript
 
 ```javascript
@@ -1159,6 +1180,7 @@ tableCell: {                                         // the container form
     } },
 },
 ```
+::::
 :::
 
 - **container → value (collapse)** — gather the region's matching children's `<field>`; slate values are **merged** into one (lossless), not truncated.
@@ -1171,7 +1193,8 @@ Non-region scalar fields (`key`, `width`, …) carry over unchanged. This is the
 
 The bridge converts on demand; a **`@type` rule** on a typed `object_list` field decides *when*, by **position**. It is an ordinary `when`-based fieldRule (same grammar — `@index`, `../@index`, `../../<field>`, `oneOf`, `lt`, …) whose `set` is a block-**type name** instead of a field definition:
 
-:::codeExample{uid="ce-66" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-66-javascript-11d07c"]}
+:::codeExample{uid="ce-66"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-66-javascript-11d07c"]}
 ### Javascript
 
 ```javascript
@@ -1186,6 +1209,7 @@ cells: {
     ],
 },
 ```
+::::
 :::
 
 The rule is evaluated in the same pass that applies field defaults (run on every edit): each typed item's target `@type` is re-resolved, and when it differs from the stored `@type` the item is **converted in place** via the bridge above. So moving a row to/from row 0 flips its cells between `tableHeaderCell` (a slate `value`) and `tableCell` (a `blocks` container), losslessly — no imperative "re-type the cells" code. Only meaningful on a **typed** object\_list (a `typeField` item has an `@type` to rewrite); it settles in one pass (the target type re-resolves to itself once the item is in place).
@@ -1216,7 +1240,8 @@ The chooser popup survives only for the genuinely ambiguous case: a single block
 
 A mapping value is either a string (simple field rename) or `{ field, type }` (rename with type conversion):
 
-:::codeExample{uid="ce-79" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-79-json-1fc605"]}
+:::codeExample{uid="ce-79"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-79-json-1fc605"]}
 ### Json
 
 ```json
@@ -1227,6 +1252,7 @@ A mapping value is either a string (simple field rename) or `{ field, type }` (r
     "image": "preview_image"
 }
 ```
+::::
 :::
 
 When `type` is specified, the value is converted at runtime:
@@ -1527,7 +1553,8 @@ The saved `fieldMapping` is read at render time by `expandListingBlocks` — no 
 
 When the editor pastes rich HTML into the page, Inka will eventually be able to recognise it as a custom block by matching against a CSS selector mapping. The proposed shape:
 
-:::codeExample{uid="ce-88" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-88-javascript-e562d7"]}
+:::codeExample{uid="ce-88"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-88-javascript-e562d7"]}
 ### Javascript
 
 ```javascript
@@ -1537,6 +1564,7 @@ video: {
     },
 }
 ```
+::::
 :::
 
 The `css:<selector>` key in `fieldMappings` matches a pasted HTML element; the value maps element attributes to block fields. Not yet implemented — open question on whether this should run via `htmlTagsToSlate` (bypassing slate conversion) or be encoded into slate so attributes/classes survive.

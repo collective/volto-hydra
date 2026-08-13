@@ -277,7 +277,8 @@ To make a site editable with Inka you break a page into:
 
 When the page loads inside Inka's edit iframe, you initialise the bridge and declare your blocks; otherwise you render normally from the API:
 
-:::codeExample{uid="ce-8" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-8-js-bf605e"]}
+:::codeExample{uid="ce-8"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-8-js-bf605e"]}
 ### Js
 
 ```js
@@ -317,11 +318,13 @@ else {
     renderPage(await fetchContent(path));
 }
 ```
+::::
 :::
 
 Page data ends up shaped like this — one shared `blocks` dict, and a region per named list inside `blocks_layout`:
 
-:::codeExample{uid="ce-10" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-10-js-2e9648"]}
+:::codeExample{uid="ce-10"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-10-js-2e9648"]}
 ### Js
 
 ```js
@@ -339,11 +342,13 @@ Page data ends up shaped like this — one shared `blocks` dict, and a region pe
   }
 }
 ```
+::::
 :::
 
 Then you augment the rendered HTML with `data-` attributes (or `<!-- hydra ... -->` comments) so Inka can find your blocks and editable fields:
 
-:::codeExample{uid="ce-12" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-12-html-e0187e"]}
+:::codeExample{uid="ce-12"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-12-html-e0187e"]}
 ### Html
 
 ```html
@@ -358,6 +363,7 @@ Then you augment the rendered HTML with `data-` attributes (or `<!-- hydra ... -
   </a>
 </div>
 ```
+::::
 :::
 
 ### Deep-link anchors (fragments)
@@ -367,7 +373,8 @@ To let editors link to a spot *inside* a page, mark the element with a real `id`
 - `data-linkable-h1` … `data-linkable-h6="Label"` — a heading anchor **at that level**. Use these on your headings; the suffix is the level.
 - `data-linkable-id="Label"` — a **level-less** anchor (a figure, a defined term, any non-heading target).
 
-:::codeExample{uid="ce-16" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-16-html-5cddab"]}
+:::codeExample{uid="ce-16"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-16-html-5cddab"]}
 ### Html
 
 ```html
@@ -375,6 +382,7 @@ To let editors link to a spot *inside* a page, mark the element with a real `id`
 <h3 id="enterprise" data-linkable-h3="Enterprise plan">Enterprise plan</h3>
 <figure id="fig-1" data-linkable-id="Figure 1">…</figure>
 ```
+::::
 :::
 
 Inka harvests these per block on render as `{ id, name, level }` and stores them in the block's data, so the object browser offers them as `path#pricing` link targets — as a nested list reflecting the page's structure. Both attributes must survive into your **published** render for the anchor to resolve at runtime — Inka only reads them in edit mode.

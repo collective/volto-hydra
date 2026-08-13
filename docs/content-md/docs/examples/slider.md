@@ -34,7 +34,8 @@ blocks:
 
 A carousel/slider that cycles through slides. Slides are stored as an object\_list — each slide has a title, description, image, and optional button.
 
-:::codeExample{uid="ref-slider-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-slider" slotId="schema" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-slider-schema-javascript-ce9b5a"]}
+:::codeExample{uid="ref-slider-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-slider" slotId="schema"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-slider-schema-javascript-ce9b5a"]}
 ### Schema
 
 ```javascript
@@ -120,9 +121,11 @@ A carousel/slider that cycles through slides. Slides are stored as an object\_li
   }
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-slider-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-slider" slotId="json-data" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-slider-json-data-json-c5167b"]}
+:::codeExample{uid="ref-slider-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-slider" slotId="json-data"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-slider-json-data-json-c5167b"]}
 ### JSON Block Data
 
 ```json
@@ -160,9 +163,11 @@ A carousel/slider that cycles through slides. Slides are stored as an object\_li
   ]
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-slider-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-slider" slotId="rendering" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-slider-rendering-jsx-87bcad","ref-slider-rendering-vue-6e69c4","ref-slider-rendering-svelte-586973"]}
+:::codeExample{uid="ref-slider-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-slider" slotId="rendering"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-slider-rendering-jsx-87bcad","ref-slider-rendering-vue-6e69c4","ref-slider-rendering-svelte-586973"]}
 ### React
 
 ```jsx
@@ -286,4 +291,5 @@ const slides = computed(() => expandTemplatesSync(props.block.slides || [], { id
   </div>
 </div>
 ```
+::::
 :::

@@ -82,7 +82,8 @@ Instead of combining editing and rendering into one framework and codebase, thes
 
 You could think of it as splitting Volto into two parts, Rendering and CMS UI/Admin UI while keeping the same UI and then making the Rendering part easily replaceable with other implementations.
 
-:::codeExample{uid="ce-5" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-5-bash-56c4ae"]}
+:::codeExample{uid="ce-5"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-5-bash-56c4ae"]}
 ### Architecture
 
 ```bash
@@ -108,6 +109,7 @@ You could think of it as splitting Volto into two parts, Rendering and CMS UI/Ad
  Anon         │   Frontend   │◄──────────────────────┤    Plone    │
               └──────────────┘                       └─────────────┘
 ```
+::::
 :::
 
 ## The iframe ↔ admin bridge

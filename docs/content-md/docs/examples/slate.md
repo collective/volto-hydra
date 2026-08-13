@@ -107,7 +107,8 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet
 
-:::codeExample{uid="ref-text-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-text" slotId="schema" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-text-schema-javascript-6ffd2e"]}
+:::codeExample{uid="ref-text-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-text" slotId="schema"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-text-schema-javascript-6ffd2e"]}
 ### Schema
 
 ```javascript
@@ -124,9 +125,11 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
   }
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-text-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-text" slotId="json-data" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-text-json-data-json-f6d82b"]}
+:::codeExample{uid="ref-text-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-text" slotId="json-data"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-text-json-data-json-f6d82b"]}
 ### JSON Block Data
 
 ```json
@@ -144,9 +147,11 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
   ]
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-text-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-text" slotId="rendering" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-text-rendering-jsx-076433","ref-text-rendering-vue-54b4b7","ref-text-rendering-svelte-2aa474"]}
+:::codeExample{uid="ref-text-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-text" slotId="rendering"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-text-rendering-jsx-076433","ref-text-rendering-vue-54b4b7","ref-text-rendering-svelte-2aa474"]}
 ### React
 
 ```jsx
@@ -228,4 +233,5 @@ defineProps({ node: Object });
   <svelte:element this={node.type} data-node-id={node.nodeId}>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</svelte:element>
 {/if}
 ```
+::::
 :::

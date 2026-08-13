@@ -241,7 +241,8 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem iusto odio dignissim qui blandit praesent luptatum zzril delenit auguevel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore blandit praesent luptatum zzril qu. Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.&#x20;
 :::
 
-:::codeExample{uid="ref-separator-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="schema" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-separator-schema-javascript-3157d9"]}
+:::codeExample{uid="ref-separator-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="schema"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-separator-schema-javascript-3157d9"]}
 ### Schema
 
 ```javascript
@@ -257,9 +258,11 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
   }
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-separator-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="json-data" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-separator-json-data-json-9d890c"]}
+:::codeExample{uid="ref-separator-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="json-data"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-separator-json-data-json-9d890c"]}
 ### JSON Block Data
 
 ```json
@@ -270,9 +273,11 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
   }
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-separator-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="rendering" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-separator-rendering-jsx-470901","ref-separator-rendering-vue-4281a1","ref-separator-rendering-svelte-8c1d19"]}
+:::codeExample{uid="ref-separator-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="rendering"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-separator-rendering-jsx-470901","ref-separator-rendering-vue-4281a1","ref-separator-rendering-svelte-8c1d19"]}
 ### React
 
 ```jsx
@@ -312,4 +317,5 @@ defineProps({ block: Object });
   <hr />
 </div>
 ```
+::::
 :::

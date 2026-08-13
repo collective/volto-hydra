@@ -42,12 +42,14 @@ blocks:
 Pass this object inside the `blocks` option when calling `initBridge()` to register this block type with the admin UI. See [Custom Blocks](/docs/live-preview) for the full setup guide.
 :::
 
-:::codeExample{uid="tpl-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="schema" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["tpl-schema-javascript-000000"]}
+:::codeExample{uid="tpl-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="schema"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["tpl-schema-javascript-000000"]}
 ### Schema
 
 ```javascript
 
 ```
+::::
 :::
 
 :::slate{uid="tpl-json-heading" fixed=true readOnly=true templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-heading"}
@@ -58,12 +60,14 @@ Pass this object inside the `blocks` option when calling `initBridge()` to regis
 Example JSON as stored in the Plone content API. This is the data structure your component will receive in the `block` prop.
 :::
 
-:::codeExample{uid="tpl-json" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-data" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["tpl-json-json-000000"]}
+:::codeExample{uid="tpl-json" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-data"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["tpl-json-json-000000"]}
 ### JSON Block Data
 
 ```json
 
 ```
+::::
 :::
 
 :::slate{uid="tpl-rendering-heading" fixed=true readOnly=true templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering-heading"}
@@ -74,7 +78,8 @@ Example JSON as stored in the Plone content API. This is the data structure your
 How this block renders in your frontend. Add its handling to your renderer, or — for list-style blocks — register a fetcher and reuse your list rendering.
 :::
 
-:::codeExample{uid="tpl-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["tpl-rendering-jsx-000000","tpl-rendering-vue-000000","tpl-rendering-svelte-000000"]}
+:::codeExample{uid="tpl-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["tpl-rendering-jsx-000000","tpl-rendering-vue-000000","tpl-rendering-svelte-000000"]}
 ### React
 
 ```jsx
@@ -92,4 +97,5 @@ How this block renders in your frontend. Add its handling to your renderer, or �
 ```svelte
 
 ```
+::::
 :::

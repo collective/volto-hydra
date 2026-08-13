@@ -42,7 +42,8 @@ Renders a set of values as links into a faceted search — a "tag cloud" of shor
 :::searchShortcuts{uid="ss-live-1" index="Subject" searchUrl="/search" variation="default"}
 :::
 
-:::codeExample{uid="ref-searchShortcuts-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-searchShortcuts" slotId="schema" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-searchShortcuts-schema-javascript-980727"]}
+:::codeExample{uid="ref-searchShortcuts-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-searchShortcuts" slotId="schema"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-searchShortcuts-schema-javascript-980727"]}
 ### Schema
 
 ```javascript
@@ -100,9 +101,11 @@ Renders a set of values as links into a faceted search — a "tag cloud" of shor
   }
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-searchShortcuts-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-searchShortcuts" slotId="json-data" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-searchShortcuts-json-data-json-b402fc"]}
+:::codeExample{uid="ref-searchShortcuts-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-searchShortcuts" slotId="json-data"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-searchShortcuts-json-data-json-b402fc"]}
 ### JSON Block Data
 
 ```json
@@ -114,13 +117,15 @@ Renders a set of values as links into a faceted search — a "tag cloud" of shor
   "variation": "default"
 }
 ```
+::::
 :::
 
 :::slate{uid="ref-searchShortcuts-rendering-intro" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-searchShortcuts" slotId="rendering"}
 This block has no bespoke renderer. Add its fetcher to your fetchItems map (keyed by @type) and expandListingBlocks expands it in any region you render — the same seam that powers [listings](/docs/listings) and other collection blocks. See [Custom Blocks](/docs/custom-blocks) to define the block type. Only the fetcher below is block-specific.
 :::
 
-:::codeExample{uid="ref-searchShortcuts-fetcher" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-searchShortcuts" slotId="rendering" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-searchShortcuts-fetcher-javascript-e7f760"]}
+:::codeExample{uid="ref-searchShortcuts-fetcher" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-searchShortcuts" slotId="rendering"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-searchShortcuts-fetcher-javascript-e7f760"]}
 ### Fetcher
 
 ```javascript
@@ -147,9 +152,11 @@ export function searchShortcutsFetcher({ apiUrl, contextPath }) {
   };
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-searchShortcuts-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-searchShortcuts" slotId="rendering" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-searchShortcuts-rendering-javascript-ab7111"]}
+:::codeExample{uid="ref-searchShortcuts-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-searchShortcuts" slotId="rendering"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-searchShortcuts-rendering-javascript-ab7111"]}
 ### Render
 
 ```javascript
@@ -165,4 +172,5 @@ const { items } = await expandListingBlocks(regionBlockIds, {
 });
 items.forEach((item) => renderBlock(item)); // your normal per-block renderer
 ```
+::::
 :::

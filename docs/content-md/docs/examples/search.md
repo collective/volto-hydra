@@ -149,7 +149,8 @@ A search interface with faceted filtering. Contains a child listing block for re
 ::::
 :::
 
-:::codeExample{uid="ref-search-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-search" slotId="schema" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-search-schema-javascript-8711ec"]}
+:::codeExample{uid="ref-search-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-search" slotId="schema"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-search-schema-javascript-8711ec"]}
 ### Schema
 
 ```javascript
@@ -260,9 +261,11 @@ A search interface with faceted filtering. Contains a child listing block for re
   }
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-search-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-search" slotId="json-data" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-search-json-data-json-155258"]}
+:::codeExample{uid="ref-search-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-search" slotId="json-data"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-search-json-data-json-155258"]}
 ### JSON Block Data
 
 ```json
@@ -311,9 +314,11 @@ A search interface with faceted filtering. Contains a child listing block for re
   }
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-search-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-search" slotId="rendering" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-search-rendering-jsx-dd082e","ref-search-rendering-vue-3c1873","ref-search-rendering-svelte-7ba7ad"]}
+:::codeExample{uid="ref-search-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-search" slotId="rendering"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-search-rendering-jsx-dd082e","ref-search-rendering-vue-3c1873","ref-search-rendering-svelte-7ba7ad"]}
 ### React
 
 ```jsx
@@ -453,4 +458,5 @@ const listingBlock = computed(() => listingId.value ? props.block.blocks?.[listi
   {/if}
 </div>
 ```
+::::
 :::

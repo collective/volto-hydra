@@ -186,7 +186,8 @@ The Video-Block can be aligned to the right with text floating around it on the 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam. Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat quis nostrud exerci tation ullamcorper ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat quis Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam. Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt
 :::
 
-:::codeExample{uid="ref-video-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-video" slotId="schema" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-video-schema-javascript-104794"]}
+:::codeExample{uid="ref-video-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-video" slotId="schema"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-video-schema-javascript-104794"]}
 ### Schema
 
 ```javascript
@@ -222,9 +223,11 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
   }
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-video-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-video" slotId="json-data" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-video-json-data-json-9ce28f"]}
+:::codeExample{uid="ref-video-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-video" slotId="json-data"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-video-json-data-json-9ce28f"]}
 ### JSON Block Data
 
 ```json
@@ -233,9 +236,11 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
   "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-video-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-video" slotId="rendering" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-video-rendering-jsx-b3c5ea","ref-video-rendering-vue-160de2","ref-video-rendering-svelte-b4e8ba"]}
+:::codeExample{uid="ref-video-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-video" slotId="rendering"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-video-rendering-jsx-b3c5ea","ref-video-rendering-vue-160de2","ref-video-rendering-svelte-b4e8ba"]}
 ### React
 
 ```jsx
@@ -313,4 +318,5 @@ const youtubeId = computed(() => {
   {/if}
 </div>
 ```
+::::
 :::

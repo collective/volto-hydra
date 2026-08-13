@@ -50,7 +50,8 @@ To make your site editable with Inka you load hydra.js in your frontend and call
 
 Call `initBridge()` with an `onEditChange` callback to receive live content updates as the user edits. Your frontend re-renders in real time. Outside edit mode, fetch content from the API as normal.
 
-:::codeExample{uid="ce-5" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-5-javascript-3259a0"]}
+:::codeExample{uid="ce-5"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-5-javascript-3259a0"]}
 ### Javascript
 
 ```javascript
@@ -65,6 +66,7 @@ if (window.name.startsWith('hydra')) {
     renderPage(await fetchContent(window.location.pathname));
 }
 ```
+::::
 :::
 
 The `formData` passed to `onEditChange` has the same structure as the Plone REST API response, so the same rendering code works for both live editing and normal page display.
@@ -75,7 +77,8 @@ Either hashbang (`/#!/path`) or normal (`/path`) style paths are supported.
 
 Iterate `blocks_layout.items` and render each block by type. Add `data-block-uid` so Inka knows which block the user clicked.
 
-:::codeExample{uid="ce-10" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-10-javascript-23153e"]}
+:::codeExample{uid="ce-10"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-10-javascript-23153e"]}
 ### Javascript
 
 ```javascript
@@ -120,13 +123,15 @@ Iterate `blocks_layout.items` and render each block by type. Add `data-block-uid
 </body>
 </html>
 ```
+::::
 :::
 
 ## Allowed Blocks and Page Regions
 
 When initialising the bridge, you can configure rules for what blocks can be added to the page and where. Pages can have multiple blocks fields for different regions (e.g., header, content, footer), each with its own allowed block types and limits. These show as separate sections in the sidebar when no block is selected:
 
-:::codeExample{uid="ce-13" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ce-13-javascript-4aeb0d"]}
+:::codeExample{uid="ce-13"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ce-13-javascript-4aeb0d"]}
 ### Javascript
 
 ```javascript
@@ -155,4 +160,5 @@ bridge = initBridge({
     },
 });
 ```
+::::
 :::

@@ -146,7 +146,8 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum.Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua.
 
-:::codeExample{uid="ref-image-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-image" slotId="schema" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-image-schema-javascript-979df6"]}
+:::codeExample{uid="ref-image-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-image" slotId="schema"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-image-schema-javascript-979df6"]}
 ### Schema
 
 ```javascript
@@ -178,9 +179,11 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
   }
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-image-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-image" slotId="json-data" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-image-json-data-json-ddd34d"]}
+:::codeExample{uid="ref-image-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-image" slotId="json-data"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-image-json-data-json-ddd34d"]}
 ### JSON Block Data
 
 ```json
@@ -195,9 +198,11 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
   ]
 }
 ```
+::::
 :::
 
-:::codeExample{uid="ref-image-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-image" slotId="rendering" tabs="${1.../h3}" tabs.label="${1/text}" tabs.language="${2/lang}" tabs.code="${2/code}" tabs@ids=["ref-image-rendering-jsx-a59bc5","ref-image-rendering-vue-c3dead","ref-image-rendering-svelte-52a7e2"]}
+:::codeExample{uid="ref-image-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-image" slotId="rendering"}
+::::tabs[]{repeat="h3" label="${1/text}" language="${2/lang}" code="${2/code}" @ids=["ref-image-rendering-jsx-a59bc5","ref-image-rendering-vue-c3dead","ref-image-rendering-svelte-52a7e2"]}
 ### React
 
 ```jsx
@@ -265,4 +270,5 @@ const imgSrc = computed(() => getImageUrl(props.block.url));
   {/if}
 </div>
 ```
+::::
 :::
