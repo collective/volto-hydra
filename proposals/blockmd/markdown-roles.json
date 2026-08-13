@@ -34,5 +34,16 @@
         "blocks": "${2.../blocks_layout}"
       }
     }
+  },
+  "slider": {
+    "sections": {
+      "field": "slides",
+      "at": "h2",
+      "item": {
+        "head_title": "${1/text}",
+        "title": "${2/text}",
+        "description": "${3/text}"
+      }
+    }
   }
 }

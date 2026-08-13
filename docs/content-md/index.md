@@ -427,8 +427,14 @@ export const POST = async ({ request }) => {
  "styles": {}
 }
 ```
-::::slides[object_list]
-:::slide{uid="b09f39ea-36c3-4f09-9a18-30aef3565a22" buttonText="See all Content Types" description="You can log in and experience currently working features (Volto like but on any frontend)" flagAlign="left" head_title="Welcome to Inka" title="You can use this site to test Inka"}
+::::slides[object_list]{repeat="h2" head_title="${1/text}" title="${2/text}" description="${3/text}" @ids=["b09f39ea-36c3-4f09-9a18-30aef3565a22","ef8ceecc-7c1d-4e0a-9b67-a56e7d03f6e3"]}
+## Welcome to Inka
+
+You can use this site to test Inka
+
+You can log in and experience currently working features (Volto like but on any frontend)
+
+:::@{buttonText="See all Content Types" flagAlign="left"}
 ```fields
 {
  "href": [
@@ -499,7 +505,14 @@ export const POST = async ({ request }) => {
 }
 ```
 :::
-:::slide{uid="ef8ceecc-7c1d-4e0a-9b67-a56e7d03f6e3" buttonText="See all blocks" description="Frontend freedom makes it easy to create beautiful and fast experiences" flagAlign="right" head_title="Welcome to Inka's many frontends" hideButton=false title="You are enjoying one of many possible frontends"}
+
+## Welcome to Inka's many frontends
+
+You are enjoying one of many possible frontends
+
+Frontend freedom makes it easy to create beautiful and fast experiences
+
+:::@{buttonText="See all blocks" flagAlign="right" hideButton=false}
 ```fields
 {
  "href": [
