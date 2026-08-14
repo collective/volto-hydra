@@ -40,6 +40,8 @@ export default defineConfig({
       'packages/volto-hydra/**/*.{test,spec}.{js,jsx,ts,tsx}',
       // the docs markdown->blocks parser (docs/markdown-to-blocks.mjs)
       'docs/**/*.{test,spec}.mjs',
+      // the block <-> markdown converter and the prototype-mapping spike
+      'lib/**/*.{test,spec}.mjs',
     ],
     // hydra-js has its own jest harness; covered by `cd packages/hydra-js && pnpm test` in CI.
     exclude: ['**/node_modules/**', 'packages/hydra-js/**'],
