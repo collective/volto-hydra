@@ -1,0 +1,142 @@
+---
+"@type": Document
+UID: 405582582e70493c96a6c549444a1eaa
+allow_discussion: false
+contributors: []
+creators:
+  - admin
+description: >-
+  
+  The button block shows a button for which a link (internal or external) can be
+  stored. The button can be displayed left, right or center and have a
+  background color.
+effective: 2023-07-06T18:35:00
+exclude_from_nav: false
+expires: null
+id: button
+language: "##DEFAULT##"
+layout: document_view
+preview_caption: null
+preview_image: null
+review_state: published
+rights: ""
+subjects:
+  - blocks
+title: Button
+assignments:
+  - { uid: f3ee132b-6215-4e42-b26b-713f668eea61, type: title }
+  - { uid: ref-button-description, type: slate }
+  - { uid: editor-screenshot, type: image }
+  - { uid: eab7123b-6a41-4537-8979-09e4fbbf317b, type: separator }
+  - { uid: b03e7ce7-b7b5-4413-bd2e-d42bff4bba9a, type: button }
+  - { uid: 1cfea1d8-13df-4bcd-9220-07252085dad7, type: separator }
+  - { uid: a8d191e1-5b3a-4ef6-b38f-6cb9af33ff85, type: button }
+  - { uid: 1e658fdd-1de8-4c00-80e7-5f91155a2a8a, type: separator }
+  - { uid: 9aa3c0c3-6565-4e9c-8e27-d07eeedf4314, type: button }
+  - { uid: 5b8d1979-adec-479a-ad8d-466fd3012fe5, type: separator }
+  - { uid: 18db9de3-b9a3-4ada-a79a-39c7734c1291, type: slate }
+  - { uid: beef7c11-acca-4e40-8477-e6f2e42d0f06, type: button }
+  - { uid: 022174c5-3f65-44b7-99de-c8037ff61598, type: separator }
+  - { uid: 23608517-868c-47e7-b7ac-3dfb015acefe, type: slate }
+  - { uid: 31dcaf51-715a-4458-b11b-5d03a085b90d, type: button }
+  - { uid: 50e24e21-a7fc-478c-9c65-152b5f86352f, type: separator }
+  - { uid: e5e36303-3541-41d0-8eff-053f90a6d75f, type: slate }
+  - { uid: e150d94a-7a54-451b-8019-31349d98d957, type: button }
+  - { uid: a0e70eab-97f8-4221-9e1e-e4cfef9ab58d, type: heading }
+  - { uid: 634edc58-3600-4918-b6e5-0924dce67591, type: separator }
+  - { uid: 0d3d0bd6-ee66-44a3-9da8-b5e84ba797e4, type: button }
+  - { uid: 561ce253-b5a1-4868-91ce-3f6024cf3a0d, type: separator }
+  - { uid: 0b8a95f2-1320-4f44-a21d-4cfada6bd222, type: button }
+  - { uid: 46d0b71e-b9ee-481f-a4bf-b98cd7d1a452, type: separator }
+  - { uid: dd9dc0eb-821a-4581-97af-7e59afc249e1, type: button }
+  - { uid: fa9321f8-ab68-4ca8-92de-23c5f0662c93, type: separator }
+  - { uid: 35741452-106a-428f-864d-678be9822d87, type: slate }
+  - { uid: f62e21a3-b906-4c0c-bef8-f42cd9631967, type: button }
+  - { uid: 108ab524-ac76-4127-b0e6-7227f5ea1549, type: separator }
+  - { uid: 738b4894-1ed9-4556-8d5e-2d5f5a5e09ae, type: slate }
+  - { uid: e20c3c62-3c1d-4e45-a5c4-649b81b47a46, type: button }
+  - { uid: 7760c976-1716-45d0-a22b-527bed9e8de9, type: separator }
+  - { uid: 2fa5b869-89cd-4d15-aee9-80b4e1bf11a2, type: slate }
+  - { uid: fc0ddcf5-4acc-4f9b-8c5c-992db47399ce, type: button }
+  - { uid: ref-button-schema, type: codeExample }
+  - { uid: ref-button-json-data, type: codeExample }
+  - { uid: ref-button-rendering, type: codeExample }
+prototypes: |
+  <block type="title"      _="${h1}" />
+  <block type="slate"      value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
+  <block type="image"      description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" />
+---
+
+# Button
+
+A call-to-action button with an editable label and link.
+
+![The button example block being edited in Volto Hydra](/docs/images/button-edit)
+
+<block type="separator" uid="eab7123b-6a41-4537-8979-09e4fbbf317b" data='{"styles":{"align":"full"}}' />
+
+<block type="button" uid="b03e7ce7-b7b5-4413-bd2e-d42bff4bba9a" inneralign="left" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{"buttonAlign":"wide"}}' />
+
+<block type="separator" uid="1cfea1d8-13df-4bcd-9220-07252085dad7" data='{"styles":{"align":"full"}}' />
+
+<block type="button" uid="a8d191e1-5b3a-4ef6-b38f-6cb9af33ff85" inneralign="center" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{"buttonAlign":"wide"}}' />
+
+<block type="separator" uid="1e658fdd-1de8-4c00-80e7-5f91155a2a8a" data='{"styles":{"align":"full"}}' />
+
+<block type="button" uid="9aa3c0c3-6565-4e9c-8e27-d07eeedf4314" inneralign="right" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{"align":"full","buttonAlign":"wide"}}' />
+
+<block type="separator" uid="5b8d1979-adec-479a-ad8d-466fd3012fe5" data='{"styles":{"align":"full"}}' />
+
+Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
+
+<block type="button" uid="beef7c11-acca-4e40-8477-e6f2e42d0f06" inneralign="left" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{}}' />
+
+<block type="separator" uid="022174c5-3f65-44b7-99de-c8037ff61598" data='{"styles":{"align":"full"}}' />
+
+Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
+
+<block type="button" uid="31dcaf51-715a-4458-b11b-5d03a085b90d" inneralign="center" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{}}' />
+
+<block type="separator" uid="50e24e21-a7fc-478c-9c65-152b5f86352f" data='{"styles":{"align":"full"}}' />
+
+Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
+
+<block type="button" uid="e150d94a-7a54-451b-8019-31349d98d957" inneralign="right" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{}}' />
+
+<block type="heading" uid="a0e70eab-97f8-4221-9e1e-e4cfef9ab58d" alignment="left" heading="Button Block" tag="h2" data='{"styles":{"backgroundColor":"grey"}}' />
+
+<block type="separator" uid="634edc58-3600-4918-b6e5-0924dce67591" data='{"styles":{"align":"full","backgroundColor":"grey"}}' />
+
+<block type="button" uid="0d3d0bd6-ee66-44a3-9da8-b5e84ba797e4" inneralign="left" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{"backgroundColor":"grey","buttonAlign":"wide"}}' />
+
+<block type="separator" uid="561ce253-b5a1-4868-91ce-3f6024cf3a0d" data='{"styles":{"align":"full","backgroundColor":"grey"}}' />
+
+<block type="button" uid="0b8a95f2-1320-4f44-a21d-4cfada6bd222" inneralign="center" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{"backgroundColor":"grey","buttonAlign":"wide"}}' />
+
+<block type="separator" uid="46d0b71e-b9ee-481f-a4bf-b98cd7d1a452" data='{"styles":{"align":"full","backgroundColor":"grey"}}' />
+
+<block type="button" uid="dd9dc0eb-821a-4581-97af-7e59afc249e1" inneralign="right" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{"backgroundColor":"grey","buttonAlign":"wide"}}' />
+
+<block type="separator" uid="fa9321f8-ab68-4ca8-92de-23c5f0662c93" data='{"styles":{"align":"full","backgroundColor":"grey"}}' />
+
+<block type="slate" uid="35741452-106a-428f-864d-678be9822d87" data='{"styles":{"backgroundColor":"grey"},"value":[{"children":[{"text":"Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi."}],"type":"p"}]}' />
+
+<block type="button" uid="f62e21a3-b906-4c0c-bef8-f42cd9631967" inneralign="left" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{"backgroundColor":"grey","buttonAlign":"center"}}' />
+
+<block type="separator" uid="108ab524-ac76-4127-b0e6-7227f5ea1549" data='{"styles":{"align":"full","backgroundColor":"grey"}}' />
+
+<block type="slate" uid="738b4894-1ed9-4556-8d5e-2d5f5a5e09ae" data='{"styles":{"backgroundColor":"grey"},"value":[{"children":[{"text":"Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi."}],"type":"p"}]}' />
+
+<block type="button" uid="e20c3c62-3c1d-4e45-a5c4-649b81b47a46" inneralign="center" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{"backgroundColor":"grey","buttonAlign":"center"}}' />
+
+<block type="separator" uid="7760c976-1716-45d0-a22b-527bed9e8de9" data='{"styles":{"align":"full","backgroundColor":"grey"}}' />
+
+<block type="slate" uid="2fa5b869-89cd-4d15-aee9-80b4e1bf11a2" data='{"styles":{"backgroundColor":"grey"},"value":[{"children":[{"text":"Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi."}],"type":"p"}]}' />
+
+<block type="button" uid="fc0ddcf5-4acc-4f9b-8c5c-992db47399ce" inneralign="right" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{"backgroundColor":"grey","buttonAlign":"center"}}' />
+
+<block type="codeExample" uid="ref-button-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-button" slotId="schema" data='{"tabs":[{"@id":"ref-button-schema-javascript-8aa182","label":"Schema","language":"javascript","code":"{\n  \"button\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"title\": {\n          \"title\": \"Label\"\n        },\n        \"href\": {\n          \"title\": \"Link\",\n          \"widget\": \"object_browser\",\n          \"mode\": \"link\"\n        },\n        \"inneralign\": {\n          \"title\": \"Alignment\",\n          \"widget\": \"select\",\n          \"choices\": [\n            [\n              \"left\",\n              \"Left\"\n            ],\n            [\n              \"center\",\n              \"Center\"\n            ],\n            [\n              \"right\",\n              \"Right\"\n            ]\n          ],\n          \"default\": \"left\"\n        }\n      }\n    }\n  }\n}"}]}' />
+
+<block type="codeExample" uid="ref-button-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-button" slotId="json-data" data='{"tabs":[{"@id":"ref-button-json-data-json-ed3030","label":"JSON Block Data","language":"json","code":"{\n  \"@type\": \"button\",\n  \"title\": \"Learn More\",\n  \"href\": [\n    {\n      \"@id\": \"/about-us\"\n    }\n  ]\n}"}]}' />
+
+<block type="codeExample" uid="ref-button-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-button" slotId="rendering" data='{"tabs":[{"@id":"ref-button-rendering-jsx-ab4e0b","label":"React","language":"jsx","code":"function ButtonBlock({ block }) {\n  const title = block.title || &#39;Button&#39;;\n  const href = block.href?.[0]?.[&#39;@id&#39;] || block.href || &#39;#&#39;;\n\n  return (\n    <div data-block-uid={block[&#39;@uid&#39;]} className=\"button-block\">\n      <a href={href} data-edit-text=\"title\" data-edit-link=\"href\" className=\"btn\">\n        {title}\n      </a>\n    </div>\n  );\n}"},{"@id":"ref-button-rendering-vue-e704dd","label":"Vue","language":"vue","code":"<template>\n  <div :data-block-uid=\"block[&#39;@uid&#39;]\" class=\"button-block\">\n    <a :href=\"href\" data-edit-text=\"title\" data-edit-link=\"href\" class=\"btn\">\n      {{ block.title || &#39;Button&#39; }}\n    </a>\n  </div>\n</template>\n\n<script setup>\nimport { computed } from &#39;vue&#39;;\nconst props = defineProps({ block: Object });\nconst href = computed(() => props.block.href?.[0]?.[&#39;@id&#39;] || props.block.href || &#39;#&#39;);\n</script>"},{"@id":"ref-button-rendering-svelte-a8e495","label":"Svelte","language":"svelte","code":"<script>\n  export let block;\n  $: href = block.href?.[0]?.[&#39;@id&#39;] || block.href || &#39;#&#39;;\n</script>\n\n<div data-block-uid={block[&#39;@uid&#39;]} class=\"button-block\">\n  <a {href} data-edit-text=\"title\" data-edit-link=\"href\" class=\"btn\">\n    {block.title || &#39;Button&#39;}\n  </a>\n</div>"}]}' />
