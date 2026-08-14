@@ -908,7 +908,17 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   // chevron / drag walks it OUT to the nearest ancestor that accepts the type,
   // so it "escapes"). Surface each as a failing test, like the issues below.
   const allowedBlocksViolations = []; // {blockType, allowed, parentType, pagePath, blockId}
-  const CONTAINMENT_EXEMPT = new Set(['empty', 'column', 'title', 'description']);
+  // `contentLayout` is a structural page-layout block applied through the layout
+  // picker (allowedLayouts) — it IS the content region's root, never a
+  // reorderable content block, so the "can it be reordered in its container"
+  // containment check doesn't apply (like column/title/description).
+  const CONTAINMENT_EXEMPT = new Set([
+    'empty',
+    'column',
+    'title',
+    'description',
+    'contentLayout',
+  ]);
   // Track block @types seen in content that aren't in blocksConfig — the
   // frontend's Block.vue falls through to a "Not implemented" placeholder
   // for these. Collect all occurrences so the report shows every page
