@@ -109,23 +109,11 @@ prototypes: |
 
 # 
 
-<block type="slate">
-
 A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block, repeating each block once per result entry. This means a listing can be moved between containers and reuse normal blocks for what it repeats.
-
-</block>
-
-<block type="slate">
 
 `expandListingBlocks(layout, options)` is a helper in hydra.js that handles fetching, paging, and mapping results to block objects. It walks a layout, fetches results for each listing-type block, and returns `{ items, paging }` where `items` is an array of block objects with `@uid` and `@type`.
 
-</block>
-
-<block type="slate">
-
 You tell it which block types need fetching via a `fetchItems` map — keys are block types, values are fetcher functions. This means you can have different kinds of listings (Plone queries, RSS feeds, etc.) each with their own fetcher:
-
-</block>
 
 <block type="codeExample">
 
@@ -149,11 +137,7 @@ const { items, paging } = await expandListingBlocks(layout, {
 
 ## Example: Mixing Listings, Blocks and Paging
 
-<block type="slate">
-
 A grid can have a mix of listing and static blocks sharing a single paging. The `staticBlocks` helper wraps non-listing blocks so they participate in the shared page window. The listings use Suspense so they load client-side:
-
-</block>
 
 <block type="codeExample">
 
@@ -215,11 +199,7 @@ async function ListingItems({ id, blocks, paging, seen, fetchItems, onPaging }) 
 
 ## ploneFetchItems Helper
 
-<block type="slate">
-
 `ploneFetchItems({ apiUrl, contextPath, extraCriteria })` creates a fetcher function for Plone's `@querystring-search` endpoint, suitable as a value in the `fetchItems` map.
-
-</block>
 
 <block type="slateTable" table.fixed table.celled>
 
@@ -231,17 +211,9 @@ async function ListingItems({ id, blocks, paging, seen, fetchItems, onPaging }) 
 
 </block>
 
-<block type="slate">
-
 A listing with no `querystring` defaults to showing the current folder's contents in folder order.
 
-</block>
-
-<block type="slate">
-
 `ploneFetchItems` also normalizes Plone's image data — packaging `image_field` + `image_scales` into a self-contained `image` object with `@id` duplicated inside (needed for URL resolution):
-
-</block>
 
 <block type="codeExample">
 
@@ -257,25 +229,13 @@ A listing with no `querystring` defaults to showing the current folder's content
 
 </block>
 
-<block type="slate">
-
 This self-contained object has everything needed to resolve image URLs with scale support — see the Nuxt example's `composables/imageProps.js` for one approach.
-
-</block>
-
-<block type="slate">
 
 For non-Plone backends (RSS feeds, external APIs, etc.), write your own fetcher: `async (block, { start, size }) => ({ items, total })`. `start` is the zero-based offset, `size` is the number of items to return (or `0` for total-only), and `total` in the return value is the full count, not just this page.
 
-</block>
-
 ## Example fetchers
 
-<block type="slate">
-
 The same `fetchItems` seam powers other "collection" blocks — each is just a fetcher that returns raw result objects (`expandListingBlocks` maps `@id → href` etc. and repeats an item block per result, so they need **no bespoke renderer**; they render via the standard item types on every frontend). `@hydra-js/helpers` ships three reference fetchers:
-
-</block>
 
 <block type="slateTable" table.fixed table.celled>
 
@@ -287,11 +247,7 @@ The same `fetchItems` seam powers other "collection" blocks — each is just a f
 
 </block>
 
-<block type="slate">
-
 Register them alongside `listing` in the `fetchItems` map:
-
-</block>
 
 <block type="codeExample">
 
@@ -311,25 +267,13 @@ const { items } = await expandListingBlocks(layout, {
 
 </block>
 
-<block type="slate">
-
 The **Search Shortcuts** link target reads Volto's search-block facet params — a page with a `search` block picks up `?facet.<index>=<value>` from the URL. The block's *index* uses the existing `select_querystring_field` widget; the optional *this-page field* uses `schemaFieldSelect` (a `/@types`-backed field dropdown, parameterized by `fieldType`), which **Related Items** also uses with `fieldType: 'relation'`.
-
-</block>
 
 ## Field Mapping
 
-<block type="slate">
-
 `fieldMapping` on a listing block controls which fields appear on expanded items — only mapped fields are included. Default: `{ @id → href, title → title, description → description, image → image }`. Values can be a string (rename) or `{ field, type }` for conversions:
 
-</block>
-
-<block type="slate">
-
 Built-in item types and the fields they expose:
-
-</block>
 
 <block type="slateTable" table.fixed table.celled>
 
@@ -360,11 +304,7 @@ Types: string (array→join, image→URL), link (→[{@id}]), image (pass throug
 
 ## Item Type Selection
 
-<block type="slate">
-
 Use `variation` on the listing block to control what `@type` expanded items get. Listings reuse the same `inheritSchemaFrom` recipe as container blocks (see [Container Blocks › Synchronised Block Types](container-blocks.md#synchronised-block-types-in-a-container)) but differ in one structural way: there's no blocks field to declare `itemTypeField` on, since listing children are *virtual* (produced from query results at render time, not authored as page data). Instead, declare the typeField directly on the `inheritSchemaFrom` recipe:
-
-</block>
 
 <block type="codeExample">
 
@@ -396,25 +336,13 @@ listing: {
 
 </block>
 
-<block type="slate">
-
 `filterConvertibleFrom: '@default'` restricts the dropdown to types that have a `fieldMappings['@default']` entry — i.e. types that can be populated from the canonical content fields (`@id`, `title`, `description`, `image`) that listing queries return. Each item type's `fieldMappings['@default']` (on its own block config) defines how those source fields land on its schema; that static mapping is enough to render listings. Adding `mappingField` to the enhancer exposes the `FieldMappingWidget` so the editor can override the mapping per listing instance.
-
-</block>
-
-<block type="slate">
 
 The widget saves its output as `fieldMapping` (singular) on the block data. `expandListingBlocks` reads that at render time to translate each query result into an item block.
 
-</block>
-
 ## Combining Listings with Container Syncing
 
-<block type="slate">
-
 A container (e.g. `gridBlock`) can mix **manual children** AND **a listing** as children. Add `'listing'` to the blocks field's `allowedBlocks`, and the parent's typeField propagates everywhere:
-
-</block>
 
 <block type="codeExample">
 
@@ -441,34 +369,18 @@ gridBlock: {
 
 </block>
 
-<block type="slate">
-
 `filterConvertibleFrom: '@default'` keeps `'listing'` out of the dropdown (it's a structural container, not an item type, so it has no `fieldMappings['@default']`) but it stays in `allowedBlocks` so a listing block can still exist as a structural child. The editor sees "Teaser / Image / Summary" in the picker; the listing is a structural choice they don't have to think about.
 
-</block>
-
-<block type="slate">
-
 When the editor changes `gridBlock.variation` to e.g. `'summary'`:
-
-</block>
 
 - **Manual children** (a teaser, an image) get their `@type` converted via the destination type's `fieldMappings` — teaser becomes summary.
 - **Listing child** keeps `@type: 'listing'` but its own `variation` field is set to `'summary'`, so the listing now renders summary items.
 
-<block type="slate">
-
 The sync walks recursively — if the listing held nested containers with their own typeFields, those would update too. Net effect: ONE picker on the parent controls the rendered type for every descendant, regardless of whether descendants are authored manually or expanded from a query.
-
-</block>
 
 ## Path Transformation (pathToApiPath)
 
-<block type="slate">
-
 If your frontend embeds state in the URL path (like pagination), you need to tell hydra.js how to transform the frontend path to the API/admin path. Otherwise, the admin will try to navigate to URLs that don't exist in the CMS.
-
-</block>
 
 <block type="codeExample">
 
@@ -485,19 +397,11 @@ const bridge = initBridge({
 
 </block>
 
-<block type="slate">
-
 The `pathToApiPath` function is called whenever hydra.js sends a `PATH_CHANGE` message to the admin, allowing your frontend to strip or transform URL segments that are frontend-specific (like pagination, filters, or other client-side state).
-
-</block>
 
 ## Paging Values
 
-<block type="slate">
-
 Both `expandListingBlocks` and `staticBlocks` return `{ items, paging }`. You pass `{ start, size }` as input (not mutated) and get back computed paging values:
-
-</block>
 
 - **`currentPage`** (number) — Zero-based current page index
 - **`totalPages`** (number) — Total number of pages
@@ -507,28 +411,12 @@ Both `expandListingBlocks` and `staticBlocks` return `{ items, paging }`. You pa
 - **`pages`** (array) — Window of \~5 page objects: `{ start, page }` where page is 1-based
 - **`seen`** (number) — Running item count — pass to the next call's `seen` option for position tracking in grids
 
-<block type="slate">
-
 Neither function mutates the input `paging` object — calling again with the same `{ start, size }` is safe.
-
-</block>
-
-<block type="slate">
 
 When multiple listings share a pager (e.g. a grid with several listings), `expandListingBlocks` walks them sequentially. Each fetch returns `{ items, total }`, so the total is learned from the response and used to compute where the next listing starts. One request per listing. Listings outside the page window are fetched with `size: 0` (total only, no items).
 
-</block>
-
-<block type="slate">
-
 When mixing listings with static blocks in a shared pager, use `staticBlocks(ids, { blocks, paging, seen })` for the non-listing blocks — it tracks their position in the paging window. Chain the returned `paging.seen` to the next call so each block knows its offset (see the React example above).
-
-</block>
 
 ## Notes
 
-<block type="slate">
-
 Expanded listing items share the listing block's `@uid`. Selecting any expanded item selects the parent listing block.
-
-</block>

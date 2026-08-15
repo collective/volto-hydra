@@ -71,11 +71,7 @@ prototypes: |
 
 </block>
 
-<block type="slate">
-
 Strike the right balance for your site. Make it easy for editors to create engagement — while staying compliant.
-
-</block>
 
 <block type="slate">
 
@@ -87,11 +83,7 @@ Strike the right balance for your site. Make it easy for editors to create engag
 
 ## Why Inka
 
-<block type="slate">
-
 Compliance or engagement is a false choice. You decide where the dial sits for each site.
-
-</block>
 
 <block type="image" align="center" size="l" url="/images/quadrant/@@download/image/quadrant.svg" />
 
@@ -406,14 +398,10 @@ export const POST = async ({ request }) => {
 
 <block type="slate" data='{"value":[{"children":[{"text":""},{"text":"You can use this site to test Inka Edit."}],"type":"p"},{"children":[{"text":""},{"children":[{"text":"Disclaimer"}],"type":"strong"},{"text":": This instance is reset every night, so all changes will be lost afterwards."}],"type":"p"}]}' />
 
-<block type="slate">
-
 You can **log in** and use it as an admin user using these **credentials**:\
 \
 username: **admin**\
 password: **admin**
-
-</block>
 
 <block type="slate" data='{"value":[{"children":[{"text":"This site uses some recommended "},{"children":[{"text":"add-ons"}],"type":"strong"},{"text":":"}],"type":"p"},{"children":[{"children":[{"text":"Some blocks that are suitable to be used with volto-light-theme."}],"type":"li"},{"children":[{"text":""},{"children":[{"text":"volto-form-block"}],"data":{"url":"https://github.com/collective/volto-form-block"},"type":"link"},{"text":""}],"type":"li"}],"type":"ul"}]}' />
 

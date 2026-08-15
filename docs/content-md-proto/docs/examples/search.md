@@ -58,11 +58,7 @@ prototypes: |
 
 # 
 
-<block type="slate">
-
 A search interface with faceted filtering. Contains a child listing block for results and typed facets (checkbox, select, date range, toggle) for filtering.
-
-</block>
 
 <block type="image" url="/docs/images/search-edit" alt="The search example block being edited in Volto Hydra" align="center" size="l" />
 

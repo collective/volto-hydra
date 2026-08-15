@@ -98,11 +98,7 @@ prototypes: |
 
 <block type="introduction" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data='{"value":[{"children":[{"text":"Highlight Title H2 "}],"type":"h2"}]}' />
 
-<block type="slate">
-
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat.&#x20;
-
-</block>
 
 <block type="separator">
 
@@ -190,21 +186,9 @@ Text can be **bold** or *Italic*.
 
 </block>
 
-<block type="slate">
+<block type="slate" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data='{"styles":{},"value":[{"children":[{"text":""},{"children":[{"text":"Link internal "}],"data":{"url":"/docs/examples/button"},"type":"link"},{"text":""}],"type":"p"}]}' />
 
-[Link internal ](/docs/examples/button)
-
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data='{"styles":{}}' />
-
-</block>
-
-<block type="slate">
-
-[Link external](https://www.google.com)
-
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data='{"styles":{}}' />
-
-</block>
+<block type="slate" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data='{"styles":{},"value":[{"children":[{"text":""},{"children":[{"text":"Link external"}],"data":{"url":"https://www.google.com"},"type":"link"},{"text":""}],"type":"p"}]}' />
 
 <block type="separator">
 

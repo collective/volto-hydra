@@ -45,11 +45,7 @@ prototypes: |
 
 # 
 
-<block type="slate">
-
 A carousel/slider that cycles through slides. Slides are stored as an object\_list — each slide has a title, description, image, and optional button.
-
-</block>
 
 <block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-slider" slotId="schema">
 

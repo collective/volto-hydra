@@ -46,11 +46,7 @@ prototypes: |
 
 # 
 
-<block type="slate">
-
 Renders entries from an external RSS feed. Its items are fetched at render time (by a fetcher you provide) and shown with a configurable item type (variation).
-
-</block>
 
 ## Live example
 

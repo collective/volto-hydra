@@ -69,11 +69,7 @@ prototypes: |
 
 # 
 
-<block type="slate">
-
 A table with rich text (Slate) content in each cell. Supports adding/removing rows and columns via toolbar actions.
-
-</block>
 
 <block type="image" url="/docs/images/table-edit" alt="The table example block being edited in Volto Hydra" align="center" size="l" />
 

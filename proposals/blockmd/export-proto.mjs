@@ -28,8 +28,8 @@ const PROTO_TEXT = {
   title: '<block type="title" _="${h1}" />',
   slate: '<block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />',
   separator: '<block type="separator" _="${hr}" />',
-  button: '<block type="button" title="${p/text}" href="${p/link}" />',
-  teaser: '<block type="teaser" title="${h/text}" href="${h/link}" description="${p/text}" />',
+  button: '<block type="button" title="${a/text}" href="${a/link}" />',
+  teaser: '<block type="teaser" title="${h/text}" description="${p/text}" href="${a/linkitem}" />',
   image: [
     '<block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />',
     '<block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />',

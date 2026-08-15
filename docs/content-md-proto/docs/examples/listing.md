@@ -59,11 +59,7 @@ prototypes: |
 
 # 
 
-<block type="slate">
-
 Displays a list of content items from a query. The listing block fetches items from the Plone catalog based on a querystring and renders each item using a configurable item type (variation). Built-in item types are default (title + description) and summary (title + description + image).
-
-</block>
 
 <block type="image" url="/docs/images/listing-edit" alt="The listing example block being edited in Volto Hydra" align="center" size="l" />
 

@@ -68,27 +68,15 @@ prototypes: |
 
 # 
 
-<block type="slate">
-
 Click into any text in the preview that's marked inline-editable and start typing. There are two kinds of text fields: **simple text** (like a title) and **slate** (rich text — the body of a paragraph block, descriptions, etc.).
-
-</block>
 
 ## Simple text
 
-<block type="slate">
-
 Click and type. `Enter` splits the field into two text blocks (when supported); `Backspace` at the start joins back. That's it.
-
-</block>
 
 ## Slate (rich text)
 
-<block type="slate">
-
 Slate fields are richer:
-
-</block>
 
 - Select text → the Quanta toolbar shows formatting options.
 - Apply marks: **Bold**, *Italic*, ~~Strikethrough~~ via toolbar buttons or keyboard shortcuts.
@@ -97,11 +85,7 @@ Slate fields are richer:
 
 ## Markdown shortcuts
 
-<block type="slate">
-
 When you're typing in a slate field, certain markdown patterns are converted automatically:
-
-</block>
 
 ### Block-level (start of a line, then space)
 
@@ -132,52 +116,28 @@ When you're typing in a slate field, certain markdown patterns are converted aut
 
 ### Backspace-at-start: unwrap
 
-<block type="slate">
-
 Press `Backspace` at the very start of a heading, list item, or blockquote and it converts back to a plain paragraph. Use this when a markdown shortcut grabbed you a heading you didn't actually want.
-
-</block>
 
 ## The slash menu
 
-<block type="slate">
-
 Type `/` at the start of an empty text block to open a menu of block types you can convert to (heading, image, list, your custom blocks, …). Keep typing to filter (`/he` filters to heading); `Enter` picks the highlighted result; `Escape` dismisses without changing anything.
-
-</block>
 
 <block type="image" url="/docs/images/slash-menu" alt="Empty paragraph showing the slash menu listing block types — Accordion, Columns, Description, etc." align="center" size="l" />
 
-<block type="slate">
-
 The slash menu changes the block's `@type`. If you wanted to add a *new* block, see [Adding and moving blocks](adding-and-moving-blocks.md) instead.
-
-</block>
 
 ## Splitting and joining paragraphs
 
-<block type="slate">
-
 Inside a slate paragraph block:
-
-</block>
 
 - `Enter` splits at the cursor — the part after the cursor becomes a new block of the same type.
 - `Backspace` at the start of a block joins it with the previous block (text merges, cursor lands at the join point).
 
-<block type="slate">
-
 These work the same in headings and lists.
-
-</block>
 
 ## Saving
 
-<block type="slate">
-
 There's no "save" inside a field — every keystroke is reflected in the page state, and changes are saved when you click the toolbar's **Save** button. Until you save, the green-dot/save indicator shows there are unsaved changes.
-
-</block>
 
 ## Things you can't do (yet)
 

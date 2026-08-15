@@ -44,11 +44,7 @@ prototypes: |
 
 # 
 
-<block type="slate">
-
 A full-width hero section with heading, subheading, image, rich text description, and a call-to-action button. Demonstrates multiple field types in a single block: string, textarea, slate, image, and object\_browser.
-
-</block>
 
 <block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-hero" slotId="schema">
 

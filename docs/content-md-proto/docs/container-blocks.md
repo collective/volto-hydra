@@ -140,36 +140,20 @@ prototypes: |
 
 # 
 
-<block type="slate">
-
 A block — or the page itself — is divided into **regions**, and each region holds an ordered list of blocks. Sliders have a slides region, grids have columns, accordions have panels; a page has its main `items` region (and optionally a header, footer, …).
 
-</block>
-
-<block type="slate">
-
 You declare regions in your `blockSchema` (or the page schema), and **you choose how each region is stored in the JSON**:
-
-</block>
 
 - **`blocks_layout`** — the region's *ordering* is a named list inside the parent's shared `blocks_layout` dict, and the blocks themselves live in the parent's shared `blocks` dict. This is the default, and it's what persists through the backend (see [Why these persist](#why-these-persist-and-separate-top-level-fields-dont)).
 - **`object_list`** — the region is stored inline, as an array of objects on the field itself.
 
-<block type="slate">
-
 Both look and behave the same in the editor — selecting, dragging, nesting — and blocks can be dragged from one to the other; only the JSON storage differs.
-
-</block>
 
 ---
 
 ## blocks\_layout: a region in the shared dict
 
-<block type="slate">
-
 Each child has its own `@type` and schema (from `blocks`). The blocks live in the parent's shared `blocks` dict; the region's name is a key in the parent's shared `blocks_layout` dict that holds the ordering:
-
-</block>
 
 <block type="codeExample">
 
@@ -198,27 +182,15 @@ slides: {
 
 </block>
 
-<block type="slate">
-
 A block can declare several `blocks_layout` regions; they all share the one `blocks` dict, and each region gets its own list under `blocks_layout`.
-
-</block>
 
 <block type="slate" data='{"value":[{"type":"blockquote","children":[{"type":"strong","children":[{"text":"The region name is a key inside "},{"type":"code","children":[{"text":"blocks_layout"}]},{"text":" — not a top-level field."}]},{"text":" The ordering list lives at "},{"type":"code","children":[{"text":"blocks_layout.<region>"}]},{"text":" (a plain array of ids). A tempting mistake is to store it as a top-level field named after the region:  "},{"text":"<!-- codeExample: json -->"},{"text":" "},{"type":"code","children":[{"text":"json // ✅ CORRECT — ordering keyed inside the shared blocks_layout dict { \"@type\": \"slider\", \"blocks\": { … }, \"blocks_layout\": { \"slides\": [\"slide-1\", \"slide-2\"] } }  // ❌ WRONG — an ad-hoc top-level `slides` field holding { items: [...] } { \"@type\": \"slider\", \"blocks\": { … }, \"slides\": { \"items\": [\"slide-1\", \"slide-2\"] } } "}]},{"text":"  The wrong form may "},{"type":"em","children":[{"text":"look"}]},{"text":" fine in a frontend that reads it back the same way, but "},{"type":"code","children":[{"text":"slides"}]},{"text":" is "},{"type":"strong","children":[{"text":"not a registered field"}]},{"text":", so the backend "},{"type":"strong","children":[{"text":"silently drops it on save"}]},{"text":" (see "},{"type":"link","data":{"url":"#why-these-persist-and-separate-top-level-fields-dont"},"children":[{"text":"Why these persist"}]},{"text":") — and tools that walk the shared dict (the block path map, the sanity checks, the editor&#39;s reorder/drag) never see the region, because they look under "},{"type":"code","children":[{"text":"blocks_layout"}]},{"text":", never at a field named for the region. Renderers must read the ordering from "},{"type":"code","children":[{"text":"blocks_layout[<region>]"}]},{"text":", not from "},{"type":"code","children":[{"text":"<region>.items"}]},{"text":"."}]}]}' />
 
 ## Multiple regions
 
-<block type="slate">
-
 A container (or the page) can declare more than one **region** — each a schema property with its own `allowedBlocks`. The default region is `items`.
 
-</block>
-
-<block type="slate">
-
 Storage is a property of **each region, not the container**: every region independently chooses `widget: 'blocks_layout'` or `widget: 'object_list'`, and a single container may **mix** them — e.g. a `blocks_layout` region for body content alongside an `object_list` region for a set of inline cards. A blocks\_layout region keys its ordering inside the shared `blocks_layout` dict (its children in the shared `blocks` dict); an object\_list region stores its items inline on its own field. So "is this container object\_list or blocks\_layout?" is never a meaningful question — you look at the region. Every blocks\_layout region's children still share the one `blocks` dict; the regions only partition *ordering*.
-
-</block>
 
 <block type="codeExample">
 
@@ -249,33 +221,17 @@ properties: {
 
 </block>
 
-<block type="slate">
-
 Each blocks field has its own `allowedBlocks` / `maxLength`. A declared field appears in the editor even when empty (it gets a seeded empty block so it is editable and a drop target).
-
-</block>
 
 ### Why these persist (and separate top-level fields don't)
 
-<block type="slate">
-
 `blocks_layout` regions live as **keys inside the registered `blocks_layout` dict** rather than as separate top-level fields (the older `header_blocks` / `footer_blocks` style) for one concrete reason: **persistence**.
-
-</block>
-
-<block type="slate">
 
 The backend deserializer only saves values for **registered fields**. `blocks` and `blocks_layout` are registered behavior fields, so the entire `blocks_layout` dict — every list inside it — is stored verbatim. An ad-hoc top-level field like `footer_blocks` is **not** a registered field, so the backend **silently drops it on save**. (A footer might still appear on the live site if a layout template re-injects it on every load — but that footer is never actually persisted.) Keeping every region inside the registered `blocks_layout` dict makes them all persist for real.
 
-</block>
-
 ## object\_list: a region stored inline
 
-<block type="slate">
-
 The other storage choice for a region. Instead of ordering in the shared `blocks_layout` dict, all items share one inline schema and are stored as an array with an ID field, at the field itself. (To place the array deeper — e.g. `block.table.rows` — nest the field inside a `widget: 'object'`; see below.)
-
-</block>
 
 <block type="codeExample">
 
@@ -310,11 +266,7 @@ slides: {
 
 ## object\_list with allowedBlocks: Typed Items
 
-<block type="slate">
-
 When `allowedBlocks` is set on an `object_list`, items can have different types (like `blocks_layout`) but are still stored as an array. Each item's type is stored in the field specified by `typeField` (defaults to `'@type'`) and its schema is looked up from `blocks`:
-
-</block>
 
 <block type="codeExample">
 
@@ -343,25 +295,13 @@ facets: {
 
 </block>
 
-<block type="slate">
-
 Both `blocks_layout` and `object_list` look the same in the editing UI and blocks can be dragged between them — data is automatically adapted when moving between formats (ID fields added/stripped, type fields set appropriately).
-
-</block>
 
 ## widget: 'object': nesting fields (and containers) inside a block field
 
-<block type="slate">
-
 A `widget: 'object'` field groups sub-fields under one key. Its `schema.properties` are first-class — plain fields OR nested containers — and everything nests **inside** the object, exactly where the schema puts it. No `dataPath` indirection.
 
-</block>
-
-<block type="slate">
-
 An **`object_list`** inside an object stores its array at `object.<field>`:
-
-</block>
 
 <block type="codeExample">
 
@@ -382,11 +322,7 @@ table: {
 
 </block>
 
-<block type="slate">
-
 A **`blocks_layout`** inside an object makes the object its own mini-container: it holds its own `blocks` dict + `blocks_layout`, just like a columns/grid container block, one level deeper:
-
-</block>
 
 <block type="codeExample">
 
@@ -403,31 +339,15 @@ table: { widget: 'object', schema: { properties: {
 
 </block>
 
-<block type="slate">
-
 A **plain field** inside an object is edited in the canvas like any top-level field — address it inline with its `/`-path (`data-edit-text="content/headline"`, and the same for `data-edit-link` / `data-edit-media`). The object is *transparent*: `content/headline` writes back to `block.content.headline`, never a flat key. See [Field Path Syntax](visual-editing.md#field-path-syntax) for the full grammar (`/` object descent, `..` = parent block, `/field` = page).
-
-</block>
-
-<block type="slate">
 
 Blocks inside a nested container are edited in the canvas like any other container. The sidebar prefixes a nested container's **title** with the path (e.g. **Table / Rows**) so the nesting is visible.
 
-</block>
-
-<block type="slate">
-
 This replaces `dataPath`: declare the container inside the object rather than hoisting it to the block's top level with a `dataPath` back-reference.
-
-</block>
 
 ## Container schema reference
 
-<block type="slate">
-
 A block's schema is a standard [Volto block schema](https://6.docs.plone.org/volto/blocks/editcomponent.html) (fieldsets, `properties`, widgets, `default`, etc.). Inka reads three container-oriented `widget` values plus a few per-field keys — those are:
-
-</block>
 
 <block type="slateTable" table.fixed table.celled>
 
@@ -439,19 +359,11 @@ A block's schema is a standard [Volto block schema](https://6.docs.plone.org/vol
 
 </block>
 
-<block type="slate">
-
 All three can nest inside `object`, and a container may mix a `blocks_layout` region and an `object_list` region. Everything else in a field def (`title`, `default`, `type`, `choices`, `mode`, …) is plain Volto and behaves as documented there.
-
-</block>
 
 ## Rendering Containers in Your Frontend
 
-<block type="slate">
-
 Add `data-block-uid` to each child element. You don't need to mark the container element itself:
-
-</block>
 
 <block type="codeExample">
 
@@ -481,11 +393,7 @@ Add `data-block-uid` to each child element. You don't need to mark the container
 
 ## Table Mode
 
-<block type="slate">
-
 Set `addMode: 'table'` for table-like structures (rows containing cells). This lets users add and remove columns as easily as rows. The rows live inside a `table` object field (`block.table.rows`) — no `dataPath`:
-
-</block>
 
 <block type="codeExample">
 
@@ -517,35 +425,19 @@ table: {
 
 ## Empty Blocks
 
-<block type="slate">
-
 A container region can never be truly empty. When its last child is deleted, Inka fills it back in — but *what* it inserts depends on the region's config:
-
-</block>
 
 - If the region has a **`defaultBlockType`**, that type is added.
 - If the region allows exactly **one** `allowedBlocks` type, that type is added.
 - Only when the region has **no `defaultBlockType` and more than one `allowedBlocks`** is the choice ambiguous — so Inka inserts a placeholder child with `@type: "empty"` and shows a '+' for the user to pick a type in place.
 
-<block type="slate">
-
 So the simplest way to never deal with empty placeholders in a region is to give it a `defaultBlockType` (or a single-entry `allowedBlocks`). Otherwise your frontend must render `empty`.
-
-</block>
-
-<block type="slate">
 
 Empty blocks are stripped before saving. Render them as empty space; Inka puts a '+' button in the middle for the user to pick a real type in place. You can override the look of that '+' by rendering something inside the empty block and adding `data-block-add="button"` to it.
 
-</block>
-
 ### Making a region empty by default — `defaultBlockType: "empty"`
 
-<block type="slate">
-
 The rules above mean a region with a `defaultBlockType`, or a single-entry `allowedBlocks`, is *never* empty — it always seeds a block of that type. To declare a region that should sit **empty until an editor adds something**, while still restricting **what** they can add, set **`defaultBlockType: "empty"`** and do **not** list `"empty"` in `allowedBlocks`:
-
-</block>
 
 <block type="codeExample">
 
@@ -562,47 +454,23 @@ announcement: {
 
 </block>
 
-<block type="slate">
-
 This is the one case where `"empty"` is a **configured** default rather than the fallback Inka inserts for an ambiguous region. The seed and the add diverge on purpose:
-
-</block>
 
 - **Passive seed** (region loaded, or its last child deleted): Inka seeds a bare `@type: "empty"` placeholder — nothing renders. `defaultBlockType` wins over the single-`allowedBlocks` auto-fill, so the region genuinely shows empty.
 - **The '+' (active add / fill)**: inserts a real block from `allowedBlocks` (converting the empty placeholder **in place**), never another `empty`. The add path reads `allowedBlocks`, not `defaultBlockType` — so a single-entry `allowedBlocks` fills straight to that type with no chooser.
 - **`"empty"` is never in `allowedBlocks`** — it isn't a type an editor opts into; it's the "region is empty" state. On save the placeholder is stripped, so a genuinely-empty region persists with no blocks.
 
-<block type="slate">
-
 Use this for optional site chrome — e.g. a header announcement that is usually absent but can hold a single global alert when needed. (Because the seed is `"empty"`, the frontend must render `empty` as a selectable slot — see below.)
-
-</block>
-
-<block type="slate">
 
 **Forced regions are locked until unlocked.** When the region is a **forced layout** (`allowedLayouts`), it is template-controlled — its content lives in the shared template and is edited *centrally*, like a branded footer. So the seeded empty is stamped as a **locked template member** (`readOnly`, with the forced layout's `templateId`/`templateInstanceId`): it shows empty, but you cannot fill it until you **unlock** the template (enter template-edit-mode). This prevents an editor from silently filling it per-page — the announcement stays site-wide. Filling then happens in template-edit-mode and locking publishes it everywhere. (This stamping happens in the editor's empty-seeding — `ensureEmptyBlockIfEmpty` — so **view-mode merging still leaves an empty forced layout empty**; no empty is ever inserted at render time.)
 
-</block>
-
 ### `empty` is a universal placeholder — renderers must tolerate it
-
-<block type="slate">
 
 In a no-default, multi-allowed region, `@type: "empty"` can appear in **any** container — including transiently, the moment a child is deleted and before the user picks a replacement. You never list `"empty"` in `allowedBlocks`; it isn't a type you opt into. So every container renderer has to render an `empty` child without erroring.
 
-</block>
-
-<block type="slate">
-
 If your container renders its children by delegating each one to your central block dispatch (the function or component that switches on `@type`), you get this for free — just give that dispatch an `empty` case that renders a selectable placeholder.
 
-</block>
-
-<block type="slate">
-
 The trap is a **custom** container renderer that only expects specific child types — a `contextNavigation` that walks `navItem`/`listing` children, say. Don't hand-roll an allow-list that rejects anything else, or a seeded `empty` will throw and break the whole container. Route non-special children through your central dispatch instead of throwing:
-
-</block>
 
 <block type="codeExample">
 
@@ -619,28 +487,16 @@ for (const childId of items) {
 
 </block>
 
-<block type="slate">
-
 Two more things a renderer must survive once the user picks a type for a seeded empty:
-
-</block>
 
 - **Re-render on the type change.** The child's `@type` flips from `empty` to the picked type in place (same `data-block-uid`). If your renderer memoises or does its work once (e.g. an async setup), make sure it re-runs when a child's type changes — otherwise it keeps showing the stale `empty`.
 - **Tolerate a freshly-typed child with no data yet.** A just-picked `navItem` has no `href`; a just-picked form field has no value — render a placeholder, don't crash on the missing field.
 
 ## Synchronised Block Types in a Container
 
-<block type="slate">
-
 You can have one container type whose children are all kept the same `@type`, with the editor picking that type once on the parent. When the type changes, every child is converted (using each child's `fieldMappings`); when a new child is added it gets the selected type.
 
-</block>
-
-<block type="slate">
-
 Declare `itemTypeField` on the *blocks field* — its value names a sibling field on the same schema whose value drives every child's `@type`. The sibling field is typically rendered with `widget: 'blockTypeSelect'`, which computes its `choices` from the blocks field's `allowedBlocks` at render time:
-
-</block>
 
 <block type="codeExample">
 
@@ -677,19 +533,11 @@ blocks: {
 
 </block>
 
-<block type="slate">
-
 The relationship is local: read the schema and you can see "the children of `slides` get their `@type` from `variation`" right next to the field declaration. Works the same for `widget: 'blocks_layout'` and `widget: 'object_list'` children.
-
-</block>
 
 ### Field-value syncing
 
-<block type="slate">
-
 On top of type syncing you can also have field *values* centrally controlled at the parent — set once on the parent, applied to every child. Add ONE enhancer on the parent:
-
-</block>
 
 <block type="codeExample">
 
@@ -709,20 +557,12 @@ gridBlock: {
 
 </block>
 
-<block type="slate">
-
 `inheritSchemaFrom` does two things automatically:
-
-</block>
 
 1. Surfaces the **parent-claimed** fields on the parent's sidebar under an "Item Defaults" fieldset.
 2. Auto-hides the same fields on every child's sidebar (via a `hideParentOwnedFields` enhancer that's applied to every block at INIT — no per-child opt-in).
 
-<block type="slate">
-
 The parent declares **what it claims** per child block type via `parentControlled`. If absent, the default is: parent claims everything *not* listed in the child's `fieldMappings['@default']` mapping. The default works for typical cases; set `parentControlled` only when you want a different split (e.g. keep a meta-toggle field editable per-child):
-
-</block>
 
 <block type="codeExample">
 
@@ -746,11 +586,7 @@ listing: {
 
 </block>
 
-<block type="slate">
-
 When `parentControlled[childType]` is set, it **replaces** the `@default` fallback for that child type. Both sides — the parent's "Item Defaults" fieldset and the child's hidden fields — are computed from the same single rule, so they can never get out of sync.
-
-</block>
 
 ### Recipe options
 

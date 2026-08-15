@@ -44,11 +44,7 @@ prototypes: |
 
 # 
 
-<block type="slate">
-
 A horizontal multi-column container. The block has one slot — columns — restricted to column children, capped at four. Each column is itself a container holding any of its allowed inner block types (slate, image, …).
-
-</block>
 
 <block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-columns" slotId="schema">
 

@@ -115,21 +115,13 @@ prototypes: |
 
 # 
 
-<block type="slate">
-
 Templates allow editors to centrally control content and reuse content. They allow a developer to not have to hard code layout decisions and instead use rules to apply user layouts in template content stored separately from the page, or give the user a choice on which layout they want.
-
-</block>
 
 ---
 
 ## Template Concepts
 
-<block type="slate">
-
 Templates:
-
-</block>
 
 - Can be created from any blocks
 - Are always edited in-context in the current page (user can switch in and out of template edit mode)
@@ -137,21 +129,13 @@ Templates:
 - `allowedTemplates` and `allowedLayouts` applied to the blocks schema let the developer control loading templates: which templates are available for use, which are automatically applied as layouts, and which the editor can switch between
 - During rendering, the frontend can use the provided helper (`expandTemplates` / `expandTemplatesSync`) to refresh templates found in the page content from the template content, and apply layouts based on rules (such as forcing a layout based on content type or metadata). Alternatively the frontend can write its own merge logic.
 
-<block type="slate">
-
 Templates are analogous to blocks themselves but are made up of blocks with special properties. Each block in a template can be one of:
-
-</block>
 
 - **Fixed + ReadOnly** — can't be edited or moved (e.g. branded headers/footers). Similar to fixed hard-coded HTML in a block.
 - **Fixed** — can be edited but not moved (e.g. required sections). Similar to a block field.
 - **Slot** (`fixed: false` / unset) — a named region (`slotId`) where editors can add their own blocks. Similar to a block field. The `"default"` slot receives leftover content.
 
-<block type="slate">
-
 The slot a block lives in is identified by its `slotId`. This is the field name used by `expandTemplates` / `expandTemplatesSync` and by the merge rules below — not `placeholder`.
-
-</block>
 
 <block type="codeExample">
 
@@ -173,45 +157,25 @@ The slot a block lives in is identified by its `slotId`. This is the field name 
 
 ## Editing a template (central control)
 
-<block type="slate">
-
 The point of a template is that its locked parts are authored **once** and update **everywhere**. Templates are stored as their own normal content documents; a page only *references* one — its blocks carry the `templateId`. On render the merge injects the template's `fixed` / `fixed+readOnly` blocks and fills the slots with the page's own content.
 
-</block>
-
-<block type="slate">
-
 To change a template for every page that uses it:
-
-</block>
 
 1. On a page using the template, toggle **template edit mode** (the `editTemplate` control on the block).
 2. Edit the `fixed` / `fixed+readOnly` blocks — in template edit mode these become editable; normally they're locked.
 3. Save. The edits are written **back into the template document**, so every page that uses that template shows the change on its next render.
 
-<block type="slate">
-
 What propagates and what doesn't:
-
-</block>
 
 - **`fixed` / `fixed+readOnly` blocks edited in template edit mode** → propagate to all pages using the template (template-controlled).
 - **Slot content** (blocks editors add into a slot) is **per-page** — it lives on the page and is never written back to the template.
 - Editing a `fixed` block's content in *normal* mode overrides it for **that page only**; the template's version stays the default for other pages.
 
-<block type="slate">
-
 **Reusing a template multiple times:** a page may apply the same template more than once (e.g. two of the same layout or snippet). Each use is a distinct *instance*; the merge gives every instance its own block ids, so they never collide.
-
-</block>
 
 ## Which mechanism for which use case?
 
-<block type="slate">
-
 The two configurations below look similar but solve different problems. Pick by **who controls the structure** and **whether it repeats**:
-
-</block>
 
 <block type="slateTable" table.fixed table.celled>
 
@@ -223,61 +187,33 @@ The two configurations below look similar but solve different problems. Pick by 
 
 </block>
 
-<block type="slate">
-
 A **branded header/footer is the canonical `allowedLayouts` case**, *not* `allowedTemplates`: don't make the footer a `templateId` block the editor inserts — force a layout across the footer field. Within that layout, each block declares how locked it is:
-
-</block>
 
 - **`fixed: true, readOnly: true`** — can't be edited or moved (logo, branded chrome).
 - **`fixed: true`** — content-editable but not movable (a required section).
 - **slot** (`fixed` unset, with `slotId`) — a region where editors add their own blocks; the `"default"` slot receives leftover content.
 
-<block type="slate">
-
 For a fully-fixed branded footer, leave the blocks **field empty** (`{items: []}`) and let the layout content item supply everything — then editing the layout updates every page.
-
-</block>
 
 ### Block structure inside a template (read this before debugging an empty merge)
 
-<block type="slate">
-
 **Nested containers are fully supported** (e.g. a branded footer built as a `columns` block). The merge recurses into any field whose `.items` array lists the block's nested block IDs — a `blocks_layout`-widget field of **any name** (a `columns` block's `columns` field counts). Two rules for nested content:
-
-</block>
 
 - Pair every nested `blocks` map with such a sibling layout field (or the merge throws "no sibling field whose `.items` array lists those block IDs").
 - Give **every** block a `slotId` — the container, each column, and each block inside each column. A unique id per block (e.g. the block's own uid) works.
 
-<block type="slate">
-
 So a branded footer is, end to end: a `columns` block (`slotId`, `fixed`, `readOnly`) → each `column` (`slotId`, `fixed`, `readOnly`) → each leaf block (`slotId`, `fixed`, `readOnly`).
-
-</block>
 
 ### object\_list containers (sliders, tables)
 
-<block type="slate">
-
 A container lays out its children one of two ways, and the merge treats **both the same** — as an ordered region of child blocks:
-
-</block>
 
 - **`blocks_layout`** (columns, grid): children live in the block's shared `blocks` map, ordered by a `blocks_layout` region (as above).
 - **`object_list`** (a slider's slides, a table's rows): children are an **inline array** of block objects, each identified by an **id field** (`@id` by default).
 
-<block type="slate">
-
 Everything else is identical: every object\_list item still needs a `slotId` (plus `templateId` / `fixed` / `readOnly` as appropriate), and a slot item fills from the page's content just like a `blocks_layout` slot.
 
-</block>
-
-<block type="slate">
-
 The merge identifies object\_list items by their **id field**, and it varies per field — a form's `subblocks` key on `field_id`, a slider's `slides` on `@id`, a table's `rows` on `key`. A frontend has no schema, so whenever you expand a template or layout that contains an object\_list container you MUST tell the merge each field's id field via an **`idFieldMap`** (`{ blockType: { field: idField } }`). Without it the merge falls back to `@id` — and for a `field_id`-keyed field that mints a broken id and the item is dropped on the next merge.
-
-</block>
 
 <block type="codeExample">
 
@@ -295,19 +231,11 @@ const items = expandTemplatesSync(layout, {
 
 </block>
 
-<block type="slate">
-
 (On the admin this map is derived from the block schema automatically. When you re-enter to expand a **single** object\_list array on its own, the `idField` shorthand is enough: `expandTemplatesSync(block.slides, { templateState, templates, idField: '@id' })`.)
-
-</block>
 
 ## allowedTemplates vs allowedLayouts
 
-<block type="slate">
-
 Configure templates in `page.schema.properties` on the blocks field:
-
-</block>
 
 <block type="codeExample">
 
@@ -335,31 +263,19 @@ initBridge({
 
 ## Applying Merge Rules
 
-<block type="slate">
-
 Use `expandTemplates` (async) or `expandTemplatesSync` (sync with pre-fetched templates) to merge template content during rendering.
-
-</block>
 
 - **Edit Mode**: These functions auto-detect edit mode via `isEditMode()` and pass blocks through unchanged (just adding `@uid`). The admin handles template merging and adds `nodeId` attributes for inline editing.
 - **SSR**: On SSR (no window), `isEditMode()` returns false so templates are expanded — this is correct since edit mode only exists in the browser iframe.
 
-<block type="slate">
-
 **Sync vs Async**:
-
-</block>
 
 - **`expandTemplatesSync`** — Use when templates are pre-fetched at page load. Better for Vue computed properties since it's synchronous.
 - **`expandTemplates`** — Use when you need to lazy-load templates on demand. Handles on-demand loading of forced layouts not in page data.
 
 ## Pre-loading with loadTemplates
 
-<block type="slate">
-
 **`loadTemplates(data, loadTemplate)`** scans page data for `templateId` references and loads them all in parallel. It follows nested references (templates referencing other templates) and has a 5s per-template timeout. It only loads templates actually in the page data — `allowedLayouts` options are loaded on demand when a forced layout is applied.
-
-</block>
 
 <block type="codeExample">
 
@@ -398,11 +314,7 @@ for (const item of items) {
 
 </block>
 
-<block type="slate">
-
 Options:
-
-</block>
 
 - **`blocks`**: Map of blockId -> block data
 - **`templateState`**: Create a fresh `{}` **once per page render** and share it across **every** `expandTemplatesSync`/`expandTemplates` call — top-level and every nested container / object\_list re-entry. It records the template instances minted this render so a re-entry is recognized as already-expanded content and passed through. **Never reset or recreate it mid-render** (e.g. don't `templateState = {}` again before rendering, and don't pass a fresh `{}` per call): wiping it drops the minted instances, so re-entries re-apply the template instead of passing through — infinite recursion / blank page. Recognition is **data-derived** (by `templateInstanceId`), so it is safe to hand blocks back as a Vue reactive value, a clone, or a `postMessage` copy — no `toRaw` needed. (In Vue/React, provide it once at the page root via provide/inject or context; see `examples/nuxt-blog-starter` and `examples/hydra-nextjs`.)
@@ -412,22 +324,14 @@ Options:
 
 ## How the Merge Works
 
-<block type="slate">
-
 The merge algorithm follows these rules:
-
-</block>
 
 1. Remove the blocks with the `templateId` to replace, storing any that aren't fixed and readOnly by `slotId`.
 2. Insert in their place the template content: if fixed and readOnly, just insert it; if fixed, copy block content (not including block fields) from a page block with the same `slotId`; if a slot block, don't insert it, but insert the previous blocks with the same `slotId`.
 3. Recursively replace any block fields using the same rules.
 4. Any slot blocks left over are inserted at the end of a special slot called `"default"` if it exists, otherwise are dropped.
 
-<block type="slate">
-
 When a layout is applied, the rules are the same but applied across a whole blocks field. Content without a `slotId` ends up:
-
-</block>
 
 - In the `"default"` slot if it exists
 - In the bottom slot outside the last fixed template block
@@ -448,17 +352,9 @@ After:   [Fixed Header] [User Block A] [User Block B] [Fixed Footer]
 
 ## Forcing Layouts
 
-<block type="slate">
-
 A **forced layout** (`allowedLayouts`) is applied **automatically across a whole blocks field** — unlike a **snippet** (`allowedTemplates`), which the *editor* inserts as a block where they choose (see the decision table above). Forcing is **your frontend's** call: you pass `allowedLayouts`, so you decide **which** layout to force and **when**.
 
-</block>
-
-<block type="slate">
-
 Pass a static layout to always force one (e.g. a footer):
-
-</block>
 
 <block type="codeExample">
 
@@ -482,11 +378,7 @@ const items = await expandTemplates(layout, {
 
 ### Choosing the layout with your own rules
 
-<block type="slate">
-
 `allowedLayouts` is just a value you compute, so apply whatever rule you like — content type, metadata, route, A/B bucket — then pass the result. Pass `undefined` (or omit it) to force nothing; pass **several** to let the editor pick from the Layout dropdown (include `null` for a "no layout" option).
-
-</block>
 
 <block type="codeExample">
 
@@ -509,8 +401,4 @@ const items = await expandTemplates(layout, {
 
 </block>
 
-<block type="slate">
-
 Note: during editing the admin side will load the templates so in order to apply the same rules of forcing a layout you will need to set `allowedLayouts` in `page.schema.properties` to ensure the page loads with the right template.
-
-</block>

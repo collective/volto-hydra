@@ -27,8 +27,10 @@ const SRC = resolve(INKA, 'docs/content/content/content');
 // A resolved link summary carries only `@id` when authored; the stored JSON has
 // the target's brain resolved in. The markdown owns the `@id`; the API restores
 // the rest. So compare links on the target alone (see the /link widget).
-const isLinkSummary = (o) => o && typeof o === 'object' && '@id' in o
-  && ('Title' in o || 'Description' in o || 'hasPreviewImage' in o);
+const LINK_KEYS = new Set(['@id', '@type', 'title', 'Title', 'description', 'Description',
+  'hasPreviewImage', 'getRemoteUrl', 'head_title', 'image_field', 'image_scales', 'review_state']);
+const isLinkSummary = (o) => o && typeof o === 'object' && !Array.isArray(o)
+  && '@id' in o && Object.keys(o).every((k) => LINK_KEYS.has(k));
 
 /** Comparison view: drop derived/default-nothing, collapse link summaries. */
 function semantic(v) {
@@ -65,7 +67,31 @@ const canonId = (jsonId, rootId) => (jsonId === rootId ? '/' : jsonId);
 // No decode option: use the mount's default (decodeAuto), the exact server path.
 const { items } = readTree(MD);
 
-let pass = 0, blockDiff = 0, stateDiff = 0, error = 0, skip = 0, noOrder = 0;
+// Block types that RENDER their href summary. A teaser shows href[0].title /
+// description / hasPreviewImage when `overwrite` is off (teaser.md:80); a button
+// or link renders only href[0]['@id'] (button.md:70), so its embedded href.title
+// is edit-time cruft no consumer reads -- checking it would be a false positive.
+const RENDERS_HREF_SUMMARY = new Set(['teaser']);
+
+// The link collapse compares only @id, so a dropped rendered sub-field (a
+// teaser's href.title) would pass silently. Check the RENDERED href fields
+// directly: title is a hard requirement (the frontend shows it when overwrite is
+// off); hasPreviewImage is a reported residual (the clean link carries @id+title
+// but not the preview flag yet).
+function hrefRender(served, stored) {
+  const out = { titleBad: [], previewGap: 0 };
+  for (const [uid, sb] of Object.entries(stored)) {
+    if (!RENDERS_HREF_SUMMARY.has(sb['@type'])) continue;
+    const s = Array.isArray(sb.href) && sb.href[0]?.['@id'] ? sb.href[0] : null;
+    if (!s || s.title === undefined) continue; // no rendered title to preserve
+    const v = served?.[uid]?.href?.[0] ?? {};
+    if (v.title !== s.title) out.titleBad.push(`${sb['@type']} href.title ${JSON.stringify(v.title)}!=${JSON.stringify(s.title)}`);
+    if (s.hasPreviewImage && v.hasPreviewImage === undefined) out.previewGap += 1;
+  }
+  return out;
+}
+
+let pass = 0, blockDiff = 0, stateDiff = 0, error = 0, skip = 0, noOrder = 0, renderDiff = 0, previewGap = 0;
 const problems = [];
 for (const [id, item] of items) {
   // Blob items (Image/File synthesised from `blobs:`) have no data.json of
@@ -88,17 +114,24 @@ for (const [id, item] of items) {
   const folderishOk = orig.is_folderish === undefined || item.is_folderish === orig.is_folderish;
   if (item.getObjPositionInParent === undefined && orig.getObjPositionInParent != null) noOrder += 1;
 
+  const render = hrefRender(item.blocks, orig.blocks);
+  previewGap += render.previewGap;
+
   if (badUids.length || !layoutOk) {
     blockDiff += 1;
     problems.push(`BLOCKS ${id}: ${!layoutOk ? 'layout; ' : ''}${badUids.length} block(s) [${badUids.slice(0, 3).map((u) => orig.blocks[u]['@type']).join(', ')}]`);
   } else if (!parentOk || !folderishOk) {
     stateDiff += 1;
     problems.push(`STATE  ${id}: ${!parentOk ? 'parent ' : ''}${!folderishOk ? 'is_folderish' : ''}`);
+  } else if (render.titleBad.length) {
+    renderDiff += 1;
+    problems.push(`RENDER ${id}: ${render.titleBad.slice(0, 2).join('; ')}`);
   } else pass += 1;
 }
 
-console.log(`\nproto mount: ${pass} pass, ${blockDiff} block-diff, ${stateDiff} state-diff, ${error} error  (${skip} skipped)`);
+console.log(`\nproto mount: ${pass} pass, ${blockDiff} block-diff, ${stateDiff} state-diff, ${renderDiff} render-diff, ${error} error  (${skip} skipped)`);
 if (noOrder) console.log(`  gap: ${noOrder} item(s) have a JSON position but no sibling order (exporter does not yet emit \`order:\`)`);
+if (previewGap) console.log(`  gap: ${previewGap} teaser href(s) drop hasPreviewImage (clean link carries @id+title, not the preview flag)`);
 console.log('');
 for (const p of problems.slice(0, 30)) console.log(`  ${p}`);
 if (problems.length > 30) console.log(`  …and ${problems.length - 30} more`);

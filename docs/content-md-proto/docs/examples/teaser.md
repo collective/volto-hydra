@@ -49,7 +49,7 @@ assignments:
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
-  <block type="teaser" title="${h/text}" href="${h/link}" description="${p/text}" />
+  <block type="teaser" title="${h/text}" description="${p/text}" href="${a/linkitem}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="codeExample">
@@ -61,19 +61,17 @@ prototypes: |
 
 # 
 
-<block type="slate">
-
 A content preview card that links to another page. Selecting a target page via the object browser auto-fills the title, description, and preview image from that page. Editors can toggle "overwrite" to customize these values.
-
-</block>
 
 <block type="image" url="/docs/images/teaser-edit" alt="The teaser example block being edited in Volto Hydra" align="center" size="l" />
 
 <block type="teaser">
 
-## [Headline H2](/docs/examples/content-types/page)
+## Headline H2
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum.
+
+[Page](/docs/examples/content-types/page)
 
 <fields head_title="Head title" data='{"styles":{"align":"center"}}' />
 
@@ -81,9 +79,11 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 <block type="teaser">
 
-## [Headline H2](/docs/examples/content-types/page)
+## Headline H2
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea.
+
+[Page](/docs/examples/content-types/page)
 
 <fields head_title="Head title" data='{"styles":{"align":"left"}}' />
 
@@ -91,9 +91,11 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 <block type="teaser">
 
-## [Headline H2](/docs/examples/content-types/page)
+## Headline H2
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea.
+
+[Page](/docs/examples/content-types/page)
 
 <fields head_title="Head title" data='{"styles":{"align":"right"}}' />
 
@@ -101,9 +103,11 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 <block type="teaser">
 
-## [Headline H2](/docs/examples/content-types/page)
+## Headline H2
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum.
+
+[Page](/docs/examples/content-types/page)
 
 <fields data='{"styles":{"align":"center","backgroundColor":"grey"}}' />
 
@@ -111,9 +115,11 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 <block type="teaser">
 
-## [Headline H2](/docs/examples/content-types/page)
+## Headline H2
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea.
+
+[Page](/docs/examples/content-types/page)
 
 <fields data='{"styles":{"align":"left","backgroundColor":"grey"}}' />
 
@@ -121,9 +127,11 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 <block type="teaser">
 
-## [Headline H2](/docs/examples/content-types/page)
+## Headline H2
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea.
+
+[Page](/docs/examples/content-types/page)
 
 <fields data='{"styles":{"align":"right","backgroundColor":"grey"}}' />
 

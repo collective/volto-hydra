@@ -22,15 +22,21 @@ const INKA = resolve(HERE, '../..');
 const MD = resolve(INKA, 'docs/content-md-proto');
 const SRC = resolve(INKA, 'docs/content/content/content');
 
-// A resolved link summary: an object-browser value carries only `@id` when
-// authored, but the stored JSON has the target's brain (capitalised `Title`,
-// `Description`, `hasPreviewImage`, ...) resolved in. The markdown carries the
-// `@id` alone; the API re-resolves the summary at read time. So compare on the
-// target only, and count what we drop -- this is the one place parity is not
-// byte-exact, and it must not be silent.
+// A link value's stored JSON carries an embedded object-browser summary: `@id`
+// plus the picked item's fields. Plone does NOT resolve this on read -- 12 of 18
+// stored summaries here are STALE vs their target (a button href to `/` says
+// Title "Example" while `/` is titled "Inka"), which only happens if the summary
+// was embedded at edit time. Of those fields, the frontend renders only some:
+// a teaser shows lowercase `title`/`description`/`hasPreviewImage`, a button
+// shows nothing but `@id`. So we compare a link on `@id` (the collapse), and the
+// RENDERED sub-fields are checked separately by check-proto-mount -- the
+// capitalised brain keys (`Title`, `Description`, `@type`, ...) are unrendered
+// edit-time cruft. Count what we drop; it must not be silent.
 let linksCollapsed = 0;
-const isLinkSummary = (o) => o && typeof o === 'object' && '@id' in o
-  && ('Title' in o || 'Description' in o || 'hasPreviewImage' in o);
+const LINK_KEYS = new Set(['@id', '@type', 'title', 'Title', 'description', 'Description',
+  'hasPreviewImage', 'getRemoteUrl', 'head_title', 'image_field', 'image_scales', 'review_state']);
+const isLinkSummary = (o) => o && typeof o === 'object' && !Array.isArray(o)
+  && '@id' in o && Object.keys(o).every((k) => LINK_KEYS.has(k));
 
 /** Comparison view: drop plaintext, empty styles, empty text leaves, and the
  *  resolved half of a link summary. */
@@ -92,7 +98,7 @@ for (const md of walk(MD)) {
 }
 
 console.log(`\nparity: ${pass} pass, ${diff} diff, ${error} error  (${skip} skipped, no blocks)`);
-if (linksCollapsed) console.log(`  note: ${linksCollapsed} link summary compare(s) reduced to @id -- the resolved brain (Title/Description/hasPreviewImage) is the API's to restore, not stored in markdown\n`);
+if (linksCollapsed) console.log(`  note: ${linksCollapsed} link summary compare(s) reduced to @id -- the embedded brain is unrendered edit-time cruft; rendered href fields are checked by check-proto-mount\n`);
 else console.log('');
 for (const p of problems.slice(0, 30)) console.log(`  ${p}`);
 if (problems.length > 30) console.log(`  …and ${problems.length - 30} more`);

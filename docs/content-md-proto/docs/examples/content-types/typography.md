@@ -53,8 +53,8 @@ assignments:
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
-  <block type="button" title="${p/text}" href="${p/link}" />
-  <block type="teaser" title="${h/text}" href="${h/link}" description="${p/text}" />
+  <block type="button" title="${a/text}" href="${a/link}" />
+  <block type="teaser" title="${h/text}" description="${p/text}" href="${a/linkitem}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="slateTable">
@@ -81,9 +81,11 @@ prototypes: |
 
 <block type="teaser">
 
-### [Teaser Title (H2, 30/36px)](/docs/examples/content-types)
+### Teaser Title (H2, 30/36px)
 
 For grid blocks, the font of the headlines are variable, depending on the number of cells in the grid.
+
+[Content Types](/docs/examples/content-types)
 
 <fields data='{"head_title":null,"styles":{"align":"left"}}' />
 
@@ -97,9 +99,11 @@ For grid blocks, the font of the headlines are variable, depending on the number
 
 <block type="teaser">
 
-### [Teaser Title (H3, 24/30px)](/docs/examples/content-types)
+### Teaser Title (H3, 24/30px)
 
 Paragraph (p, 18px/24px). This section has a sample of content types available in this site.
+
+[Content Types](/docs/examples/content-types)
 
 <fields head_title="Teaser Headtitle (DIV, 14/18px)" data='{"styles":{"align":"left"}}' />
 
@@ -109,11 +113,7 @@ Paragraph (p, 18px/24px). This section has a sample of content types available i
 
 ## Text Heading H2 (H2, 30/36px)
 
-<block type="slate">
-
 Paragraph (p, 18px/24px)
-
-</block>
 
 - unordered list
 - unordered list
@@ -121,39 +121,19 @@ Paragraph (p, 18px/24px)
 1. ordered list
 2. ordered list
 
-<block type="slate">
-
 blockquote
-
-</block>
-
-<block type="slate">
 
 **bold** / italic / ~~strikethrough~~
 
-</block>
-
-<block type="slate">
-
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
-
-</block>
 
 ### Text Heading H3 (H3, 24/30px)
 
-<block type="slate">
-
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
-
-</block>
 
 <block type="introduction" data='{"value":[{"children":[{"text":"Text Heading H2 (H2, 36/48px)"}],"type":"h2"}]}' />
 
-<block type="slate">
-
 Paragraph text (p, 24/33px) -> Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
-
-</block>
 
 <block type="listing" block="875e2811-edb6-4842-8cc0-246fa1be6f58" headline="Heading (H2, 33/42px)" headlineTag="h2" variation="default" data='{"query":[],"querystring":{"limit":"5","query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["File","Document"]}],"sort_on":"effective","sort_order":"descending","sort_order_boolean":"descending"},"styles":{}}' />
 
