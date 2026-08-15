@@ -65,7 +65,25 @@ function originalFor(id) {
 const canonId = (jsonId, rootId) => (jsonId === rootId ? '/' : jsonId);
 
 // No decode option: use the mount's default (decodeAuto), the exact server path.
-const { items } = readTree(MD);
+const { items, blobFiles } = readTree(MD);
+
+// Images/files live in flattened dirs (docs-images-x-001/) with logical @ids, so
+// map @id -> its JSON by walking, not by path. Used to verify blob items, which
+// have no data.json at their content path.
+function walkFiles(dir, hits = []) {
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) walkFiles(p, hits);
+    else if (name === 'data.json') hits.push(p);
+  }
+  return hits;
+}
+const byId = {};
+for (const f of walkFiles(SRC)) {
+  try { const d = JSON.parse(readFileSync(f, 'utf-8')); if (d['@id']) byId[d['@id']] = d; } catch { /* skip */ }
+}
+const rootJsonId = Object.values(byId).find((d) => d['@type'] === 'Plone Site')?.['@id'];
+const jsonFor = (p) => byId[p] ?? Object.values(byId).find((d) => canonId(d['@id'], rootJsonId) === p);
 
 // Block types that RENDER their href summary. A teaser shows href[0].title /
 // description / hasPreviewImage when `overwrite` is off (teaser.md:80); a button
@@ -129,7 +147,25 @@ for (const [id, item] of items) {
   } else pass += 1;
 }
 
+// Blob items are reconstructed from `blobs:` (no data.json at their content
+// path), so verify against the JSON by @id, plus that the bytes are on disk.
+let blobOk = 0; const blobBad = [];
+for (const [p, file] of blobFiles) {
+  const it = items.get(p); const o = jsonFor(p);
+  if (!o) { blobBad.push(`${p}: no json`); continue; }
+  const field = it['@type'] === 'Image' ? 'image' : 'file';
+  const diffs = [];
+  for (const k of ['@type', 'id', 'UID', 'title', 'description', 'review_state', 'exclude_from_nav']) {
+    if (JSON.stringify(it[k]) !== JSON.stringify(o[k])) diffs.push(k);
+  }
+  if (it[field]?.size !== o[field]?.size) diffs.push('size');
+  if (!existsSync(file)) diffs.push('bytes-missing');
+  if (diffs.length) blobBad.push(`BLOB   ${p}: ${diffs.join(',')}`); else blobOk += 1;
+}
+problems.push(...blobBad);
+
 console.log(`\nproto mount: ${pass} pass, ${blockDiff} block-diff, ${stateDiff} state-diff, ${renderDiff} render-diff, ${error} error  (${skip} skipped)`);
+console.log(`blobs: ${blobOk}/${blobFiles.size} reconstruct (fields + size + bytes) vs JSON`);
 if (noOrder) console.log(`  gap: ${noOrder} item(s) have a JSON position but no sibling order (exporter does not yet emit \`order:\`)`);
 if (previewGap) console.log(`  gap: ${previewGap} teaser href(s) drop hasPreviewImage (clean link carries @id+title, not the preview flag)`);
 console.log('');

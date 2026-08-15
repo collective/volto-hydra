@@ -26,12 +26,27 @@ assignments:
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
-order:
-  - penguin2.jpg
-  - penguin4.jpg
-  - penguin3.jpg
-  - penguin1.jpg
-  - quadrant
+blobs:
+  - file: penguin2.jpg
+    uid: 05bace45294c45d5ab93de883e7ce702
+    id: penguin2.jpg
+    exclude_from_nav: false
+  - file: penguin4.jpg
+    uid: 0c351dd841c34c6da9c313b1bc551e34
+    id: penguin4.jpg
+    exclude_from_nav: false
+  - file: penguin3.jpg
+    uid: 7de78fea55354a29ad78b909efb07436
+    id: penguin3.jpg
+    exclude_from_nav: false
+  - file: penguin1.jpg
+    uid: 9abc1a813bcf46388e565b277bd8c6bf
+    id: penguin1.jpg
+    exclude_from_nav: false
+  - file: quadrant.svg
+    uid: quadrant-svg
+    title: CMS Quadrant
+    description: CMS landscape quadrant showing Visual Editing vs Frontend Freedom
 ---
 
 # 

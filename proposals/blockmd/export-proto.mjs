@@ -8,13 +8,17 @@
  *   node proposals/blockmd/export-proto.mjs [--out DIR]
  */
 import {
-  readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, readdirSync, statSync,
+  readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, readdirSync, statSync, copyFileSync,
 } from 'fs';
-import { join, dirname, resolve, basename } from 'path';
+import { join, dirname, resolve, basename, extname } from 'path';
 import { fileURLToPath } from 'url';
 import YAML from 'yaml';
 import { SERVER_STATE } from '../../lib/blockmd.mjs';
+import { blobDefaults, BLOB_FIELD } from '../../lib/markdown-mount.mjs';
 import { parsePrototypes, emitPage } from '../../lib/prototype-mapping.mjs';
+
+const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.avif']);
+const typeForFile = (f) => (IMAGE_EXT.has(extname(f).toLowerCase()) ? 'Image' : 'File');
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const INKA = resolve(HERE, '../..');
@@ -113,8 +117,10 @@ for (const f of walk(SRC)) {
 const ROOT = items.find((i) => i['@type'] === 'Plone Site')?.['@id'];
 const canon = (id) => (id === ROOT ? '/' : id);
 const hasKids = new Set(items.map((i) => canon((i.parent || {})['@id'] ?? '')).filter(Boolean));
-const childrenOf = new Map(); // folder path -> child ids, in document order
+const isBlob = (d) => BLOB_FIELD[d['@type']] && d[BLOB_FIELD[d['@type']]]?.blob_path;
+const childrenOf = new Map(); // folder path -> page child ids, in document order
 for (const d of items) {
+  if (isBlob(d)) continue; // a blob is carried in `blobs:`, not a nav child
   const pid = canon((d.parent || {})['@id'] ?? '');
   if (!pid || !d.id) continue;
   if (!childrenOf.has(pid)) childrenOf.set(pid, []);
@@ -129,9 +135,38 @@ const pathFor = (id, folderish) => {
 if (existsSync(OUT)) rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
 
-let pages = 0, tier3 = 0, clean = 0;
+const blobsByFolder = new Map(); // folder path -> blob entries
+let pages = 0, tier3 = 0, clean = 0, blobs = 0;
+const skipped = [];
 for (const d of items) {
   const id = canon(d['@id']);
+  const parentId = canon((d.parent || {})['@id'] ?? '');
+
+  // A blob (Image/File): the bytes go next to the parent's markdown and the
+  // identity is recorded in the parent folder's `blobs:` -- not written as a
+  // page. Only what the file cannot tell us is stored; the reader restores the
+  // rest from blobDefaults, so the two lists cannot drift.
+  const blobField = BLOB_FIELD[d['@type']];
+  if (blobField && d[blobField]?.blob_path) {
+    const meta = d[blobField];
+    const src = join(SRC, meta.blob_path);
+    if (!existsSync(src)) { skipped.push(`${id}: blob missing at ${meta.blob_path}`); continue; }
+    const file = meta.filename || basename(src);
+    const destDir = join(OUT, parentId.replace(/^\//, ''));
+    mkdirSync(destDir, { recursive: true });
+    copyFileSync(src, join(destDir, file));
+    blobs += 1;
+    const entry = { file, uid: d.UID };
+    if (d.id !== file.replace(/\.[^.]+$/, '')) entry.id = d.id;
+    if (d['@type'] !== typeForFile(file)) entry.type = d['@type'];
+    for (const [k, v] of Object.entries(blobDefaults(d['@type'], meta.filename))) {
+      if (d[k] !== undefined && JSON.stringify(d[k]) !== JSON.stringify(v)) entry[k] = d[k];
+    }
+    if (!blobsByFolder.has(parentId)) blobsByFolder.set(parentId, []);
+    blobsByFolder.get(parentId).push(entry);
+    continue;
+  }
+
   const folderish = hasKids.has(id) || d['@type'] === 'Plone Site';
   const dest = join(OUT, pathFor(id, folderish));
   mkdirSync(dirname(dest), { recursive: true });
@@ -155,25 +190,28 @@ for (const d of items) {
   }
 }
 
-// Second pass: fold sibling order into each folder's frontmatter. Insert it
-// textually before the closing `---` so the assignments/prototypes blocks are
-// left byte-for-byte intact (reparsing them would reformat the mapping).
+// Second pass: fold folder-level facts (sibling `order:` and `blobs:`) into each
+// folder's own frontmatter. Insert textually before the closing `---` so the
+// assignments/prototypes blocks stay byte-for-byte intact (reparsing them would
+// reformat the mapping).
 let ordered = 0;
-for (const [folderId, present] of childrenOf) {
+for (const folderId of new Set([...childrenOf.keys(), ...blobsByFolder.keys()])) {
   const target = join(OUT, pathFor(folderId, true));
-  if (!existsSync(target)) continue;
+  if (!existsSync(target)) { skipped.push(`${folderId}: has children/blobs but no index.md`); continue; }
+  const present = childrenOf.get(folderId) ?? [];
   const listed = toctreeOrder(folderId);
-  let order;
+  const fm = {};
   if (listed) {
     const known = listed.filter((id) => present.includes(id));
-    order = [...known, ...present.filter((id) => !known.includes(id))];
-  } else if (present.length > 1) order = present;
-  else continue;
-  const orderYaml = YAML.stringify({ order }).trim();
+    fm.order = [...known, ...present.filter((id) => !known.includes(id))];
+  } else if (present.length > 1) fm.order = present;
+  if (blobsByFolder.has(folderId)) fm.blobs = blobsByFolder.get(folderId);
+  if (!Object.keys(fm).length) continue;
   const text = readFileSync(target, 'utf8');
-  writeFileSync(target, text.replace(/\n---\n/, `\n${orderYaml}\n---\n`));
+  writeFileSync(target, text.replace(/\n---\n/, `\n${YAML.stringify(fm).trim()}\n---\n`));
   ordered += 1;
 }
 
-console.log(`\n${pages} pages, ${ordered} folders ordered -> ${OUT}`);
+console.log(`\n${pages} pages, ${blobs} blobs, ${ordered} folders annotated -> ${OUT}`);
+if (skipped.length) console.log(`  skipped: ${skipped.length}\n${skipped.slice(0, 10).map((s) => `    ${s}`).join('\n')}`);
 console.log(`~${tier3} tier-3 data tags of ${clean} blocks (${Math.round((1 - tier3 / clean) * 100)}% clean)`);

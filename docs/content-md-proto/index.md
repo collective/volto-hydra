@@ -66,9 +66,14 @@ prototypes: |
 order:
   - templates
   - images
-  - plone-foundation.png
   - docs
   - search
+blobs:
+  - file: image.png
+    uid: a5bf990b119747c4b2855fedc1ea0185
+    id: plone-foundation.png
+    title: Plone Foundation Logo
+    exclude_from_nav: false
 ---
 
 <block type="slate">

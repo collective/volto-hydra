@@ -31,15 +31,43 @@ order:
   - copy_of_news-item
   - copy_of_page
   - event
-  - example-image.jpg
   - external-link
-  - image-dark
-  - image-light
   - internal-link
   - link
   - news-item
   - page
   - typography
+blobs:
+  - file: danielle-barnes-kGNaS3lYCso-unsplash.jpg
+    uid: 6cca02c5580d4f7c865af74835ceab9d
+    id: example-image.jpg
+    title: Image
+    exclude_from_nav: false
+    effective: 2024-03-08T12:40:00
+  - file: black-starry-night.jpg
+    uid: 970ec24c76784c66a06d8c8d8b6522b2
+    id: image-dark
+    title: Image
+    description: >-
+      
+      The Image content type can be used to upload an image in various formats
+      (JPG, GIF, PNG, SVG). The uploaded image should always have a high
+      resolution so that it can be used flexibly, for example as a banner image.
+      Plone automatically delivers the images in the best scaling, so there is
+      no need to scale images down manually.
+    rights: "Credits: ipsum dolor sit amet."
+    exclude_from_nav: false
+  - file: image-light.jpg
+    uid: eec82559bf3242a6be4d43bc2096f399
+    title: Image - Light
+    description: >-
+      
+      The Image content type can be used to upload an image in various formats
+      (JPG, GIF, PNG, SVG). The uploaded image should always have a high
+      resolution so that it can be used flexibly, for example as a banner image.
+      Plone automatically delivers the images in the best scaling, so there is
+      no need to scale images down manually.
+    exclude_from_nav: false
 ---
 
 # 
