@@ -40,7 +40,7 @@ const PROTO_TEXT = {
     '</block>',
   ].join('\n'),
   accordion: [
-    '<block type="accordion" right_arrows="true">',
+    '<block type="accordion" right_arrows=true>',
     '  <region name="panels" widget="object_list">',
     '    <block type="panel" title="${h2/text}" />',
     '  </region>',

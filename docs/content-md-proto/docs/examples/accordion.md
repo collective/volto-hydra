@@ -107,7 +107,7 @@ prototypes: |
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
     </region>
   </block>
-  <block type="accordion" right_arrows="true">
+  <block type="accordion" right_arrows=true>
     <region name="panels" widget="object_list">
       <block type="panel" title="${h2/text}" />
     </region>
