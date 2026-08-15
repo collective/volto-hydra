@@ -62,7 +62,8 @@ function originalFor(id) {
 // The reader normalises the ROOT to '/'; the JSON stores it as its full @id.
 const canonId = (jsonId, rootId) => (jsonId === rootId ? '/' : jsonId);
 
-const { items } = readTree(MD, { decode: decodePage });
+// No decode option: use the mount's default (decodeAuto), the exact server path.
+const { items } = readTree(MD);
 
 let pass = 0, blockDiff = 0, stateDiff = 0, error = 0, skip = 0, noOrder = 0;
 const problems = [];
