@@ -33,13 +33,37 @@ prototypes: |
   </block>
 ---
 
-<block type="separator" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="sep" data='{"fixed":true,"readOnly":true,"styles":{"align":"full"}}' />
+<block type="separator">
 
-<block type="slate" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="examples-heading" data='{"fixed":true,"readOnly":true,"value":[{"type":"h2","children":[{"text":"Developer Reference"}]}]}' />
+---
 
-<block type="slate" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="schema-heading" data='{"fixed":true,"readOnly":true,"value":[{"type":"h3","children":[{"text":"Schema"}]}]}' />
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="sep" data='{"fixed":true,"readOnly":true,"styles":{"align":"full"}}' />
 
-<block type="slate" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="schema-desc" data='{"fixed":true,"readOnly":true,"value":[{"type":"p","children":[{"text":"Pass this object inside the "},{"type":"code","children":[{"text":"blocks"}]},{"text":" option when calling "},{"type":"code","children":[{"text":"initBridge()"}]},{"text":" to register this block type with the admin UI. See "},{"type":"link","data":{"url":"/docs/live-preview"},"children":[{"text":"Custom Blocks"}]},{"text":" for the full setup guide."}]}]}' />
+</block>
+
+<block type="slate">
+
+## Developer Reference
+
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="examples-heading" data='{"fixed":true,"readOnly":true}' />
+
+</block>
+
+<block type="slate">
+
+### Schema
+
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="schema-heading" data='{"fixed":true,"readOnly":true}' />
+
+</block>
+
+<block type="slate">
+
+Pass this object inside the `blocks` option when calling `initBridge()` to register this block type with the admin UI. See [Custom Blocks](/docs/live-preview) for the full setup guide.
+
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="schema-desc" data='{"fixed":true,"readOnly":true}' />
+
+</block>
 
 <block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="schema">
 
@@ -51,9 +75,21 @@ prototypes: |
 
 </block>
 
-<block type="slate" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-heading" data='{"fixed":true,"readOnly":true,"value":[{"type":"h3","children":[{"text":"JSON Block Data"}]}]}' />
+<block type="slate">
 
-<block type="slate" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-desc" data='{"fixed":true,"readOnly":true,"value":[{"type":"p","children":[{"text":"Example JSON as stored in the Plone content API. This is the data structure your component will receive in the "},{"type":"code","children":[{"text":"block"}]},{"text":" prop."}]}]}' />
+### JSON Block Data
+
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-heading" data='{"fixed":true,"readOnly":true}' />
+
+</block>
+
+<block type="slate">
+
+Example JSON as stored in the Plone content API. This is the data structure your component will receive in the `block` prop.
+
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-desc" data='{"fixed":true,"readOnly":true}' />
+
+</block>
 
 <block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-data">
 
@@ -65,9 +101,21 @@ prototypes: |
 
 </block>
 
-<block type="slate" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering-heading" data='{"fixed":true,"readOnly":true,"value":[{"type":"h3","children":[{"text":"Rendering"}]}]}' />
+<block type="slate">
 
-<block type="slate" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering-desc" data='{"fixed":true,"readOnly":true,"value":[{"type":"p","children":[{"text":"How this block renders in your frontend. Add its handling to your renderer, or — for list-style blocks — register a fetcher and reuse your list rendering."}]}]}' />
+### Rendering
+
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering-heading" data='{"fixed":true,"readOnly":true}' />
+
+</block>
+
+<block type="slate">
+
+How this block renders in your frontend. Add its handling to your renderer, or — for list-style blocks — register a fetcher and reuse your list rendering.
+
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering-desc" data='{"fixed":true,"readOnly":true}' />
+
+</block>
 
 <block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering">
 

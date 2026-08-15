@@ -71,7 +71,13 @@ Embeds a map from a URL (Google Maps, OpenStreetMap, etc.) using an iframe. The 
 
 <block type="maps" align="wide" title="Plone Conference 2024 Location" data='{"styles":{},"url":"https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d48400.376998388674!2d-47.9029345500163!3d-15.808744945878342!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sde!2sde!4v1710241027280!5m2!1sde!2sde"}' />
 
-<block type="separator" data='{"styles":{"align":"full"}}' />
+<block type="separator">
+
+---
+
+<fields data='{"styles":{"align":"full"}}' />
+
+</block>
 
 ## Text Heading H2&#x20;
 
@@ -79,7 +85,13 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="maps" align="center" title="Ploneconf 2022 was in Namur, Belgium " data='{"styles":{},"url":"https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2468.496805908769!2d4.867355714504337!3d50.46334407876937!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x47c1996d6ee4733f%3A0x1e62003289f50ea5!2zVGjDqcOidHJlIGRlIE5hbXVy!5e1!3m2!1sde!2sde!4v1710240653269!5m2!1sde!2sde"}' />
 
-<block type="separator" data='{"styles":{"align":"left"}}' />
+<block type="separator">
+
+---
+
+<fields data='{"styles":{"align":"left"}}' />
+
+</block>
 
 ### Text Heading H3
 

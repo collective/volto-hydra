@@ -15,4 +15,10 @@ prototypes: |
 
 <block type="socialLinks" templateId="/templates/site-footer" templateInstanceId="site-footer-def-instance" slotId="social" data='{"fixed":true,"readOnly":true,"links":[{"@id":"link-1","url":"https://github.com/collective/volto-hydra","fixed":true,"readOnly":true,"templateId":"/templates/site-footer","templateInstanceId":"site-footer-def-instance"},{"@id":"link-2","url":"https://discord.gg/plone","fixed":true,"readOnly":true,"templateId":"/templates/site-footer","templateInstanceId":"site-footer-def-instance"},{"@id":"link-3","url":"https://plone.org","fixed":true,"readOnly":true,"templateId":"/templates/site-footer","templateInstanceId":"site-footer-def-instance"},{"@id":"link-4","url":"https://www.youtube.com/@plonecms","fixed":true,"readOnly":true,"templateId":"/templates/site-footer","templateInstanceId":"site-footer-def-instance"}]}' />
 
-<block type="slate" templateId="/templates/site-footer" templateInstanceId="site-footer-def-instance" slotId="copyright" data='{"fixed":true,"readOnly":true,"value":[{"type":"p","children":[{"text":"Inka — design-system-first page building. © 2024-2026 Plone Foundation."}]}]}' />
+<block type="slate">
+
+Inka — design-system-first page building. © 2024-2026 Plone Foundation.
+
+<fields templateId="/templates/site-footer" templateInstanceId="site-footer-def-instance" slotId="copyright" data='{"fixed":true,"readOnly":true}' />
+
+</block>

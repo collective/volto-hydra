@@ -78,13 +78,25 @@ Renders a table of contents generated from heading blocks on the current page. I
 
 <block type="toc" title="Inhaltsverzeichnis" variation="default" />
 
-<block type="separator" data='{"styles":{"align":"full"}}' />
+<block type="separator">
+
+---
+
+<fields data='{"styles":{"align":"full"}}' />
+
+</block>
 
 <block type="image" align="wide" copyright_and_sources="Copyright: unsplash.com" description="Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt." size="l" title="Title Image" url="/docs/examples/content-types/image-dark" data='{"styles":{"size:noprefix":"large"}}' />
 
 <block type="introduction" data='{"value":[{"children":[{"text":"Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. "}],"type":"p"}]}' />
 
-<block type="separator" data='{"styles":{"align":"full"}}' />
+<block type="separator">
+
+---
+
+<fields data='{"styles":{"align":"full"}}' />
+
+</block>
 
 ## Text Heading H2&#x20;
 
@@ -114,7 +126,13 @@ Text can be **bold** or *italic*.
 
 [Link external](https://www.google.com/)
 
-<block type="separator" data='{"styles":{"align":"left"}}' />
+<block type="separator">
+
+---
+
+<fields data='{"styles":{"align":"left"}}' />
+
+</block>
 
 <block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc" slotId="schema">
 

@@ -72,7 +72,13 @@ prototypes: |
 
 Strike the right balance for your site. Make it easy for editors to create engagement — while staying compliant.
 
-<block type="slate" data='{"value":[{"type":"p","children":[{"type":"link","data":{"url":"https://hydra.pretagov.com/login?return_url=/"},"children":[{"text":"Try the demo"}]},{"text":"  ·  "},{"type":"link","data":{"url":"https://github.com/collective/volto-hydra"},"children":[{"text":"Source on GitHub"}]}]}],"styles":{"backgroundColor":"grey"}}' />
+<block type="slate">
+
+[Try the demo](https://hydra.pretagov.com/login?return_url=/)  ·  [Source on GitHub](https://github.com/collective/volto-hydra)
+
+<fields data='{"styles":{"backgroundColor":"grey"}}' />
+
+</block>
 
 ## Why Inka
 
@@ -400,7 +406,13 @@ password: **admin**
 
 </block>
 
-<block type="separator" data='{"styles":{"align":"full"}}' />
+<block type="separator">
+
+---
+
+<fields data='{"styles":{"align":"full"}}' />
+
+</block>
 
 ## View this site in other frameworks
 

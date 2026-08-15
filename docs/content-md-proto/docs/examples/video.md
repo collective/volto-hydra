@@ -78,7 +78,13 @@ Embeds a video from a URL. Detects YouTube links and renders an iframe embed; ot
 
 <block type="video" align="wide" url="https://www.youtube.com/watch?v=_yaYy86jdk8" data='{"styles":{}}' />
 
-<block type="separator" data='{"styles":{"align":"full"}}' />
+<block type="separator">
+
+---
+
+<fields data='{"styles":{"align":"full"}}' />
+
+</block>
 
 ### Headline H2
 
@@ -86,7 +92,13 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="video" align="center" url="https://www.youtube.com/watch?v=_yaYy86jdk8" data='{"styles":{}}' />
 
-<block type="separator" data='{"styles":{"align":"left"}}' />
+<block type="separator">
+
+---
+
+<fields data='{"styles":{"align":"left"}}' />
+
+</block>
 
 ### Video-Block (Align: Left)
 

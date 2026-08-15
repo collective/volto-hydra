@@ -15,7 +15,13 @@ prototypes: |
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
 ---
 
-<block type="title" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="title" data='{"fixed":true}' />
+<block type="title">
+
+# 
+
+<fields templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="title" data='{"fixed":true}' />
+
+</block>
 
 <block type="eventMetadata" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="event-metadata" data='{"fixed":true}' />
 

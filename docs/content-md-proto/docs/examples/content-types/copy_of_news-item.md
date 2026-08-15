@@ -39,10 +39,22 @@ prototypes: |
 
 <block type="dateField" dateField="effective" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="date" data='{"showTime":false,"fixed":true,"readOnly":true}' />
 
-<block type="title" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="title" data='{"fixed":true,"readOnly":true}' />
+<block type="title">
+
+# 
+
+<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="title" data='{"fixed":true,"readOnly":true}' />
+
+</block>
 
 <block type="introduction" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data='{"value":[{"children":[{"text":"Cinnamon skinny medium panna americano spice affogato froth frappuccino that."}],"type":"p"}]}' />
 
 <block type="leadimage" align="center" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="lead-image" data='{"fixed":true}' />
 
-<block type="slate" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data='{"styles":{},"value":[{"children":[{"text":"Ristretto so chicory skinny ristretto au decaffeinated sugar that spoon shop crema ut pot lungo. Flavour that milk brewed flavour whipped kopi black and robusta. Bar sugar americano eu froth variety brewed acerbic steamed. Aroma est milk doppio frappuccino half cream filter french froth luwak. Acerbic plunger au barista flavour in froth trade."}],"type":"p"}]}' />
+<block type="slate">
+
+Ristretto so chicory skinny ristretto au decaffeinated sugar that spoon shop crema ut pot lungo. Flavour that milk brewed flavour whipped kopi black and robusta. Bar sugar americano eu froth variety brewed acerbic steamed. Aroma est milk doppio frappuccino half cream filter french froth luwak. Acerbic plunger au barista flavour in froth trade.
+
+<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data='{"styles":{}}' />
+
+</block>
