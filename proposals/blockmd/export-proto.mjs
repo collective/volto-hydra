@@ -50,6 +50,13 @@ const PROTO_TEXT = {
     '  </region>',
     '</block>',
   ].join('\n'),
+  gridBlock: [
+    '<block type="gridBlock">',
+    '  <region name="blocks" widget="blocks_layout">',
+    '    <block type="teaser" title="${h2/text}" description="${p/text}" />',
+    '  </region>',
+    '</block>',
+  ].join('\n'),
   accordion: [
     '<block type="accordion" right_arrows=true>',
     '  <region name="panels" widget="object_list">',

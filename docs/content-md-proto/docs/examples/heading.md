@@ -38,6 +38,7 @@ assignments:
   - { uid: 7ebc67e3-e666-43f4-9fce-5dc14f98834f, type: slate }
   - { uid: 0126e819-d955-41c5-a736-2f0b5ffda8a1, type: separator }
   - { uid: 1bedcc9d-1c02-44e8-bb8e-5c46d6c67d3d, type: gridBlock }
+  - { uid: 882e7872-bcf3-4234-a510-d1cff6bf2f7f, type: teaser }
   - { uid: ref-heading-schema, type: codeExample }
   - { id: ref-heading-schema-javascript-f00bc9 }
   - { uid: ref-heading-json-data, type: codeExample }
@@ -53,6 +54,11 @@ prototypes: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
+    </region>
+  </block>
+  <block type="gridBlock">
+    <region name="blocks" widget="blocks_layout">
+      <block type="teaser" title="${h2/text}" description="${p/text}" />
     </region>
   </block>
 ---
@@ -83,7 +89,11 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="separator" data='{"styles":{"align":"full"}}' />
 
-<block type="gridBlock" headline="Block Title" data='{"blocks":{"882e7872-bcf3-4234-a510-d1cff6bf2f7f":{"@type":"teaser","description":"Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.","head_title":null,"href":[{"@id":"/docs/examples/content-types/page","@type":"Document","Description":"The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.","Title":"Page","getRemoteUrl":null,"hasPreviewImage":true,"head_title":null,"image_field":"preview_image","title":"Page"}],"styles":{"align":"left"},"title":"Teaser Title H2"}},"blocks_layout":{"items":["882e7872-bcf3-4234-a510-d1cff6bf2f7f"]},"styles":{}}' />
+<block type="gridBlock" headline="Block Title">
+
+<block type="teaser" title="Teaser Title H2" data='{"description":"Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.","head_title":null,"href":[{"@id":"/docs/examples/content-types/page","@type":"Document","Description":"The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.","Title":"Page","getRemoteUrl":null,"hasPreviewImage":true,"head_title":null,"image_field":"preview_image","title":"Page"}],"styles":{"align":"left"}}' />
+
+</block>
 
 <block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="schema">
 

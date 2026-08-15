@@ -23,7 +23,10 @@ assignments:
   - { uid: a6cad3f3-57e8-4bb7-8ac2-b12096e974d2, type: title }
   - { uid: 8fe8fc9b-221c-4c74-b66f-671d638222f3, type: heading }
   - { uid: 4be85eba-b165-4a87-8585-d8697616004d, type: gridBlock }
+  - { uid: e5a7baea-d795-4e31-9145-53accbbe7bc3, type: teaser }
   - { uid: 4092b07d-31df-4aaa-9cfd-5bbdf814bb04, type: gridBlock }
+  - { uid: c86e09b4-faaa-4f71-ba71-c3cf69f2d260, type: teaser }
+  - { uid: 92f80d54-c607-4360-8e2f-ca8dc6b792c5, type: teaser }
   - { uid: f5858bf7-5485-479c-b0b2-10eee0dc937c, type: slate }
   - { uid: 11e4610d-dfac-493d-b9be-345949ca3276, type: slate }
   - { uid: b8c4c6dc-47f1-493d-a2ba-d1ca958def4a, type: slate }
@@ -39,7 +42,10 @@ assignments:
   - { uid: f4104455-1f80-4209-827d-416f2f07dec9, type: image }
   - { uid: dc27e427-babe-4497-a6ae-fdefeaba2d13, type: button }
   - { uid: bde519a7-d6c0-4bf5-b84b-d832f7f4cdd6, type: gridBlock }
+  - { uid: 38e1fde4-8886-4673-9316-5e1b96bcc222, type: slate }
   - { uid: af96daae-955d-42f8-a5e7-c7943fb2e321, type: gridBlock }
+  - { uid: a7ffd7f2-5dbf-4b5c-b24e-d10db0dff8df, type: slate }
+  - { uid: c1163fcc-e2a4-4e81-b6ab-af537c8b4d56, type: slate }
   - { uid: 47cef702-7d66-4313-b3ec-585408735218, type: toc }
   - { uid: caa483f6-bc0f-4a5a-94d2-925897969928, type: slateTable }
   - { uid: e770913c-fb7b-4cf1-94a8-7eb6e24ff66e, type: slate }
@@ -57,15 +63,30 @@ prototypes: |
       </block>
     </region>
   </block>
+  <block type="gridBlock">
+    <region name="blocks" widget="blocks_layout">
+      <block type="teaser" title="${h2/text}" description="${p/text}" />
+    </region>
+  </block>
 ---
 
 # 
 
 <block type="heading" alignment="left" heading="Heading (H2, 33/42px)" tag="h2" data='{"styles":{}}' />
 
-<block type="gridBlock" data='{"blocks":{"e5a7baea-d795-4e31-9145-53accbbe7bc3":{"@type":"teaser","description":"For grid blocks, the font of the headlines are variable, depending on the number of cells in the grid.","head_title":null,"href":[{"@id":"/docs/examples/content-types","@type":"Document","Description":"This section has a sample of content types available in this site.","Title":"Content Types","getRemoteUrl":null,"hasPreviewImage":null,"head_title":null,"image_field":"image","title":"Content Types"}],"styles":{"align":"left"},"title":"Teaser Title (H2, 30/36px)"}},"blocks_layout":{"items":["e5a7baea-d795-4e31-9145-53accbbe7bc3"]},"styles":{}}' />
+<block type="gridBlock">
 
-<block type="gridBlock" data='{"blocks":{"92f80d54-c607-4360-8e2f-ca8dc6b792c5":{"@type":"teaser","description":"Paragraph (p, 18px/24px). This section has a sample of content types available in this site.","head_title":"Teaser Headtitle (DIV, 14/18px)","href":[{"@id":"/docs/examples/content-types","@type":"Document","Description":"This section has a sample of content types available in this site.","Title":"Content Types","getRemoteUrl":null,"hasPreviewImage":null,"head_title":null,"image_field":"image","title":"Content Types"}],"styles":{"align":"left"},"title":"Teaser Title (H3, 24/30px)"},"c86e09b4-faaa-4f71-ba71-c3cf69f2d260":{"@type":"teaser","head_title":"Teaser Headtitle (DIV, 14/18px)","href":[{"@id":"/docs/examples/content-types","@type":"Document","Description":"This section has a sample of content types available in this site.","Title":"Content Types","getRemoteUrl":null,"hasPreviewImage":null,"head_title":null,"image_field":"image","title":"Content Types"}],"styles":{"align":"left"},"title":"Teaser Title (H3, 24/30px)"}},"blocks_layout":{"items":["c86e09b4-faaa-4f71-ba71-c3cf69f2d260","92f80d54-c607-4360-8e2f-ca8dc6b792c5"]},"styles":{}}' />
+<block type="teaser" description="For grid blocks, the font of the headlines are variable, depending on the number of cells in the grid." title="Teaser Title (H2, 30/36px)" data='{"head_title":null,"href":[{"@id":"/docs/examples/content-types","@type":"Document","Description":"This section has a sample of content types available in this site.","Title":"Content Types","getRemoteUrl":null,"hasPreviewImage":null,"head_title":null,"image_field":"image","title":"Content Types"}],"styles":{"align":"left"}}' />
+
+</block>
+
+<block type="gridBlock">
+
+<block type="teaser" head_title="Teaser Headtitle (DIV, 14/18px)" title="Teaser Title (H3, 24/30px)" data='{"href":[{"@id":"/docs/examples/content-types","@type":"Document","Description":"This section has a sample of content types available in this site.","Title":"Content Types","getRemoteUrl":null,"hasPreviewImage":null,"head_title":null,"image_field":"image","title":"Content Types"}],"styles":{"align":"left"}}' />
+
+<block type="teaser" description="Paragraph (p, 18px/24px). This section has a sample of content types available in this site." head_title="Teaser Headtitle (DIV, 14/18px)" title="Teaser Title (H3, 24/30px)" data='{"href":[{"@id":"/docs/examples/content-types","@type":"Document","Description":"This section has a sample of content types available in this site.","Title":"Content Types","getRemoteUrl":null,"hasPreviewImage":null,"head_title":null,"image_field":"image","title":"Content Types"}],"styles":{"align":"left"}}' />
+
+</block>
 
 ## Text Heading H2 (H2, 30/36px)
 
@@ -97,9 +118,19 @@ Paragraph text (p, 24/33px) -> Lorem ipsum dolor sit amet, consetetur sadipscing
 
 <block type="button" inneralign="left" title="Button text (button, 18/24px)" data='{"styles":{}}' />
 
-<block type="gridBlock" data='{"blocks":{"38e1fde4-8886-4673-9316-5e1b96bcc222":{"@type":"slate","plaintext":"Text Heading (H2, 30/36px)\nFor grid blocks, the font of the headlines are variable, depending on the number of cells in the grid.","value":[{"children":[{"text":"Text Heading (H2, 30/36px)"}],"type":"h2"},{"children":[{"text":"For grid blocks, the font of the headlines are variable, depending on the number of cells in the grid."}],"type":"p"}]}},"blocks_layout":{"items":["38e1fde4-8886-4673-9316-5e1b96bcc222"]},"styles":{}}' />
+<block type="gridBlock">
 
-<block type="gridBlock" data='{"blocks":{"a7ffd7f2-5dbf-4b5c-b24e-d10db0dff8df":{"@type":"slate","plaintext":"Text Heading (H3, 24/30px)\nParagraph Text (p, 18/24px)","value":[{"children":[{"text":"Text Heading (H3, 24/30px)"}],"type":"h2"},{"children":[{"text":"Paragraph Text (p, 18/24px)"}],"type":"p"}]},"c1163fcc-e2a4-4e81-b6ab-af537c8b4d56":{"@type":"slate","plaintext":"Text Heading (H3, 24/30px)\nParagraph Text (p, 18/24px)","value":[{"children":[{"text":"Text Heading (H3, 24/30px)"}],"type":"h2"},{"children":[{"text":"Paragraph Text (p, 18/24px)"}],"type":"p"}]}},"blocks_layout":{"items":["a7ffd7f2-5dbf-4b5c-b24e-d10db0dff8df","c1163fcc-e2a4-4e81-b6ab-af537c8b4d56"]},"styles":{}}' />
+<block type="slate" data='{"value":[{"children":[{"text":"Text Heading (H2, 30/36px)"}],"type":"h2"},{"children":[{"text":"For grid blocks, the font of the headlines are variable, depending on the number of cells in the grid."}],"type":"p"}]}' />
+
+</block>
+
+<block type="gridBlock">
+
+<block type="slate" data='{"value":[{"children":[{"text":"Text Heading (H3, 24/30px)"}],"type":"h2"},{"children":[{"text":"Paragraph Text (p, 18/24px)"}],"type":"p"}]}' />
+
+<block type="slate" data='{"value":[{"children":[{"text":"Text Heading (H3, 24/30px)"}],"type":"h2"},{"children":[{"text":"Paragraph Text (p, 18/24px)"}],"type":"p"}]}' />
+
+</block>
 
 <block type="toc" variation="default" data='{"levels":["h2","h3"],"styles":{}}' />
 
