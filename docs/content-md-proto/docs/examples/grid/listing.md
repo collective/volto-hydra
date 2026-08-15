@@ -35,9 +35,9 @@ assignments:
   - { uid: 0fae8b67-374c-4ca2-b3e0-86114e2f17e1, type: listing }
 prototypes: |
   <block type="title" _="${h1}" />
-  <block type="gridBlock">
+  <block type="gridBlock" headline="${h/text}">
     <region name="blocks" widget="blocks_layout">
-      <block type="teaser" title="${h2/text}" description="${p/text}" />
+      <block type="teaser" title="${h/text}" description="${p/text}" />
     </region>
   </block>
 ---

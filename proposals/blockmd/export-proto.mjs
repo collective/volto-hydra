@@ -51,9 +51,9 @@ const PROTO_TEXT = {
     '</block>',
   ].join('\n'),
   gridBlock: [
-    '<block type="gridBlock">',
+    '<block type="gridBlock" headline="${h/text}">',
     '  <region name="blocks" widget="blocks_layout">',
-    '    <block type="teaser" title="${h2/text}" description="${p/text}" />',
+    '    <block type="teaser" title="${h/text}" description="${p/text}" />',
     '  </region>',
     '</block>',
   ].join('\n'),

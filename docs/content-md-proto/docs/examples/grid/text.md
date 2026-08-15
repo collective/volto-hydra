@@ -55,16 +55,18 @@ assignments:
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
-  <block type="gridBlock">
+  <block type="gridBlock" headline="${h/text}">
     <region name="blocks" widget="blocks_layout">
-      <block type="teaser" title="${h2/text}" description="${p/text}" />
+      <block type="teaser" title="${h/text}" description="${p/text}" />
     </region>
   </block>
 ---
 
 # 
 
-<block type="gridBlock" headline="Block Title">
+<block type="gridBlock">
+
+## Block Title
 
 <block type="slate" data='{"value":[{"children":[{"text":"Text Title H2"}],"type":"h2"},{"children":[{"text":"Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi."}],"type":"p"}]}' />
 
