@@ -51,8 +51,13 @@ assignments:
   - { uid: f0a56edf-a963-4177-877c-76d9a4d6c20b, type: slate }
   - { uid: 00146980-5c86-4ecd-a84e-d373183231ad, type: slate }
   - { uid: ref-text-schema, type: codeExample }
+  - { id: ref-text-schema-javascript-6ffd2e }
   - { uid: ref-text-json-data, type: codeExample }
+  - { id: ref-text-json-data-json-f6d82b }
   - { uid: ref-text-rendering, type: codeExample }
+  - { id: ref-text-rendering-jsx-076433 }
+  - { id: ref-text-rendering-vue-54b4b7 }
+  - { id: ref-text-rendering-svelte-2aa474 }
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
@@ -108,8 +113,131 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-text" slotId="schema" data='{"tabs":[{"@id":"ref-text-schema-javascript-6ffd2e","label":"Schema","language":"javascript","code":"{\n  \"slate\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"value\": {\n          \"title\": \"Text\",\n          \"widget\": \"slate\"\n        }\n      }\n    }\n  }\n}"}]}' />
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-text" slotId="schema">
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-text" slotId="json-data" data='{"tabs":[{"@id":"ref-text-json-data-json-f6d82b","label":"JSON Block Data","language":"json","code":"{\n  \"@type\": \"slate\",\n  \"value\": [\n    {\n      \"type\": \"h2\",\n      \"children\": [\n        {\n          \"text\": \"Welcome\"\n        }\n      ]\n    }\n  ]\n}"}]}' />
+### Schema
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-text" slotId="rendering" data='{"tabs":[{"@id":"ref-text-rendering-jsx-076433","label":"React","language":"jsx","code":"function SlateBlock({ block }) {\n  return (\n    <div data-block-uid={block[&#39;@uid&#39;]} data-edit-text=\"value\">\n      {(block.value || []).map((node, i) => (\n        <SlateNode key={i} node={node} />\n      ))}\n    </div>\n  );\n}\n\nfunction SlateNode({ node }) {\n  if (node.text !== undefined) return <>{node.text}</>;\n  const children = (node.children || []).map((c, i) => <SlateNode key={i} node={c} />);\n  const Tag = node.type === &#39;link&#39; ? &#39;a&#39; : node.type;\n  const props = { &#39;data-node-id&#39;: node.nodeId };\n  if (node.type === &#39;link&#39;) props.href = node.data?.url;\n  return <Tag {...props}>{children}</Tag>;\n}"},{"@id":"ref-text-rendering-vue-54b4b7","label":"Vue","language":"vue","code":"<!-- SlateBlock.vue -->\n<template>\n  <div :data-block-uid=\"block[&#39;@uid&#39;]\" data-edit-text=\"value\">\n    <SlateNode v-for=\"(node, i) in block.value || []\" :key=\"i\" :node=\"node\" />\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>\n\n<!-- SlateNode.vue -->\n<template>\n  <template v-if=\"!node.type\">{{ node.text }}</template>\n  <a v-else-if=\"node.type === &#39;link&#39;\" :href=\"node.data?.url\" :data-node-id=\"node.nodeId\">\n    <SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" />\n  </a>\n  <component v-else :is=\"node.type\" :data-node-id=\"node.nodeId\">\n    <SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" />\n  </component>\n</template>\n\n<script setup>\ndefineProps({ node: Object });\n</script>"},{"@id":"ref-text-rendering-svelte-2aa474","label":"Svelte","language":"svelte","code":"<!-- SlateBlock.svelte -->\n<script>\n  import SlateNode from &#39;./SlateNode.svelte&#39;;\n  export let block;\n</script>\n\n<div data-block-uid={block[&#39;@uid&#39;]} data-edit-text=\"value\">\n  {#each block.value || [] as node, i (i)}\n    <SlateNode {node} />\n  {/each}\n</div>\n\n<!-- SlateNode.svelte -->\n<script>\n  export let node;\n</script>\n\n{#if node.text !== undefined}\n  {node.text}\n{:else if node.type === &#39;link&#39;}\n  <a href={node.data?.url} data-node-id={node.nodeId}>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</a>\n{:else}\n  <svelte:element this={node.type} data-node-id={node.nodeId}>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</svelte:element>\n{/if}"}]}' />
+```javascript
+{
+  "slate": {
+    "blockSchema": {
+      "properties": {
+        "value": {
+          "title": "Text",
+          "widget": "slate"
+        }
+      }
+    }
+  }
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-text" slotId="json-data">
+
+### JSON Block Data
+
+```json
+{
+  "@type": "slate",
+  "value": [
+    {
+      "type": "h2",
+      "children": [
+        {
+          "text": "Welcome"
+        }
+      ]
+    }
+  ]
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-text" slotId="rendering">
+
+### React
+
+```jsx
+function SlateBlock({ block }) {
+  return (
+    <div data-block-uid={block['@uid']} data-edit-text="value">
+      {(block.value || []).map((node, i) => (
+        <SlateNode key={i} node={node} />
+      ))}
+    </div>
+  );
+}
+
+function SlateNode({ node }) {
+  if (node.text !== undefined) return <>{node.text}</>;
+  const children = (node.children || []).map((c, i) => <SlateNode key={i} node={c} />);
+  const Tag = node.type === 'link' ? 'a' : node.type;
+  const props = { 'data-node-id': node.nodeId };
+  if (node.type === 'link') props.href = node.data?.url;
+  return <Tag {...props}>{children}</Tag>;
+}
+```
+
+### Vue
+
+```vue
+<!-- SlateBlock.vue -->
+<template>
+  <div :data-block-uid="block['@uid']" data-edit-text="value">
+    <SlateNode v-for="(node, i) in block.value || []" :key="i" :node="node" />
+  </div>
+</template>
+
+<script setup>
+defineProps({ block: Object });
+</script>
+
+<!-- SlateNode.vue -->
+<template>
+  <template v-if="!node.type">{{ node.text }}</template>
+  <a v-else-if="node.type === 'link'" :href="node.data?.url" :data-node-id="node.nodeId">
+    <SlateNode v-for="(c, i) in node.children" :key="i" :node="c" />
+  </a>
+  <component v-else :is="node.type" :data-node-id="node.nodeId">
+    <SlateNode v-for="(c, i) in node.children" :key="i" :node="c" />
+  </component>
+</template>
+
+<script setup>
+defineProps({ node: Object });
+</script>
+```
+
+### Svelte
+
+```svelte
+<!-- SlateBlock.svelte -->
+<script>
+  import SlateNode from './SlateNode.svelte';
+  export let block;
+</script>
+
+<div data-block-uid={block['@uid']} data-edit-text="value">
+  {#each block.value || [] as node, i (i)}
+    <SlateNode {node} />
+  {/each}
+</div>
+
+<!-- SlateNode.svelte -->
+<script>
+  export let node;
+</script>
+
+{#if node.text !== undefined}
+  {node.text}
+{:else if node.type === 'link'}
+  <a href={node.data?.url} data-node-id={node.nodeId}>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</a>
+{:else}
+  <svelte:element this={node.type} data-node-id={node.nodeId}>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</svelte:element>
+{/if}
+```
+
+</block>

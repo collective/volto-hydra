@@ -50,8 +50,13 @@ assignments:
   - { uid: 09460f92-723d-402d-a0a5-76a15f2678ad, type: slate }
   - { uid: 3e036171-0a20-47d0-a06a-a7f493b65186, type: separator }
   - { uid: ref-toc-schema, type: codeExample }
+  - { id: ref-toc-schema-javascript-496d15 }
   - { uid: ref-toc-json-data, type: codeExample }
+  - { id: ref-toc-json-data-json-aaa910 }
   - { uid: ref-toc-rendering, type: codeExample }
+  - { id: ref-toc-rendering-jsx-ee2124 }
+  - { id: ref-toc-rendering-vue-12aef2 }
+  - { id: ref-toc-rendering-svelte-397c7f }
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
@@ -111,8 +116,199 @@ Text can be **bold** or *italic*.
 
 <block type="separator" data='{"styles":{"align":"left"}}' />
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc" slotId="schema" data='{"tabs":[{"@id":"ref-toc-schema-javascript-496d15","label":"Schema","language":"javascript","code":"{\n  \"toc\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"title\": {\n          \"title\": \"Title\"\n        },\n        \"hide_title\": {\n          \"title\": \"Hide title\",\n          \"type\": \"boolean\"\n        },\n        \"ordered\": {\n          \"title\": \"Ordered\",\n          \"type\": \"boolean\"\n        },\n        \"levels\": {\n          \"title\": \"Entries\",\n          \"isMulti\": true,\n          \"choices\": [\n            [\n              \"h1\",\n              \"h1\"\n            ],\n            [\n              \"h2\",\n              \"h2\"\n            ],\n            [\n              \"h3\",\n              \"h3\"\n            ],\n            [\n              \"h4\",\n              \"h4\"\n            ],\n            [\n              \"h5\",\n              \"h5\"\n            ],\n            [\n              \"h6\",\n              \"h6\"\n            ]\n          ]\n        }\n      }\n    }\n  }\n}"}]}' />
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc" slotId="schema">
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc" slotId="json-data" data='{"tabs":[{"@id":"ref-toc-json-data-json-aaa910","label":"JSON Block Data","language":"json","code":"{\n  \"@type\": \"toc\",\n  \"title\": \"On this page\",\n  \"hide_title\": false,\n  \"ordered\": false,\n  \"levels\": [\n    \"h2\",\n    \"h3\"\n  ]\n}"}]}' />
+### Schema
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc" slotId="rendering" data='{"tabs":[{"@id":"ref-toc-rendering-jsx-ee2124","label":"React","language":"jsx","code":"function TocBlock({ block, content }) {\n  const entries = [];\n  if (content?.blocks &amp;&amp; content?.blocks_layout?.items) {\n    for (const id of content.blocks_layout.items) {\n      const b = content.blocks[id];\n      if (!b) continue;\n      if (b[&#39;@type&#39;] === &#39;heading&#39; &amp;&amp; b.heading) {\n        entries.push({ id, level: parseInt((b.tag || &#39;h2&#39;).slice(1)), text: b.heading });\n      } else if (b[&#39;@type&#39;] === &#39;slate&#39; &amp;&amp; b.value?.[0]?.type?.match(/^h[1-6]$/)) {\n        const level = parseInt(b.value[0].type.slice(1));\n        const text = b.plaintext || b.value[0].children?.map(c => c.text).join(&#39;&#39;) || &#39;&#39;;\n        if (text.trim()) entries.push({ id, level, text });\n      }\n    }\n  }\n\n  return (\n    <nav data-block-uid={block[&#39;@uid&#39;]} className=\"toc-block\">\n      {entries.length > 0 ? (\n        <ul>\n          {entries.map(e => (\n            <li key={e.id} style={{ marginLeft: `${(e.level - 2) * 1.5}em` }}>\n              <a href={`#${e.id}`}>{e.text}</a>\n            </li>\n          ))}\n        </ul>\n      ) : (\n        <p>Table of Contents</p>\n      )}\n    </nav>\n  );\n}"},{"@id":"ref-toc-rendering-vue-12aef2","label":"Vue","language":"vue","code":"<template>\n  <nav :data-block-uid=\"block[&#39;@uid&#39;]\" class=\"toc-block\">\n    <ul v-if=\"entries.length\">\n      <li v-for=\"e in entries\" :key=\"e.id\" :style=\"{ marginLeft: (e.level - 2) * 1.5 + &#39;em&#39; }\">\n        <a :href=\"`#${e.id}`\">{{ e.text }}</a>\n      </li>\n    </ul>\n    <p v-else>Table of Contents</p>\n  </nav>\n</template>\n\n<script setup>\nimport { computed } from &#39;vue&#39;;\n\nconst props = defineProps({ block: Object, content: Object });\n\nconst entries = computed(() => {\n  const result = [];\n  const c = props.content;\n  if (!c?.blocks || !c?.blocks_layout?.items) return result;\n  for (const id of c.blocks_layout.items) {\n    const b = c.blocks[id];\n    if (!b) continue;\n    if (b[&#39;@type&#39;] === &#39;heading&#39; &amp;&amp; b.heading) {\n      result.push({ id, level: parseInt((b.tag || &#39;h2&#39;).slice(1)), text: b.heading });\n    } else if (b[&#39;@type&#39;] === &#39;slate&#39; &amp;&amp; b.value?.[0]?.type?.match(/^h[1-6]$/)) {\n      const level = parseInt(b.value[0].type.slice(1));\n      const text = b.plaintext || b.value[0].children?.map(c => c.text).join(&#39;&#39;) || &#39;&#39;;\n      if (text.trim()) result.push({ id, level, text });\n    }\n  }\n  return result;\n});\n</script>"},{"@id":"ref-toc-rendering-svelte-397c7f","label":"Svelte","language":"svelte","code":"<script>\n  export let block;\n  export let content = {};\n\n  $: entries = (() => {\n    const result = [];\n    if (!content?.blocks || !content?.blocks_layout?.items) return result;\n    for (const id of content.blocks_layout.items) {\n      const b = content.blocks[id];\n      if (!b) continue;\n      if (b[&#39;@type&#39;] === &#39;heading&#39; &amp;&amp; b.heading) {\n        result.push({ id, level: parseInt((b.tag || &#39;h2&#39;).slice(1)), text: b.heading });\n      } else if (b[&#39;@type&#39;] === &#39;slate&#39; &amp;&amp; b.value?.[0]?.type?.match(/^h[1-6]$/)) {\n        const level = parseInt(b.value[0].type.slice(1));\n        const text = b.plaintext || b.value[0].children?.map(c => c.text).join(&#39;&#39;) || &#39;&#39;;\n        if (text.trim()) result.push({ id, level, text });\n      }\n    }\n    return result;\n  })();\n</script>\n\n<nav data-block-uid={block[&#39;@uid&#39;]} class=\"toc-block\">\n  {#if entries.length > 0}\n    <ul>\n      {#each entries as e (e.id)}\n        <li style=\"margin-left: {(e.level - 2) * 1.5}em\">\n          <a href=\"#{e.id}\">{e.text}</a>\n        </li>\n      {/each}\n    </ul>\n  {:else}\n    <p>Table of Contents</p>\n  {/if}\n</nav>"}]}' />
+```javascript
+{
+  "toc": {
+    "blockSchema": {
+      "properties": {
+        "title": {
+          "title": "Title"
+        },
+        "hide_title": {
+          "title": "Hide title",
+          "type": "boolean"
+        },
+        "ordered": {
+          "title": "Ordered",
+          "type": "boolean"
+        },
+        "levels": {
+          "title": "Entries",
+          "isMulti": true,
+          "choices": [
+            [
+              "h1",
+              "h1"
+            ],
+            [
+              "h2",
+              "h2"
+            ],
+            [
+              "h3",
+              "h3"
+            ],
+            [
+              "h4",
+              "h4"
+            ],
+            [
+              "h5",
+              "h5"
+            ],
+            [
+              "h6",
+              "h6"
+            ]
+          ]
+        }
+      }
+    }
+  }
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc" slotId="json-data">
+
+### JSON Block Data
+
+```json
+{
+  "@type": "toc",
+  "title": "On this page",
+  "hide_title": false,
+  "ordered": false,
+  "levels": [
+    "h2",
+    "h3"
+  ]
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc" slotId="rendering">
+
+### React
+
+```jsx
+function TocBlock({ block, content }) {
+  const entries = [];
+  if (content?.blocks && content?.blocks_layout?.items) {
+    for (const id of content.blocks_layout.items) {
+      const b = content.blocks[id];
+      if (!b) continue;
+      if (b['@type'] === 'heading' && b.heading) {
+        entries.push({ id, level: parseInt((b.tag || 'h2').slice(1)), text: b.heading });
+      } else if (b['@type'] === 'slate' && b.value?.[0]?.type?.match(/^h[1-6]$/)) {
+        const level = parseInt(b.value[0].type.slice(1));
+        const text = b.plaintext || b.value[0].children?.map(c => c.text).join('') || '';
+        if (text.trim()) entries.push({ id, level, text });
+      }
+    }
+  }
+
+  return (
+    <nav data-block-uid={block['@uid']} className="toc-block">
+      {entries.length > 0 ? (
+        <ul>
+          {entries.map(e => (
+            <li key={e.id} style={{ marginLeft: `${(e.level - 2) * 1.5}em` }}>
+              <a href={`#${e.id}`}>{e.text}</a>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>Table of Contents</p>
+      )}
+    </nav>
+  );
+}
+```
+
+### Vue
+
+```vue
+<template>
+  <nav :data-block-uid="block['@uid']" class="toc-block">
+    <ul v-if="entries.length">
+      <li v-for="e in entries" :key="e.id" :style="{ marginLeft: (e.level - 2) * 1.5 + 'em' }">
+        <a :href="`#${e.id}`">{{ e.text }}</a>
+      </li>
+    </ul>
+    <p v-else>Table of Contents</p>
+  </nav>
+</template>
+
+<script setup>
+import { computed } from 'vue';
+
+const props = defineProps({ block: Object, content: Object });
+
+const entries = computed(() => {
+  const result = [];
+  const c = props.content;
+  if (!c?.blocks || !c?.blocks_layout?.items) return result;
+  for (const id of c.blocks_layout.items) {
+    const b = c.blocks[id];
+    if (!b) continue;
+    if (b['@type'] === 'heading' && b.heading) {
+      result.push({ id, level: parseInt((b.tag || 'h2').slice(1)), text: b.heading });
+    } else if (b['@type'] === 'slate' && b.value?.[0]?.type?.match(/^h[1-6]$/)) {
+      const level = parseInt(b.value[0].type.slice(1));
+      const text = b.plaintext || b.value[0].children?.map(c => c.text).join('') || '';
+      if (text.trim()) result.push({ id, level, text });
+    }
+  }
+  return result;
+});
+</script>
+```
+
+### Svelte
+
+```svelte
+<script>
+  export let block;
+  export let content = {};
+
+  $: entries = (() => {
+    const result = [];
+    if (!content?.blocks || !content?.blocks_layout?.items) return result;
+    for (const id of content.blocks_layout.items) {
+      const b = content.blocks[id];
+      if (!b) continue;
+      if (b['@type'] === 'heading' && b.heading) {
+        result.push({ id, level: parseInt((b.tag || 'h2').slice(1)), text: b.heading });
+      } else if (b['@type'] === 'slate' && b.value?.[0]?.type?.match(/^h[1-6]$/)) {
+        const level = parseInt(b.value[0].type.slice(1));
+        const text = b.plaintext || b.value[0].children?.map(c => c.text).join('') || '';
+        if (text.trim()) result.push({ id, level, text });
+      }
+    }
+    return result;
+  })();
+</script>
+
+<nav data-block-uid={block['@uid']} class="toc-block">
+  {#if entries.length > 0}
+    <ul>
+      {#each entries as e (e.id)}
+        <li style="margin-left: {(e.level - 2) * 1.5}em">
+          <a href="#{e.id}">{e.text}</a>
+        </li>
+      {/each}
+    </ul>
+  {:else}
+    <p>Table of Contents</p>
+  {/if}
+</nav>
+```
+
+</block>

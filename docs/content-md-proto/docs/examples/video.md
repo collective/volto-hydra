@@ -44,8 +44,13 @@ assignments:
   - { uid: 19a3d50a-a683-4e59-ac7c-d2ba2149cdd7, type: video }
   - { uid: 49a61581-70ce-4810-84c2-1d91ac421197, type: slate }
   - { uid: ref-video-schema, type: codeExample }
+  - { id: ref-video-schema-javascript-104794 }
   - { uid: ref-video-json-data, type: codeExample }
+  - { id: ref-video-json-data-json-9ce28f }
   - { uid: ref-video-rendering, type: codeExample }
+  - { id: ref-video-rendering-jsx-b3c5ea }
+  - { id: ref-video-rendering-vue-160de2 }
+  - { id: ref-video-rendering-svelte-b4e8ba }
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
@@ -99,8 +104,137 @@ The Video-Block can be aligned to the right with text floating around it on the 
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam. Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat quis nostrud exerci tation ullamcorper ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat quis Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam. Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-video" slotId="schema" data='{"tabs":[{"@id":"ref-video-schema-javascript-104794","label":"Schema","language":"javascript","code":"{\n  \"video\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"url\": {\n          \"title\": \"Video URL\"\n        },\n        \"controls\": {\n          \"title\": \"Show controls\",\n          \"type\": \"boolean\",\n          \"default\": true\n        },\n        \"autoplay\": {\n          \"title\": \"Autoplay\",\n          \"type\": \"boolean\",\n          \"default\": false\n        },\n        \"loop\": {\n          \"title\": \"Loop\",\n          \"type\": \"boolean\",\n          \"default\": false\n        },\n        \"muted\": {\n          \"title\": \"Muted (required for autoplay)\",\n          \"type\": \"boolean\",\n          \"default\": false\n        }\n      }\n    }\n  }\n}"}]}' />
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-video" slotId="schema">
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-video" slotId="json-data" data='{"tabs":[{"@id":"ref-video-json-data-json-9ce28f","label":"JSON Block Data","language":"json","code":"{\n  \"@type\": \"video\",\n  \"url\": \"https://www.youtube.com/watch?v=dQw4w9WgXcQ\"\n}"}]}' />
+### Schema
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-video" slotId="rendering" data='{"tabs":[{"@id":"ref-video-rendering-jsx-b3c5ea","label":"React","language":"jsx","code":"function VideoBlock({ block }) {\n  const url = block.url || &#39;&#39;;\n  const youtubeId = url.match(/(?:youtu\\.be\\/|youtube\\.com\\/(?:watch\\?v=|embed\\/))([^&amp;?/]+)/)?.[1];\n\n  return (\n    <div data-block-uid={block[&#39;@uid&#39;]} className=\"video-block\">\n      {youtubeId ? (\n        <iframe\n          src={`https://www.youtube.com/embed/${youtubeId}`}\n          allowFullScreen\n          style={{ width: &#39;100%&#39;, aspectRatio: &#39;16/9&#39;, border: &#39;none&#39; }}\n        />\n      ) : url ? (\n        <video src={url} controls style={{ width: &#39;100%&#39; }} />\n      ) : (\n        <p>No video URL set</p>\n      )}\n    </div>\n  );\n}"},{"@id":"ref-video-rendering-vue-160de2","label":"Vue","language":"vue","code":"<template>\n  <div :data-block-uid=\"block[&#39;@uid&#39;]\" class=\"video-block\">\n    <iframe\n      v-if=\"youtubeId\"\n      :src=\"`https://www.youtube.com/embed/${youtubeId}`\"\n      allowfullscreen\n      style=\"width: 100%; aspect-ratio: 16/9; border: none\"\n    />\n    <video v-else-if=\"block.url\" :src=\"block.url\" controls style=\"width: 100%\" />\n    <p v-else>No video URL set</p>\n  </div>\n</template>\n\n<script setup>\nimport { computed } from &#39;vue&#39;;\nconst props = defineProps({ block: Object });\nconst youtubeId = computed(() => {\n  const url = props.block.url || &#39;&#39;;\n  return url.match(/(?:youtu\\.be\\/|youtube\\.com\\/(?:watch\\?v=|embed\\/))([^&amp;?/]+)/)?.[1];\n});\n</script>"},{"@id":"ref-video-rendering-svelte-b4e8ba","label":"Svelte","language":"svelte","code":"<script>\n  export let block;\n  $: url = block.url || &#39;&#39;;\n  $: youtubeId = url.match(/(?:youtu\\.be\\/|youtube\\.com\\/(?:watch\\?v=|embed\\/))([^&amp;?/]+)/)?.[1];\n</script>\n\n<div data-block-uid={block[&#39;@uid&#39;]} class=\"video-block\">\n  {#if youtubeId}\n    <iframe\n      src=\"https://www.youtube.com/embed/{youtubeId}\"\n      allowfullscreen\n      style=\"width: 100%; aspect-ratio: 16/9; border: none\"\n      title=\"Video\"\n    />\n  {:else if url}\n    <video src={url} controls style=\"width: 100%\">\n      <track kind=\"captions\" />\n    </video>\n  {:else}\n    <p>No video URL set</p>\n  {/if}\n</div>"}]}' />
+```javascript
+{
+  "video": {
+    "blockSchema": {
+      "properties": {
+        "url": {
+          "title": "Video URL"
+        },
+        "controls": {
+          "title": "Show controls",
+          "type": "boolean",
+          "default": true
+        },
+        "autoplay": {
+          "title": "Autoplay",
+          "type": "boolean",
+          "default": false
+        },
+        "loop": {
+          "title": "Loop",
+          "type": "boolean",
+          "default": false
+        },
+        "muted": {
+          "title": "Muted (required for autoplay)",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  }
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-video" slotId="json-data">
+
+### JSON Block Data
+
+```json
+{
+  "@type": "video",
+  "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-video" slotId="rendering">
+
+### React
+
+```jsx
+function VideoBlock({ block }) {
+  const url = block.url || '';
+  const youtubeId = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([^&?/]+)/)?.[1];
+
+  return (
+    <div data-block-uid={block['@uid']} className="video-block">
+      {youtubeId ? (
+        <iframe
+          src={`https://www.youtube.com/embed/${youtubeId}`}
+          allowFullScreen
+          style={{ width: '100%', aspectRatio: '16/9', border: 'none' }}
+        />
+      ) : url ? (
+        <video src={url} controls style={{ width: '100%' }} />
+      ) : (
+        <p>No video URL set</p>
+      )}
+    </div>
+  );
+}
+```
+
+### Vue
+
+```vue
+<template>
+  <div :data-block-uid="block['@uid']" class="video-block">
+    <iframe
+      v-if="youtubeId"
+      :src="`https://www.youtube.com/embed/${youtubeId}`"
+      allowfullscreen
+      style="width: 100%; aspect-ratio: 16/9; border: none"
+    />
+    <video v-else-if="block.url" :src="block.url" controls style="width: 100%" />
+    <p v-else>No video URL set</p>
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue';
+const props = defineProps({ block: Object });
+const youtubeId = computed(() => {
+  const url = props.block.url || '';
+  return url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([^&?/]+)/)?.[1];
+});
+</script>
+```
+
+### Svelte
+
+```svelte
+<script>
+  export let block;
+  $: url = block.url || '';
+  $: youtubeId = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([^&?/]+)/)?.[1];
+</script>
+
+<div data-block-uid={block['@uid']} class="video-block">
+  {#if youtubeId}
+    <iframe
+      src="https://www.youtube.com/embed/{youtubeId}"
+      allowfullscreen
+      style="width: 100%; aspect-ratio: 16/9; border: none"
+      title="Video"
+    />
+  {:else if url}
+    <video src={url} controls style="width: 100%">
+      <track kind="captions" />
+    </video>
+  {:else}
+    <p>No video URL set</p>
+  {/if}
+</div>
+```
+
+</block>

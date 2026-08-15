@@ -43,8 +43,13 @@ assignments:
   - { uid: ceee1cfa-80ff-44f1-b3af-3cfd4be3f4ba, type: maps }
   - { uid: f9dec030-b72d-4940-af4c-6dc123cea7a6, type: slate }
   - { uid: ref-maps-schema, type: codeExample }
+  - { id: ref-maps-schema-javascript-45f9f0 }
   - { uid: ref-maps-json-data, type: codeExample }
+  - { id: ref-maps-json-data-json-04466f }
   - { uid: ref-maps-rendering, type: codeExample }
+  - { id: ref-maps-rendering-jsx-7fbc14 }
+  - { id: ref-maps-rendering-vue-85ab6d }
+  - { id: ref-maps-rendering-svelte-4d9083 }
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
@@ -100,8 +105,112 @@ blandit praesent luptatum zzril qui.
 
 <block type="slate" />
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-maps" slotId="schema" data='{"tabs":[{"@id":"ref-maps-schema-javascript-45f9f0","label":"Schema","language":"javascript","code":"{\n  \"maps\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"url\": {\n          \"title\": \"Map Embed URL\"\n        },\n        \"title\": {\n          \"title\": \"Title\",\n          \"type\": \"string\"\n        }\n      }\n    }\n  }\n}"}]}' />
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-maps" slotId="schema">
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-maps" slotId="json-data" data='{"tabs":[{"@id":"ref-maps-json-data-json-04466f","label":"JSON Block Data","language":"json","code":"{\n  \"@type\": \"maps\",\n  \"url\": \"https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2468.496805908769!2d4.867355714504337!3d50.46334407876937!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x47c1996d6ee4733f%3A0x1e62003289f50ea5!2zVGjDqcOidHJlIGRlIE5hbXVy!5e1!3m2!1sde!2sde!4v1710240653269!5m2!1sde!2sde\",\n  \"title\": \"Ploneconf 2022 was in Namur, Belgium\"\n}"}]}' />
+### Schema
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-maps" slotId="rendering" data='{"tabs":[{"@id":"ref-maps-rendering-jsx-7fbc14","label":"React","language":"jsx","code":"function MapsBlock({ block }) {\n  const url = block.url || &#39;&#39;;\n\n  return (\n    <div data-block-uid={block[&#39;@uid&#39;]} className=\"maps-block\">\n      {url ? (\n        <iframe\n          src={url}\n          title={block.title || &#39;Map&#39;}\n          allowFullScreen\n          loading=\"lazy\"\n          style={{ width: &#39;100%&#39;, height: &#39;450px&#39;, border: &#39;none&#39; }}\n        />\n      ) : (\n        <p>No map URL set</p>\n      )}\n    </div>\n  );\n}"},{"@id":"ref-maps-rendering-vue-85ab6d","label":"Vue","language":"vue","code":"<template>\n  <div :data-block-uid=\"block[&#39;@uid&#39;]\" class=\"maps-block\">\n    <iframe\n      v-if=\"block.url\"\n      :src=\"block.url\"\n      :title=\"block.title || &#39;Map&#39;\"\n      allowfullscreen\n      loading=\"lazy\"\n      style=\"width: 100%; height: 450px; border: none\"\n    />\n    <p v-else>No map URL set</p>\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>"},{"@id":"ref-maps-rendering-svelte-4d9083","label":"Svelte","language":"svelte","code":"<script>\n  export let block;\n</script>\n\n<div data-block-uid={block[&#39;@uid&#39;]} class=\"maps-block\">\n  {#if block.url}\n    <iframe\n      src={block.url}\n      title={block.title || &#39;Map&#39;}\n      allowfullscreen\n      loading=\"lazy\"\n      style=\"width: 100%; height: 450px; border: none\"\n    />\n  {:else}\n    <p>No map URL set</p>\n  {/if}\n</div>"}]}' />
+```javascript
+{
+  "maps": {
+    "blockSchema": {
+      "properties": {
+        "url": {
+          "title": "Map Embed URL"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      }
+    }
+  }
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-maps" slotId="json-data">
+
+### JSON Block Data
+
+```json
+{
+  "@type": "maps",
+  "url": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2468.496805908769!2d4.867355714504337!3d50.46334407876937!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x47c1996d6ee4733f%3A0x1e62003289f50ea5!2zVGjDqcOidHJlIGRlIE5hbXVy!5e1!3m2!1sde!2sde!4v1710240653269!5m2!1sde!2sde",
+  "title": "Ploneconf 2022 was in Namur, Belgium"
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-maps" slotId="rendering">
+
+### React
+
+```jsx
+function MapsBlock({ block }) {
+  const url = block.url || '';
+
+  return (
+    <div data-block-uid={block['@uid']} className="maps-block">
+      {url ? (
+        <iframe
+          src={url}
+          title={block.title || 'Map'}
+          allowFullScreen
+          loading="lazy"
+          style={{ width: '100%', height: '450px', border: 'none' }}
+        />
+      ) : (
+        <p>No map URL set</p>
+      )}
+    </div>
+  );
+}
+```
+
+### Vue
+
+```vue
+<template>
+  <div :data-block-uid="block['@uid']" class="maps-block">
+    <iframe
+      v-if="block.url"
+      :src="block.url"
+      :title="block.title || 'Map'"
+      allowfullscreen
+      loading="lazy"
+      style="width: 100%; height: 450px; border: none"
+    />
+    <p v-else>No map URL set</p>
+  </div>
+</template>
+
+<script setup>
+defineProps({ block: Object });
+</script>
+```
+
+### Svelte
+
+```svelte
+<script>
+  export let block;
+</script>
+
+<div data-block-uid={block['@uid']} class="maps-block">
+  {#if block.url}
+    <iframe
+      src={block.url}
+      title={block.title || 'Map'}
+      allowfullscreen
+      loading="lazy"
+      style="width: 100%; height: 450px; border: none"
+    />
+  {:else}
+    <p>No map URL set</p>
+  {/if}
+</div>
+```
+
+</block>

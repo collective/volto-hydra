@@ -29,12 +29,15 @@ assignments:
   - { uid: ul-5, type: slate }
   - { uid: p-6, type: slate }
   - { uid: ce-7, type: codeExample }
+  - { id: ce-7-javascript-f6a08c }
   - { uid: h-8, type: slate }
   - { uid: p-9, type: slate }
   - { uid: p-10, type: slate }
   - { uid: ce-11, type: codeExample }
+  - { id: ce-11-javascript-060e3a }
   - { uid: p-12, type: slate }
   - { uid: ce-13, type: codeExample }
+  - { id: ce-13-javascript-852336 }
   - { uid: h-14, type: slate }
   - { uid: p-15, type: slate }
   - { uid: h-16, type: slate }
@@ -72,7 +75,44 @@ Detect the admin iframe and load the bridge only when needed. `window.name` is s
 
 This persists across SPA navigation within the iframe, allowing your frontend to detect it's in the admin even after client-side route changes. In view mode, render from your API immediately but still load the bridge for navigation tracking. In edit mode, wait for `onEditChange` before rendering.
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-7-javascript-f6a08c","label":"Javascript","language":"javascript","code":"function loadBridge(callback) {\n    const existingScript = document.getElementById(\"hydraBridge\");\n    if (!existingScript) {\n      const script = document.createElement(\"script\");\n      script.src = \"your-hydra-js-path\";\n      script.id = \"hydraBridge\";\n      document.body.appendChild(script);\n      script.onload = () => callback();\n    } else {\n      callback();\n    }\n}\n\nconst isHydraEdit = window.name.startsWith(&#39;hydra-edit:&#39;);\nconst isHydraView = window.name.startsWith(&#39;hydra-view:&#39;);\nconst inAdminIframe = isHydraEdit || isHydraView;\n\n// View mode or not in admin: render from API\nif (!isHydraEdit) {\n    renderPage(await fetchContent(path));\n}\n\n// Load bridge only in admin iframe\nif (inAdminIframe) {\n    loadBridge(() => {\n        initBridge({\n            onEditChange: (formData) => renderPage(formData),\n        });\n    });\n}"}]}' />
+<block type="codeExample">
+
+### Javascript
+
+```javascript
+function loadBridge(callback) {
+    const existingScript = document.getElementById("hydraBridge");
+    if (!existingScript) {
+      const script = document.createElement("script");
+      script.src = "your-hydra-js-path";
+      script.id = "hydraBridge";
+      document.body.appendChild(script);
+      script.onload = () => callback();
+    } else {
+      callback();
+    }
+}
+
+const isHydraEdit = window.name.startsWith('hydra-edit:');
+const isHydraView = window.name.startsWith('hydra-view:');
+const inAdminIframe = isHydraEdit || isHydraView;
+
+// View mode or not in admin: render from API
+if (!isHydraEdit) {
+    renderPage(await fetchContent(path));
+}
+
+// Load bridge only in admin iframe
+if (inAdminIframe) {
+    loadBridge(() => {
+        initBridge({
+            onEditChange: (formData) => renderPage(formData),
+        });
+    });
+}
+```
+
+</block>
 
 ## Authentication
 
@@ -80,11 +120,50 @@ As soon as the editor logs into the hydra editor, your frontend should use the s
 
 The `access_token` is passed as a URL parameter on initial load and automatically stored in `sessionStorage` by hydra.js. On SPA navigation, the URL param is gone but the token persists in `sessionStorage`. Use the `getAccessToken()` helper:
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-11-javascript-060e3a","label":"Javascript","language":"javascript","code":"import { getAccessToken } from &#39;@hydra-js/hydra.js&#39;;\n\nconst token = getAccessToken();\n// Returns token from URL param (if present)\n// or sessionStorage (for SPA navigation)"}]}' />
+<block type="codeExample">
+
+### Javascript
+
+```javascript
+import { getAccessToken } from '@hydra-js/hydra.js';
+
+const token = getAccessToken();
+// Returns token from URL param (if present)
+// or sessionStorage (for SPA navigation)
+```
+
+</block>
 
 Example using Next.js 14 and ploneClient:
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-13-javascript-852336","label":"Javascript","language":"javascript","code":"import ploneClient from \"@plone/client\";\nimport { useQuery } from \"@tanstack/react-query\";\nimport { getAccessToken } from &#39;@hydra-js/hydra.js&#39;;\n\nexport default function Blog({ params }) {\n  const token = getAccessToken();\n\n  const client = ploneClient.initialize({\n    apiPath: \"http://localhost:8080/Plone/\",\n    token: token,\n  });\n\n  const { getContentQuery } = client;\n  const { data, isLoading } = useQuery(\n    getContentQuery({ path: &#39;/blogs&#39; })\n  );\n\n  if (isLoading) return <div>Loading...</div>;\n  return <div>{data.title}</div>;\n}"}]}' />
+<block type="codeExample">
+
+### Javascript
+
+```javascript
+import ploneClient from "@plone/client";
+import { useQuery } from "@tanstack/react-query";
+import { getAccessToken } from '@hydra-js/hydra.js';
+
+export default function Blog({ params }) {
+  const token = getAccessToken();
+
+  const client = ploneClient.initialize({
+    apiPath: "http://localhost:8080/Plone/",
+    token: token,
+  });
+
+  const { getContentQuery } = client;
+  const { data, isLoading } = useQuery(
+    getContentQuery({ path: '/blogs' })
+  );
+
+  if (isLoading) return <div>Loading...</div>;
+  return <div>{data.title}</div>;
+}
+```
+
+</block>
 
 ## Preventing Reloads
 

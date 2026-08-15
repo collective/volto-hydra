@@ -28,14 +28,17 @@ assignments:
   - { uid: h-3, type: slate }
   - { uid: p-4, type: slate }
   - { uid: ce-5, type: codeExample }
+  - { id: ce-5-javascript-3259a0 }
   - { uid: p-6, type: slate }
   - { uid: p-7, type: slate }
   - { uid: h-8, type: slate }
   - { uid: p-9, type: slate }
   - { uid: ce-10, type: codeExample }
+  - { id: ce-10-javascript-23153e }
   - { uid: h-11, type: slate }
   - { uid: p-12, type: slate }
   - { uid: ce-13, type: codeExample }
+  - { id: ce-13-javascript-4aeb0d }
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
@@ -57,7 +60,24 @@ To make your site editable with Inka you load hydra.js in your frontend and call
 
 Call `initBridge()` with an `onEditChange` callback to receive live content updates as the user edits. Your frontend re-renders in real time. Outside edit mode, fetch content from the API as normal.
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-5-javascript-3259a0","label":"Javascript","language":"javascript","code":"import { initBridge } from &#39;./hydra.js&#39;;\n\nlet bridge;\nif (window.name.startsWith(&#39;hydra&#39;)) {\n    bridge = initBridge({\n        onEditChange: (formData) => renderPage(formData),\n    });\n} else {\n    renderPage(await fetchContent(window.location.pathname));\n}"}]}' />
+<block type="codeExample">
+
+### Javascript
+
+```javascript
+import { initBridge } from './hydra.js';
+
+let bridge;
+if (window.name.startsWith('hydra')) {
+    bridge = initBridge({
+        onEditChange: (formData) => renderPage(formData),
+    });
+} else {
+    renderPage(await fetchContent(window.location.pathname));
+}
+```
+
+</block>
 
 The `formData` passed to `onEditChange` has the same structure as the Plone REST API response, so the same rendering code works for both live editing and normal page display.
 
@@ -67,10 +87,88 @@ Either hashbang (`/#!/path`) or normal (`/path`) style paths are supported.
 
 Iterate `blocks_layout.items` and render each block by type. Add `data-block-uid` so Inka knows which block the user clicked.
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-10-javascript-23153e","label":"Javascript","language":"javascript","code":"<!DOCTYPE html>\n<html>\n<head>\n    <script type=\"module\">\n    import { initBridge } from &#39;./hydra.js&#39;;\n\n    if (window.name.startsWith(&#39;hydra&#39;)) {\n        initBridge({\n            onEditChange: (formData) => renderPage(formData),\n        });\n    } else {\n        renderPage(await fetchContent(window.location.pathname));\n    }\n\n    function renderPage(data) {\n        document.getElementById(&#39;content&#39;).innerHTML =\n            data.blocks_layout.items.map(id => {\n                const block = data.blocks[id];\n                return `<div data-block-uid=\"${id}\">\n                    ${renderBlock(block)}\n                </div>`;\n            }).join(&#39;&#39;);\n    }\n\n    function renderBlock(block) {\n        switch (block[&#39;@type&#39;]) {\n            case &#39;slate&#39;:\n                return renderSlate(block.value);\n            case &#39;image&#39;:\n                return `<img src=\"${block.url}/@@images/image\" />`;\n            default:\n                return `<pre>${JSON.stringify(block, null, 2)}</pre>`;\n        }\n    }\n    </script>\n</head>\n<body>\n    <div id=\"content\"></div>\n</body>\n</html>"}]}' />
+<block type="codeExample">
+
+### Javascript
+
+```javascript
+<!DOCTYPE html>
+<html>
+<head>
+    <script type="module">
+    import { initBridge } from './hydra.js';
+
+    if (window.name.startsWith('hydra')) {
+        initBridge({
+            onEditChange: (formData) => renderPage(formData),
+        });
+    } else {
+        renderPage(await fetchContent(window.location.pathname));
+    }
+
+    function renderPage(data) {
+        document.getElementById('content').innerHTML =
+            data.blocks_layout.items.map(id => {
+                const block = data.blocks[id];
+                return `<div data-block-uid="${id}">
+                    ${renderBlock(block)}
+                </div>`;
+            }).join('');
+    }
+
+    function renderBlock(block) {
+        switch (block['@type']) {
+            case 'slate':
+                return renderSlate(block.value);
+            case 'image':
+                return `<img src="${block.url}/@@images/image" />`;
+            default:
+                return `<pre>${JSON.stringify(block, null, 2)}</pre>`;
+        }
+    }
+    </script>
+</head>
+<body>
+    <div id="content"></div>
+</body>
+</html>
+```
+
+</block>
 
 ## Allowed Blocks and Page Regions
 
 When initialising the bridge, you can configure rules for what blocks can be added to the page and where. Pages can have multiple blocks fields for different regions (e.g., header, content, footer), each with its own allowed block types and limits. These show as separate sections in the sidebar when no block is selected:
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-13-javascript-4aeb0d","label":"Javascript","language":"javascript","code":"bridge = initBridge({\n    page: {\n        schema: {\n            properties: {\n                items: {\n                    widget: &#39;blocks_layout&#39;,\n                    title: &#39;Content&#39;,\n                    allowedBlocks: [&#39;slate&#39;, &#39;image&#39;, &#39;hero&#39;, &#39;columns&#39;],\n                },\n                header: {\n                    widget: &#39;blocks_layout&#39;,\n                    title: &#39;Header&#39;,\n                    allowedBlocks: [&#39;slate&#39;, &#39;image&#39;],\n                    maxLength: 3,\n                },\n                footer: {\n                    widget: &#39;blocks_layout&#39;,\n                    title: &#39;Footer&#39;,\n                    allowedBlocks: [&#39;slate&#39;, &#39;link&#39;],\n                },\n            },\n        },\n    },\n});"}]}' />
+<block type="codeExample">
+
+### Javascript
+
+```javascript
+bridge = initBridge({
+    page: {
+        schema: {
+            properties: {
+                items: {
+                    widget: 'blocks_layout',
+                    title: 'Content',
+                    allowedBlocks: ['slate', 'image', 'hero', 'columns'],
+                },
+                header: {
+                    widget: 'blocks_layout',
+                    title: 'Header',
+                    allowedBlocks: ['slate', 'image'],
+                    maxLength: 3,
+                },
+                footer: {
+                    widget: 'blocks_layout',
+                    title: 'Footer',
+                    allowedBlocks: ['slate', 'link'],
+                },
+            },
+        },
+    },
+});
+```
+
+</block>

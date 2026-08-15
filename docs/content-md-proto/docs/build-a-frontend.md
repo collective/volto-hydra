@@ -30,14 +30,18 @@ assignments:
   - { uid: ul-6, type: slate }
   - { uid: p-7, type: slate }
   - { uid: ce-8, type: codeExample }
+  - { id: ce-8-js-bf605e }
   - { uid: p-9, type: slate }
   - { uid: ce-10, type: codeExample }
+  - { id: ce-10-js-2e9648 }
   - { uid: p-11, type: slate }
   - { uid: ce-12, type: codeExample }
+  - { id: ce-12-html-e0187e }
   - { uid: h-13, type: slate }
   - { uid: p-14, type: slate }
   - { uid: ul-15, type: slate }
   - { uid: ce-16, type: codeExample }
+  - { id: ce-16-html-5cddab }
   - { uid: p-17, type: slate }
   - { uid: p-18, type: slate }
   - { uid: p-19, type: slate }
@@ -118,15 +122,94 @@ To make a site editable with Inka you break a page into:
 
 When the page loads inside Inka's edit iframe, you initialise the bridge and declare your blocks; otherwise you render normally from the API:
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-8-js-bf605e","label":"Js","language":"js","code":"let bridge;\n\nif (window.name.startsWith(&#39;hydra&#39;)) {\n    bridge = initBridge({\n      page: {\n        schema: {\n          // Each blocks field (widget: &#39;blocks_layout&#39;) is a named list of\n          // blocks. The field name is the key inside the `blocks_layout` dict;\n          // the default field is `items`. Each has its own allowedBlocks.\n          properties: {\n            items:  { widget: &#39;blocks_layout&#39;, allowedBlocks: [&#39;slate&#39;, &#39;grid&#39;, &#39;myimage&#39;] },\n            header: { widget: &#39;blocks_layout&#39;, allowedBlocks: [&#39;slate&#39;, &#39;image&#39;], maxLength: 3 },\n            footer: { widget: &#39;blocks_layout&#39;, allowedBlocks: [&#39;slate&#39;, &#39;link&#39;] },\n          },\n        },\n      },\n      blocks: {\n        // we can add custom blocks (or alter builtin ones)\n        myimage: {\n          blockSchema: {\n            properties: {\n              image: { widget: &#39;image&#39; },\n              url: { widget: &#39;url&#39; },\n              caption: { type: &#39;string&#39; },\n            }\n          }\n        }\n      },\n      onEditChange: (formData) => renderPage(formData),\n    });\n}\nelse {\n    // When not editing, render from the server api\n    renderPage(await fetchContent(path));\n}"}]}' />
+<block type="codeExample">
+
+### Js
+
+```js
+let bridge;
+
+if (window.name.startsWith('hydra')) {
+    bridge = initBridge({
+      page: {
+        schema: {
+          // Each blocks field (widget: 'blocks_layout') is a named list of
+          // blocks. The field name is the key inside the `blocks_layout` dict;
+          // the default field is `items`. Each has its own allowedBlocks.
+          properties: {
+            items:  { widget: 'blocks_layout', allowedBlocks: ['slate', 'grid', 'myimage'] },
+            header: { widget: 'blocks_layout', allowedBlocks: ['slate', 'image'], maxLength: 3 },
+            footer: { widget: 'blocks_layout', allowedBlocks: ['slate', 'link'] },
+          },
+        },
+      },
+      blocks: {
+        // we can add custom blocks (or alter builtin ones)
+        myimage: {
+          blockSchema: {
+            properties: {
+              image: { widget: 'image' },
+              url: { widget: 'url' },
+              caption: { type: 'string' },
+            }
+          }
+        }
+      },
+      onEditChange: (formData) => renderPage(formData),
+    });
+}
+else {
+    // When not editing, render from the server api
+    renderPage(await fetchContent(path));
+}
+```
+
+</block>
 
 Page data ends up shaped like this — one shared `blocks` dict, and a region per named list inside `blocks_layout`:
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-10-js-2e9648","label":"Js","language":"js","code":"{\n  ...\n  blocks: {\n    &#39;text-1&#39;: { &#39;@type&#39;: &#39;slate&#39;, ... },\n    &#39;header-1&#39;: { &#39;@type&#39;: &#39;image&#39;, ... },\n    &#39;footer-1&#39;: { &#39;@type&#39;: &#39;slate&#39;, ... }\n  },\n  blocks_layout: {\n    items: [&#39;text-1&#39;],     // main content region (the default)\n    header: [&#39;header-1&#39;],  // header region\n    footer: [&#39;footer-1&#39;]   // footer region\n  }\n}"}]}' />
+<block type="codeExample">
+
+### Js
+
+```js
+{
+  ...
+  blocks: {
+    'text-1': { '@type': 'slate', ... },
+    'header-1': { '@type': 'image', ... },
+    'footer-1': { '@type': 'slate', ... }
+  },
+  blocks_layout: {
+    items: ['text-1'],     // main content region (the default)
+    header: ['header-1'],  // header region
+    footer: ['footer-1']   // footer region
+  }
+}
+```
+
+</block>
 
 Then you augment the rendered HTML with `data-` attributes (or `<!-- hydra ... -->` comments) so Inka can find your blocks and editable fields:
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-12-html-e0187e","label":"Html","language":"html","code":"<!-- hydra edit-text=title -->\n<div>Page Title</div>\n\n<div id=content>\n  <!-- hydra block-uid=\"1234\" edit-text=title(p) edit-media=image(img) edit-link=url -->\n  <a href=\"http://go.to\">\n    <img src=\"http://my.img\"/>\n    <p>A caption</p>\n  </a>\n</div>"}]}' />
+<block type="codeExample">
+
+### Html
+
+```html
+<!-- hydra edit-text=title -->
+<div>Page Title</div>
+
+<div id=content>
+  <!-- hydra block-uid="1234" edit-text=title(p) edit-media=image(img) edit-link=url -->
+  <a href="http://go.to">
+    <img src="http://my.img"/>
+    <p>A caption</p>
+  </a>
+</div>
+```
+
+</block>
 
 ### Deep-link anchors (fragments)
 
@@ -135,7 +218,17 @@ To let editors link to a spot *inside* a page, mark the element with a real `id`
 - `data-linkable-h1` … `data-linkable-h6="Label"` — a heading anchor **at that level**. Use these on your headings; the suffix is the level.
 - `data-linkable-id="Label"` — a **level-less** anchor (a figure, a defined term, any non-heading target).
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-16-html-5cddab","label":"Html","language":"html","code":"<h2 id=\"pricing\" data-linkable-h2=\"Pricing\">Pricing</h2>\n<h3 id=\"enterprise\" data-linkable-h3=\"Enterprise plan\">Enterprise plan</h3>\n<figure id=\"fig-1\" data-linkable-id=\"Figure 1\">…</figure>"}]}' />
+<block type="codeExample">
+
+### Html
+
+```html
+<h2 id="pricing" data-linkable-h2="Pricing">Pricing</h2>
+<h3 id="enterprise" data-linkable-h3="Enterprise plan">Enterprise plan</h3>
+<figure id="fig-1" data-linkable-id="Figure 1">…</figure>
+```
+
+</block>
 
 Inka harvests these per block on render as `{ id, name, level }` and stores them in the block's data, so the object browser offers them as `path#pricing` link targets — as a nested list reflecting the page's structure. Both attributes must survive into your **published** render for the anchor to resolve at runtime — Inka only reads them in edit mode.
 

@@ -31,8 +31,13 @@ assignments:
   - { uid: 2a597dde-dd2b-4c66-816c-09e243a188f5, type: gridBlock }
   - { uid: c2eaacd0-4e96-4344-a0ac-26ed644fc503, type: slider }
   - { uid: ref-listing-schema, type: codeExample }
+  - { id: ref-listing-schema-javascript-bd0476 }
   - { uid: ref-listing-json-data, type: codeExample }
+  - { id: ref-listing-json-data-json-829696 }
   - { uid: ref-listing-rendering, type: codeExample }
+  - { id: ref-listing-rendering-jsx-f33c73 }
+  - { id: ref-listing-rendering-vue-3c4a00 }
+  - { id: ref-listing-rendering-svelte-aca768 }
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
@@ -59,8 +64,208 @@ Displays a list of content items from a query. The listing block fetches items f
 
 <block type="slider" headline="Listing: Image Slider" headlineTag="h2" data='{"autoplayDelay":4000,"autoplayEnabled":false,"autoplayJump":false,"slides":[{"@id":"slider-listing-1","@type":"listing","fieldMapping":{"@id":"href","title":"alt","image":"url"},"querystring":{"query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Image"]}],"sort_order":"ascending"},"variation":"image"}],"styles":{}}' />
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="schema" data='{"tabs":[{"@id":"ref-listing-schema-javascript-bd0476","label":"Schema","language":"javascript","code":"{\n  \"listing\": {\n    \"itemTypeField\": \"variation\",\n    \"schemaEnhancer\": {\n      \"inheritSchemaFrom\": {\n        \"mappingField\": \"fieldMapping\",\n        \"defaultsField\": \"itemDefaults\",\n        \"filterConvertibleFrom\": \"@default\",\n        \"title\": \"Item Type\",\n        \"default\": \"summary\"\n      }\n    }\n  },\n  \"summary\": {\n    \"fieldMappings\": {\n      \"@default\": {\n        \"@id\": \"href\",\n        \"title\": \"title\",\n        \"description\": \"description\",\n        \"image\": \"image\"\n      }\n    },\n    \"blockSchema\": {\n      \"properties\": {\n        \"href\": {\n          \"title\": \"Link\",\n          \"widget\": \"url\"\n        },\n        \"title\": {\n          \"title\": \"Title\"\n        },\n        \"description\": {\n          \"title\": \"Description\",\n          \"widget\": \"textarea\"\n        },\n        \"image\": {\n          \"title\": \"Image\",\n          \"widget\": \"url\"\n        },\n        \"date\": {\n          \"title\": \"Date\",\n          \"widget\": \"date\"\n        }\n      }\n    }\n  },\n  \"default\": {\n    \"fieldMappings\": {\n      \"@default\": {\n        \"@id\": \"href\",\n        \"title\": \"title\",\n        \"description\": \"description\"\n      }\n    },\n    \"blockSchema\": {\n      \"properties\": {\n        \"href\": {\n          \"title\": \"Link\",\n          \"widget\": \"url\"\n        },\n        \"title\": {\n          \"title\": \"Title\"\n        },\n        \"description\": {\n          \"title\": \"Description\",\n          \"widget\": \"textarea\"\n        }\n      }\n    }\n  }\n}"}]}' />
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="schema">
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="json-data" data='{"tabs":[{"@id":"ref-listing-json-data-json-829696","label":"JSON Block Data","language":"json","code":"{\n  \"@type\": \"listing\",\n  \"variation\": \"summary\",\n  \"querystring\": {\n    \"query\": [\n      {\n        \"i\": \"portal_type\",\n        \"o\": \"plone.app.querystring.operation.selection.any\",\n        \"v\": [\n          \"Document\"\n        ]\n      }\n    ],\n    \"sort_on\": \"effective\",\n    \"sort_order\": \"descending\"\n  }\n}\n\n{\n  \"@uid\": \"item-1\",\n  \"@type\": \"summary\",\n  \"href\": \"/news/my-article\",\n  \"title\": \"My Article\",\n  \"description\": \"Article summary text\",\n  \"image\": \"/news/my-article/@@images/image-800x600.jpg\"\n}"}]}' />
+### Schema
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="rendering" data='{"tabs":[{"@id":"ref-listing-rendering-jsx-f33c73","label":"React","language":"jsx","code":"function ListingBlock({ block, blockId }) {\n  const [items, setItems] = useState([]);\n\n  useEffect(() => {\n    async function load() {\n      const fetchItems = ploneFetchItems({ apiUrl: API_URL });\n      const result = await expandListingBlocks([blockId], {\n        blocks: { [blockId]: block },\n        fetchItems: { listing: fetchItems },\n        itemTypeField: &#39;variation&#39;,\n      });\n      setItems(result.items);\n    }\n    load();\n  }, [block.querystring]);\n\n  return (\n    <div data-block-uid={blockId} className=\"listing-block\">\n      {items.map((item, i) => (\n        <BlockRenderer key={i} block={item} />\n      ))}\n    </div>\n  );\n}"},{"@id":"ref-listing-rendering-vue-3c4a00","label":"Vue","language":"vue","code":"<template>\n  <div :data-block-uid=\"blockId\" class=\"listing-block\">\n    <BlockRenderer v-for=\"(item, i) in items\" :key=\"i\" :block=\"item\" />\n  </div>\n</template>\n\n<script setup>\nimport { ref, watch } from &#39;vue&#39;;\n\nconst props = defineProps({ block: Object, blockId: String });\nconst items = ref([]);\n\nwatch(() => props.block.querystring, async () => {\n  const fetchItems = ploneFetchItems({ apiUrl: API_URL });\n  const result = await expandListingBlocks([props.blockId], {\n    blocks: { [props.blockId]: props.block },\n    fetchItems: { listing: fetchItems },\n    itemTypeField: &#39;variation&#39;,\n  });\n  items.value = result.items;\n}, { immediate: true });\n</script>"},{"@id":"ref-listing-rendering-svelte-aca768","label":"Svelte","language":"svelte","code":"<script>\n  import BlockRenderer from &#39;./BlockRenderer.svelte&#39;;\n\n  export let block;\n  export let blockId;\n\n  let items = [];\n\n  $: block.querystring, loadItems();\n\n  async function loadItems() {\n    const fetchItems = ploneFetchItems({ apiUrl: API_URL });\n    const result = await expandListingBlocks([blockId], {\n      blocks: { [blockId]: block },\n      fetchItems: { listing: fetchItems },\n      itemTypeField: &#39;variation&#39;,\n    });\n    items = result.items;\n  }\n</script>\n\n<div data-block-uid={blockId} class=\"listing-block\">\n  {#each items as item, i (i)}\n    <BlockRenderer block={item} />\n  {/each}\n</div>"}]}' />
+```javascript
+{
+  "listing": {
+    "itemTypeField": "variation",
+    "schemaEnhancer": {
+      "inheritSchemaFrom": {
+        "mappingField": "fieldMapping",
+        "defaultsField": "itemDefaults",
+        "filterConvertibleFrom": "@default",
+        "title": "Item Type",
+        "default": "summary"
+      }
+    }
+  },
+  "summary": {
+    "fieldMappings": {
+      "@default": {
+        "@id": "href",
+        "title": "title",
+        "description": "description",
+        "image": "image"
+      }
+    },
+    "blockSchema": {
+      "properties": {
+        "href": {
+          "title": "Link",
+          "widget": "url"
+        },
+        "title": {
+          "title": "Title"
+        },
+        "description": {
+          "title": "Description",
+          "widget": "textarea"
+        },
+        "image": {
+          "title": "Image",
+          "widget": "url"
+        },
+        "date": {
+          "title": "Date",
+          "widget": "date"
+        }
+      }
+    }
+  },
+  "default": {
+    "fieldMappings": {
+      "@default": {
+        "@id": "href",
+        "title": "title",
+        "description": "description"
+      }
+    },
+    "blockSchema": {
+      "properties": {
+        "href": {
+          "title": "Link",
+          "widget": "url"
+        },
+        "title": {
+          "title": "Title"
+        },
+        "description": {
+          "title": "Description",
+          "widget": "textarea"
+        }
+      }
+    }
+  }
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="json-data">
+
+### JSON Block Data
+
+```json
+{
+  "@type": "listing",
+  "variation": "summary",
+  "querystring": {
+    "query": [
+      {
+        "i": "portal_type",
+        "o": "plone.app.querystring.operation.selection.any",
+        "v": [
+          "Document"
+        ]
+      }
+    ],
+    "sort_on": "effective",
+    "sort_order": "descending"
+  }
+}
+
+{
+  "@uid": "item-1",
+  "@type": "summary",
+  "href": "/news/my-article",
+  "title": "My Article",
+  "description": "Article summary text",
+  "image": "/news/my-article/@@images/image-800x600.jpg"
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="rendering">
+
+### React
+
+```jsx
+function ListingBlock({ block, blockId }) {
+  const [items, setItems] = useState([]);
+
+  useEffect(() => {
+    async function load() {
+      const fetchItems = ploneFetchItems({ apiUrl: API_URL });
+      const result = await expandListingBlocks([blockId], {
+        blocks: { [blockId]: block },
+        fetchItems: { listing: fetchItems },
+        itemTypeField: 'variation',
+      });
+      setItems(result.items);
+    }
+    load();
+  }, [block.querystring]);
+
+  return (
+    <div data-block-uid={blockId} className="listing-block">
+      {items.map((item, i) => (
+        <BlockRenderer key={i} block={item} />
+      ))}
+    </div>
+  );
+}
+```
+
+### Vue
+
+```vue
+<template>
+  <div :data-block-uid="blockId" class="listing-block">
+    <BlockRenderer v-for="(item, i) in items" :key="i" :block="item" />
+  </div>
+</template>
+
+<script setup>
+import { ref, watch } from 'vue';
+
+const props = defineProps({ block: Object, blockId: String });
+const items = ref([]);
+
+watch(() => props.block.querystring, async () => {
+  const fetchItems = ploneFetchItems({ apiUrl: API_URL });
+  const result = await expandListingBlocks([props.blockId], {
+    blocks: { [props.blockId]: props.block },
+    fetchItems: { listing: fetchItems },
+    itemTypeField: 'variation',
+  });
+  items.value = result.items;
+}, { immediate: true });
+</script>
+```
+
+### Svelte
+
+```svelte
+<script>
+  import BlockRenderer from './BlockRenderer.svelte';
+
+  export let block;
+  export let blockId;
+
+  let items = [];
+
+  $: block.querystring, loadItems();
+
+  async function loadItems() {
+    const fetchItems = ploneFetchItems({ apiUrl: API_URL });
+    const result = await expandListingBlocks([blockId], {
+      blocks: { [blockId]: block },
+      fetchItems: { listing: fetchItems },
+      itemTypeField: 'variation',
+    });
+    items = result.items;
+  }
+</script>
+
+<div data-block-uid={blockId} class="listing-block">
+  {#each items as item, i (i)}
+    <BlockRenderer block={item} />
+  {/each}
+</div>
+```
+
+</block>

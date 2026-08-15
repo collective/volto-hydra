@@ -38,8 +38,13 @@ assignments:
   - { uid: aa800193-7bf4-4f54-9bb6-a6c5b4e02b81, type: heading }
   - { uid: 4266731a-e721-4f2f-95de-c7c3e885677b, type: slateTable }
   - { uid: ref-table-schema, type: codeExample }
+  - { id: ref-table-schema-javascript-237d52 }
   - { uid: ref-table-json-data, type: codeExample }
+  - { id: ref-table-json-data-json-472dd4 }
   - { uid: ref-table-rendering, type: codeExample }
+  - { id: ref-table-rendering-jsx-ee1611 }
+  - { id: ref-table-rendering-vue-570ccb }
+  - { id: ref-table-rendering-svelte-de27fc }
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
@@ -74,8 +79,206 @@ A table with rich text (Slate) content in each cell. Supports adding/removing ro
 
 <block type="slateTable" data='{"styles":{"backgroundColor":"grey"},"table":{"basic":false,"celled":true,"compact":false,"fixed":true,"hideHeaders":false,"inverted":false,"rows":[{"cells":[{"key":"4266731a-2616q","type":"header","value":[{"children":[{"text":"Title Tablehead"}],"type":"p"}]},{"key":"4266731a-9c5fm","type":"header","value":[{"children":[{"text":"Title Tablehead"}],"type":"p"}]},{"key":"4266731a-ljf3","type":"header","value":[{"children":[{"text":"Title Tablehead"}],"type":"p"}]},{"key":"4266731a-fgtdt","type":"header","value":[{"children":[{"text":"Title Tablehead"}],"type":"p"}]}],"key":"4266731a-36un"},{"cells":[{"key":"4266731a-flhhb","type":"data","value":[{"type":"p","children":[{"text":"Heading H2"},{"text":"Heading H3"},{"text":""},{"text":"Text can be "},{"children":[{"text":"bold"}],"type":"strong"},{"text":" or "},{"children":[{"text":"italic"}],"type":"em"},{"text":" or a "},{"children":[{"text":"Link"}],"data":{"url":"/docs/examples"},"type":"link"},{"text":" "}]}]},{"key":"4266731a-9biso","type":"data","value":[{"type":"p","children":[{"text":"Heading H2"},{"text":"Heading H3"},{"text":""},{"text":"Text can be "},{"children":[{"text":"bold"}],"type":"strong"},{"text":" or "},{"children":[{"text":"italic"}],"type":"em"},{"text":" or a "},{"children":[{"text":"Link"}],"data":{"url":"/docs/examples"},"type":"link"},{"text":""}]}]},{"key":"4266731a-56ea8","type":"data","value":[{"type":"p","children":[{"text":"Heading H2"},{"text":"Heading H3"},{"text":""},{"text":"Text can be "},{"children":[{"text":"bold"}],"type":"strong"},{"text":" or "},{"children":[{"text":"italic"}],"type":"em"},{"text":" or a "},{"children":[{"text":"Link"}],"data":{"url":"/docs/examples"},"type":"link"},{"text":""}]}]},{"key":"4266731a-47ahr","type":"data","value":[{"type":"p","children":[{"text":"Heading H2"},{"text":"Heading H3"},{"text":""},{"text":"Text can be "},{"children":[{"text":"bold"}],"type":"strong"},{"text":" or "},{"children":[{"text":"italic"}],"type":"em"},{"text":" or a "},{"children":[{"text":"Link"}],"data":{"url":"/docs/examples"},"type":"link"},{"text":""}]}]}],"key":"4266731a-6qrch"},{"cells":[{"key":"4266731a-21kbu","type":"data","value":[{"type":"p","children":[{"text":"Heading H2"},{"text":"Heading H3"},{"text":""},{"text":"Text can be "},{"children":[{"text":"bold"}],"type":"strong"},{"text":" or "},{"children":[{"text":"italic"}],"type":"em"},{"text":" or a "},{"children":[{"text":"Link"}],"data":{"url":"/docs/examples"},"type":"link"},{"text":""}]}]},{"key":"4266731a-1ph74","type":"data","value":[{"type":"p","children":[{"text":"Heading H2"},{"text":"Heading H3"},{"text":""},{"text":"Text can be "},{"children":[{"text":"bold"}],"type":"strong"},{"text":" or "},{"children":[{"text":"italic"}],"type":"em"},{"text":" or a "},{"children":[{"text":"Link"}],"data":{"url":"/docs/examples"},"type":"link"},{"text":""}]}]},{"key":"4266731a-5m4uq","type":"data","value":[{"type":"p","children":[{"text":"Heading H2"},{"text":"Heading H3"},{"text":""},{"text":"Text can be "},{"children":[{"text":"bold"}],"type":"strong"},{"text":" or "},{"children":[{"text":"italic"}],"type":"em"},{"text":" or a "},{"children":[{"text":"Link"}],"data":{"url":"/docs/examples"},"type":"link"},{"text":""}]}]},{"key":"4266731a-6474i","type":"data","value":[{"type":"p","children":[{"text":"Heading H2"},{"text":"Heading H3"},{"text":""},{"text":"Text can be "},{"children":[{"text":"bold"}],"type":"strong"},{"text":" or "},{"children":[{"text":"italic"}],"type":"em"},{"text":" or a "},{"children":[{"text":"Link"}],"data":{"url":"/docs/examples"},"type":"link"},{"text":""}]}]}],"key":"4266731a-7ujhi"},{"cells":[{"key":"4266731a-99oe4","type":"data","value":[{"type":"p","children":[{"text":"Heading H2"},{"text":"Heading H3"},{"text":""},{"text":"Text can be "},{"children":[{"text":"bold"}],"type":"strong"},{"text":" or "},{"children":[{"text":"italic"}],"type":"em"},{"text":" or a "},{"children":[{"text":"Link"}],"data":{"url":"/docs/examples"},"type":"link"},{"text":""}]}]},{"key":"4266731a-d896l","type":"data","value":[{"type":"p","children":[{"text":"Heading H2"},{"text":"Heading H3"},{"text":""},{"text":"Text can be "},{"children":[{"text":"bold"}],"type":"strong"},{"text":" or "},{"children":[{"text":"italic"}],"type":"em"},{"text":" or a "},{"children":[{"text":"Link"}],"data":{"url":"/docs/examples"},"type":"link"},{"text":""}]}]},{"key":"4266731a-ack6p","type":"data","value":[{"type":"p","children":[{"text":"Heading H2"},{"text":"Heading H3"},{"text":""},{"text":"Text can be "},{"children":[{"text":"bold"}],"type":"strong"},{"text":" or "},{"children":[{"text":"italic"}],"type":"em"},{"text":" or a "},{"children":[{"text":"Link"}],"data":{"url":"/docs/examples"},"type":"link"},{"text":""}]}]},{"key":"4266731a-fkour","type":"data","value":[{"type":"p","children":[{"text":"Heading H2"},{"text":"Heading H3"},{"text":""},{"text":"Text can be "},{"children":[{"text":"bold"}],"type":"strong"},{"text":" or "},{"children":[{"text":"italic"}],"type":"em"},{"text":" or a "},{"children":[{"text":"Link"}],"data":{"url":"/docs/examples"},"type":"link"},{"text":""}]}]}],"key":"4266731a-8f7ih"},{"cells":[{"key":"4266731a-cn6mu","type":"data","value":[{"type":"p","children":[{"text":"Heading H2"},{"text":"Heading H3"},{"text":""},{"text":"Text can be "},{"children":[{"text":"bold"}],"type":"strong"},{"text":" or "},{"children":[{"text":"italic"}],"type":"em"},{"text":" or a "},{"children":[{"text":"Link"}],"data":{"url":"/docs/examples"},"type":"link"},{"text":""}]}]},{"key":"4266731a-4t8ro","type":"data","value":[{"type":"p","children":[{"text":"Heading H2"},{"text":"Heading H3"},{"text":""},{"text":"Text can be "},{"children":[{"text":"bold"}],"type":"strong"},{"text":" or "},{"children":[{"text":"italic"}],"type":"em"},{"text":" or a "},{"children":[{"text":"Link"}],"data":{"url":"/docs/examples"},"type":"link"},{"text":""}]}]},{"key":"4266731a-72b6i","type":"data","value":[{"type":"p","children":[{"text":"Heading H2"},{"text":"Heading H3"},{"text":""},{"text":"Text can be "},{"children":[{"text":"bold"}],"type":"strong"},{"text":" or "},{"children":[{"text":"italic"}],"type":"em"},{"text":" or a "},{"children":[{"text":"Link"}],"data":{"url":"/docs/examples"},"type":"link"},{"text":""}]}]},{"key":"4266731a-5nchn","type":"data","value":[{"type":"p","children":[{"text":"Heading H2"},{"text":"Heading H3"},{"text":""},{"text":"Text can be "},{"children":[{"text":"bold"}],"type":"strong"},{"text":" or "},{"children":[{"text":"italic"}],"type":"em"},{"text":" or a "},{"children":[{"text":"Link"}],"data":{"url":"/docs/examples"},"type":"link"},{"text":""}]}]}],"key":"4266731a-bd5ru"}],"striped":true}}' />
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-table" slotId="schema" data='{"tabs":[{"@id":"ref-table-schema-javascript-237d52","label":"Schema","language":"javascript","code":"{\n  \"slateTable\": {\n    \"addMode\": \"table\",\n    \"blockSchema\": {\n      \"properties\": {\n        \"table\": {\n          \"title\": \"Table\",\n          \"widget\": \"object\",\n          \"schema\": {\n            \"properties\": {\n              \"rows\": {\n                \"widget\": \"object_list\",\n                \"idField\": \"key\",\n                \"addMode\": \"table\",\n                \"schema\": {\n                  \"properties\": {\n                    \"cells\": {\n                      \"widget\": \"object_list\",\n                      \"idField\": \"key\",\n                      \"schema\": {\n                        \"properties\": {\n                          \"value\": {\n                            \"widget\": \"slate\"\n                          }\n                        }\n                      }\n                    }\n                  }\n                }\n              }\n            }\n          }\n        }\n      }\n    }\n  }\n}"}]}' />
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-table" slotId="schema">
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-table" slotId="json-data" data='{"tabs":[{"@id":"ref-table-json-data-json-472dd4","label":"JSON Block Data","language":"json","code":"{\n  \"@type\": \"slateTable\",\n  \"table\": {\n    \"rows\": [\n      {\n        \"key\": \"row-1\",\n        \"cells\": [\n          {\n            \"key\": \"cell-1\",\n            \"value\": [\n              {\n                \"type\": \"p\",\n                \"children\": [\n                  {\n                    \"text\": \"Name\"\n                  }\n                ]\n              }\n            ]\n          },\n          {\n            \"key\": \"cell-2\",\n            \"value\": [\n              {\n                \"type\": \"p\",\n                \"children\": [\n                  {\n                    \"text\": \"Role\"\n                  }\n                ]\n              }\n            ]\n          }\n        ]\n      },\n      {\n        \"key\": \"row-2\",\n        \"cells\": [\n          {\n            \"key\": \"cell-3\",\n            \"value\": [\n              {\n                \"type\": \"p\",\n                \"children\": [\n                  {\n                    \"text\": \"Alice\"\n                  }\n                ]\n              }\n            ]\n          },\n          {\n            \"key\": \"cell-4\",\n            \"value\": [\n              {\n                \"type\": \"p\",\n                \"children\": [\n                  {\n                    \"text\": \"Engineer\"\n                  }\n                ]\n              }\n            ]\n          }\n        ]\n      }\n    ]\n  }\n}"}]}' />
+### Schema
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-table" slotId="rendering" data='{"tabs":[{"@id":"ref-table-rendering-jsx-ee1611","label":"React","language":"jsx","code":"function TableBlock({ block }) {\n  const rows = block.table?.rows || [];\n  return (\n    <div data-block-uid={block[&#39;@uid&#39;]}>\n      <table>\n        <tbody>\n          {rows.map(row => (\n            <tr key={row.key} data-block-uid={row.key}>\n              {row.cells.map(cell => (\n                <td key={cell.key} data-block-uid={cell.key} data-edit-text=\"value\">\n                  {(cell.value || []).map((node, i) => (\n                    <SlateNode key={i} node={node} />\n                  ))}\n                </td>\n              ))}\n            </tr>\n          ))}\n        </tbody>\n      </table>\n    </div>\n  );\n}"},{"@id":"ref-table-rendering-vue-570ccb","label":"Vue","language":"vue","code":"<template>\n  <div :data-block-uid=\"block[&#39;@uid&#39;]\">\n    <table>\n      <tbody>\n        <tr v-for=\"row in block.table?.rows || []\" :key=\"row.key\" :data-block-uid=\"row.key\">\n          <td v-for=\"cell in row.cells\" :key=\"cell.key\" :data-block-uid=\"cell.key\" data-edit-text=\"value\">\n            <SlateNode v-for=\"(node, i) in cell.value || []\" :key=\"i\" :node=\"node\" />\n          </td>\n        </tr>\n      </tbody>\n    </table>\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>"},{"@id":"ref-table-rendering-svelte-de27fc","label":"Svelte","language":"svelte","code":"<script>\n  import SlateNode from &#39;./SlateNode.svelte&#39;;\n  export let block;\n</script>\n\n<div data-block-uid={block[&#39;@uid&#39;]}>\n  <table>\n    <tbody>\n      {#each block.table?.rows || [] as row (row.key)}\n        <tr data-block-uid={row.key}>\n          {#each row.cells as cell (cell.key)}\n            <td data-block-uid={cell.key} data-edit-text=\"value\">\n              {#each cell.value || [] as node, i (i)}\n                <SlateNode {node} />\n              {/each}\n            </td>\n          {/each}\n        </tr>\n      {/each}\n    </tbody>\n  </table>\n</div>"}]}' />
+```javascript
+{
+  "slateTable": {
+    "addMode": "table",
+    "blockSchema": {
+      "properties": {
+        "table": {
+          "title": "Table",
+          "widget": "object",
+          "schema": {
+            "properties": {
+              "rows": {
+                "widget": "object_list",
+                "idField": "key",
+                "addMode": "table",
+                "schema": {
+                  "properties": {
+                    "cells": {
+                      "widget": "object_list",
+                      "idField": "key",
+                      "schema": {
+                        "properties": {
+                          "value": {
+                            "widget": "slate"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-table" slotId="json-data">
+
+### JSON Block Data
+
+```json
+{
+  "@type": "slateTable",
+  "table": {
+    "rows": [
+      {
+        "key": "row-1",
+        "cells": [
+          {
+            "key": "cell-1",
+            "value": [
+              {
+                "type": "p",
+                "children": [
+                  {
+                    "text": "Name"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "cell-2",
+            "value": [
+              {
+                "type": "p",
+                "children": [
+                  {
+                    "text": "Role"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "key": "row-2",
+        "cells": [
+          {
+            "key": "cell-3",
+            "value": [
+              {
+                "type": "p",
+                "children": [
+                  {
+                    "text": "Alice"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "cell-4",
+            "value": [
+              {
+                "type": "p",
+                "children": [
+                  {
+                    "text": "Engineer"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-table" slotId="rendering">
+
+### React
+
+```jsx
+function TableBlock({ block }) {
+  const rows = block.table?.rows || [];
+  return (
+    <div data-block-uid={block['@uid']}>
+      <table>
+        <tbody>
+          {rows.map(row => (
+            <tr key={row.key} data-block-uid={row.key}>
+              {row.cells.map(cell => (
+                <td key={cell.key} data-block-uid={cell.key} data-edit-text="value">
+                  {(cell.value || []).map((node, i) => (
+                    <SlateNode key={i} node={node} />
+                  ))}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+```
+
+### Vue
+
+```vue
+<template>
+  <div :data-block-uid="block['@uid']">
+    <table>
+      <tbody>
+        <tr v-for="row in block.table?.rows || []" :key="row.key" :data-block-uid="row.key">
+          <td v-for="cell in row.cells" :key="cell.key" :data-block-uid="cell.key" data-edit-text="value">
+            <SlateNode v-for="(node, i) in cell.value || []" :key="i" :node="node" />
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</template>
+
+<script setup>
+defineProps({ block: Object });
+</script>
+```
+
+### Svelte
+
+```svelte
+<script>
+  import SlateNode from './SlateNode.svelte';
+  export let block;
+</script>
+
+<div data-block-uid={block['@uid']}>
+  <table>
+    <tbody>
+      {#each block.table?.rows || [] as row (row.key)}
+        <tr data-block-uid={row.key}>
+          {#each row.cells as cell (cell.key)}
+            <td data-block-uid={cell.key} data-edit-text="value">
+              {#each cell.value || [] as node, i (i)}
+                <SlateNode {node} />
+              {/each}
+            </td>
+          {/each}
+        </tr>
+      {/each}
+    </tbody>
+  </table>
+</div>
+```
+
+</block>

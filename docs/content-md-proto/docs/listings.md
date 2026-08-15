@@ -29,10 +29,12 @@ assignments:
   - { uid: p-2, type: slate }
   - { uid: p-3, type: slate }
   - { uid: ce-4, type: codeExample }
+  - { id: ce-4-javascript-17afd4 }
   - { uid: sep-5, type: separator }
   - { uid: h-6, type: slate }
   - { uid: p-7, type: slate }
   - { uid: ce-8, type: codeExample }
+  - { id: ce-8-jsx-37efcc }
   - { uid: h-9, type: slate }
   - { uid: ul-10, type: slate }
   - { uid: h-11, type: slate }
@@ -41,6 +43,7 @@ assignments:
   - { uid: p-14, type: slate }
   - { uid: p-15, type: slate }
   - { uid: ce-16, type: codeExample }
+  - { id: ce-16-json-38bb3a }
   - { uid: p-17, type: slate }
   - { uid: p-18, type: slate }
   - { uid: h-19, type: slate }
@@ -48,20 +51,24 @@ assignments:
   - { uid: tbl-21, type: slateTable }
   - { uid: p-22, type: slate }
   - { uid: ce-23, type: codeExample }
+  - { id: ce-23-json-6d0894 }
   - { uid: p-24, type: slate }
   - { uid: h-25, type: slate }
   - { uid: p-26, type: slate }
   - { uid: p-27, type: slate }
   - { uid: tbl-28, type: slateTable }
   - { uid: ce-29, type: codeExample }
+  - { id: ce-29-json-a7c4dc }
   - { uid: h-30, type: slate }
   - { uid: p-31, type: slate }
   - { uid: ce-32, type: codeExample }
+  - { id: ce-32-javascript-f6757f }
   - { uid: p-33, type: slate }
   - { uid: p-34, type: slate }
   - { uid: h-35, type: slate }
   - { uid: p-36, type: slate }
   - { uid: ce-37, type: codeExample }
+  - { id: ce-37-javascript-2ec596 }
   - { uid: p-38, type: slate }
   - { uid: p-39, type: slate }
   - { uid: ul-40, type: slate }
@@ -69,6 +76,7 @@ assignments:
   - { uid: h-42, type: slate }
   - { uid: p-43, type: slate }
   - { uid: ce-44, type: codeExample }
+  - { id: ce-44-javascript-82ad8e }
   - { uid: p-45, type: slate }
   - { uid: h-46, type: slate }
   - { uid: p-47, type: slate }
@@ -97,7 +105,23 @@ A listing block fetches content from the server (e.g. latest news) and renders e
 
 You tell it which block types need fetching via a `fetchItems` map — keys are block types, values are fetcher functions. This means you can have different kinds of listings (Plone queries, RSS feeds, etc.) each with their own fetcher:
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-4-javascript-17afd4","label":"Javascript","language":"javascript","code":"const { items, paging } = await expandListingBlocks(layout, {\n  blocks,\n  paging: { start: 0, size: 6 },\n  fetchItems: {\n    listing: ploneFetchItems({ apiUrl, contextPath }),\n    rssFeed: myRSSFetcher,\n  },\n});\n// paging = { totalPages, totalItems, currentPage, prev, next, pages, seen }"}]}' />
+<block type="codeExample">
+
+### Javascript
+
+```javascript
+const { items, paging } = await expandListingBlocks(layout, {
+  blocks,
+  paging: { start: 0, size: 6 },
+  fetchItems: {
+    listing: ploneFetchItems({ apiUrl, contextPath }),
+    rssFeed: myRSSFetcher,
+  },
+});
+// paging = { totalPages, totalItems, currentPage, prev, next, pages, seen }
+```
+
+</block>
 
 ---
 
@@ -105,7 +129,54 @@ You tell it which block types need fetching via a `fetchItems` map — keys are 
 
 A grid can have a mix of listing and static blocks sharing a single paging. The `staticBlocks` helper wraps non-listing blocks so they participate in the shared page window. The listings use Suspense so they load client-side:
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-8-jsx-37efcc","label":"Jsx","language":"jsx","code":"import { Suspense, useState } from &#39;react&#39;;\nimport { staticBlocks, expandListingBlocks, ploneFetchItems } from &#39;@hydra-js/hydra.js&#39;;\n\nfunction Grid({ blocks, blocks_layout, pageNum, apiUrl, contextPath }) {\n  const pagingInput = { start: pageNum * 6, size: 6 };\n  const fetchItems = { listing: ploneFetchItems({ apiUrl, contextPath }) };\n  const [gridPaging, setGridPaging] = useState({});\n\n  // Walk layout in order, chaining `seen` for position tracking\n  let seen = 0;\n  return (\n    <div className=\"grid\">\n      {blocks_layout.items.map(id => {\n        if (fetchItems[blocks[id][&#39;@type&#39;]]) {\n          const mySeen = seen;\n          return (\n            <Suspense key={id} fallback={<div>Loading...</div>}>\n              <ListingItems id={id} blocks={blocks} paging={pagingInput}\n                seen={mySeen} fetchItems={fetchItems} onPaging={setGridPaging} />\n            </Suspense>\n          );\n        }\n        const result = staticBlocks([id], { blocks, paging: pagingInput, seen });\n        seen = result.paging.seen;\n        return result.items.map(item =>\n          <Block key={item[&#39;@uid&#39;]} block={item} />\n        );\n      })}\n      {gridPaging.totalPages > 1 &amp;&amp; <Paging paging={gridPaging} />}\n    </div>\n  );\n}\n\nasync function ListingItems({ id, blocks, paging, seen, fetchItems, onPaging }) {\n  const result = await expandListingBlocks([id], {\n    blocks, paging, seen, fetchItems,\n  });\n  onPaging(result.paging);\n  return result.items.map(item => <Block key={item[&#39;@uid&#39;]} block={item} />);\n}"}]}' />
+<block type="codeExample">
+
+### Jsx
+
+```jsx
+import { Suspense, useState } from 'react';
+import { staticBlocks, expandListingBlocks, ploneFetchItems } from '@hydra-js/hydra.js';
+
+function Grid({ blocks, blocks_layout, pageNum, apiUrl, contextPath }) {
+  const pagingInput = { start: pageNum * 6, size: 6 };
+  const fetchItems = { listing: ploneFetchItems({ apiUrl, contextPath }) };
+  const [gridPaging, setGridPaging] = useState({});
+
+  // Walk layout in order, chaining `seen` for position tracking
+  let seen = 0;
+  return (
+    <div className="grid">
+      {blocks_layout.items.map(id => {
+        if (fetchItems[blocks[id]['@type']]) {
+          const mySeen = seen;
+          return (
+            <Suspense key={id} fallback={<div>Loading...</div>}>
+              <ListingItems id={id} blocks={blocks} paging={pagingInput}
+                seen={mySeen} fetchItems={fetchItems} onPaging={setGridPaging} />
+            </Suspense>
+          );
+        }
+        const result = staticBlocks([id], { blocks, paging: pagingInput, seen });
+        seen = result.paging.seen;
+        return result.items.map(item =>
+          <Block key={item['@uid']} block={item} />
+        );
+      })}
+      {gridPaging.totalPages > 1 && <Paging paging={gridPaging} />}
+    </div>
+  );
+}
+
+async function ListingItems({ id, blocks, paging, seen, fetchItems, onPaging }) {
+  const result = await expandListingBlocks([id], {
+    blocks, paging, seen, fetchItems,
+  });
+  onPaging(result.paging);
+  return result.items.map(item => <Block key={item['@uid']} block={item} />);
+}
+```
+
+</block>
 
 ## expandListingBlocks Options
 
@@ -126,7 +197,19 @@ A listing with no `querystring` defaults to showing the current folder's content
 
 `ploneFetchItems` also normalizes Plone's image data — packaging `image_field` + `image_scales` into a self-contained `image` object with `@id` duplicated inside (needed for URL resolution):
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-16-json-38bb3a","label":"Json","language":"json","code":"// Plone search result:\n{ \"@id\": \"/news/article\", \"image_field\": \"image\", \"image_scales\": { \"image\": [{ \"...\": \"...\" }] } }\n\n// After normalization:\n{ \"@id\": \"/news/article\", \"image\": { \"@id\": \"/news/article\", \"image_field\": \"image\", \"image_scales\": { \"...\": \"...\" } } }"}]}' />
+<block type="codeExample">
+
+### Json
+
+```json
+// Plone search result:
+{ "@id": "/news/article", "image_field": "image", "image_scales": { "image": [{ "...": "..." }] } }
+
+// After normalization:
+{ "@id": "/news/article", "image": { "@id": "/news/article", "image_field": "image", "image_scales": { "...": "..." } } }
+```
+
+</block>
 
 This self-contained object has everything needed to resolve image URLs with scale support — see the Nuxt example's `composables/imageProps.js` for one approach.
 
@@ -140,7 +223,23 @@ The same `fetchItems` seam powers other "collection" blocks — each is just a f
 
 Register them alongside `listing` in the `fetchItems` map:
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-23-json-6d0894","label":"Javascript","language":"javascript","code":"const { items } = await expandListingBlocks(layout, {\n  blocks,\n  fetchItems: {\n    listing:             ploneFetchItems({ apiUrl, contextPath }),\n    relatedItemsListing: relatedItemsFetcher({ apiUrl, contextPath }),\n    searchShortcuts:     searchShortcutsFetcher({ apiUrl, contextPath }),\n    rssFeed:             rssFetcher(),\n  },\n});"}]}' />
+<block type="codeExample">
+
+### Javascript
+
+```javascript
+const { items } = await expandListingBlocks(layout, {
+  blocks,
+  fetchItems: {
+    listing:             ploneFetchItems({ apiUrl, contextPath }),
+    relatedItemsListing: relatedItemsFetcher({ apiUrl, contextPath }),
+    searchShortcuts:     searchShortcutsFetcher({ apiUrl, contextPath }),
+    rssFeed:             rssFetcher(),
+  },
+});
+```
+
+</block>
 
 The **Search Shortcuts** link target reads Volto's search-block facet params — a page with a `search` block picks up `?facet.<index>=<value>` from the URL. The block's *index* uses the existing `select_querystring_field` widget; the optional *this-page field* uses `schemaFieldSelect` (a `/@types`-backed field dropdown, parameterized by `fieldType`), which **Related Items** also uses with `fieldType: 'relation'`.
 
@@ -152,13 +251,56 @@ Built-in item types and the fields they expose:
 
 <block type="slateTable" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-28-r0","cells":[{"key":"tbl-28-r0c0","type":"header","value":[{"type":"p","children":[{"text":"Type"}]}]},{"key":"tbl-28-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Fields"}]}]}]},{"key":"tbl-28-r1","cells":[{"key":"tbl-28-r1c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"default"}]}]}]},{"key":"tbl-28-r1c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"title"}]},{"text":", "},{"type":"code","children":[{"text":"description"}]},{"text":", "},{"type":"code","children":[{"text":"href"}]}]}]}]},{"key":"tbl-28-r2","cells":[{"key":"tbl-28-r2c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"summary"}]}]}]},{"key":"tbl-28-r2c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"title"}]},{"text":", "},{"type":"code","children":[{"text":"description"}]},{"text":", "},{"type":"code","children":[{"text":"href"}]},{"text":", "},{"type":"code","children":[{"text":"image"}]}]}]}]},{"key":"tbl-28-r3","cells":[{"key":"tbl-28-r3c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"teaser"}]}]}]},{"key":"tbl-28-r3c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"title"}]},{"text":", "},{"type":"code","children":[{"text":"description"}]},{"text":", "},{"type":"code","children":[{"text":"href"}]},{"text":", "},{"type":"code","children":[{"text":"preview_image"}]}]}]}]}]}}' />
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-29-json-a7c4dc","label":"Json","language":"json","code":"\"fieldMapping\": {\n  \"@id\": { \"field\": \"href\", \"type\": \"link\" },\n  \"title\": \"title\",\n  \"image\": { \"field\": \"preview_image\", \"type\": \"image\" },\n  \"Subject\": { \"field\": \"tags\", \"type\": \"string\" }\n}\n\nTypes: string (array→join, image→URL), link (→[{@id}]), image (pass through)"}]}' />
+<block type="codeExample">
+
+### Json
+
+```json
+"fieldMapping": {
+  "@id": { "field": "href", "type": "link" },
+  "title": "title",
+  "image": { "field": "preview_image", "type": "image" },
+  "Subject": { "field": "tags", "type": "string" }
+}
+
+Types: string (array→join, image→URL), link (→[{@id}]), image (pass through)
+```
+
+</block>
 
 ## Item Type Selection
 
 Use `variation` on the listing block to control what `@type` expanded items get. Listings reuse the same `inheritSchemaFrom` recipe as container blocks (see [Container Blocks › Synchronised Block Types](container-blocks.md#synchronised-block-types-in-a-container)) but differ in one structural way: there's no blocks field to declare `itemTypeField` on, since listing children are *virtual* (produced from query results at render time, not authored as page data). Instead, declare the typeField directly on the `inheritSchemaFrom` recipe:
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-32-javascript-f6757f","label":"Javascript","language":"javascript","code":"listing: {\n    blockSchema: {\n        properties: {\n            variation: {\n                widget: &#39;blockTypeSelect&#39;,\n                filterConvertibleFrom: &#39;@default&#39;,  // only offer types with @default mappings\n            },\n            // FieldMappingWidget is added at sidebar render time by\n            // inheritSchemaFrom (the enhancer reads `mappingField` below);\n            // declare an empty placeholder so it appears in the auto-generated\n            // default fieldset alongside `variation`.\n            fieldMapping: {},\n        },\n    },\n    schemaEnhancer: {\n        inheritSchemaFrom: {\n            typeField: &#39;variation&#39;,     // listing has no blocks field — declare here\n            mappingField: &#39;fieldMapping&#39;,\n        },\n    },\n}"}]}' />
+<block type="codeExample">
+
+### Javascript
+
+```javascript
+listing: {
+    blockSchema: {
+        properties: {
+            variation: {
+                widget: 'blockTypeSelect',
+                filterConvertibleFrom: '@default',  // only offer types with @default mappings
+            },
+            // FieldMappingWidget is added at sidebar render time by
+            // inheritSchemaFrom (the enhancer reads `mappingField` below);
+            // declare an empty placeholder so it appears in the auto-generated
+            // default fieldset alongside `variation`.
+            fieldMapping: {},
+        },
+    },
+    schemaEnhancer: {
+        inheritSchemaFrom: {
+            typeField: 'variation',     // listing has no blocks field — declare here
+            mappingField: 'fieldMapping',
+        },
+    },
+}
+```
+
+</block>
 
 `filterConvertibleFrom: '@default'` restricts the dropdown to types that have a `fieldMappings['@default']` entry — i.e. types that can be populated from the canonical content fields (`@id`, `title`, `description`, `image`) that listing queries return. Each item type's `fieldMappings['@default']` (on its own block config) defines how those source fields land on its schema; that static mapping is enough to render listings. Adding `mappingField` to the enhancer exposes the `FieldMappingWidget` so the editor can override the mapping per listing instance.
 
@@ -168,7 +310,30 @@ The widget saves its output as `fieldMapping` (singular) on the block data. `exp
 
 A container (e.g. `gridBlock`) can mix **manual children** AND **a listing** as children. Add `'listing'` to the blocks field's `allowedBlocks`, and the parent's typeField propagates everywhere:
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-37-javascript-2ec596","label":"Javascript","language":"javascript","code":"gridBlock: {\n    blockSchema: {\n        properties: {\n            slides: {\n                widget: &#39;blocks_layout&#39;,\n                itemTypeField: &#39;variation&#39;,\n                allowedBlocks: [&#39;teaser&#39;, &#39;image&#39;, &#39;listing&#39;],  // manual items + listing\n            },\n            variation: {\n                widget: &#39;blockTypeSelect&#39;,\n                filterConvertibleFrom: &#39;@default&#39;,  // keeps &#39;listing&#39; out of the dropdown\n            },\n        },\n    },\n    schemaEnhancer: { inheritSchemaFrom: {} },\n}"}]}' />
+<block type="codeExample">
+
+### Javascript
+
+```javascript
+gridBlock: {
+    blockSchema: {
+        properties: {
+            slides: {
+                widget: 'blocks_layout',
+                itemTypeField: 'variation',
+                allowedBlocks: ['teaser', 'image', 'listing'],  // manual items + listing
+            },
+            variation: {
+                widget: 'blockTypeSelect',
+                filterConvertibleFrom: '@default',  // keeps 'listing' out of the dropdown
+            },
+        },
+    },
+    schemaEnhancer: { inheritSchemaFrom: {} },
+}
+```
+
+</block>
 
 `filterConvertibleFrom: '@default'` keeps `'listing'` out of the dropdown (it's a structural container, not an item type, so it has no `fieldMappings['@default']`) but it stays in `allowedBlocks` so a listing block can still exist as a structural child. The editor sees "Teaser / Image / Summary" in the picker; the listing is a structural choice they don't have to think about.
 
@@ -183,7 +348,20 @@ The sync walks recursively — if the listing held nested containers with their 
 
 If your frontend embeds state in the URL path (like pagination), you need to tell hydra.js how to transform the frontend path to the API/admin path. Otherwise, the admin will try to navigate to URLs that don't exist in the CMS.
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-44-javascript-82ad8e","label":"Javascript","language":"javascript","code":"const bridge = initBridge({\n    page: { ... },\n    // Transform frontend path to API path by stripping paging segments\n    // e.g., /test-page/@pg_block-8-grid_1 -> /test-page\n    pathToApiPath: (path) => path.replace(/\\/@pg_[^/]+_\\d+/, &#39;&#39;),\n});"}]}' />
+<block type="codeExample">
+
+### Javascript
+
+```javascript
+const bridge = initBridge({
+    page: { ... },
+    // Transform frontend path to API path by stripping paging segments
+    // e.g., /test-page/@pg_block-8-grid_1 -> /test-page
+    pathToApiPath: (path) => path.replace(/\/@pg_[^/]+_\d+/, ''),
+});
+```
+
+</block>
 
 The `pathToApiPath` function is called whenever hydra.js sends a `PATH_CHANGE` message to the admin, allowing your frontend to strip or transform URL segments that are frontend-specific (like pagination, filters, or other client-side state).
 

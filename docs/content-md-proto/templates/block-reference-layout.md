@@ -12,12 +12,17 @@ assignments:
   - { uid: tpl-schema-heading, type: slate }
   - { uid: tpl-schema-desc, type: slate }
   - { uid: tpl-schema, type: codeExample }
+  - { id: tpl-schema-javascript-000000 }
   - { uid: tpl-json-heading, type: slate }
   - { uid: tpl-json-desc, type: slate }
   - { uid: tpl-json, type: codeExample }
+  - { id: tpl-json-json-000000 }
   - { uid: tpl-rendering-heading, type: slate }
   - { uid: tpl-rendering-desc, type: slate }
   - { uid: tpl-rendering, type: codeExample }
+  - { id: tpl-rendering-jsx-000000 }
+  - { id: tpl-rendering-vue-000000 }
+  - { id: tpl-rendering-svelte-000000 }
 prototypes: |
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
   <block type="separator" _="${hr}" />
@@ -36,16 +41,52 @@ prototypes: |
 
 <block type="slate" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="schema-desc" data='{"fixed":true,"readOnly":true,"value":[{"type":"p","children":[{"text":"Pass this object inside the "},{"type":"code","children":[{"text":"blocks"}]},{"text":" option when calling "},{"type":"code","children":[{"text":"initBridge()"}]},{"text":" to register this block type with the admin UI. See "},{"type":"link","data":{"url":"/docs/live-preview"},"children":[{"text":"Custom Blocks"}]},{"text":" for the full setup guide."}]}]}' />
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="schema" data='{"tabs":[{"@id":"tpl-schema-javascript-000000","label":"Schema","language":"javascript","code":""}]}' />
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="schema">
+
+### Schema
+
+```javascript
+
+```
+
+</block>
 
 <block type="slate" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-heading" data='{"fixed":true,"readOnly":true,"value":[{"type":"h3","children":[{"text":"JSON Block Data"}]}]}' />
 
 <block type="slate" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-desc" data='{"fixed":true,"readOnly":true,"value":[{"type":"p","children":[{"text":"Example JSON as stored in the Plone content API. This is the data structure your component will receive in the "},{"type":"code","children":[{"text":"block"}]},{"text":" prop."}]}]}' />
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-data" data='{"tabs":[{"@id":"tpl-json-json-000000","label":"JSON Block Data","language":"json","code":""}]}' />
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-data">
+
+### JSON Block Data
+
+```json
+
+```
+
+</block>
 
 <block type="slate" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering-heading" data='{"fixed":true,"readOnly":true,"value":[{"type":"h3","children":[{"text":"Rendering"}]}]}' />
 
 <block type="slate" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering-desc" data='{"fixed":true,"readOnly":true,"value":[{"type":"p","children":[{"text":"How this block renders in your frontend. Add its handling to your renderer, or — for list-style blocks — register a fetcher and reuse your list rendering."}]}]}' />
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering" data='{"tabs":[{"@id":"tpl-rendering-jsx-000000","label":"React","language":"jsx","code":""},{"@id":"tpl-rendering-vue-000000","label":"Vue","language":"vue","code":""},{"@id":"tpl-rendering-svelte-000000","label":"Svelte","language":"svelte","code":""}]}' />
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering">
+
+### React
+
+```jsx
+
+```
+
+### Vue
+
+```vue
+
+```
+
+### Svelte
+
+```svelte
+
+```
+
+</block>

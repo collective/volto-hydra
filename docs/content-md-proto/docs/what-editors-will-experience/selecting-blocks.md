@@ -43,12 +43,14 @@ assignments:
   - { uid: h-19, type: slate }
   - { uid: p-20, type: slate }
   - { uid: ce-21, type: codeExample }
+  - { id: ce-21-text-3d139a }
   - { uid: p-22, type: slate }
   - { uid: img-23, type: image }
   - { uid: p-24, type: slate }
   - { uid: h-25, type: slate }
   - { uid: p-26, type: slate }
   - { uid: ce-27, type: codeExample }
+  - { id: ce-27-text-19ff8a }
   - { uid: ul-28, type: slate }
   - { uid: p-29, type: slate }
   - { uid: img-30, type: image }
@@ -116,7 +118,20 @@ The sidebar is the other way to navigate selection — useful when the block you
 
 When a block is selected, the sidebar shows the **chain of parent containers** from the root down to the block — one collapsible section per level. Each level has a `‹` arrow on the left.
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-21-text-3d139a","label":"Text","language":"text","code":"‹ Columns          ← click ‹ to deselect (go to page level)\n   [Columns settings]\n   ‹ Column        ← click ‹ to select Columns\n      [Column settings]\n      ‹ Text       ← current block, highlighted\n         [Text body, …]"}]}' />
+<block type="codeExample">
+
+### Text
+
+```text
+‹ Columns          ← click ‹ to deselect (go to page level)
+   [Columns settings]
+   ‹ Column        ← click ‹ to select Columns
+      [Column settings]
+      ‹ Text       ← current block, highlighted
+         [Text body, …]
+```
+
+</block>
 
 Click any `‹` arrow to **navigate up** to that level. This does the same thing as pressing `Escape` repeatedly, but visibly — you can see what each parent is named, jump several levels in one click, and edit the parent's own settings (alignment, padding, …) inline without leaving the current selection.
 
@@ -128,7 +143,18 @@ This works for any depth — nested columns, slider with templated children, acc
 
 When a container block is selected, the sidebar shows that container's **children** as a list, one row per child:
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-27-text-19ff8a","label":"Text","language":"text","code":"Slides                    [+]\n⋮⋮  Slide 1                >\n⋮⋮  Slide 2                >\n⋮⋮  Slide 3                >"}]}' />
+<block type="codeExample">
+
+### Text
+
+```text
+Slides                    [+]
+⋮⋮  Slide 1                >
+⋮⋮  Slide 2                >
+⋮⋮  Slide 3                >
+```
+
+</block>
 
 - **`⋮⋮` drag handle** — drag to reorder children within the container.
 - **`>` drill-in arrow** — selects that child, scrolls the preview to it, switches the sidebar to its settings.

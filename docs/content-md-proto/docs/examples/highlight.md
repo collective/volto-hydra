@@ -40,8 +40,13 @@ assignments:
   - { uid: 25a0a1b5-3ce9-468f-8968-9a7f83ca4e53, type: highlight }
   - { uid: 94655cc3-817d-48ba-bc20-6e9f7796dc46, type: highlight }
   - { uid: ref-highlight-schema, type: codeExample }
+  - { id: ref-highlight-schema-javascript-80590c }
   - { uid: ref-highlight-json-data, type: codeExample }
+  - { id: ref-highlight-json-data-json-a2bfa3 }
   - { uid: ref-highlight-rendering, type: codeExample }
+  - { id: ref-highlight-rendering-jsx-659b6c }
+  - { id: ref-highlight-rendering-vue-dd8730 }
+  - { id: ref-highlight-rendering-svelte-d3a4c8 }
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
@@ -70,8 +75,214 @@ A prominent content section with a background image, overlay, title, rich text b
 
 <block type="highlight" title="Highlight-Block" cta_title="Button" image="/docs/examples/content-types/image/@@images/image" data='{"styles":{"descriptionColor":"highlight-custom-color-5"},"description":[{"children":[{"text":"Lorem ipsum dolor sit amet, "},{"children":[{"text":"consetetur sadipscing"}],"data":{"url":"/docs/examples/button"},"type":"link"},{"text":" elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt."}],"type":"p"}],"cta_link":[{"@id":"/docs/examples/content-types/page"}]}' />
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-highlight" slotId="schema" data='{"tabs":[{"@id":"ref-highlight-schema-javascript-80590c","label":"Schema","language":"javascript","code":"{\n  \"highlight\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"title\": {\n          \"title\": \"Title\"\n        },\n        \"description\": {\n          \"title\": \"Description\",\n          \"widget\": \"slate\"\n        },\n        \"image\": {\n          \"title\": \"Background Image\",\n          \"widget\": \"image\"\n        },\n        \"cta_title\": {\n          \"title\": \"CTA Text\"\n        },\n        \"cta_link\": {\n          \"title\": \"CTA Link\",\n          \"widget\": \"object_browser\",\n          \"mode\": \"link\"\n        }\n      }\n    }\n  }\n}"}]}' />
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-highlight" slotId="schema">
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-highlight" slotId="json-data" data='{"tabs":[{"@id":"ref-highlight-json-data-json-a2bfa3","label":"JSON Block Data","language":"json","code":"{\n  \"@type\": \"highlight\",\n  \"title\": \"Featured Content\",\n  \"description\": [\n    {\n      \"type\": \"p\",\n      \"children\": [\n        {\n          \"text\": \"Discover the latest updates and features available in this release.\"\n        }\n      ]\n    }\n  ],\n  \"image\": \"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%23334455%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3EHighlight BG%3C/text%3E%3C/svg%3E\",\n  \"cta_title\": \"Read More\",\n  \"cta_link\": [\n    {\n      \"@id\": \"/news/latest\"\n    }\n  ]\n}"}]}' />
+### Schema
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-highlight" slotId="rendering" data='{"tabs":[{"@id":"ref-highlight-rendering-jsx-659b6c","label":"React","language":"jsx","code":"const highlightGradients = {\n  &#39;highlight-custom-color-1&#39;: &#39;linear-gradient(135deg, #1e3a5f, #2563eb)&#39;,\n  &#39;highlight-custom-color-2&#39;: &#39;linear-gradient(135deg, #064e3b, #059669)&#39;,\n  &#39;highlight-custom-color-3&#39;: &#39;linear-gradient(135deg, #581c87, #9333ea)&#39;,\n  &#39;highlight-custom-color-4&#39;: &#39;linear-gradient(135deg, #78350f, #d97706)&#39;,\n  &#39;highlight-custom-color-5&#39;: &#39;linear-gradient(135deg, #881337, #e11d48)&#39;,\n};\n\nimport { getImageUrl } from &#39;./utils.js&#39;;\n\nfunction HighlightBlock({ block }) {\n  const title = block.title || &#39;&#39;;\n  const description = block.description || [];\n  const imageSrc = getImageUrl(block.image);\n  const ctaText = block.cta_title || &#39;&#39;;\n  const ctaLink = block.cta_link?.[0]?.[&#39;@id&#39;] || &#39;&#39;;\n  const gradient = highlightGradients[block.styles?.descriptionColor] || &#39;linear-gradient(135deg, #334, #556)&#39;;\n  const bgStyle = imageSrc\n    ? { backgroundImage: `url(${imageSrc})`, backgroundSize: &#39;cover&#39;, backgroundPosition: &#39;center&#39; }\n    : { background: gradient };\n\n  return (\n    <section\n      data-block-uid={block[&#39;@uid&#39;]}\n      className=\"highlight-block\"\n      style={{ ...bgStyle, padding: &#39;40px 20px&#39;, color: &#39;white&#39;, borderRadius: &#39;8px&#39; }}\n    >\n      <div className=\"highlight-overlay\" style={{ background: &#39;rgba(0,0,0,0.4)&#39;, padding: &#39;30px&#39;, borderRadius: &#39;8px&#39; }}>\n        <h2 data-edit-text=\"title\">{title}</h2>\n        <div className=\"highlight-body\" data-edit-text=\"description\">\n          {description.map((node, i) => (\n            <SlateNode key={i} node={node} />\n          ))}\n        </div>\n        {ctaText &amp;&amp; (\n          <a href={ctaLink} data-edit-text=\"cta_title\" data-edit-link=\"cta_link\" className=\"highlight-cta\"\n            style={{ display: &#39;inline-block&#39;, padding: &#39;10px 20px&#39;, background: &#39;#007eb1&#39;, color: &#39;white&#39;, textDecoration: &#39;none&#39;, borderRadius: &#39;4px&#39;, marginTop: &#39;16px&#39; }}>\n            {ctaText}\n          </a>\n        )}\n      </div>\n    </section>\n  );\n}"},{"@id":"ref-highlight-rendering-vue-dd8730","label":"Vue","language":"vue","code":"<template>\n  <section\n    :data-block-uid=\"block[&#39;@uid&#39;]\"\n    class=\"highlight-block\"\n    :style=\"{ ...bgStyle, padding: &#39;40px 20px&#39;, color: &#39;white&#39;, borderRadius: &#39;8px&#39; }\"\n  >\n    <div class=\"highlight-overlay\" style=\"background:rgba(0,0,0,0.4);padding:30px;border-radius:8px\">\n      <h2 data-edit-text=\"title\">{{ block.title }}</h2>\n      <div class=\"highlight-body\" data-edit-text=\"description\">\n        <SlateNode v-for=\"(node, i) in block.description || []\" :key=\"i\" :node=\"node\" />\n      </div>\n      <a\n        v-if=\"block.cta_title\"\n        :href=\"ctaLink\"\n        data-edit-text=\"cta_title\"\n        data-edit-link=\"cta_link\"\n        class=\"highlight-cta\"\n        style=\"display:inline-block;padding:10px 20px;background:#007eb1;color:white;text-decoration:none;border-radius:4px;margin-top:16px\"\n      >\n        {{ block.cta_title }}\n      </a>\n    </div>\n  </section>\n</template>\n\n<script setup>\nimport { computed } from &#39;vue&#39;;\nconst props = defineProps({ block: Object });\nconst ctaLink = computed(() => props.block.cta_link?.[0]?.[&#39;@id&#39;] || &#39;&#39;);\n\nconst gradients = {\n  &#39;highlight-custom-color-1&#39;: &#39;linear-gradient(135deg, #1e3a5f, #2563eb)&#39;,\n  &#39;highlight-custom-color-2&#39;: &#39;linear-gradient(135deg, #064e3b, #059669)&#39;,\n  &#39;highlight-custom-color-3&#39;: &#39;linear-gradient(135deg, #581c87, #9333ea)&#39;,\n  &#39;highlight-custom-color-4&#39;: &#39;linear-gradient(135deg, #78350f, #d97706)&#39;,\n  &#39;highlight-custom-color-5&#39;: &#39;linear-gradient(135deg, #881337, #e11d48)&#39;,\n};\nconst bgStyle = computed(() => {\n  if (props.block.image) {\n    return { backgroundImage: `url(${props.block.image})`, backgroundSize: &#39;cover&#39;, backgroundPosition: &#39;center&#39; };\n  }\n  const gradient = gradients[props.block.styles?.descriptionColor] || &#39;linear-gradient(135deg, #334, #556)&#39;;\n  return { background: gradient };\n});\n</script>"},{"@id":"ref-highlight-rendering-svelte-d3a4c8","label":"Svelte","language":"svelte","code":"<script>\n  import SlateNode from &#39;./SlateNode.svelte&#39;;\n  export let block;\n  $: ctaLink = block.cta_link?.[0]?.[&#39;@id&#39;] || &#39;&#39;;\n\n  const gradients = {\n    &#39;highlight-custom-color-1&#39;: &#39;linear-gradient(135deg, #1e3a5f, #2563eb)&#39;,\n    &#39;highlight-custom-color-2&#39;: &#39;linear-gradient(135deg, #064e3b, #059669)&#39;,\n    &#39;highlight-custom-color-3&#39;: &#39;linear-gradient(135deg, #581c87, #9333ea)&#39;,\n    &#39;highlight-custom-color-4&#39;: &#39;linear-gradient(135deg, #78350f, #d97706)&#39;,\n    &#39;highlight-custom-color-5&#39;: &#39;linear-gradient(135deg, #881337, #e11d48)&#39;,\n  };\n  $: gradient = gradients[block.styles?.descriptionColor] || &#39;linear-gradient(135deg, #334, #556)&#39;;\n  $: bgStyle = block.image\n    ? `background-image:url(${block.image});background-size:cover;background-position:center`\n    : `background:${gradient}`;\n</script>\n\n<section\n  data-block-uid={block[&#39;@uid&#39;]}\n  class=\"highlight-block\"\n  style=\"{bgStyle};padding:40px 20px;color:white;border-radius:8px\"\n>\n  <div class=\"highlight-overlay\" style=\"background:rgba(0,0,0,0.4);padding:30px;border-radius:8px\">\n    <h2 data-edit-text=\"title\">{block.title}</h2>\n    <div class=\"highlight-body\" data-edit-text=\"description\">\n      {#each block.description || [] as node, i (i)}\n        <SlateNode {node} />\n      {/each}\n    </div>\n    {#if block.cta_title}\n      <a href={ctaLink} data-edit-text=\"cta_title\" data-edit-link=\"cta_link\" class=\"highlight-cta\"\n        style=\"display:inline-block;padding:10px 20px;background:#007eb1;color:white;text-decoration:none;border-radius:4px;margin-top:16px\">\n        {block.cta_title}\n      </a>\n    {/if}\n  </div>\n</section>"}]}' />
+```javascript
+{
+  "highlight": {
+    "blockSchema": {
+      "properties": {
+        "title": {
+          "title": "Title"
+        },
+        "description": {
+          "title": "Description",
+          "widget": "slate"
+        },
+        "image": {
+          "title": "Background Image",
+          "widget": "image"
+        },
+        "cta_title": {
+          "title": "CTA Text"
+        },
+        "cta_link": {
+          "title": "CTA Link",
+          "widget": "object_browser",
+          "mode": "link"
+        }
+      }
+    }
+  }
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-highlight" slotId="json-data">
+
+### JSON Block Data
+
+```json
+{
+  "@type": "highlight",
+  "title": "Featured Content",
+  "description": [
+    {
+      "type": "p",
+      "children": [
+        {
+          "text": "Discover the latest updates and features available in this release."
+        }
+      ]
+    }
+  ],
+  "image": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%23334455%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3EHighlight BG%3C/text%3E%3C/svg%3E",
+  "cta_title": "Read More",
+  "cta_link": [
+    {
+      "@id": "/news/latest"
+    }
+  ]
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-highlight" slotId="rendering">
+
+### React
+
+```jsx
+const highlightGradients = {
+  'highlight-custom-color-1': 'linear-gradient(135deg, #1e3a5f, #2563eb)',
+  'highlight-custom-color-2': 'linear-gradient(135deg, #064e3b, #059669)',
+  'highlight-custom-color-3': 'linear-gradient(135deg, #581c87, #9333ea)',
+  'highlight-custom-color-4': 'linear-gradient(135deg, #78350f, #d97706)',
+  'highlight-custom-color-5': 'linear-gradient(135deg, #881337, #e11d48)',
+};
+
+import { getImageUrl } from './utils.js';
+
+function HighlightBlock({ block }) {
+  const title = block.title || '';
+  const description = block.description || [];
+  const imageSrc = getImageUrl(block.image);
+  const ctaText = block.cta_title || '';
+  const ctaLink = block.cta_link?.[0]?.['@id'] || '';
+  const gradient = highlightGradients[block.styles?.descriptionColor] || 'linear-gradient(135deg, #334, #556)';
+  const bgStyle = imageSrc
+    ? { backgroundImage: `url(${imageSrc})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+    : { background: gradient };
+
+  return (
+    <section
+      data-block-uid={block['@uid']}
+      className="highlight-block"
+      style={{ ...bgStyle, padding: '40px 20px', color: 'white', borderRadius: '8px' }}
+    >
+      <div className="highlight-overlay" style={{ background: 'rgba(0,0,0,0.4)', padding: '30px', borderRadius: '8px' }}>
+        <h2 data-edit-text="title">{title}</h2>
+        <div className="highlight-body" data-edit-text="description">
+          {description.map((node, i) => (
+            <SlateNode key={i} node={node} />
+          ))}
+        </div>
+        {ctaText && (
+          <a href={ctaLink} data-edit-text="cta_title" data-edit-link="cta_link" className="highlight-cta"
+            style={{ display: 'inline-block', padding: '10px 20px', background: '#007eb1', color: 'white', textDecoration: 'none', borderRadius: '4px', marginTop: '16px' }}>
+            {ctaText}
+          </a>
+        )}
+      </div>
+    </section>
+  );
+}
+```
+
+### Vue
+
+```vue
+<template>
+  <section
+    :data-block-uid="block['@uid']"
+    class="highlight-block"
+    :style="{ ...bgStyle, padding: '40px 20px', color: 'white', borderRadius: '8px' }"
+  >
+    <div class="highlight-overlay" style="background:rgba(0,0,0,0.4);padding:30px;border-radius:8px">
+      <h2 data-edit-text="title">{{ block.title }}</h2>
+      <div class="highlight-body" data-edit-text="description">
+        <SlateNode v-for="(node, i) in block.description || []" :key="i" :node="node" />
+      </div>
+      <a
+        v-if="block.cta_title"
+        :href="ctaLink"
+        data-edit-text="cta_title"
+        data-edit-link="cta_link"
+        class="highlight-cta"
+        style="display:inline-block;padding:10px 20px;background:#007eb1;color:white;text-decoration:none;border-radius:4px;margin-top:16px"
+      >
+        {{ block.cta_title }}
+      </a>
+    </div>
+  </section>
+</template>
+
+<script setup>
+import { computed } from 'vue';
+const props = defineProps({ block: Object });
+const ctaLink = computed(() => props.block.cta_link?.[0]?.['@id'] || '');
+
+const gradients = {
+  'highlight-custom-color-1': 'linear-gradient(135deg, #1e3a5f, #2563eb)',
+  'highlight-custom-color-2': 'linear-gradient(135deg, #064e3b, #059669)',
+  'highlight-custom-color-3': 'linear-gradient(135deg, #581c87, #9333ea)',
+  'highlight-custom-color-4': 'linear-gradient(135deg, #78350f, #d97706)',
+  'highlight-custom-color-5': 'linear-gradient(135deg, #881337, #e11d48)',
+};
+const bgStyle = computed(() => {
+  if (props.block.image) {
+    return { backgroundImage: `url(${props.block.image})`, backgroundSize: 'cover', backgroundPosition: 'center' };
+  }
+  const gradient = gradients[props.block.styles?.descriptionColor] || 'linear-gradient(135deg, #334, #556)';
+  return { background: gradient };
+});
+</script>
+```
+
+### Svelte
+
+```svelte
+<script>
+  import SlateNode from './SlateNode.svelte';
+  export let block;
+  $: ctaLink = block.cta_link?.[0]?.['@id'] || '';
+
+  const gradients = {
+    'highlight-custom-color-1': 'linear-gradient(135deg, #1e3a5f, #2563eb)',
+    'highlight-custom-color-2': 'linear-gradient(135deg, #064e3b, #059669)',
+    'highlight-custom-color-3': 'linear-gradient(135deg, #581c87, #9333ea)',
+    'highlight-custom-color-4': 'linear-gradient(135deg, #78350f, #d97706)',
+    'highlight-custom-color-5': 'linear-gradient(135deg, #881337, #e11d48)',
+  };
+  $: gradient = gradients[block.styles?.descriptionColor] || 'linear-gradient(135deg, #334, #556)';
+  $: bgStyle = block.image
+    ? `background-image:url(${block.image});background-size:cover;background-position:center`
+    : `background:${gradient}`;
+</script>
+
+<section
+  data-block-uid={block['@uid']}
+  class="highlight-block"
+  style="{bgStyle};padding:40px 20px;color:white;border-radius:8px"
+>
+  <div class="highlight-overlay" style="background:rgba(0,0,0,0.4);padding:30px;border-radius:8px">
+    <h2 data-edit-text="title">{block.title}</h2>
+    <div class="highlight-body" data-edit-text="description">
+      {#each block.description || [] as node, i (i)}
+        <SlateNode {node} />
+      {/each}
+    </div>
+    {#if block.cta_title}
+      <a href={ctaLink} data-edit-text="cta_title" data-edit-link="cta_link" class="highlight-cta"
+        style="display:inline-block;padding:10px 20px;background:#007eb1;color:white;text-decoration:none;border-radius:4px;margin-top:16px">
+        {block.cta_title}
+      </a>
+    {/if}
+  </div>
+</section>
+```
+
+</block>

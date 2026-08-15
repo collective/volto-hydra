@@ -51,8 +51,13 @@ assignments:
   - { uid: b7d57c29-c082-4b41-b6e0-7ccf83d46b97, type: image }
   - { uid: b6bf35d7-7536-4a32-9821-4ae209de88fe, type: slate }
   - { uid: ref-image-schema, type: codeExample }
+  - { id: ref-image-schema-javascript-979df6 }
   - { uid: ref-image-json-data, type: codeExample }
+  - { id: ref-image-json-data-json-ddd34d }
   - { uid: ref-image-rendering, type: codeExample }
+  - { id: ref-image-rendering-jsx-a59bc5 }
+  - { id: ref-image-rendering-vue-c3dead }
+  - { id: ref-image-rendering-svelte-52a7e2 }
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
@@ -103,8 +108,129 @@ The Bild-Block can be aligned to the right with text floating around it on the l
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum.Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua.
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-image" slotId="schema" data='{"tabs":[{"@id":"ref-image-schema-javascript-979df6","label":"Schema","language":"javascript","code":"{\n  \"image\": {\n    \"fieldMappings\": {\n      \"@default\": {\n        \"image\": \"url\",\n        \"@id\": \"href\",\n        \"title\": \"alt\"\n      }\n    },\n    \"blockSchema\": {\n      \"properties\": {\n        \"url\": {\n          \"title\": \"Image\",\n          \"widget\": \"image\"\n        },\n        \"alt\": {\n          \"title\": \"Alt Text\"\n        },\n        \"href\": {\n          \"title\": \"Link\",\n          \"widget\": \"object_browser\",\n          \"mode\": \"link\"\n        }\n      }\n    }\n  }\n}"}]}' />
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-image" slotId="schema">
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-image" slotId="json-data" data='{"tabs":[{"@id":"ref-image-json-data-json-ddd34d","label":"JSON Block Data","language":"json","code":"{\n  \"@type\": \"image\",\n  \"url\": \"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27600%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%2377aadd%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3ETest Image%3C/text%3E%3C/svg%3E\",\n  \"alt\": \"A description of the image\",\n  \"href\": [\n    {\n      \"@id\": \"/target-page\"\n    }\n  ]\n}"}]}' />
+### Schema
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-image" slotId="rendering" data='{"tabs":[{"@id":"ref-image-rendering-jsx-a59bc5","label":"React","language":"jsx","code":"import { getImageUrl } from &#39;./utils.js&#39;;\n\nfunction ImageBlock({ block }) {\n  const src = getImageUrl(block.url);\n  const alt = block.alt || &#39;&#39;;\n  const href = block.href?.[0]?.[&#39;@id&#39;] || block.href;\n\n  const img = src\n    ? <img data-edit-media=\"url\" src={src} alt={alt} />\n    : <div data-edit-media=\"url\" style={{height:100,background:&#39;#e5e7eb&#39;,display:&#39;flex&#39;,alignItems:&#39;center&#39;,justifyContent:&#39;center&#39;,borderRadius:4,cursor:&#39;pointer&#39;}}>Click to add image</div>;\n\n  return (\n    <div data-block-uid={block[&#39;@uid&#39;]}>\n      {href ? (\n        <a href={href} data-edit-link=\"href\">{img}</a>\n      ) : (\n        <>{img}</>\n      )}\n    </div>\n  );\n}"},{"@id":"ref-image-rendering-vue-c3dead","label":"Vue","language":"vue","code":"<template>\n  <div :data-block-uid=\"block[&#39;@uid&#39;]\">\n    <a v-if=\"href\" :href=\"href\" data-edit-link=\"href\">\n      <img data-edit-media=\"url\" :src=\"imgSrc\" :alt=\"block.alt\" />\n    </a>\n    <img v-else data-edit-media=\"url\" :src=\"imgSrc\" :alt=\"block.alt\" />\n  </div>\n</template>\n\n<script setup>\nimport { computed } from &#39;vue&#39;;\nimport { getImageUrl } from &#39;./utils.js&#39;;\nconst props = defineProps({ block: Object });\nconst href = computed(() => props.block.href?.[0]?.[&#39;@id&#39;] || props.block.href);\nconst imgSrc = computed(() => getImageUrl(props.block.url));\n</script>"},{"@id":"ref-image-rendering-svelte-52a7e2","label":"Svelte","language":"svelte","code":"<script>\n  import { getImageUrl } from &#39;./utils.js&#39;;\n  export let block;\n  $: href = block.href?.[0]?.[&#39;@id&#39;] || block.href;\n  $: imgSrc = getImageUrl(block.url);\n</script>\n\n<div data-block-uid={block[&#39;@uid&#39;]}>\n  {#if href}\n    <a {href} data-edit-link=\"href\">\n      <img data-edit-media=\"url\" src={imgSrc} alt={block.alt} />\n    </a>\n  {:else}\n    <img data-edit-media=\"url\" src={imgSrc} alt={block.alt} />\n  {/if}\n</div>"}]}' />
+```javascript
+{
+  "image": {
+    "fieldMappings": {
+      "@default": {
+        "image": "url",
+        "@id": "href",
+        "title": "alt"
+      }
+    },
+    "blockSchema": {
+      "properties": {
+        "url": {
+          "title": "Image",
+          "widget": "image"
+        },
+        "alt": {
+          "title": "Alt Text"
+        },
+        "href": {
+          "title": "Link",
+          "widget": "object_browser",
+          "mode": "link"
+        }
+      }
+    }
+  }
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-image" slotId="json-data">
+
+### JSON Block Data
+
+```json
+{
+  "@type": "image",
+  "url": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27600%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%2377aadd%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3ETest Image%3C/text%3E%3C/svg%3E",
+  "alt": "A description of the image",
+  "href": [
+    {
+      "@id": "/target-page"
+    }
+  ]
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-image" slotId="rendering">
+
+### React
+
+```jsx
+import { getImageUrl } from './utils.js';
+
+function ImageBlock({ block }) {
+  const src = getImageUrl(block.url);
+  const alt = block.alt || '';
+  const href = block.href?.[0]?.['@id'] || block.href;
+
+  const img = src
+    ? <img data-edit-media="url" src={src} alt={alt} />
+    : <div data-edit-media="url" style={{height:100,background:'#e5e7eb',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:4,cursor:'pointer'}}>Click to add image</div>;
+
+  return (
+    <div data-block-uid={block['@uid']}>
+      {href ? (
+        <a href={href} data-edit-link="href">{img}</a>
+      ) : (
+        <>{img}</>
+      )}
+    </div>
+  );
+}
+```
+
+### Vue
+
+```vue
+<template>
+  <div :data-block-uid="block['@uid']">
+    <a v-if="href" :href="href" data-edit-link="href">
+      <img data-edit-media="url" :src="imgSrc" :alt="block.alt" />
+    </a>
+    <img v-else data-edit-media="url" :src="imgSrc" :alt="block.alt" />
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue';
+import { getImageUrl } from './utils.js';
+const props = defineProps({ block: Object });
+const href = computed(() => props.block.href?.[0]?.['@id'] || props.block.href);
+const imgSrc = computed(() => getImageUrl(props.block.url));
+</script>
+```
+
+### Svelte
+
+```svelte
+<script>
+  import { getImageUrl } from './utils.js';
+  export let block;
+  $: href = block.href?.[0]?.['@id'] || block.href;
+  $: imgSrc = getImageUrl(block.url);
+</script>
+
+<div data-block-uid={block['@uid']}>
+  {#if href}
+    <a {href} data-edit-link="href">
+      <img data-edit-media="url" src={imgSrc} alt={block.alt} />
+    </a>
+  {:else}
+    <img data-edit-media="url" src={imgSrc} alt={block.alt} />
+  {/if}
+</div>
+```
+
+</block>

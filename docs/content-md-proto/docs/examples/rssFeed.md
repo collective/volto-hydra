@@ -25,10 +25,14 @@ assignments:
   - { uid: rss-live-heading, type: slate }
   - { uid: rss-live-1, type: rssFeed }
   - { uid: ref-rssFeed-schema, type: codeExample }
+  - { id: ref-rssFeed-schema-javascript-d79cf2 }
   - { uid: ref-rssFeed-json-data, type: codeExample }
+  - { id: ref-rssFeed-json-data-json-c55bf4 }
   - { uid: ref-rssFeed-rendering-intro, type: slate }
   - { uid: ref-rssFeed-fetcher, type: codeExample }
+  - { id: ref-rssFeed-fetcher-javascript-7f0034 }
   - { uid: ref-rssFeed-rendering, type: codeExample }
+  - { id: ref-rssFeed-rendering-javascript-df4061 }
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
@@ -47,12 +51,126 @@ Renders entries from an external RSS feed. Its items are fetched at render time 
 
 <block type="rssFeed" feedUrl="https://pypi.org/rss/project/plone/releases.xml" variation="default" />
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="schema" data='{"tabs":[{"@id":"ref-rssFeed-schema-javascript-d79cf2","label":"Schema","language":"javascript","code":"{\n  \"rssFeed\": {\n    \"id\": \"rssFeed\",\n    \"title\": \"RSS Feed\",\n    \"blockSchema\": {\n      \"fieldsets\": [\n        {\n          \"id\": \"default\",\n          \"title\": \"Default\",\n          \"fields\": [\n            \"feedUrl\",\n            \"count\",\n            \"variation\",\n            \"fieldMapping\"\n          ]\n        }\n      ],\n      \"properties\": {\n        \"feedUrl\": {\n          \"title\": \"Feed URL\",\n          \"widget\": \"url\"\n        },\n        \"count\": {\n          \"title\": \"Max items\",\n          \"type\": \"number\",\n          \"default\": 6\n        },\n        \"variation\": {\n          \"title\": \"Item Type\",\n          \"widget\": \"blockTypeSelect\",\n          \"filterConvertibleFrom\": \"@default\",\n          \"default\": \"summary\"\n        }\n      }\n    },\n    \"schemaEnhancer\": {\n      \"inheritSchemaFrom\": {\n        \"typeField\": \"variation\",\n        \"mappingField\": \"fieldMapping\",\n        \"defaultsField\": \"itemDefaults\"\n      }\n    }\n  }\n}"}]}' />
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="schema">
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="json-data" data='{"tabs":[{"@id":"ref-rssFeed-json-data-json-c55bf4","label":"JSON Block Data","language":"json","code":"{\n  \"@type\": \"rssFeed\",\n  \"feedUrl\": \"https://pypi.org/rss/project/plone/releases.xml\",\n  \"count\": 6,\n  \"variation\": \"summary\"\n}"}]}' />
+### Schema
+
+```javascript
+{
+  "rssFeed": {
+    "id": "rssFeed",
+    "title": "RSS Feed",
+    "blockSchema": {
+      "fieldsets": [
+        {
+          "id": "default",
+          "title": "Default",
+          "fields": [
+            "feedUrl",
+            "count",
+            "variation",
+            "fieldMapping"
+          ]
+        }
+      ],
+      "properties": {
+        "feedUrl": {
+          "title": "Feed URL",
+          "widget": "url"
+        },
+        "count": {
+          "title": "Max items",
+          "type": "number",
+          "default": 6
+        },
+        "variation": {
+          "title": "Item Type",
+          "widget": "blockTypeSelect",
+          "filterConvertibleFrom": "@default",
+          "default": "summary"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "inheritSchemaFrom": {
+        "typeField": "variation",
+        "mappingField": "fieldMapping",
+        "defaultsField": "itemDefaults"
+      }
+    }
+  }
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="json-data">
+
+### JSON Block Data
+
+```json
+{
+  "@type": "rssFeed",
+  "feedUrl": "https://pypi.org/rss/project/plone/releases.xml",
+  "count": 6,
+  "variation": "summary"
+}
+```
+
+</block>
 
 <block type="slate" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="rendering" data='{"value":[{"type":"p","children":[{"text":"This block has no bespoke renderer. Add its fetcher to your fetchItems map (keyed by @type) and expandListingBlocks expands it in any region you render — the same seam that powers "},{"type":"link","data":{"url":"/docs/listings"},"children":[{"text":"listings"}]},{"text":" and other collection blocks. See "},{"type":"link","data":{"url":"/docs/custom-blocks"},"children":[{"text":"Custom Blocks"}]},{"text":" to define the block type. Only the fetcher below is block-specific."}]}]}' />
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="rendering" data='{"tabs":[{"@id":"ref-rssFeed-fetcher-javascript-7f0034","label":"Fetcher","language":"javascript","code":"// packages/helpers — client-side, best-effort (CORS-permitting feeds).\nexport function rssFetcher() {\n  return async function fetchItems(block, { start, size }) {\n    let entries = [];\n    try {\n      const res = await fetch(block.feedUrl);\n      entries = parseRssEntries(await res.text()); // → [{ &#39;@id&#39;: link, title, description, pubDate }]\n    } catch {\n      return { items: [], total: 0 };              // CORS / parse failure → empty feed, never throws\n    }\n    if (block.count != null) entries = entries.slice(0, block.count);\n    return { items: entries.slice(start, start + size), total: entries.length };\n  };\n}\n\n// Dependency-free parse so it runs in the browser AND node (no DOMParser):\nfunction parseRssEntries(xml) {\n  const out = [];\n  const tag = (b, n) => (new RegExp(`<${n}\\\\b[^>]*>([\\\\s\\\\S]*?)<\\\\/${n}>`, &#39;i&#39;).exec(b) || [])[1];\n  for (const m of xml.matchAll(/<item\\b[^>]*>([\\s\\S]*?)<\\/item>/gi)) {\n    const b = m[1];\n    out.push({ &#39;@id&#39;: tag(b, &#39;link&#39;) || &#39;&#39;, title: tag(b, &#39;title&#39;) || &#39;&#39;, description: tag(b, &#39;description&#39;) || &#39;&#39;, pubDate: tag(b, &#39;pubDate&#39;) });\n  }\n  return out;\n}"}]}' />
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="rendering">
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="rendering" data='{"tabs":[{"@id":"ref-rssFeed-rendering-javascript-df4061","label":"Render","language":"javascript","code":"// One fetchItems map, keyed by @type, holds every fetch-based block you use.\nconst fetchItems = {\n  listing: ploneFetchItems({ apiUrl, contextPath }),\n  rssFeed: rssFetcher(), // ← this block — just another entry\n};\n\n// Call this on each region you render (the list of block ids in that region).\nconst { items } = await expandListingBlocks(regionBlockIds, {\n  blocks, fetchItems, itemTypeField: &#39;variation&#39;,\n});\nitems.forEach((item) => renderBlock(item)); // your normal per-block renderer"}]}' />
+### Fetcher
+
+```javascript
+// packages/helpers — client-side, best-effort (CORS-permitting feeds).
+export function rssFetcher() {
+  return async function fetchItems(block, { start, size }) {
+    let entries = [];
+    try {
+      const res = await fetch(block.feedUrl);
+      entries = parseRssEntries(await res.text()); // → [{ '@id': link, title, description, pubDate }]
+    } catch {
+      return { items: [], total: 0 };              // CORS / parse failure → empty feed, never throws
+    }
+    if (block.count != null) entries = entries.slice(0, block.count);
+    return { items: entries.slice(start, start + size), total: entries.length };
+  };
+}
+
+// Dependency-free parse so it runs in the browser AND node (no DOMParser):
+function parseRssEntries(xml) {
+  const out = [];
+  const tag = (b, n) => (new RegExp(`<${n}\\b[^>]*>([\\s\\S]*?)<\\/${n}>`, 'i').exec(b) || [])[1];
+  for (const m of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)) {
+    const b = m[1];
+    out.push({ '@id': tag(b, 'link') || '', title: tag(b, 'title') || '', description: tag(b, 'description') || '', pubDate: tag(b, 'pubDate') });
+  }
+  return out;
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed" slotId="rendering">
+
+### Render
+
+```javascript
+// One fetchItems map, keyed by @type, holds every fetch-based block you use.
+const fetchItems = {
+  listing: ploneFetchItems({ apiUrl, contextPath }),
+  rssFeed: rssFetcher(), // ← this block — just another entry
+};
+
+// Call this on each region you render (the list of block ids in that region).
+const { items } = await expandListingBlocks(regionBlockIds, {
+  blocks, fetchItems, itemTypeField: 'variation',
+});
+items.forEach((item) => renderBlock(item)); // your normal per-block renderer
+```
+
+</block>

@@ -32,6 +32,7 @@ assignments:
   - { uid: h-6, type: slate }
   - { uid: p-7, type: slate }
   - { uid: ce-8, type: codeExample }
+  - { id: ce-8-text-6b4738 }
   - { uid: ul-9, type: slate }
   - { uid: h-10, type: slate }
   - { uid: p-11, type: slate }
@@ -93,7 +94,23 @@ If something in this guide doesn't match what you see, it's almost always becaus
 
 The editor screen has three regions:
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-8-text-6b4738","label":"Text","language":"text","code":"┌───────────┬──────────────────────────────────┬──────────────┐\n│           │                                  │              │\n│  Toolbar  │   Live preview (your frontend)   │   Sidebar    │\n│           │                                  │              │\n│  • Save   │                                  │   Page title │\n│  • Pages  │  Click anywhere here to edit.    │   Block list │\n│  • Site   │                                  │   Settings   │\n│           │                                  │              │\n└───────────┴──────────────────────────────────┴──────────────┘"}]}' />
+<block type="codeExample">
+
+### Text
+
+```text
+┌───────────┬──────────────────────────────────┬──────────────┐
+│           │                                  │              │
+│  Toolbar  │   Live preview (your frontend)   │   Sidebar    │
+│           │                                  │              │
+│  • Save   │                                  │   Page title │
+│  • Pages  │  Click anywhere here to edit.    │   Block list │
+│  • Site   │                                  │   Settings   │
+│           │                                  │              │
+└───────────┴──────────────────────────────────┴──────────────┘
+```
+
+</block>
 
 - **Toolbar (left)** — saving, navigating to other pages, site settings. Standard Volto, plus the **Frontend switcher** (see below).
 - **Live preview (centre)** — your actual frontend, running inside an iframe. This is what readers will see. Click directly into the preview to edit.

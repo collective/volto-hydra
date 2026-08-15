@@ -36,8 +36,13 @@ assignments:
   - { uid: 616b625c-b79f-4881-8536-b67a9e401a7d, type: listing }
   - { uid: 7624cf59-05d0-4055-8f55-5fd6597d84b0, type: slate }
   - { uid: ref-grid-schema, type: codeExample }
+  - { id: ref-grid-schema-javascript-af1095 }
   - { uid: ref-grid-json-data, type: codeExample }
+  - { id: ref-grid-json-data-json-5ff79e }
   - { uid: ref-grid-rendering, type: codeExample }
+  - { id: ref-grid-rendering-jsx-f30d80 }
+  - { id: ref-grid-rendering-vue-1d61ab }
+  - { id: ref-grid-rendering-svelte-8158ec }
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
@@ -56,8 +61,129 @@ A responsive grid that lays out child blocks in equal-width cells. The block use
 
 <block type="slate" data='{"value":[{"children":[{"text":""}],"type":"p"}]}' />
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="schema" data='{"tabs":[{"@id":"ref-grid-schema-javascript-af1095","label":"Schema","language":"javascript","code":"{\n  \"gridBlock\": {\n    \"allowedBlocks\": [\"teaser\", \"image\", \"slate\"],\n    \"blockSchema\": {\n      \"properties\": {\n        \"blocks_layout\": {\n          \"title\": \"Cells\",\n          \"widget\": \"blocks_layout\",\n          \"allowedBlocks\": [\"teaser\", \"image\", \"slate\"]\n        }\n      }\n    }\n  }\n}"}]}' />
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="schema">
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="json-data" data='{"tabs":[{"@id":"ref-grid-json-data-json-5ff79e","label":"JSON Block Data","language":"json","code":"{\n  \"@type\": \"gridBlock\",\n  \"blocks\": {\n    \"cell-1\": {\n      \"@type\": \"teaser\",\n      \"title\": \"Design\",\n      \"description\": \"We craft beautiful interfaces that users love.\",\n      \"href\": [{\"@id\": \"/design\"}]\n    },\n    \"cell-2\": {\n      \"@type\": \"image\",\n      \"url\": \"https://placehold.co/600x400\",\n      \"alt\": \"Placeholder\"\n    },\n    \"cell-3\": {\n      \"@type\": \"teaser\",\n      \"title\": \"Learn More\",\n      \"description\": \"Explore the full documentation.\",\n      \"href\": [{\"@id\": \"/docs\"}]\n    }\n  },\n  \"blocks_layout\": {\n    \"items\": [\"cell-1\", \"cell-2\", \"cell-3\"]\n  }\n}"}]}' />
+### Schema
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="rendering" data='{"tabs":[{"@id":"ref-grid-rendering-jsx-f30d80","label":"React","language":"jsx","code":"function GridBlock({ block }) {\n  const blocks = block.blocks || {};\n  const items = block.blocks_layout?.items || [];\n\n  return (\n    <div data-block-uid={block[&#39;@uid&#39;]} className=\"grid-block\">\n      <div style={{ display: &#39;grid&#39;, gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: &#39;1rem&#39; }}>\n        {items.map(id => {\n          const child = { ...blocks[id], &#39;@uid&#39;: id };\n          return (\n            <div key={id} className=\"grid-cell\">\n              <BlockRenderer block={child} />\n            </div>\n          );\n        })}\n      </div>\n    </div>\n  );\n}"},{"@id":"ref-grid-rendering-vue-1d61ab","label":"Vue","language":"vue","code":"<template>\n  <div :data-block-uid=\"block[&#39;@uid&#39;]\" class=\"grid-block\">\n    <div :style=\"{ display: &#39;grid&#39;, gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: &#39;1rem&#39; }\">\n      <div v-for=\"id in items\" :key=\"id\" class=\"grid-cell\">\n        <BlockRenderer :block=\"{ ...block.blocks?.[id], &#39;@uid&#39;: id }\" />\n      </div>\n    </div>\n  </div>\n</template>\n\n<script setup>\nimport { computed } from &#39;vue&#39;;\nimport BlockRenderer from &#39;./BlockRenderer.vue&#39;;\nconst props = defineProps({ block: Object });\nconst items = computed(() => props.block.blocks_layout?.items || []);\n</script>"},{"@id":"ref-grid-rendering-svelte-8158ec","label":"Svelte","language":"svelte","code":"<script>\n  import BlockRenderer from &#39;./BlockRenderer.svelte&#39;;\n  export let block;\n  $: blocks = block.blocks || {};\n  $: items = block.blocks_layout?.items || [];\n</script>\n\n<div data-block-uid={block[&#39;@uid&#39;]} class=\"grid-block\">\n  <div style=\"display: grid; grid-template-columns: repeat({items.length}, 1fr); gap: 1rem\">\n    {#each items as id (id)}\n      <div class=\"grid-cell\">\n        <BlockRenderer block={{ ...blocks[id], &#39;@uid&#39;: id }} />\n      </div>\n    {/each}\n  </div>\n</div>"}]}' />
+```javascript
+{
+  "gridBlock": {
+    "allowedBlocks": ["teaser", "image", "slate"],
+    "blockSchema": {
+      "properties": {
+        "blocks_layout": {
+          "title": "Cells",
+          "widget": "blocks_layout",
+          "allowedBlocks": ["teaser", "image", "slate"]
+        }
+      }
+    }
+  }
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="json-data">
+
+### JSON Block Data
+
+```json
+{
+  "@type": "gridBlock",
+  "blocks": {
+    "cell-1": {
+      "@type": "teaser",
+      "title": "Design",
+      "description": "We craft beautiful interfaces that users love.",
+      "href": [{"@id": "/design"}]
+    },
+    "cell-2": {
+      "@type": "image",
+      "url": "https://placehold.co/600x400",
+      "alt": "Placeholder"
+    },
+    "cell-3": {
+      "@type": "teaser",
+      "title": "Learn More",
+      "description": "Explore the full documentation.",
+      "href": [{"@id": "/docs"}]
+    }
+  },
+  "blocks_layout": {
+    "items": ["cell-1", "cell-2", "cell-3"]
+  }
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="rendering">
+
+### React
+
+```jsx
+function GridBlock({ block }) {
+  const blocks = block.blocks || {};
+  const items = block.blocks_layout?.items || [];
+
+  return (
+    <div data-block-uid={block['@uid']} className="grid-block">
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '1rem' }}>
+        {items.map(id => {
+          const child = { ...blocks[id], '@uid': id };
+          return (
+            <div key={id} className="grid-cell">
+              <BlockRenderer block={child} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+```
+
+### Vue
+
+```vue
+<template>
+  <div :data-block-uid="block['@uid']" class="grid-block">
+    <div :style="{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '1rem' }">
+      <div v-for="id in items" :key="id" class="grid-cell">
+        <BlockRenderer :block="{ ...block.blocks?.[id], '@uid': id }" />
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue';
+import BlockRenderer from './BlockRenderer.vue';
+const props = defineProps({ block: Object });
+const items = computed(() => props.block.blocks_layout?.items || []);
+</script>
+```
+
+### Svelte
+
+```svelte
+<script>
+  import BlockRenderer from './BlockRenderer.svelte';
+  export let block;
+  $: blocks = block.blocks || {};
+  $: items = block.blocks_layout?.items || [];
+</script>
+
+<div data-block-uid={block['@uid']} class="grid-block">
+  <div style="display: grid; grid-template-columns: repeat({items.length}, 1fr); gap: 1rem">
+    {#each items as id (id)}
+      <div class="grid-cell">
+        <BlockRenderer block={{ ...blocks[id], '@uid': id }} />
+      </div>
+    {/each}
+  </div>
+</div>
+```
+
+</block>

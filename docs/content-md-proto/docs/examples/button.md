@@ -59,8 +59,13 @@ assignments:
   - { uid: 2fa5b869-89cd-4d15-aee9-80b4e1bf11a2, type: slate }
   - { uid: fc0ddcf5-4acc-4f9b-8c5c-992db47399ce, type: button }
   - { uid: ref-button-schema, type: codeExample }
+  - { id: ref-button-schema-javascript-8aa182 }
   - { uid: ref-button-json-data, type: codeExample }
+  - { id: ref-button-json-data-json-ed3030 }
   - { uid: ref-button-rendering, type: codeExample }
+  - { id: ref-button-rendering-jsx-ab4e0b }
+  - { id: ref-button-rendering-vue-e704dd }
+  - { id: ref-button-rendering-svelte-a8e495 }
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
@@ -142,8 +147,118 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="button" inneralign="right" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{"backgroundColor":"grey","buttonAlign":"center"}}' />
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-button" slotId="schema" data='{"tabs":[{"@id":"ref-button-schema-javascript-8aa182","label":"Schema","language":"javascript","code":"{\n  \"button\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"title\": {\n          \"title\": \"Label\"\n        },\n        \"href\": {\n          \"title\": \"Link\",\n          \"widget\": \"object_browser\",\n          \"mode\": \"link\"\n        },\n        \"inneralign\": {\n          \"title\": \"Alignment\",\n          \"widget\": \"select\",\n          \"choices\": [\n            [\n              \"left\",\n              \"Left\"\n            ],\n            [\n              \"center\",\n              \"Center\"\n            ],\n            [\n              \"right\",\n              \"Right\"\n            ]\n          ],\n          \"default\": \"left\"\n        }\n      }\n    }\n  }\n}"}]}' />
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-button" slotId="schema">
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-button" slotId="json-data" data='{"tabs":[{"@id":"ref-button-json-data-json-ed3030","label":"JSON Block Data","language":"json","code":"{\n  \"@type\": \"button\",\n  \"title\": \"Learn More\",\n  \"href\": [\n    {\n      \"@id\": \"/about-us\"\n    }\n  ]\n}"}]}' />
+### Schema
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-button" slotId="rendering" data='{"tabs":[{"@id":"ref-button-rendering-jsx-ab4e0b","label":"React","language":"jsx","code":"function ButtonBlock({ block }) {\n  const title = block.title || &#39;Button&#39;;\n  const href = block.href?.[0]?.[&#39;@id&#39;] || block.href || &#39;#&#39;;\n\n  return (\n    <div data-block-uid={block[&#39;@uid&#39;]} className=\"button-block\">\n      <a href={href} data-edit-text=\"title\" data-edit-link=\"href\" className=\"btn\">\n        {title}\n      </a>\n    </div>\n  );\n}"},{"@id":"ref-button-rendering-vue-e704dd","label":"Vue","language":"vue","code":"<template>\n  <div :data-block-uid=\"block[&#39;@uid&#39;]\" class=\"button-block\">\n    <a :href=\"href\" data-edit-text=\"title\" data-edit-link=\"href\" class=\"btn\">\n      {{ block.title || &#39;Button&#39; }}\n    </a>\n  </div>\n</template>\n\n<script setup>\nimport { computed } from &#39;vue&#39;;\nconst props = defineProps({ block: Object });\nconst href = computed(() => props.block.href?.[0]?.[&#39;@id&#39;] || props.block.href || &#39;#&#39;);\n</script>"},{"@id":"ref-button-rendering-svelte-a8e495","label":"Svelte","language":"svelte","code":"<script>\n  export let block;\n  $: href = block.href?.[0]?.[&#39;@id&#39;] || block.href || &#39;#&#39;;\n</script>\n\n<div data-block-uid={block[&#39;@uid&#39;]} class=\"button-block\">\n  <a {href} data-edit-text=\"title\" data-edit-link=\"href\" class=\"btn\">\n    {block.title || &#39;Button&#39;}\n  </a>\n</div>"}]}' />
+```javascript
+{
+  "button": {
+    "blockSchema": {
+      "properties": {
+        "title": {
+          "title": "Label"
+        },
+        "href": {
+          "title": "Link",
+          "widget": "object_browser",
+          "mode": "link"
+        },
+        "inneralign": {
+          "title": "Alignment",
+          "widget": "select",
+          "choices": [
+            [
+              "left",
+              "Left"
+            ],
+            [
+              "center",
+              "Center"
+            ],
+            [
+              "right",
+              "Right"
+            ]
+          ],
+          "default": "left"
+        }
+      }
+    }
+  }
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-button" slotId="json-data">
+
+### JSON Block Data
+
+```json
+{
+  "@type": "button",
+  "title": "Learn More",
+  "href": [
+    {
+      "@id": "/about-us"
+    }
+  ]
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-button" slotId="rendering">
+
+### React
+
+```jsx
+function ButtonBlock({ block }) {
+  const title = block.title || 'Button';
+  const href = block.href?.[0]?.['@id'] || block.href || '#';
+
+  return (
+    <div data-block-uid={block['@uid']} className="button-block">
+      <a href={href} data-edit-text="title" data-edit-link="href" className="btn">
+        {title}
+      </a>
+    </div>
+  );
+}
+```
+
+### Vue
+
+```vue
+<template>
+  <div :data-block-uid="block['@uid']" class="button-block">
+    <a :href="href" data-edit-text="title" data-edit-link="href" class="btn">
+      {{ block.title || 'Button' }}
+    </a>
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue';
+const props = defineProps({ block: Object });
+const href = computed(() => props.block.href?.[0]?.['@id'] || props.block.href || '#');
+</script>
+```
+
+### Svelte
+
+```svelte
+<script>
+  export let block;
+  $: href = block.href?.[0]?.['@id'] || block.href || '#';
+</script>
+
+<div data-block-uid={block['@uid']} class="button-block">
+  <a {href} data-edit-text="title" data-edit-link="href" class="btn">
+    {block.title || 'Button'}
+  </a>
+</div>
+```
+
+</block>

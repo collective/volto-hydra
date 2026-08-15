@@ -32,6 +32,7 @@ assignments:
   - { uid: h-3, type: slate }
   - { uid: p-4, type: slate }
   - { uid: ce-5, type: codeExample }
+  - { id: ce-5-bash-56c4ae }
   - { uid: h-6, type: slate }
   - { uid: p-7, type: slate }
   - { uid: ul-8, type: slate }
@@ -89,7 +90,35 @@ Instead of combining editing and rendering into one framework and codebase, thes
 
 You could think of it as splitting Volto into two parts, Rendering and CMS UI/Admin UI while keeping the same UI and then making the Rendering part easily replaceable with other implementations.
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-5-bash-56c4ae","label":"Architecture","language":"bash","code":"                  Browser            RestAPI             Server\n\n              ┌──────────────┐                       ┌─────────────┐\n Anon/Editing │    Volto     │◄─────────────────────►│    Plone    │\n              └──────────────┘                       └─────────────┘\n\n──────────────────────────────────────────────────────────────────────────\n\n          │   ┌──────────────┐                       ┌─────────────┐\n          │   │   Frontend   │◄──────────────────────┤    Plone    │\n          │   └──hydra.js────┘                       └─────────────┘\n          │          ▲                                  ▲\n Editing UI          │ iFrame Bridge                    │\n          │          ▼                                  │\n          │   ┌──────────────┐                          │\n          │   │    Inka     │◄─────────────────────────┘\n          │   └──────────────┘\n\n              ┌──────────────┐                       ┌─────────────┐\n Anon         │   Frontend   │◄──────────────────────┤    Plone    │\n              └──────────────┘                       └─────────────┘"}]}' />
+<block type="codeExample">
+
+### Architecture
+
+```bash
+                  Browser            RestAPI             Server
+
+              ┌──────────────┐                       ┌─────────────┐
+ Anon/Editing │    Volto     │◄─────────────────────►│    Plone    │
+              └──────────────┘                       └─────────────┘
+
+──────────────────────────────────────────────────────────────────────────
+
+          │   ┌──────────────┐                       ┌─────────────┐
+          │   │   Frontend   │◄──────────────────────┤    Plone    │
+          │   └──hydra.js────┘                       └─────────────┘
+          │          ▲                                  ▲
+ Editing UI          │ iFrame Bridge                    │
+          │          ▼                                  │
+          │   ┌──────────────┐                          │
+          │   │    Inka     │◄─────────────────────────┘
+          │   └──────────────┘
+
+              ┌──────────────┐                       ┌─────────────┐
+ Anon         │   Frontend   │◄──────────────────────┤    Plone    │
+              └──────────────┘                       └─────────────┘
+```
+
+</block>
 
 ## The iframe ↔ admin bridge
 

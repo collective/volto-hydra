@@ -28,6 +28,7 @@ assignments:
   - { uid: p-5, type: slate }
   - { uid: h-6, type: slate }
   - { uid: ce-7, type: codeExample }
+  - { id: ce-7-text-316e7d }
   - { uid: h-8, type: slate }
   - { uid: p-9, type: slate }
   - { uid: ul-10, type: slate }
@@ -38,15 +39,22 @@ assignments:
   - { uid: p-15, type: slate }
   - { uid: h-16, type: slate }
   - { uid: ce-17, type: codeExample }
+  - { id: ce-17-astro-6cfb06 }
   - { uid: ce-18, type: codeExample }
+  - { id: ce-18-ts-ad6a37 }
   - { uid: ce-19, type: codeExample }
+  - { id: ce-19-ts-892388 }
   - { uid: p-20, type: slate }
   - { uid: h-21, type: slate }
   - { uid: ce-22, type: codeExample }
+  - { id: ce-22-php-e87720 }
   - { uid: ce-23, type: codeExample }
+  - { id: ce-23-php-9a04e4 }
   - { uid: ce-24, type: codeExample }
+  - { id: ce-24-php-ebbd45 }
   - { uid: p-25, type: slate }
   - { uid: ce-26, type: codeExample }
+  - { id: ce-26-html-476b8c }
   - { uid: h-27, type: slate }
   - { uid: p-28, type: slate }
   - { uid: tbl-29, type: slateTable }
@@ -77,7 +85,34 @@ The fix is to update only the smallest block that changed, and let the rest of t
 
 ## How it works
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-7-text-316e7d","label":"Text","language":"text","code":"Admin (Volto)              Your server-rendered frontend\n─────────────              ──────────────────────────────\nhydra.js bridge   ────►    FORM_DATA postMessage\n                           │\n                           ▼\n                           bridge calls findChangedUnit(prev, new)\n                           │\n                           ▼\n                           unit = { unit: &#39;block&#39;, blockId: X }\n                               OR { unit: &#39;page&#39; }\n                           │\n                           ▼\n                           POST renderEndpoint { unit, formData }\n                           │\n                           ▼\n                           your endpoint renders the unit&#39;s HTML\n                           │\n                           ▼\n                           bridge swaps [data-block-uid=X].outerHTML\n                           (or renderContainer.innerHTML for page unit)"}]}' />
+<block type="codeExample">
+
+### Text
+
+```text
+Admin (Volto)              Your server-rendered frontend
+─────────────              ──────────────────────────────
+hydra.js bridge   ────►    FORM_DATA postMessage
+                           │
+                           ▼
+                           bridge calls findChangedUnit(prev, new)
+                           │
+                           ▼
+                           unit = { unit: 'block', blockId: X }
+                               OR { unit: 'page' }
+                           │
+                           ▼
+                           POST renderEndpoint { unit, formData }
+                           │
+                           ▼
+                           your endpoint renders the unit's HTML
+                           │
+                           ▼
+                           bridge swaps [data-block-uid=X].outerHTML
+                           (or renderContainer.innerHTML for page unit)
+```
+
+</block>
 
 ### The diff rule (built into `hydra.js`)
 
@@ -100,25 +135,183 @@ That dispatch must also handle `@type: "empty"` — the placeholder Inka seeds i
 
 ## Worked example: Astro
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-17-astro-6cfb06","label":"Js","language":"js","code":"// src/main.js (bridge bootstrap, runs in the iframe child)\nimport { initBridge } from &#39;@volto-hydra/hydra-js&#39;;\n\ninitBridge({\n  page: { schema: { properties: { blocks_layout: { allowedBlocks: [...] } } } },\n  blocks: { /* your block configs */ },\n  renderEndpoint: &#39;/api/render&#39;,\n  renderContainer: &#39;#content&#39;,   // optional, default &#39;#content&#39;\n});"}]}' />
+<block type="codeExample">
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-18-ts-ad6a37","label":"Astro","language":"astro","code":"---\n// src/components/BlockRenderer.astro — enforces the data-block-uid contract.\nimport SlateBlock from &#39;./SlateBlock.astro&#39;;\nimport ImageBlock from &#39;./ImageBlock.astro&#39;;\n// ...\n\nconst { block } = Astro.props;\nconst type = block?.[&#39;@type&#39;];\nconst uid  = block?.[&#39;@uid&#39;];\n---\n<div data-block-uid={uid}>\n  {type === &#39;slate&#39; &amp;&amp; <SlateBlock block={block} />}\n  {type === &#39;image&#39; &amp;&amp; <ImageBlock block={block} />}\n  {/* ...one branch per block type... */}\n</div>"}]}' />
+### Js
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-19-ts-892388","label":"Ts","language":"ts","code":"// src/pages/api/render.ts — the render endpoint.\nimport type { APIRoute } from &#39;astro&#39;;\nimport { experimental_AstroContainer as AstroContainer } from &#39;astro/container&#39;;\nimport BlockRenderer from &#39;../../components/BlockRenderer.astro&#39;;\nimport Content from &#39;../../components/Content.astro&#39;;\n\nexport const POST: APIRoute = async ({ request }) => {\n  const { unit, formData } = await request.json();\n  const container = await AstroContainer.create();\n  if (unit.unit === &#39;page&#39;) {\n    const html = await container.renderToString(Content, { props: { formData } });\n    return new Response(html, { headers: { &#39;Content-Type&#39;: &#39;text/html&#39; } });\n  }\n  // unit === &#39;block&#39;\n  const block = findBlockById(formData, unit.blockId);\n  const html = await container.renderToString(BlockRenderer, { props: { block } });\n  return new Response(html, { headers: { &#39;Content-Type&#39;: &#39;text/html&#39; } });\n};\n\nfunction findBlockById(formData, blockId) {\n  const blocks = formData?.blocks;\n  if (!blocks) return null;\n  if (blocks[blockId]) return { ...blocks[blockId], &#39;@uid&#39;: blockId };\n  for (const child of Object.values(blocks)) {\n    const inside = findBlockById(child, blockId);\n    if (inside) return inside;\n  }\n  return null;\n}"}]}' />
+```js
+// src/main.js (bridge bootstrap, runs in the iframe child)
+import { initBridge } from '@volto-hydra/hydra-js';
+
+initBridge({
+  page: { schema: { properties: { blocks_layout: { allowedBlocks: [...] } } } },
+  blocks: { /* your block configs */ },
+  renderEndpoint: '/api/render',
+  renderContainer: '#content',   // optional, default '#content'
+});
+```
+
+</block>
+
+<block type="codeExample">
+
+### Astro
+
+```astro
+---
+// src/components/BlockRenderer.astro — enforces the data-block-uid contract.
+import SlateBlock from './SlateBlock.astro';
+import ImageBlock from './ImageBlock.astro';
+// ...
+
+const { block } = Astro.props;
+const type = block?.['@type'];
+const uid  = block?.['@uid'];
+---
+<div data-block-uid={uid}>
+  {type === 'slate' && <SlateBlock block={block} />}
+  {type === 'image' && <ImageBlock block={block} />}
+  {/* ...one branch per block type... */}
+</div>
+```
+
+</block>
+
+<block type="codeExample">
+
+### Ts
+
+```ts
+// src/pages/api/render.ts — the render endpoint.
+import type { APIRoute } from 'astro';
+import { experimental_AstroContainer as AstroContainer } from 'astro/container';
+import BlockRenderer from '../../components/BlockRenderer.astro';
+import Content from '../../components/Content.astro';
+
+export const POST: APIRoute = async ({ request }) => {
+  const { unit, formData } = await request.json();
+  const container = await AstroContainer.create();
+  if (unit.unit === 'page') {
+    const html = await container.renderToString(Content, { props: { formData } });
+    return new Response(html, { headers: { 'Content-Type': 'text/html' } });
+  }
+  // unit === 'block'
+  const block = findBlockById(formData, unit.blockId);
+  const html = await container.renderToString(BlockRenderer, { props: { block } });
+  return new Response(html, { headers: { 'Content-Type': 'text/html' } });
+};
+
+function findBlockById(formData, blockId) {
+  const blocks = formData?.blocks;
+  if (!blocks) return null;
+  if (blocks[blockId]) return { ...blocks[blockId], '@uid': blockId };
+  for (const child of Object.values(blocks)) {
+    const inside = findBlockById(child, blockId);
+    if (inside) return inside;
+  }
+  return null;
+}
+```
+
+</block>
 
 The full working example lives at [`docs/examples/test-astro/`](https://github.com/collective/volto-hydra/tree/main/docs/examples/test-astro) with block components in [`docs/examples/examples/astro/`](https://github.com/collective/volto-hydra/tree/main/docs/examples/examples/astro).
 
 ## Worked example: PHP
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-22-php-e87720","label":"Php","language":"php","code":"<!-- blocks/_renderer.php — enforces the data-block-uid contract -->\n<div data-block-uid=\"<?= htmlspecialchars($block[&#39;@uid&#39;]) ?>\">\n  <?php\n    $tpl = __DIR__ . \"/{$block[&#39;@type&#39;]}.php\";\n    if (file_exists($tpl)) include $tpl;\n  ?>\n</div>"}]}' />
+<block type="codeExample">
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-23-php-9a04e4","label":"Php","language":"php","code":"<!-- blocks/slate.php — one file per block type -->\n<div data-edit-text=\"value\">\n  <?php foreach ($block[&#39;value&#39;] ?? [] as $node) include __DIR__ . &#39;/_slate_node.php&#39;; ?>\n</div>"}]}' />
+### Php
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-24-php-ebbd45","label":"Php","language":"php","code":"<?php\n// api/render.php — the render endpoint\nheader(&#39;Content-Type: text/html&#39;);\n\n$payload  = json_decode(file_get_contents(&#39;php://input&#39;), true);\n$unit     = $payload[&#39;unit&#39;];\n$formData = $payload[&#39;formData&#39;];\n\nif ($unit[&#39;unit&#39;] === &#39;page&#39;) {\n    foreach ($formData[&#39;blocks_layout&#39;][&#39;items&#39;] as $id) {\n        $block = array_merge($formData[&#39;blocks&#39;][$id], [&#39;@uid&#39; => $id]);\n        include __DIR__ . &#39;/../blocks/_renderer.php&#39;;\n    }\n} else {\n    $block = find_block_by_id($formData, $unit[&#39;blockId&#39;]);\n    include __DIR__ . &#39;/../blocks/_renderer.php&#39;;\n}\n\nfunction find_block_by_id($data, $blockId) {\n    $blocks = $data[&#39;blocks&#39;] ?? [];\n    if (isset($blocks[$blockId])) {\n        return array_merge($blocks[$blockId], [&#39;@uid&#39; => $blockId]);\n    }\n    foreach ($blocks as $child) {\n        $found = find_block_by_id($child, $blockId);\n        if ($found) return $found;\n    }\n    return null;\n}"}]}' />
+```php
+<!-- blocks/_renderer.php — enforces the data-block-uid contract -->
+<div data-block-uid="<?= htmlspecialchars($block['@uid']) ?>">
+  <?php
+    $tpl = __DIR__ . "/{$block['@type']}.php";
+    if (file_exists($tpl)) include $tpl;
+  ?>
+</div>
+```
+
+</block>
+
+<block type="codeExample">
+
+### Php
+
+```php
+<!-- blocks/slate.php — one file per block type -->
+<div data-edit-text="value">
+  <?php foreach ($block['value'] ?? [] as $node) include __DIR__ . '/_slate_node.php'; ?>
+</div>
+```
+
+</block>
+
+<block type="codeExample">
+
+### Php
+
+```php
+<?php
+// api/render.php — the render endpoint
+header('Content-Type: text/html');
+
+$payload  = json_decode(file_get_contents('php://input'), true);
+$unit     = $payload['unit'];
+$formData = $payload['formData'];
+
+if ($unit['unit'] === 'page') {
+    foreach ($formData['blocks_layout']['items'] as $id) {
+        $block = array_merge($formData['blocks'][$id], ['@uid' => $id]);
+        include __DIR__ . '/../blocks/_renderer.php';
+    }
+} else {
+    $block = find_block_by_id($formData, $unit['blockId']);
+    include __DIR__ . '/../blocks/_renderer.php';
+}
+
+function find_block_by_id($data, $blockId) {
+    $blocks = $data['blocks'] ?? [];
+    if (isset($blocks[$blockId])) {
+        return array_merge($blocks[$blockId], ['@uid' => $blockId]);
+    }
+    foreach ($blocks as $child) {
+        $found = find_block_by_id($child, $blockId);
+        if ($found) return $found;
+    }
+    return null;
+}
+```
+
+</block>
 
 The HTML page that loads in the editor iframe just needs to pull in the bridge and call `initBridge` with the endpoint:
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-26-html-476b8c","label":"Html","language":"html","code":"<!-- index.php (or a static index.html) -->\n<!DOCTYPE html>\n<html>\n<head><title>My PHP frontend</title></head>\n<body>\n  <div id=\"content\"></div>\n  <script type=\"module\">\n    import { initBridge } from &#39;/static/hydra.js&#39;;\n    initBridge({\n      page: { schema: { properties: { blocks_layout: { allowedBlocks: [...] } } } },\n      blocks: { /* ... */ },\n      renderEndpoint: &#39;/api/render.php&#39;,\n    });\n  </script>\n</body>\n</html>"}]}' />
+<block type="codeExample">
+
+### Html
+
+```html
+<!-- index.php (or a static index.html) -->
+<!DOCTYPE html>
+<html>
+<head><title>My PHP frontend</title></head>
+<body>
+  <div id="content"></div>
+  <script type="module">
+    import { initBridge } from '/static/hydra.js';
+    initBridge({
+      page: { schema: { properties: { blocks_layout: { allowedBlocks: [...] } } } },
+      blocks: { /* ... */ },
+      renderEndpoint: '/api/render.php',
+    });
+  </script>
+</body>
+</html>
+```
+
+</block>
 
 ## Adapting for Django / Rails / Laravel / Symfony / Go
 

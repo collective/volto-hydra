@@ -26,10 +26,14 @@ assignments:
   - { uid: ri-live-heading, type: slate }
   - { uid: ri-live-1, type: relatedItemsListing }
   - { uid: ref-relatedItemsListing-schema, type: codeExample }
+  - { id: ref-relatedItemsListing-schema-javascript-a1a504 }
   - { uid: ref-relatedItemsListing-json-data, type: codeExample }
+  - { id: ref-relatedItemsListing-json-data-json-ba9577 }
   - { uid: ref-relatedItemsListing-rendering-intro, type: slate }
   - { uid: ref-relatedItemsListing-fetcher, type: codeExample }
+  - { id: ref-relatedItemsListing-fetcher-javascript-1c975d }
   - { uid: ref-relatedItemsListing-rendering, type: codeExample }
+  - { id: ref-relatedItemsListing-rendering-javascript-2b9d44 }
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
@@ -48,12 +52,103 @@ Renders the current page's related items relation field (default relatedItems). 
 
 <block type="relatedItemsListing" relationField="relatedItems" variation="summary" />
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="schema" data='{"tabs":[{"@id":"ref-relatedItemsListing-schema-javascript-a1a504","label":"Schema","language":"javascript","code":"{\n  \"relatedItemsListing\": {\n    \"id\": \"relatedItemsListing\",\n    \"title\": \"Related Items\",\n    \"blockSchema\": {\n      \"fieldsets\": [\n        {\n          \"id\": \"default\",\n          \"title\": \"Default\",\n          \"fields\": [\n            \"relationField\",\n            \"variation\",\n            \"fieldMapping\"\n          ]\n        }\n      ],\n      \"properties\": {\n        \"relationField\": {\n          \"title\": \"Relation field\",\n          \"widget\": \"schemaFieldSelect\",\n          \"fieldType\": \"relation\"\n        },\n        \"variation\": {\n          \"title\": \"Item Type\",\n          \"widget\": \"blockTypeSelect\",\n          \"filterConvertibleFrom\": \"@default\",\n          \"default\": \"summary\"\n        }\n      }\n    },\n    \"schemaEnhancer\": {\n      \"inheritSchemaFrom\": {\n        \"typeField\": \"variation\",\n        \"mappingField\": \"fieldMapping\",\n        \"defaultsField\": \"itemDefaults\"\n      }\n    }\n  }\n}"}]}' />
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="schema">
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="json-data" data='{"tabs":[{"@id":"ref-relatedItemsListing-json-data-json-ba9577","label":"JSON Block Data","language":"json","code":"{\n  \"@type\": \"relatedItemsListing\",\n  \"variation\": \"summary\",\n  \"relationField\": \"relatedItems\"\n}"}]}' />
+### Schema
+
+```javascript
+{
+  "relatedItemsListing": {
+    "id": "relatedItemsListing",
+    "title": "Related Items",
+    "blockSchema": {
+      "fieldsets": [
+        {
+          "id": "default",
+          "title": "Default",
+          "fields": [
+            "relationField",
+            "variation",
+            "fieldMapping"
+          ]
+        }
+      ],
+      "properties": {
+        "relationField": {
+          "title": "Relation field",
+          "widget": "schemaFieldSelect",
+          "fieldType": "relation"
+        },
+        "variation": {
+          "title": "Item Type",
+          "widget": "blockTypeSelect",
+          "filterConvertibleFrom": "@default",
+          "default": "summary"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "inheritSchemaFrom": {
+        "typeField": "variation",
+        "mappingField": "fieldMapping",
+        "defaultsField": "itemDefaults"
+      }
+    }
+  }
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="json-data">
+
+### JSON Block Data
+
+```json
+{
+  "@type": "relatedItemsListing",
+  "variation": "summary",
+  "relationField": "relatedItems"
+}
+```
+
+</block>
 
 <block type="slate" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="rendering" data='{"value":[{"type":"p","children":[{"text":"This block has no bespoke renderer. Add its fetcher to your fetchItems map (keyed by @type) and expandListingBlocks expands it in any region you render — the same seam that powers "},{"type":"link","data":{"url":"/docs/listings"},"children":[{"text":"listings"}]},{"text":" and other collection blocks. See "},{"type":"link","data":{"url":"/docs/custom-blocks"},"children":[{"text":"Custom Blocks"}]},{"text":" to define the block type. Only the fetcher below is block-specific."}]}]}' />
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="rendering" data='{"tabs":[{"@id":"ref-relatedItemsListing-fetcher-javascript-1c975d","label":"Fetcher","language":"javascript","code":"export function relatedItemsFetcher({ apiUrl, contextPath }) {\n  return async function fetchItems(block, { start, size }) {\n    const field = block.relationField || &#39;relatedItems&#39;;\n    const content = await (await fetch(`${apiUrl}${contextPath}/++api++`, { headers: authHeaders() })).json();\n    const all = Array.isArray(content[field]) ? content[field] : [];\n    return { items: all.slice(start, start + size), total: all.length };\n  };\n}"}]}' />
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="rendering">
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="rendering" data='{"tabs":[{"@id":"ref-relatedItemsListing-rendering-javascript-2b9d44","label":"Render","language":"javascript","code":"// One fetchItems map, keyed by @type, holds every fetch-based block you use.\nconst fetchItems = {\n  listing: ploneFetchItems({ apiUrl, contextPath }),\n  relatedItemsListing: relatedItemsFetcher({ apiUrl, contextPath }), // ← this block\n};\n\n// Call this on each region you render (the list of block ids in that region).\nconst { items } = await expandListingBlocks(regionBlockIds, {\n  blocks, fetchItems, itemTypeField: &#39;variation&#39;,\n});\nitems.forEach((item) => renderBlock(item)); // your normal per-block renderer"}]}' />
+### Fetcher
+
+```javascript
+export function relatedItemsFetcher({ apiUrl, contextPath }) {
+  return async function fetchItems(block, { start, size }) {
+    const field = block.relationField || 'relatedItems';
+    const content = await (await fetch(`${apiUrl}${contextPath}/++api++`, { headers: authHeaders() })).json();
+    const all = Array.isArray(content[field]) ? content[field] : [];
+    return { items: all.slice(start, start + size), total: all.length };
+  };
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="rendering">
+
+### Render
+
+```javascript
+// One fetchItems map, keyed by @type, holds every fetch-based block you use.
+const fetchItems = {
+  listing: ploneFetchItems({ apiUrl, contextPath }),
+  relatedItemsListing: relatedItemsFetcher({ apiUrl, contextPath }), // ← this block
+};
+
+// Call this on each region you render (the list of block ids in that region).
+const { items } = await expandListingBlocks(regionBlockIds, {
+  blocks, fetchItems, itemTypeField: 'variation',
+});
+items.forEach((item) => renderBlock(item)); // your normal per-block renderer
+```
+
+</block>

@@ -40,8 +40,13 @@ assignments:
   - { uid: 26accd80-9715-43ea-9b7c-aa0b3be7d0da, type: slate }
   - { uid: 177de529-ce72-4721-a58c-15feadaf285e, type: slate }
   - { uid: ref-introduction-schema, type: codeExample }
+  - { id: ref-introduction-schema-javascript-e14a03 }
   - { uid: ref-introduction-json-data, type: codeExample }
+  - { id: ref-introduction-json-data-json-d959f7 }
   - { uid: ref-introduction-rendering, type: codeExample }
+  - { id: ref-introduction-rendering-jsx-599242 }
+  - { id: ref-introduction-rendering-vue-53106b }
+  - { id: ref-introduction-rendering-svelte-9e2b59 }
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
@@ -73,8 +78,99 @@ Lorem ipsum vitae elit libero, a pharetra augue. Nulla vitae elit libero, a phar
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction" slotId="schema" data='{"tabs":[{"@id":"ref-introduction-schema-javascript-e14a03","label":"Schema","language":"javascript","code":"{\n  \"introduction\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"value\": {\n          \"title\": \"Text\",\n          \"widget\": \"slate\"\n        }\n      }\n    }\n  }\n}"}]}' />
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction" slotId="schema">
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction" slotId="json-data" data='{"tabs":[{"@id":"ref-introduction-json-data-json-d959f7","label":"JSON Block Data","language":"json","code":"{\n  \"@type\": \"introduction\",\n  \"value\": [\n    {\n      \"type\": \"p\",\n      \"children\": [\n        {\n          \"text\": \"A short introductory paragraph that sets the context for the page.\"\n        }\n      ]\n    }\n  ]\n}"}]}' />
+### Schema
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction" slotId="rendering" data='{"tabs":[{"@id":"ref-introduction-rendering-jsx-599242","label":"React","language":"jsx","code":"function IntroductionBlock({ block }) {\n  return (\n    <div data-block-uid={block[&#39;@uid&#39;]} className=\"introduction-block\">\n      <div className=\"introduction-body\" data-edit-text=\"value\">\n        {(block.value || []).map((node, i) => (\n          <SlateNode key={i} node={node} />\n        ))}\n      </div>\n    </div>\n  );\n}"},{"@id":"ref-introduction-rendering-vue-53106b","label":"Vue","language":"vue","code":"<template>\n  <div :data-block-uid=\"block[&#39;@uid&#39;]\" class=\"introduction-block\">\n    <div class=\"introduction-body\" data-edit-text=\"value\">\n      <SlateNode v-for=\"(node, i) in block.value || []\" :key=\"i\" :node=\"node\" />\n    </div>\n  </div>\n</template>\n\n<script setup>\nimport SlateNode from &#39;./SlateNode.vue&#39;;\ndefineProps({ block: Object });\n</script>"},{"@id":"ref-introduction-rendering-svelte-9e2b59","label":"Svelte","language":"svelte","code":"<script>\n  import SlateNode from &#39;./SlateNode.svelte&#39;;\n  export let block;\n</script>\n\n<div data-block-uid={block[&#39;@uid&#39;]} class=\"introduction-block\">\n  <div class=\"introduction-body\" data-edit-text=\"value\">\n    {#each block.value || [] as node, i (i)}\n      <SlateNode {node} />\n    {/each}\n  </div>\n</div>"}]}' />
+```javascript
+{
+  "introduction": {
+    "blockSchema": {
+      "properties": {
+        "value": {
+          "title": "Text",
+          "widget": "slate"
+        }
+      }
+    }
+  }
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction" slotId="json-data">
+
+### JSON Block Data
+
+```json
+{
+  "@type": "introduction",
+  "value": [
+    {
+      "type": "p",
+      "children": [
+        {
+          "text": "A short introductory paragraph that sets the context for the page."
+        }
+      ]
+    }
+  ]
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction" slotId="rendering">
+
+### React
+
+```jsx
+function IntroductionBlock({ block }) {
+  return (
+    <div data-block-uid={block['@uid']} className="introduction-block">
+      <div className="introduction-body" data-edit-text="value">
+        {(block.value || []).map((node, i) => (
+          <SlateNode key={i} node={node} />
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+### Vue
+
+```vue
+<template>
+  <div :data-block-uid="block['@uid']" class="introduction-block">
+    <div class="introduction-body" data-edit-text="value">
+      <SlateNode v-for="(node, i) in block.value || []" :key="i" :node="node" />
+    </div>
+  </div>
+</template>
+
+<script setup>
+import SlateNode from './SlateNode.vue';
+defineProps({ block: Object });
+</script>
+```
+
+### Svelte
+
+```svelte
+<script>
+  import SlateNode from './SlateNode.svelte';
+  export let block;
+</script>
+
+<div data-block-uid={block['@uid']} class="introduction-block">
+  <div class="introduction-body" data-edit-text="value">
+    {#each block.value || [] as node, i (i)}
+      <SlateNode {node} />
+    {/each}
+  </div>
+</div>
+```
+
+</block>

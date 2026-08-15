@@ -33,6 +33,7 @@ assignments:
   - { uid: ul-7, type: slate }
   - { uid: p-8, type: slate }
   - { uid: ce-9, type: codeExample }
+  - { id: ce-9-json-da054f }
   - { uid: h-10, type: slate }
   - { uid: p-11, type: slate }
   - { uid: p-12, type: slate }
@@ -56,10 +57,12 @@ assignments:
   - { uid: p-30, type: slate }
   - { uid: p-31, type: slate }
   - { uid: ce-32, type: codeExample }
+  - { id: ce-32-javascript-403dc6 }
   - { uid: p-33, type: slate }
   - { uid: h-34, type: slate }
   - { uid: p-35, type: slate }
   - { uid: ce-36, type: codeExample }
+  - { id: ce-36-javascript-336b9b }
   - { uid: ul-37, type: slate }
   - { uid: h-38, type: slate }
   - { uid: p-39, type: slate }
@@ -69,6 +72,7 @@ assignments:
   - { uid: h-43, type: slate }
   - { uid: p-44, type: slate }
   - { uid: ce-45, type: codeExample }
+  - { id: ce-45-javascript-f2cdf9 }
   - { uid: p-46, type: slate }
   - { uid: ul-47, type: slate }
   - { uid: h-48, type: slate }
@@ -77,13 +81,16 @@ assignments:
   - { uid: p-51, type: slate }
   - { uid: ul-52, type: slate }
   - { uid: ce-53, type: codeExample }
+  - { id: ce-53-bash-8d3958 }
   - { uid: h-54, type: slate }
   - { uid: p-55, type: slate }
   - { uid: p-56, type: slate }
   - { uid: ce-57, type: codeExample }
+  - { id: ce-57-javascript-4b24e8 }
   - { uid: h-58, type: slate }
   - { uid: p-59, type: slate }
   - { uid: ce-60, type: codeExample }
+  - { id: ce-60-javascript-0dbe99 }
   - { uid: p-61, type: slate }
 prototypes: |
   <block type="title" _="${h1}" />
@@ -120,7 +127,23 @@ Templates are analogous to blocks themselves but are made up of blocks with spec
 
 The slot a block lives in is identified by its `slotId`. This is the field name used by `expandTemplates` / `expandTemplatesSync` and by the merge rules below — not `placeholder`.
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-9-json-da054f","label":"Json","language":"json","code":"{\n  \"blocks\": {\n    \"header\": { \"@type\": \"slate\", \"fixed\": true,\n               \"readOnly\": true, \"slotId\": \"header\" },\n    \"content\": { \"@type\": \"slate\", \"slotId\": \"default\" },\n    \"footer\": { \"@type\": \"slate\", \"fixed\": true,\n               \"readOnly\": true, \"slotId\": \"footer\" }\n  }\n}"}]}' />
+<block type="codeExample">
+
+### Json
+
+```json
+{
+  "blocks": {
+    "header": { "@type": "slate", "fixed": true,
+               "readOnly": true, "slotId": "header" },
+    "content": { "@type": "slate", "slotId": "default" },
+    "footer": { "@type": "slate", "fixed": true,
+               "readOnly": true, "slotId": "footer" }
+  }
+}
+```
+
+</block>
 
 ## Editing a template (central control)
 
@@ -174,7 +197,21 @@ Everything else is identical: every object\_list item still needs a `slotId` (pl
 
 The merge identifies object\_list items by their **id field**, and it varies per field — a form's `subblocks` key on `field_id`, a slider's `slides` on `@id`, a table's `rows` on `key`. A frontend has no schema, so whenever you expand a template or layout that contains an object\_list container you MUST tell the merge each field's id field via an **`idFieldMap`** (`{ blockType: { field: idField } }`). Without it the merge falls back to `@id` — and for a `field_id`-keyed field that mints a broken id and the item is dropped on the next merge.
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-32-javascript-403dc6","label":"Javascript","language":"javascript","code":"const items = expandTemplatesSync(layout, {\n    blocks, templateState, templates,\n    idFieldMap: {\n        form: { subblocks: &#39;field_id&#39; }, // a form&#39;s fields key on field_id, not @id\n        slider: { slides: &#39;@id&#39; },\n    },\n});"}]}' />
+<block type="codeExample">
+
+### Javascript
+
+```javascript
+const items = expandTemplatesSync(layout, {
+    blocks, templateState, templates,
+    idFieldMap: {
+        form: { subblocks: 'field_id' }, // a form's fields key on field_id, not @id
+        slider: { slides: '@id' },
+    },
+});
+```
+
+</block>
 
 (On the admin this map is derived from the block schema automatically. When you re-enter to expand a **single** object\_list array on its own, the `idField` shorthand is enough: `expandTemplatesSync(block.slides, { templateState, templates, idField: '@id' })`.)
 
@@ -182,7 +219,26 @@ The merge identifies object\_list items by their **id field**, and it varies per
 
 Configure templates in `page.schema.properties` on the blocks field:
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-36-javascript-336b9b","label":"Javascript","language":"javascript","code":"initBridge({\n    page: {\n        schema: {\n            properties: {\n                blocks_layout: {\n                    allowedTemplates: [&#39;/templates/form-snippet&#39;],\n                    allowedLayouts: [&#39;/templates/article-layout&#39;],\n                },\n            },\n        },\n    },\n});"}]}' />
+<block type="codeExample">
+
+### Javascript
+
+```javascript
+initBridge({
+    page: {
+        schema: {
+            properties: {
+                blocks_layout: {
+                    allowedTemplates: ['/templates/form-snippet'],
+                    allowedLayouts: ['/templates/article-layout'],
+                },
+            },
+        },
+    },
+});
+```
+
+</block>
 
 - **`allowedTemplates`** — Templates shown in the BlockChooser's "Templates" group, inserted as blocks.
 - **`allowedLayouts`** — Templates shown in the Layout dropdown. They replace/merge the entire container content. A value of `null` allows for a no-template option. If none of those templates are already set as the layout then during editing, the first is applied automatically.
@@ -203,7 +259,42 @@ Use `expandTemplates` (async) or `expandTemplatesSync` (sync with pre-fetched te
 
 **`loadTemplates(data, loadTemplate)`** scans page data for `templateId` references and loads them all in parallel. It follows nested references (templates referencing other templates) and has a 5s per-template timeout. It only loads templates actually in the page data — `allowedLayouts` options are loaded on demand when a forced layout is applied.
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-45-javascript-f2cdf9","label":"Javascript","language":"javascript","code":"import { loadTemplates, expandTemplatesSync, expandTemplates }\n    from &#39;@hydra-js/hydra.js&#39;;\n\nconst loadTemplate = async (id) =>\n    fetch(`${apiBase}${id}`).then(r => r.json());\n\n// Create the shared state ONCE per page render. Every expand call (top-level AND\n// every nested container / object_list re-entry) must reuse this SAME object.\n// Never reset or recreate it mid-render.\nconst templateState = {};\n\n// Sync approach: pre-fetch templates, use in computed properties\nconst templates = await loadTemplates(pageData, loadTemplate);\nconst items = expandTemplatesSync(layout, {\n    blocks, templateState, templates,\n});\n\n// Async approach: load templates on demand — reuse the SAME templateState\nconst items = await expandTemplates(layout, {\n    blocks,\n    templateState,\n    loadTemplate: async (id) => fetch(id).then(r => r.json()),\n});\n\n// Render items - each has @uid for the block ID\nfor (const item of items) {\n    renderBlock(item[&#39;@uid&#39;], item);\n}"}]}' />
+<block type="codeExample">
+
+### Javascript
+
+```javascript
+import { loadTemplates, expandTemplatesSync, expandTemplates }
+    from '@hydra-js/hydra.js';
+
+const loadTemplate = async (id) =>
+    fetch(`${apiBase}${id}`).then(r => r.json());
+
+// Create the shared state ONCE per page render. Every expand call (top-level AND
+// every nested container / object_list re-entry) must reuse this SAME object.
+// Never reset or recreate it mid-render.
+const templateState = {};
+
+// Sync approach: pre-fetch templates, use in computed properties
+const templates = await loadTemplates(pageData, loadTemplate);
+const items = expandTemplatesSync(layout, {
+    blocks, templateState, templates,
+});
+
+// Async approach: load templates on demand — reuse the SAME templateState
+const items = await expandTemplates(layout, {
+    blocks,
+    templateState,
+    loadTemplate: async (id) => fetch(id).then(r => r.json()),
+});
+
+// Render items - each has @uid for the block ID
+for (const item of items) {
+    renderBlock(item['@uid'], item);
+}
+```
+
+</block>
 
 Options:
 
@@ -229,7 +320,17 @@ When a layout is applied, the rules are the same but applied across a whole bloc
 - In the top slot outside the first fixed template block
 - Otherwise it is dropped
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-53-bash-8d3958","label":"Diagram","language":"bash","code":"Before:  [User Block A] [User Block B]\nLayout:  [Fixed Header] [default] [Fixed Footer] [post_footer]\nAfter:   [Fixed Header] [User Block A] [User Block B] [Fixed Footer]"}]}' />
+<block type="codeExample">
+
+### Diagram
+
+```bash
+Before:  [User Block A] [User Block B]
+Layout:  [Fixed Header] [default] [Fixed Footer] [post_footer]
+After:   [Fixed Header] [User Block A] [User Block B] [Fixed Footer]
+```
+
+</block>
 
 ## Forcing Layouts
 
@@ -237,12 +338,49 @@ A **forced layout** (`allowedLayouts`) is applied **automatically across a whole
 
 Pass a static layout to always force one (e.g. a footer):
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-57-javascript-4b24e8","label":"Javascript","language":"javascript","code":"// Sync (with pre-fetched templates)\nconst items = expandTemplatesSync(layout, {\n    blocks, templateState, templates,\n    allowedLayouts: [&#39;/templates/footer-layout&#39;],\n});\n\n// Async — reuse the SAME shared templateState, never a fresh {}\nconst items = await expandTemplates(layout, {\n    blocks, templateState, loadTemplate,\n    allowedLayouts: [&#39;/templates/footer-layout&#39;],\n});"}]}' />
+<block type="codeExample">
+
+### Javascript
+
+```javascript
+// Sync (with pre-fetched templates)
+const items = expandTemplatesSync(layout, {
+    blocks, templateState, templates,
+    allowedLayouts: ['/templates/footer-layout'],
+});
+
+// Async — reuse the SAME shared templateState, never a fresh {}
+const items = await expandTemplates(layout, {
+    blocks, templateState, loadTemplate,
+    allowedLayouts: ['/templates/footer-layout'],
+});
+```
+
+</block>
 
 ### Choosing the layout with your own rules
 
 `allowedLayouts` is just a value you compute, so apply whatever rule you like — content type, metadata, route, A/B bucket — then pass the result. Pass `undefined` (or omit it) to force nothing; pass **several** to let the editor pick from the Layout dropdown (include `null` for a "no layout" option).
 
-<block type="codeExample" data='{"tabs":[{"@id":"ce-60-javascript-0dbe99","label":"Javascript","language":"javascript","code":"// Decide the forced layout from your own rules; force nothing when none match.\nconst forced =\n    pageData[&#39;@type&#39;] === &#39;News Item&#39; ? &#39;/templates/news-layout&#39; :\n    pageData.section === &#39;marketing&#39; ? &#39;/templates/campaign-layout&#39; :\n    null;\n\n// Async loads the chosen layout on demand (the sync path needs it pre-loaded — see\n// \"Pre-loading with loadTemplates\" above).\nconst items = await expandTemplates(layout, {\n    blocks, templateState, loadTemplate,\n    allowedLayouts: forced ? [forced] : undefined,\n});"}]}' />
+<block type="codeExample">
+
+### Javascript
+
+```javascript
+// Decide the forced layout from your own rules; force nothing when none match.
+const forced =
+    pageData['@type'] === 'News Item' ? '/templates/news-layout' :
+    pageData.section === 'marketing' ? '/templates/campaign-layout' :
+    null;
+
+// Async loads the chosen layout on demand (the sync path needs it pre-loaded — see
+// "Pre-loading with loadTemplates" above).
+const items = await expandTemplates(layout, {
+    blocks, templateState, loadTemplate,
+    allowedLayouts: forced ? [forced] : undefined,
+});
+```
+
+</block>
 
 Note: during editing the admin side will load the templates so in order to apply the same rules of forcing a layout you will need to set `allowedLayouts` in `page.schema.properties` to ensure the page loads with the right template.

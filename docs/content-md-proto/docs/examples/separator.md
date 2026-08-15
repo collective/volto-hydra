@@ -47,8 +47,13 @@ assignments:
   - { uid: c209c305-cde3-497d-9a58-3dc642f3cb5d, type: slate }
   - { uid: c0f46bdd-58ae-48a1-9ee7-a9ba780d7386, type: slate }
   - { uid: ref-separator-schema, type: codeExample }
+  - { id: ref-separator-schema-javascript-3157d9 }
   - { uid: ref-separator-json-data, type: codeExample }
+  - { id: ref-separator-json-data-json-9d890c }
   - { uid: ref-separator-rendering, type: codeExample }
+  - { id: ref-separator-rendering-jsx-470901 }
+  - { id: ref-separator-rendering-vue-4281a1 }
+  - { id: ref-separator-rendering-svelte-8c1d19 }
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
@@ -106,8 +111,81 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem iusto odio dignissim qui blandit praesent luptatum zzril delenit auguevel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore blandit praesent luptatum zzril qu. Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.&#x20;
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="schema" data='{"tabs":[{"@id":"ref-separator-schema-javascript-3157d9","label":"Schema","language":"javascript","code":"{\n  \"separator\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"styles\": {\n          \"title\": \"Styles\"\n        }\n      }\n    }\n  }\n}"}]}' />
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="schema">
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="json-data" data='{"tabs":[{"@id":"ref-separator-json-data-json-9d890c","label":"JSON Block Data","language":"json","code":"{\n  \"@type\": \"separator\",\n  \"styles\": {\n    \"align\": \"center\"\n  }\n}"}]}' />
+### Schema
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="rendering" data='{"tabs":[{"@id":"ref-separator-rendering-jsx-470901","label":"React","language":"jsx","code":"function SeparatorBlock({ block }) {\n  const align = block.styles?.align || &#39;full&#39;;\n\n  return (\n    <div data-block-uid={block[&#39;@uid&#39;]} className={`separator-block separator-${align}`}>\n      <hr />\n    </div>\n  );\n}"},{"@id":"ref-separator-rendering-vue-4281a1","label":"Vue","language":"vue","code":"<template>\n  <div :data-block-uid=\"block[&#39;@uid&#39;]\" :class=\"&#39;separator-block separator-&#39; + (block.styles?.align || &#39;full&#39;)\">\n    <hr />\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>"},{"@id":"ref-separator-rendering-svelte-8c1d19","label":"Svelte","language":"svelte","code":"<script>\n  export let block;\n</script>\n\n<div data-block-uid={block[&#39;@uid&#39;]} class=\"separator-block separator-{block.styles?.align || &#39;full&#39;}\">\n  <hr />\n</div>"}]}' />
+```javascript
+{
+  "separator": {
+    "blockSchema": {
+      "properties": {
+        "styles": {
+          "title": "Styles"
+        }
+      }
+    }
+  }
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="json-data">
+
+### JSON Block Data
+
+```json
+{
+  "@type": "separator",
+  "styles": {
+    "align": "center"
+  }
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="rendering">
+
+### React
+
+```jsx
+function SeparatorBlock({ block }) {
+  const align = block.styles?.align || 'full';
+
+  return (
+    <div data-block-uid={block['@uid']} className={`separator-block separator-${align}`}>
+      <hr />
+    </div>
+  );
+}
+```
+
+### Vue
+
+```vue
+<template>
+  <div :data-block-uid="block['@uid']" :class="'separator-block separator-' + (block.styles?.align || 'full')">
+    <hr />
+  </div>
+</template>
+
+<script setup>
+defineProps({ block: Object });
+</script>
+```
+
+### Svelte
+
+```svelte
+<script>
+  export let block;
+</script>
+
+<div data-block-uid={block['@uid']} class="separator-block separator-{block.styles?.align || 'full'}">
+  <hr />
+</div>
+```
+
+</block>

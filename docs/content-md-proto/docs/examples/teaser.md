@@ -38,8 +38,13 @@ assignments:
   - { uid: b798dde4-6a5d-4cef-9e25-fd532e1ea9a7, type: teaser }
   - { uid: 620f0540-8c3d-422d-a1c6-47037b5dbfbc, type: teaser }
   - { uid: ref-teaser-schema, type: codeExample }
+  - { id: ref-teaser-schema-javascript-bfff08 }
   - { uid: ref-teaser-json-data, type: codeExample }
+  - { id: ref-teaser-json-data-json-7f117c }
   - { uid: ref-teaser-rendering, type: codeExample }
+  - { id: ref-teaser-rendering-jsx-d1dd76 }
+  - { id: ref-teaser-rendering-vue-fc123a }
+  - { id: ref-teaser-rendering-svelte-bf19cf }
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
@@ -70,8 +75,180 @@ A content preview card that links to another page. Selecting a target page via t
 
 <block type="teaser" title="Headline H2" data='{"description":"Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea.","href":[{"@id":"/docs/examples/content-types/page","@type":"Document","Description":"The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.","Title":"Page","getRemoteUrl":null,"hasPreviewImage":true,"head_title":null,"image_field":"preview_image","title":"Page"}],"styles":{"align":"right","backgroundColor":"grey"}}' />
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="schema" data='{"tabs":[{"@id":"ref-teaser-schema-javascript-bfff08","label":"Schema","language":"javascript","code":"{\n  \"teaser\": {\n    \"fieldMappings\": {\n      \"@default\": {\n        \"@id\": \"href\",\n        \"title\": \"title\",\n        \"description\": \"description\",\n        \"image\": \"preview_image\"\n      }\n    },\n    \"blockSchema\": {\n      \"properties\": {\n        \"href\": {\n          \"title\": \"Target\",\n          \"widget\": \"object_browser\",\n          \"mode\": \"link\"\n        },\n        \"title\": {\n          \"title\": \"Title\"\n        },\n        \"description\": {\n          \"title\": \"Description\",\n          \"widget\": \"textarea\"\n        },\n        \"preview_image\": {\n          \"title\": \"Preview Image\",\n          \"widget\": \"image\"\n        },\n        \"overwrite\": {\n          \"title\": \"Overwrite target content\",\n          \"type\": \"boolean\"\n        }\n      }\n    }\n  }\n}"}]}' />
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="schema">
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="json-data" data='{"tabs":[{"@id":"ref-teaser-json-data-json-7f117c","label":"JSON Block Data","language":"json","code":"{\n  \"@type\": \"teaser\",\n  \"href\": [\n    {\n      \"@id\": \"/news/my-article\",\n      \"title\": \"My Article\",\n      \"description\": \"A short summary of the article\",\n      \"hasPreviewImage\": true\n    }\n  ],\n  \"title\": \"Custom Title\",\n  \"description\": \"Custom description overriding the target\",\n  \"preview_image\": \"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27400%27 height=%27300%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%2399bbdd%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2718%27%3ETeaser%3C/text%3E%3C/svg%3E\",\n  \"overwrite\": true\n}"}]}' />
+### Schema
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="rendering" data='{"tabs":[{"@id":"ref-teaser-rendering-jsx-d1dd76","label":"React","language":"jsx","code":"import { getImageUrl } from &#39;./utils.js&#39;;\n\nfunction TeaserBlock({ block }) {\n  const hrefObj = block.href?.[0] || null;\n  const useBlockData = block.overwrite || !hrefObj?.title;\n\n  const title = useBlockData ? block.title : hrefObj?.title || &#39;&#39;;\n  const description = useBlockData ? block.description : hrefObj?.description || &#39;&#39;;\n  // Strip API origin from brain @id so the link resolves same-origin.\n  const href = contentPath(hrefObj?.[&#39;@id&#39;] || &#39;&#39;);\n  const imageSrc = block.preview_image\n    ? getImageUrl(block.preview_image)\n    : (hrefObj?.hasPreviewImage ? getImageUrl({ &#39;@id&#39;: `${href}/@@images/preview_image` }) : &#39;&#39;);\n\n  if (!href) {\n    return (\n      <div data-block-uid={block[&#39;@uid&#39;]} className=\"teaser-placeholder\">\n        <p>Select a target page for this teaser</p>\n      </div>\n    );\n  }\n\n  return (\n    <div data-block-uid={block[&#39;@uid&#39;]} className=\"teaser-block\">\n      {imageSrc &amp;&amp; <img data-edit-media=\"preview_image\" src={imageSrc} alt=\"\" />}\n      <h3 data-edit-text=\"title\">{title}</h3>\n      <p data-edit-text=\"description\">{description}</p>\n      <a href={href} data-edit-link=\"href\">Read more</a>\n    </div>\n  );\n}"},{"@id":"ref-teaser-rendering-vue-fc123a","label":"Vue","language":"vue","code":"<template>\n  <div :data-block-uid=\"block[&#39;@uid&#39;]\" class=\"teaser-block\">\n    <div v-if=\"!href\" class=\"teaser-placeholder\">\n      <p>Select a target page for this teaser</p>\n    </div>\n    <template v-else>\n      <img v-if=\"imageSrc\" data-edit-media=\"preview_image\" :src=\"imageSrc\" alt=\"\" />\n      <h3 data-edit-text=\"title\">{{ title }}</h3>\n      <p data-edit-text=\"description\">{{ description }}</p>\n      <a :href=\"href\" data-edit-link=\"href\">Read more</a>\n    </template>\n  </div>\n</template>\n\n<script setup>\nimport { computed } from &#39;vue&#39;;\nimport { getImageUrl } from &#39;./utils.js&#39;;\nconst props = defineProps({ block: Object });\n\nconst hrefObj = computed(() => props.block.href?.[0] || null);\nconst useBlockData = computed(() => props.block.overwrite || !hrefObj.value?.title);\nconst title = computed(() => useBlockData.value ? props.block.title : hrefObj.value?.title || &#39;&#39;);\nconst description = computed(() => useBlockData.value ? props.block.description : hrefObj.value?.description || &#39;&#39;);\nconst href = computed(() => contentPath(hrefObj.value?.[&#39;@id&#39;] || &#39;&#39;));\nconst imageSrc = computed(() => {\n  if (props.block.preview_image) {\n    return getImageUrl(props.block.preview_image);\n  }\n  return hrefObj.value?.hasPreviewImage ? getImageUrl(`${href.value}/@@images/preview_image`) : &#39;&#39;;\n});\n</script>"},{"@id":"ref-teaser-rendering-svelte-bf19cf","label":"Svelte","language":"svelte","code":"<script>\n  import { getImageUrl } from &#39;./utils.js&#39;;\n  export let block;\n\n  $: hrefObj = block.href?.[0] || null;\n  $: useBlockData = block.overwrite || !hrefObj?.title;\n  $: title = useBlockData ? block.title : hrefObj?.title || &#39;&#39;;\n  $: description = useBlockData ? block.description : hrefObj?.description || &#39;&#39;;\n  $: href = contentPath(hrefObj?.[&#39;@id&#39;] || &#39;&#39;);\n  $: imageSrc = block.preview_image\n    ? getImageUrl(block.preview_image)\n    : (hrefObj?.hasPreviewImage ? getImageUrl(`${href}/@@images/preview_image`) : &#39;&#39;);\n</script>\n\n{#if !href}\n  <div data-block-uid={block[&#39;@uid&#39;]} class=\"teaser-placeholder\">\n    <p>Select a target page for this teaser</p>\n  </div>\n{:else}\n  <div data-block-uid={block[&#39;@uid&#39;]} class=\"teaser-block\">\n    {#if imageSrc}\n      <img data-edit-media=\"preview_image\" src={imageSrc} alt=\"\" />\n    {/if}\n    <h3 data-edit-text=\"title\">{title}</h3>\n    <p data-edit-text=\"description\">{description}</p>\n    <a {href} data-edit-link=\"href\">Read more</a>\n  </div>\n{/if}"}]}' />
+```javascript
+{
+  "teaser": {
+    "fieldMappings": {
+      "@default": {
+        "@id": "href",
+        "title": "title",
+        "description": "description",
+        "image": "preview_image"
+      }
+    },
+    "blockSchema": {
+      "properties": {
+        "href": {
+          "title": "Target",
+          "widget": "object_browser",
+          "mode": "link"
+        },
+        "title": {
+          "title": "Title"
+        },
+        "description": {
+          "title": "Description",
+          "widget": "textarea"
+        },
+        "preview_image": {
+          "title": "Preview Image",
+          "widget": "image"
+        },
+        "overwrite": {
+          "title": "Overwrite target content",
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="json-data">
+
+### JSON Block Data
+
+```json
+{
+  "@type": "teaser",
+  "href": [
+    {
+      "@id": "/news/my-article",
+      "title": "My Article",
+      "description": "A short summary of the article",
+      "hasPreviewImage": true
+    }
+  ],
+  "title": "Custom Title",
+  "description": "Custom description overriding the target",
+  "preview_image": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27400%27 height=%27300%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%2399bbdd%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2718%27%3ETeaser%3C/text%3E%3C/svg%3E",
+  "overwrite": true
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="rendering">
+
+### React
+
+```jsx
+import { getImageUrl } from './utils.js';
+
+function TeaserBlock({ block }) {
+  const hrefObj = block.href?.[0] || null;
+  const useBlockData = block.overwrite || !hrefObj?.title;
+
+  const title = useBlockData ? block.title : hrefObj?.title || '';
+  const description = useBlockData ? block.description : hrefObj?.description || '';
+  // Strip API origin from brain @id so the link resolves same-origin.
+  const href = contentPath(hrefObj?.['@id'] || '');
+  const imageSrc = block.preview_image
+    ? getImageUrl(block.preview_image)
+    : (hrefObj?.hasPreviewImage ? getImageUrl({ '@id': `${href}/@@images/preview_image` }) : '');
+
+  if (!href) {
+    return (
+      <div data-block-uid={block['@uid']} className="teaser-placeholder">
+        <p>Select a target page for this teaser</p>
+      </div>
+    );
+  }
+
+  return (
+    <div data-block-uid={block['@uid']} className="teaser-block">
+      {imageSrc && <img data-edit-media="preview_image" src={imageSrc} alt="" />}
+      <h3 data-edit-text="title">{title}</h3>
+      <p data-edit-text="description">{description}</p>
+      <a href={href} data-edit-link="href">Read more</a>
+    </div>
+  );
+}
+```
+
+### Vue
+
+```vue
+<template>
+  <div :data-block-uid="block['@uid']" class="teaser-block">
+    <div v-if="!href" class="teaser-placeholder">
+      <p>Select a target page for this teaser</p>
+    </div>
+    <template v-else>
+      <img v-if="imageSrc" data-edit-media="preview_image" :src="imageSrc" alt="" />
+      <h3 data-edit-text="title">{{ title }}</h3>
+      <p data-edit-text="description">{{ description }}</p>
+      <a :href="href" data-edit-link="href">Read more</a>
+    </template>
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue';
+import { getImageUrl } from './utils.js';
+const props = defineProps({ block: Object });
+
+const hrefObj = computed(() => props.block.href?.[0] || null);
+const useBlockData = computed(() => props.block.overwrite || !hrefObj.value?.title);
+const title = computed(() => useBlockData.value ? props.block.title : hrefObj.value?.title || '');
+const description = computed(() => useBlockData.value ? props.block.description : hrefObj.value?.description || '');
+const href = computed(() => contentPath(hrefObj.value?.['@id'] || ''));
+const imageSrc = computed(() => {
+  if (props.block.preview_image) {
+    return getImageUrl(props.block.preview_image);
+  }
+  return hrefObj.value?.hasPreviewImage ? getImageUrl(`${href.value}/@@images/preview_image`) : '';
+});
+</script>
+```
+
+### Svelte
+
+```svelte
+<script>
+  import { getImageUrl } from './utils.js';
+  export let block;
+
+  $: hrefObj = block.href?.[0] || null;
+  $: useBlockData = block.overwrite || !hrefObj?.title;
+  $: title = useBlockData ? block.title : hrefObj?.title || '';
+  $: description = useBlockData ? block.description : hrefObj?.description || '';
+  $: href = contentPath(hrefObj?.['@id'] || '');
+  $: imageSrc = block.preview_image
+    ? getImageUrl(block.preview_image)
+    : (hrefObj?.hasPreviewImage ? getImageUrl(`${href}/@@images/preview_image`) : '');
+</script>
+
+{#if !href}
+  <div data-block-uid={block['@uid']} class="teaser-placeholder">
+    <p>Select a target page for this teaser</p>
+  </div>
+{:else}
+  <div data-block-uid={block['@uid']} class="teaser-block">
+    {#if imageSrc}
+      <img data-edit-media="preview_image" src={imageSrc} alt="" />
+    {/if}
+    <h3 data-edit-text="title">{title}</h3>
+    <p data-edit-text="description">{description}</p>
+    <a {href} data-edit-link="href">Read more</a>
+  </div>
+{/if}
+```
+
+</block>

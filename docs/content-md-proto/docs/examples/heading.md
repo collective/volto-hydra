@@ -39,8 +39,13 @@ assignments:
   - { uid: 0126e819-d955-41c5-a736-2f0b5ffda8a1, type: separator }
   - { uid: 1bedcc9d-1c02-44e8-bb8e-5c46d6c67d3d, type: gridBlock }
   - { uid: ref-heading-schema, type: codeExample }
+  - { id: ref-heading-schema-javascript-f00bc9 }
   - { uid: ref-heading-json-data, type: codeExample }
+  - { id: ref-heading-json-data-json-87c435 }
   - { uid: ref-heading-rendering, type: codeExample }
+  - { id: ref-heading-rendering-jsx-eb01a3 }
+  - { id: ref-heading-rendering-vue-754dc2 }
+  - { id: ref-heading-rendering-svelte-f5f71c }
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
@@ -80,8 +85,111 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="gridBlock" headline="Block Title" data='{"blocks":{"882e7872-bcf3-4234-a510-d1cff6bf2f7f":{"@type":"teaser","description":"Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.","head_title":null,"href":[{"@id":"/docs/examples/content-types/page","@type":"Document","Description":"The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.","Title":"Page","getRemoteUrl":null,"hasPreviewImage":true,"head_title":null,"image_field":"preview_image","title":"Page"}],"styles":{"align":"left"},"title":"Teaser Title H2"}},"blocks_layout":{"items":["882e7872-bcf3-4234-a510-d1cff6bf2f7f"]},"styles":{}}' />
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="schema" data='{"tabs":[{"@id":"ref-heading-schema-javascript-f00bc9","label":"Schema","language":"javascript","code":"{\n  \"heading\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"heading\": {\n          \"title\": \"Heading\"\n        },\n        \"tag\": {\n          \"title\": \"Tag\",\n          \"widget\": \"select\",\n          \"choices\": [\n            [\n              \"h1\",\n              \"h1\"\n            ],\n            [\n              \"h2\",\n              \"h2\"\n            ],\n            [\n              \"h3\",\n              \"h3\"\n            ],\n            [\n              \"h4\",\n              \"h4\"\n            ],\n            [\n              \"h5\",\n              \"h5\"\n            ],\n            [\n              \"h6\",\n              \"h6\"\n            ]\n          ]\n        }\n      }\n    }\n  }\n}"}]}' />
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="schema">
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="json-data" data='{"tabs":[{"@id":"ref-heading-json-data-json-87c435","label":"JSON Block Data","language":"json","code":"{\n  \"@type\": \"heading\",\n  \"heading\": \"Getting Started\",\n  \"tag\": \"h2\"\n}"}]}' />
+### Schema
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="rendering" data='{"tabs":[{"@id":"ref-heading-rendering-jsx-eb01a3","label":"React","language":"jsx","code":"function HeadingBlock({ block }) {\n  const Tag = block.tag || &#39;h2&#39;;\n  const text = block.heading || &#39;&#39;;\n\n  return (\n    <Tag data-block-uid={block[&#39;@uid&#39;]} data-edit-text=\"heading\">\n      {text}\n    </Tag>\n  );\n}"},{"@id":"ref-heading-rendering-vue-754dc2","label":"Vue","language":"vue","code":"<template>\n  <component :is=\"block.tag || &#39;h2&#39;\" :data-block-uid=\"block[&#39;@uid&#39;]\" data-edit-text=\"heading\">\n    {{ block.heading }}\n  </component>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>"},{"@id":"ref-heading-rendering-svelte-f5f71c","label":"Svelte","language":"svelte","code":"<script>\n  export let block;\n</script>\n\n<svelte:element this={block.tag || &#39;h2&#39;} data-block-uid={block[&#39;@uid&#39;]} data-edit-text=\"heading\">\n  {block.heading}\n</svelte:element>"}]}' />
+```javascript
+{
+  "heading": {
+    "blockSchema": {
+      "properties": {
+        "heading": {
+          "title": "Heading"
+        },
+        "tag": {
+          "title": "Tag",
+          "widget": "select",
+          "choices": [
+            [
+              "h1",
+              "h1"
+            ],
+            [
+              "h2",
+              "h2"
+            ],
+            [
+              "h3",
+              "h3"
+            ],
+            [
+              "h4",
+              "h4"
+            ],
+            [
+              "h5",
+              "h5"
+            ],
+            [
+              "h6",
+              "h6"
+            ]
+          ]
+        }
+      }
+    }
+  }
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="json-data">
+
+### JSON Block Data
+
+```json
+{
+  "@type": "heading",
+  "heading": "Getting Started",
+  "tag": "h2"
+}
+```
+
+</block>
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="rendering">
+
+### React
+
+```jsx
+function HeadingBlock({ block }) {
+  const Tag = block.tag || 'h2';
+  const text = block.heading || '';
+
+  return (
+    <Tag data-block-uid={block['@uid']} data-edit-text="heading">
+      {text}
+    </Tag>
+  );
+}
+```
+
+### Vue
+
+```vue
+<template>
+  <component :is="block.tag || 'h2'" :data-block-uid="block['@uid']" data-edit-text="heading">
+    {{ block.heading }}
+  </component>
+</template>
+
+<script setup>
+defineProps({ block: Object });
+</script>
+```
+
+### Svelte
+
+```svelte
+<script>
+  export let block;
+</script>
+
+<svelte:element this={block.tag || 'h2'} data-block-uid={block['@uid']} data-edit-text="heading">
+  {block.heading}
+</svelte:element>
+```
+
+</block>

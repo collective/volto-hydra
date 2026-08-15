@@ -28,6 +28,11 @@ assignments:
   - { uid: why-hydra-grid, type: gridBlock }
   - { uid: quickstart-heading, type: slate }
   - { uid: quickstart-code, type: codeExample }
+  - { id: tab-nuxt }
+  - { id: tab-nextjs }
+  - { id: tab-svelte }
+  - { id: tab-vanilla }
+  - { id: tab-astro }
   - { uid: 303984b4-693a-408f-83f7-5a88b243d7db, type: slider }
   - { uid: fae599f3-e7d4-451b-a413-84355c796b7e, type: gridBlock }
   - { uid: 0ab1a8f7-2d26-4933-800c-2f10474afe63, type: separator }
@@ -63,7 +68,296 @@ Compliance or engagement is a false choice. You decide where the dial sits for e
 
 ## Quick Start
 
-<block type="codeExample" data='{"tabs":[{"@id":"tab-nuxt","label":"Nuxt.js","language":"vue","code":"<!-- pages/[...slug].vue -->\n<template>\n  <!-- data-block-uid: makes block selectable, draggable, and editable -->\n  <div v-for=\"id in page?.blocks_layout?.items\" :key=\"id\"\n       :data-block-uid=\"editing ? id : undefined\">\n    <!-- data-edit-link: click to edit link URL in sidebar -->\n    <a :href=\"page.blocks[id].link\"\n       :data-edit-link=\"editing ? &#39;link&#39; : undefined\">\n      <!-- data-edit-media: click to pick/upload image in sidebar -->\n      <img :src=\"page.blocks[id].image\"\n           :data-edit-media=\"editing ? &#39;image&#39; : undefined\" />\n      <!-- data-edit-text: edit text directly in the preview -->\n      <h3 :data-edit-text=\"editing ? &#39;title&#39; : undefined\">\n        {{ page.blocks[id].title }}\n      </h3>\n      <p :data-edit-text=\"editing ? &#39;description&#39; : undefined\">\n        {{ page.blocks[id].description }}\n      </p>\n    </a>\n  </div>\n</template>\n\n<script setup>\nimport { ref, onMounted } from &#39;vue&#39;\nimport { initBridge } from &#39;hydra-js&#39;\n\nconst page = ref(null)\nconst editing = ref(false)\n\nonMounted(async () => {\n  // Only init bridge when loaded inside the editor\n  if (window.name.startsWith(&#39;hydra&#39;)) {\n    editing.value = true\n    initBridge({\n      // Register custom block types with their field schemas\n      blocks: {\n        card: { blockSchema: { properties: {\n          image: { widget: &#39;image&#39; },\n          title: { type: &#39;string&#39; },\n          description: { type: &#39;string&#39; },\n          link: { widget: &#39;url&#39; },\n        }}}\n      },\n      // Receive live updates as editor changes content\n      onEditChange: (data) => { page.value = data }\n    })\n  } else {\n    const res = await fetch(`/++api++${useRoute().path}`)\n    page.value = await res.json()\n  }\n})\n</script>"},{"@id":"tab-nextjs","label":"Next.js","language":"jsx","code":"// app/[...slug]/page.jsx\n&#39;use client&#39;\nimport { useState, useEffect } from &#39;react&#39;\nimport { initBridge } from &#39;hydra-js&#39;\n\nexport default function Page({ params }) {\n  const [page, setPage] = useState(null)\n  const [editing, setEditing] = useState(false)\n\n  useEffect(() => {\n    // Only init bridge when loaded inside the editor\n    if (window.name.startsWith(&#39;hydra&#39;)) {\n      setEditing(true)\n      initBridge({\n        // Register custom block types with their field schemas\n        blocks: {\n          card: { blockSchema: { properties: {\n            image: { widget: &#39;image&#39; },\n            title: { type: &#39;string&#39; },\n            description: { type: &#39;string&#39; },\n            link: { widget: &#39;url&#39; },\n          }}}\n        },\n        // Receive live updates as editor changes content\n        onEditChange: setPage\n      })\n    } else {\n      fetch(`/++api++/${params.slug?.join(&#39;/&#39;) || &#39;&#39;}`)\n        .then(r => r.json()).then(setPage)\n    }\n  }, [])\n\n  if (!page) return <div>Loading...</div>\n\n  return page.blocks_layout?.items?.map(id => {\n    const block = page.blocks[id]\n    return (\n      // data-block-uid: makes block selectable, draggable, and editable\n      <div key={id} data-block-uid={editing ? id : undefined}>\n        {/* data-edit-link: click to edit link URL in sidebar */}\n        <a href={block.link}\n           data-edit-link={editing ? &#39;link&#39; : undefined}>\n          {/* data-edit-media: click to pick/upload image in sidebar */}\n          <img src={block.image}\n               data-edit-media={editing ? &#39;image&#39; : undefined} />\n          {/* data-edit-text: edit text directly in the preview */}\n          <h3 data-edit-text={editing ? &#39;title&#39; : undefined}>\n            {block.title}\n          </h3>\n          <p data-edit-text={editing ? &#39;description&#39; : undefined}>\n            {block.description}\n          </p>\n        </a>\n      </div>\n    )\n  })\n}"},{"@id":"tab-svelte","label":"SvelteKit","language":"svelte","code":"<!-- src/routes/[...slug]/+page.svelte -->\n<script>\n  import { onMount } from &#39;svelte&#39;\n  import { initBridge } from &#39;hydra-js&#39;\n\n  let page = $state(null)\n  let editing = $state(false)\n\n  onMount(async () => {\n    // Only init bridge when loaded inside the editor\n    if (window.name.startsWith(&#39;hydra&#39;)) {\n      editing = true\n      initBridge({\n        // Register custom block types with their field schemas\n        blocks: {\n          card: { blockSchema: { properties: {\n            image: { widget: &#39;image&#39; },\n            title: { type: &#39;string&#39; },\n            description: { type: &#39;string&#39; },\n            link: { widget: &#39;url&#39; },\n          }}}\n        },\n        // Receive live updates as editor changes content\n        onEditChange: (data) => { page = data }\n      })\n    } else {\n      const res = await fetch(`/++api++${window.location.pathname}`)\n      page = await res.json()\n    }\n  })\n</script>\n\n{#if page}\n  {#each page.blocks_layout?.items ?? [] as id}\n    <!-- data-block-uid: makes block selectable, draggable, and editable -->\n    <div data-block-uid={editing ? id : undefined}>\n      <!-- data-edit-link: click to edit link URL in sidebar -->\n      <a href={page.blocks[id].link}\n         data-edit-link={editing ? &#39;link&#39; : undefined}>\n        <!-- data-edit-media: click to pick/upload image in sidebar -->\n        <img src={page.blocks[id].image}\n             data-edit-media={editing ? &#39;image&#39; : undefined} />\n        <!-- data-edit-text: edit text directly in the preview -->\n        <h3 data-edit-text={editing ? &#39;title&#39; : undefined}>\n          {page.blocks[id].title}\n        </h3>\n        <p data-edit-text={editing ? &#39;description&#39; : undefined}>\n          {page.blocks[id].description}\n        </p>\n      </a>\n    </div>\n  {/each}\n{/if}"},{"@id":"tab-vanilla","label":"HTML/JS","language":"html","code":"<!-- index.html -->\n<div id=\"content\"></div>\n<script type=\"module\">\n  import { initBridge } from &#39;hydra-js&#39;\n\n  let editing = false\n\n  // Only init bridge when loaded inside the editor\n  if (window.name.startsWith(&#39;hydra&#39;)) {\n    editing = true\n    initBridge({\n      // Register custom block types with their field schemas\n      blocks: {\n        card: { blockSchema: { properties: {\n          image: { widget: &#39;image&#39; },\n          title: { type: &#39;string&#39; },\n          description: { type: &#39;string&#39; },\n          link: { widget: &#39;url&#39; },\n        }}}\n      },\n      // Receive live updates as editor changes content\n      onEditChange: renderPage\n    })\n  } else {\n    const res = await fetch(`/++api++${location.pathname}`)\n    renderPage(await res.json())\n  }\n\n  function renderPage(page) {\n    const el = document.getElementById(&#39;content&#39;)\n    el.innerHTML = page.blocks_layout.items.map(id => {\n      const b = page.blocks[id]\n      return `\n        <!-- data-block-uid: makes block selectable, draggable, and editable -->\n        <div ${editing ? `data-block-uid=\"${id}\"` : &#39;&#39;}>\n          <!-- data-edit-link: click to edit link URL in sidebar -->\n          <a href=\"${b.link}\"\n             ${editing ? &#39;data-edit-link=\"link\"&#39; : &#39;&#39;}>\n            <!-- data-edit-media: click to pick/upload image in sidebar -->\n            <img src=\"${b.image}\"\n                 ${editing ? &#39;data-edit-media=\"image\"&#39; : &#39;&#39;} />\n            <!-- data-edit-text: edit text directly in the preview -->\n            <h3 ${editing ? &#39;data-edit-text=\"title\"&#39; : &#39;&#39;}>\n              ${b.title}\n            </h3>\n            <p ${editing ? &#39;data-edit-text=\"description\"&#39; : &#39;&#39;}>\n              ${b.description}\n            </p>\n          </a>\n        </div>`\n    }).join(&#39;&#39;)\n  }\n</script>"},{"@id":"tab-astro","label":"Astro","language":"astro","code":"<!-- src/pages/[...slug].astro\n     First paint and every subsequent render come from /api/render —\n     blocks are rendered server-side by .astro components via Astro&#39;s\n     Container API. Same pattern works for PHP, Django, Rails, Laravel:\n     see docs/server-rendered-frontends.md -->\n<!DOCTYPE html>\n<html>\n  <body>\n    <div id=\"content\"></div>\n    <script>\n      import { initBridge } from &#39;hydra-js&#39;\n      if (window.name.startsWith(&#39;hydra&#39;)) {\n        initBridge({\n          // Register custom block types with their field schemas\n          blocks: {\n            card: { blockSchema: { properties: {\n              image: { widget: &#39;image&#39; },\n              title: { type: &#39;string&#39; },\n              description: { type: &#39;string&#39; },\n              link: { widget: &#39;url&#39; },\n            }}}\n          },\n          // Server-render mode (Storyblok-style): the bridge POSTs each\n          // smallest-changed-unit to renderEndpoint and swaps the\n          // returned HTML into renderContainer.\n          renderEndpoint: &#39;/api/render&#39;,\n          renderContainer: &#39;#content&#39;,\n        })\n      }\n    </script>\n  </body>\n</html>\n\n// src/pages/api/render.ts\nimport { experimental_AstroContainer as AstroContainer } from &#39;astro/container&#39;\nimport BlockRenderer from &#39;../../components/BlockRenderer.astro&#39;\n\nexport const POST = async ({ request }) => {\n  const { unit, formData } = await request.json()\n  const container = await AstroContainer.create()\n  // BlockRenderer.astro emits data-block-uid + data-edit-* attributes —\n  // same DOM contract as the other tabs, just produced server-side.\n  const html = await container.renderToString(BlockRenderer, {\n    props: { unit, formData },\n  })\n  return new Response(html, { headers: { &#39;Content-Type&#39;: &#39;text/html&#39; } })\n}"}]}' />
+<block type="codeExample">
+
+### Nuxt.js
+
+```vue
+<!-- pages/[...slug].vue -->
+<template>
+  <!-- data-block-uid: makes block selectable, draggable, and editable -->
+  <div v-for="id in page?.blocks_layout?.items" :key="id"
+       :data-block-uid="editing ? id : undefined">
+    <!-- data-edit-link: click to edit link URL in sidebar -->
+    <a :href="page.blocks[id].link"
+       :data-edit-link="editing ? 'link' : undefined">
+      <!-- data-edit-media: click to pick/upload image in sidebar -->
+      <img :src="page.blocks[id].image"
+           :data-edit-media="editing ? 'image' : undefined" />
+      <!-- data-edit-text: edit text directly in the preview -->
+      <h3 :data-edit-text="editing ? 'title' : undefined">
+        {{ page.blocks[id].title }}
+      </h3>
+      <p :data-edit-text="editing ? 'description' : undefined">
+        {{ page.blocks[id].description }}
+      </p>
+    </a>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+import { initBridge } from 'hydra-js'
+
+const page = ref(null)
+const editing = ref(false)
+
+onMounted(async () => {
+  // Only init bridge when loaded inside the editor
+  if (window.name.startsWith('hydra')) {
+    editing.value = true
+    initBridge({
+      // Register custom block types with their field schemas
+      blocks: {
+        card: { blockSchema: { properties: {
+          image: { widget: 'image' },
+          title: { type: 'string' },
+          description: { type: 'string' },
+          link: { widget: 'url' },
+        }}}
+      },
+      // Receive live updates as editor changes content
+      onEditChange: (data) => { page.value = data }
+    })
+  } else {
+    const res = await fetch(`/++api++${useRoute().path}`)
+    page.value = await res.json()
+  }
+})
+</script>
+```
+
+### Next.js
+
+```jsx
+// app/[...slug]/page.jsx
+'use client'
+import { useState, useEffect } from 'react'
+import { initBridge } from 'hydra-js'
+
+export default function Page({ params }) {
+  const [page, setPage] = useState(null)
+  const [editing, setEditing] = useState(false)
+
+  useEffect(() => {
+    // Only init bridge when loaded inside the editor
+    if (window.name.startsWith('hydra')) {
+      setEditing(true)
+      initBridge({
+        // Register custom block types with their field schemas
+        blocks: {
+          card: { blockSchema: { properties: {
+            image: { widget: 'image' },
+            title: { type: 'string' },
+            description: { type: 'string' },
+            link: { widget: 'url' },
+          }}}
+        },
+        // Receive live updates as editor changes content
+        onEditChange: setPage
+      })
+    } else {
+      fetch(`/++api++/${params.slug?.join('/') || ''}`)
+        .then(r => r.json()).then(setPage)
+    }
+  }, [])
+
+  if (!page) return <div>Loading...</div>
+
+  return page.blocks_layout?.items?.map(id => {
+    const block = page.blocks[id]
+    return (
+      // data-block-uid: makes block selectable, draggable, and editable
+      <div key={id} data-block-uid={editing ? id : undefined}>
+        {/* data-edit-link: click to edit link URL in sidebar */}
+        <a href={block.link}
+           data-edit-link={editing ? 'link' : undefined}>
+          {/* data-edit-media: click to pick/upload image in sidebar */}
+          <img src={block.image}
+               data-edit-media={editing ? 'image' : undefined} />
+          {/* data-edit-text: edit text directly in the preview */}
+          <h3 data-edit-text={editing ? 'title' : undefined}>
+            {block.title}
+          </h3>
+          <p data-edit-text={editing ? 'description' : undefined}>
+            {block.description}
+          </p>
+        </a>
+      </div>
+    )
+  })
+}
+```
+
+### SvelteKit
+
+```svelte
+<!-- src/routes/[...slug]/+page.svelte -->
+<script>
+  import { onMount } from 'svelte'
+  import { initBridge } from 'hydra-js'
+
+  let page = $state(null)
+  let editing = $state(false)
+
+  onMount(async () => {
+    // Only init bridge when loaded inside the editor
+    if (window.name.startsWith('hydra')) {
+      editing = true
+      initBridge({
+        // Register custom block types with their field schemas
+        blocks: {
+          card: { blockSchema: { properties: {
+            image: { widget: 'image' },
+            title: { type: 'string' },
+            description: { type: 'string' },
+            link: { widget: 'url' },
+          }}}
+        },
+        // Receive live updates as editor changes content
+        onEditChange: (data) => { page = data }
+      })
+    } else {
+      const res = await fetch(`/++api++${window.location.pathname}`)
+      page = await res.json()
+    }
+  })
+</script>
+
+{#if page}
+  {#each page.blocks_layout?.items ?? [] as id}
+    <!-- data-block-uid: makes block selectable, draggable, and editable -->
+    <div data-block-uid={editing ? id : undefined}>
+      <!-- data-edit-link: click to edit link URL in sidebar -->
+      <a href={page.blocks[id].link}
+         data-edit-link={editing ? 'link' : undefined}>
+        <!-- data-edit-media: click to pick/upload image in sidebar -->
+        <img src={page.blocks[id].image}
+             data-edit-media={editing ? 'image' : undefined} />
+        <!-- data-edit-text: edit text directly in the preview -->
+        <h3 data-edit-text={editing ? 'title' : undefined}>
+          {page.blocks[id].title}
+        </h3>
+        <p data-edit-text={editing ? 'description' : undefined}>
+          {page.blocks[id].description}
+        </p>
+      </a>
+    </div>
+  {/each}
+{/if}
+```
+
+### HTML/JS
+
+```html
+<!-- index.html -->
+<div id="content"></div>
+<script type="module">
+  import { initBridge } from 'hydra-js'
+
+  let editing = false
+
+  // Only init bridge when loaded inside the editor
+  if (window.name.startsWith('hydra')) {
+    editing = true
+    initBridge({
+      // Register custom block types with their field schemas
+      blocks: {
+        card: { blockSchema: { properties: {
+          image: { widget: 'image' },
+          title: { type: 'string' },
+          description: { type: 'string' },
+          link: { widget: 'url' },
+        }}}
+      },
+      // Receive live updates as editor changes content
+      onEditChange: renderPage
+    })
+  } else {
+    const res = await fetch(`/++api++${location.pathname}`)
+    renderPage(await res.json())
+  }
+
+  function renderPage(page) {
+    const el = document.getElementById('content')
+    el.innerHTML = page.blocks_layout.items.map(id => {
+      const b = page.blocks[id]
+      return `
+        <!-- data-block-uid: makes block selectable, draggable, and editable -->
+        <div ${editing ? `data-block-uid="${id}"` : ''}>
+          <!-- data-edit-link: click to edit link URL in sidebar -->
+          <a href="${b.link}"
+             ${editing ? 'data-edit-link="link"' : ''}>
+            <!-- data-edit-media: click to pick/upload image in sidebar -->
+            <img src="${b.image}"
+                 ${editing ? 'data-edit-media="image"' : ''} />
+            <!-- data-edit-text: edit text directly in the preview -->
+            <h3 ${editing ? 'data-edit-text="title"' : ''}>
+              ${b.title}
+            </h3>
+            <p ${editing ? 'data-edit-text="description"' : ''}>
+              ${b.description}
+            </p>
+          </a>
+        </div>`
+    }).join('')
+  }
+</script>
+```
+
+### Astro
+
+```astro
+<!-- src/pages/[...slug].astro
+     First paint and every subsequent render come from /api/render —
+     blocks are rendered server-side by .astro components via Astro's
+     Container API. Same pattern works for PHP, Django, Rails, Laravel:
+     see docs/server-rendered-frontends.md -->
+<!DOCTYPE html>
+<html>
+  <body>
+    <div id="content"></div>
+    <script>
+      import { initBridge } from 'hydra-js'
+      if (window.name.startsWith('hydra')) {
+        initBridge({
+          // Register custom block types with their field schemas
+          blocks: {
+            card: { blockSchema: { properties: {
+              image: { widget: 'image' },
+              title: { type: 'string' },
+              description: { type: 'string' },
+              link: { widget: 'url' },
+            }}}
+          },
+          // Server-render mode (Storyblok-style): the bridge POSTs each
+          // smallest-changed-unit to renderEndpoint and swaps the
+          // returned HTML into renderContainer.
+          renderEndpoint: '/api/render',
+          renderContainer: '#content',
+        })
+      }
+    </script>
+  </body>
+</html>
+
+// src/pages/api/render.ts
+import { experimental_AstroContainer as AstroContainer } from 'astro/container'
+import BlockRenderer from '../../components/BlockRenderer.astro'
+
+export const POST = async ({ request }) => {
+  const { unit, formData } = await request.json()
+  const container = await AstroContainer.create()
+  // BlockRenderer.astro emits data-block-uid + data-edit-* attributes —
+  // same DOM contract as the other tabs, just produced server-side.
+  const html = await container.renderToString(BlockRenderer, {
+    props: { unit, formData },
+  })
+  return new Response(html, { headers: { 'Content-Type': 'text/html' } })
+}
+```
+
+</block>
 
 <block type="slider" data='{"autoplayDelay":4000,"autoplayEnabled":false,"autoplayJump":false,"slides":[{"@id":"b09f39ea-36c3-4f09-9a18-30aef3565a22","buttonText":"See all Content Types","description":"You can log in and experience currently working features (Volto like but on any frontend)","flagAlign":"left","head_title":"Welcome to Inka","href":[{"@id":"/docs/examples/content-types","@type":"Document","Description":"This section has a sample of content types available in this site.","Title":"Content Types","hasPreviewImage":null,"head_title":null,"image_field":"image","title":"Content Types"}],"preview_image":[{"@id":"/images/penguin1.jpg","@type":"Image","CreationDate":"2024-03-07T12:29:54+01:00","Creator":"admin","Date":"2024-03-07T12:30:08+01:00","Description":"","EffectiveDate":"None","ExpirationDate":"None","ModificationDate":"2024-03-07T12:30:08+01:00","Subject":[],"Title":"testimage","Type":"Bild","UID":"9abc1a813bcf46388e565b277bd8c6bf","author_name":null,"cmf_uid":null,"commentators":[],"created":"2024-03-07T11:29:54+00:00","description":"","effective":"1969-12-30T23:00:00+00:00","end":null,"exclude_from_nav":false,"expires":"2499-12-30T23:00:00+00:00","getIcon":true,"getId":"testimage.jpg","getObjSize":"2.0 MB","getPath":"/Plone/testimage.jpg","getRemoteUrl":null,"getURL":"http://localhost:3000/testimage.jpg","hasPreviewImage":null,"head_title":null,"id":"testimage.jpg","image_field":"image","in_response_to":null,"is_folderish":false,"last_comment_date":null,"listCreators":["admin"],"location":null,"mime_type":"image/jpeg","modified":"2024-03-07T11:30:08+00:00","nav_title":null,"portal_type":"Image","review_state":null,"start":null,"sync_uid":null,"title":"testimage","total_comments":0,"type_title":"Bild"}],"title":"You can use this site to test Inka"},{"@id":"ef8ceecc-7c1d-4e0a-9b67-a56e7d03f6e3","buttonText":"See all blocks","description":"Frontend freedom makes it easy to create beautiful and fast experiences","flagAlign":"right","head_title":"Welcome to Inka&#39;s many frontends","hideButton":false,"href":[{"@id":"/docs/examples","@type":"Document","Description":"","Title":"Blocks","hasPreviewImage":null,"head_title":null,"image_field":"","title":"Blocks"}],"preview_image":[{"@id":"/images/penguin2.jpg","@type":"Image","CreationDate":"2024-03-08T13:05:46+01:00","Creator":"admin","Date":"2024-03-08T13:05:46+01:00","Description":"","EffectiveDate":"None","ExpirationDate":"None","ModificationDate":"2024-03-08T13:05:46+01:00","Subject":[],"Title":"penguin2.jpg","Type":"Bild","UID":"05bace45294c45d5ab93de883e7ce702","author_name":null,"cmf_uid":null,"commentators":[],"created":"2024-03-08T12:05:46+00:00","description":"","effective":"1969-12-30T23:00:00+00:00","end":null,"exclude_from_nav":false,"expires":"2499-12-30T23:00:00+00:00","getIcon":true,"getId":"penguin2.jpg","getObjSize":"2.8 MB","getPath":"/Plone/images/penguin2.jpg","getRemoteUrl":null,"getURL":"http://localhost:3000/images/penguin2.jpg","hasPreviewImage":null,"head_title":null,"id":"penguin2.jpg","image_field":"image","in_response_to":null,"is_folderish":false,"last_comment_date":null,"listCreators":["admin"],"location":null,"mime_type":"image/jpeg","modified":"2024-03-08T12:05:46+00:00","nav_title":null,"portal_type":"Image","review_state":null,"start":null,"sync_uid":null,"title":"penguin2.jpg","total_comments":0,"type_title":"Bild"}],"title":"You are enjoying one of many possible frontends"}],"styles":{}}' />
 
