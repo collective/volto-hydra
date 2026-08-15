@@ -51,7 +51,7 @@ assignments:
   - { uid: ul-24, type: slate }
 prototypes: |
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
+  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="separator" _="${hr}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">

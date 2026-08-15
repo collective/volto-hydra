@@ -36,7 +36,7 @@ assignments:
   - { id: ref-relatedItemsListing-rendering-javascript-2b9d44 }
 prototypes: |
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
+  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

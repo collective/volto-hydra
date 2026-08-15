@@ -12,7 +12,7 @@ assignments:
   - { uid: tpl-ev-content, type: slate }
 prototypes: |
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
+  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
 ---
 
 <block type="title" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="title" data='{"fixed":true}' />

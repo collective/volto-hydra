@@ -26,7 +26,7 @@ const OUT = outArg > -1 ? resolve(process.argv[outArg + 1]) : resolve(INKA, 'doc
 // gridBlock, the long tail) fall to tier-3 data tags automatically.
 const PROTO_TEXT = {
   title: '<block type="title" _="${h1}" />',
-  slate: '<block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />',
+  slate: '<block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />',
   separator: '<block type="separator" _="${hr}" />',
   image: [
     '<block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />',

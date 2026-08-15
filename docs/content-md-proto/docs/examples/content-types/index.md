@@ -24,7 +24,7 @@ assignments:
   - { uid: fdb1dfd1-6073-4ad0-a147-c0709c39734d, type: slate }
 prototypes: |
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
+  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
 ---
 
 # 

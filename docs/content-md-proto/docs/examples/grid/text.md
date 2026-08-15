@@ -54,7 +54,7 @@ assignments:
   - { uid: 019e7dd0-63b9-4421-8824-3544391e9b23, type: slate }
 prototypes: |
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
+  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="gridBlock">
     <region name="blocks" widget="blocks_layout">
       <block type="teaser" title="${h2/text}" description="${p/text}" />

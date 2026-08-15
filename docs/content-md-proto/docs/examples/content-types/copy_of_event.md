@@ -43,7 +43,7 @@ assignments:
   - { uid: 1a9dbeac-4f8e-4a75-9859-fd8012bd2c1a, type: slate }
 prototypes: |
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
+  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
 ---
 
 <block type="title" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="title" data='{"fixed":true,"readOnly":true}' />

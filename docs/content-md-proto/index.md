@@ -48,7 +48,7 @@ assignments:
   - { uid: 0d0c0506-f9bb-48d8-af0a-1352d81b45de, type: slate }
   - { uid: 2fac7e5d-affb-4a8e-969f-2fac4d08e0fd, type: slate }
 prototypes: |
-  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
+  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="separator" _="${hr}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
@@ -64,7 +64,11 @@ prototypes: |
   </block>
 ---
 
-<block type="slate" data='{"value":[{"type":"h1","children":[{"text":"Design-system-first page building"}]}],"styles":{}}' />
+<block type="slate">
+
+# Design-system-first page building
+
+</block>
 
 Strike the right balance for your site. Make it easy for editors to create engagement — while staying compliant.
 
