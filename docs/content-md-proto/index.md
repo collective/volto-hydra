@@ -12,6 +12,7 @@ effective: null
 exclude_from_nav: false
 expires: null
 id: Plone
+is_folderish: true
 language: "##DEFAULT##"
 review_state: null
 rights: ""

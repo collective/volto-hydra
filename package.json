@@ -51,7 +51,9 @@
     "example:nextjs": "pnpm --filter hydra-nextjs run dev",
     "example:nuxt": "pnpm --filter nuxt-blog-starter install && pnpm --filter nuxt-blog-starter run dev",
     "check:content-md": "node proposals/blockmd/import-tree.mjs --diff",
-    "check:content-parity": "node proposals/blockmd/check-parity.mjs"
+    "check:content-parity": "node proposals/blockmd/check-parity.mjs",
+    "check:proto-parity": "node proposals/blockmd/check-proto-parity.mjs",
+    "check:proto-mount": "node proposals/blockmd/check-proto-mount.mjs"
   },
   "dependencies": {
     "@plone/volto": "workspace:*",

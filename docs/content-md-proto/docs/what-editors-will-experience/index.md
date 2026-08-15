@@ -13,6 +13,7 @@ effective: 2025-01-01T00:00:00
 exclude_from_nav: false
 expires: null
 id: what-editors-will-experience
+is_folderish: true
 language: "##DEFAULT##"
 layout: document_view
 preview_caption: null

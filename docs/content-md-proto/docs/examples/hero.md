@@ -12,6 +12,7 @@ effective: null
 exclude_from_nav: false
 expires: null
 id: hero
+is_folderish: false
 language: "##DEFAULT##"
 layout: document_view
 review_state: published

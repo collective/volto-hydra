@@ -23,6 +23,7 @@ image:
   height: 633
   size: 475285
   width: 1126
+is_folderish: false
 language: "##DEFAULT##"
 layout: image_view
 review_state: null

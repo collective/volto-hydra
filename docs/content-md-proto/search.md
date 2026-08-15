@@ -11,6 +11,7 @@ creators:
 effective: null
 exclude_from_nav: true
 expires: null
+is_folderish: false
 language: ""
 review_state: published
 rights: null

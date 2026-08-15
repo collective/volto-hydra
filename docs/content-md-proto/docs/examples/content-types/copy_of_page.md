@@ -11,6 +11,7 @@ effective: 2024-03-07T17:09:00
 exclude_from_nav: false
 expires: null
 id: copy_of_page
+is_folderish: true
 language: "##DEFAULT##"
 layout: document_view
 preview_caption: null

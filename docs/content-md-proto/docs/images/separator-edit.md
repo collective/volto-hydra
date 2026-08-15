@@ -17,6 +17,7 @@ image:
   height: 900
   size: 514088
   width: 1440
+is_folderish: false
 language: "##DEFAULT##"
 layout: image_view
 review_state: null
