@@ -48,6 +48,15 @@ prototypes: |
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+  <block type="slateTable">
+    <region name="table.rows">
+      <block type="row">
+        <region name="cells">
+          <block type="cell" value="${td/slate}" />
+        </region>
+      </block>
+    </region>
+  </block>
 ---
 
 # 
@@ -94,6 +103,12 @@ Paragraph text (p, 24/33px) -> Lorem ipsum dolor sit amet, consetetur sadipscing
 
 <block type="toc" variation="default" data='{"levels":["h2","h3"],"styles":{}}' />
 
-<block type="slateTable" data='{"styles":{},"table":{"basic":false,"celled":true,"compact":false,"fixed":true,"hideHeaders":false,"inverted":false,"rows":[{"cells":[{"key":"do0ad","type":"header","value":[{"children":[{"text":"Table Header (THEAD, 18/24)"}],"type":"p"}]},{"key":"aav18","type":"header","value":[{"children":[{"text":"Table Header (THEAD, 18/24)"}],"type":"p"}]}],"key":"117r7"},{"cells":[{"key":"arr02","type":"data","value":[{"children":[{"text":"Table cell (td p, 18/24px)"}],"type":"p"}]},{"key":"81nda","type":"data","value":[{"children":[{"text":"Table cell (td p, 18/24px)"}],"type":"p"}]}],"key":"5psue"}],"striped":false}}' />
+<block type="slateTable" table.celled table.fixed>
+
+| Table Header (THEAD, 18/24) | Table Header (THEAD, 18/24) |
+| --- | --- |
+| Table cell (td p, 18/24px) | Table cell (td p, 18/24px) |
+
+</block>
 
 <block type="slate" data='{"value":[{"children":[{"text":""}],"type":"p"}]}' />

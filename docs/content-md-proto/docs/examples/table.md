@@ -50,6 +50,15 @@ prototypes: |
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+  <block type="slateTable">
+    <region name="table.rows">
+      <block type="row">
+        <region name="cells">
+          <block type="cell" value="${td/slate}" />
+        </region>
+      </block>
+    </region>
+  </block>
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

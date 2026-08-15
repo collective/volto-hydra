@@ -121,6 +121,15 @@ prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
   <block type="separator" _="${hr}" />
+  <block type="slateTable">
+    <region name="table.rows">
+      <block type="row">
+        <region name="cells">
+          <block type="cell" value="${td/slate}" />
+        </region>
+      </block>
+    </region>
+  </block>
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
@@ -339,7 +348,15 @@ This replaces `dataPath`: declare the container inside the object rather than ho
 
 A block's schema is a standard [Volto block schema](https://6.docs.plone.org/volto/blocks/editcomponent.html) (fieldsets, `properties`, widgets, `default`, etc.). Inka reads three container-oriented `widget` values plus a few per-field keys — those are:
 
-<block type="slateTable" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-37-r0","cells":[{"key":"tbl-37-r0c0","type":"header","value":[{"type":"p","children":[{"type":"code","children":[{"text":"widget"}]}]}]},{"key":"tbl-37-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Storage"}]}]},{"key":"tbl-37-r0c2","type":"header","value":[{"type":"p","children":[{"text":"Key fields"}]}]}]},{"key":"tbl-37-r1","cells":[{"key":"tbl-37-r1c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"blocks_layout"}]}]}]},{"key":"tbl-37-r1c1","type":"data","value":[{"type":"p","children":[{"text":"children are ids in the parent&#39;s shared "},{"type":"code","children":[{"text":"blocks"}]},{"text":" dict; this field&#39;s name is a region key under "},{"type":"code","children":[{"text":"blocks_layout"}]}]}]},{"key":"tbl-37-r1c2","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"allowedBlocks"}]},{"text":", "},{"type":"code","children":[{"text":"maxLength"}]},{"text":", "},{"type":"code","children":[{"text":"allowedTemplates"}]}]}]}]},{"key":"tbl-37-r2","cells":[{"key":"tbl-37-r2c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"object_list"}]}]}]},{"key":"tbl-37-r2c1","type":"data","value":[{"type":"p","children":[{"text":"inline array on the field itself"}]}]},{"key":"tbl-37-r2c2","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"idField"}]},{"text":" (default "},{"type":"code","children":[{"text":"@id"}]},{"text":"), "},{"type":"code","children":[{"text":"schema"}]},{"text":" (item schema), "},{"type":"code","children":[{"text":"allowedBlocks"}]},{"text":" + "},{"type":"code","children":[{"text":"typeField"}]},{"text":" (typed items), "},{"type":"code","children":[{"text":"defaultBlockType"}]},{"text":", "},{"type":"code","children":[{"text":"maxLength"}]},{"text":", "},{"type":"code","children":[{"text":"addMode: &#39;table&#39;"}]}]}]}]},{"key":"tbl-37-r3","cells":[{"key":"tbl-37-r3c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"object"}]}]}]},{"key":"tbl-37-r3c1","type":"data","value":[{"type":"p","children":[{"text":"groups sub-fields under one key; sub-fields (plain OR the two container widgets above) nest inside"}]}]},{"key":"tbl-37-r3c2","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"schema"}]},{"text":" (the nested properties)"}]}]}]}]}}' />
+<block type="slateTable" table.fixed table.celled>
+
+| `widget` | Storage | Key fields |
+| --- | --- | --- |
+| `blocks_layout` | children are ids in the parent's shared `blocks` dict; this field's name is a region key under `blocks_layout` | `allowedBlocks`, `maxLength`, `allowedTemplates` |
+| `object_list` | inline array on the field itself | `idField` (default `@id`), `schema` (item schema), `allowedBlocks` + `typeField` (typed items), `defaultBlockType`, `maxLength`, `addMode: 'table'` |
+| `object` | groups sub-fields under one key; sub-fields (plain OR the two container widgets above) nest inside | `schema` (the nested properties) |
+
+</block>
 
 All three can nest inside `object`, and a container may mix a `blocks_layout` region and an `object_list` region. Everything else in a field def (`title`, `default`, `type`, `choices`, `mode`, …) is plain Volto and behaves as documented there.
 

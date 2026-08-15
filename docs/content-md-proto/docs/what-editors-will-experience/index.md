@@ -70,6 +70,15 @@ prototypes: |
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+  <block type="slateTable">
+    <region name="table.rows">
+      <block type="row">
+        <region name="cells">
+          <block type="cell" value="${td/slate}" />
+        </region>
+      </block>
+    </region>
+  </block>
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
@@ -178,6 +187,16 @@ Phones don't have an `Escape` key. To walk back up out of a nested block (a teas
 
 ### Differences from desktop in one place
 
-<block type="slateTable" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-39-r0","cells":[{"key":"tbl-39-r0c0","type":"header","value":[{"type":"p","children":[{"text":"Desktop / tablet"}]}]},{"key":"tbl-39-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Mobile (≤767 px)"}]}]}]},{"key":"tbl-39-r1","cells":[{"key":"tbl-39-r1c0","type":"data","value":[{"type":"p","children":[{"text":"Quanta floats near the block, can fade after idle"}]}]},{"key":"tbl-39-r1c1","type":"data","value":[{"type":"p","children":[{"text":"Quanta pinned to top, always visible"}]}]}]},{"key":"tbl-39-r2","cells":[{"key":"tbl-39-r2c0","type":"data","value":[{"type":"p","children":[{"text":"Main toolbar on the left, full height"}]}]},{"key":"tbl-39-r2c1","type":"data","value":[{"type":"p","children":[{"text":"Main toolbar at the bottom, 44 px compact"}]}]}]},{"key":"tbl-39-r3","cells":[{"key":"tbl-39-r3c0","type":"data","value":[{"type":"p","children":[{"text":"Sidebar on the right as a side panel"}]}]},{"key":"tbl-39-r3c1","type":"data","value":[{"type":"p","children":[{"text":"Sidebar covers the whole screen"}]}]}]},{"key":"tbl-39-r4","cells":[{"key":"tbl-39-r4c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"⋯"}]},{"text":" menu drops down inline"}]}]},{"key":"tbl-39-r4c1","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"⋯"}]},{"text":" menu slides up as a bottom sheet"}]}]}]},{"key":"tbl-39-r5","cells":[{"key":"tbl-39-r5c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"Escape"}]},{"text":" key walks selection up"}]}]},{"key":"tbl-39-r5c1","type":"data","value":[{"type":"p","children":[{"text":"Tap the "},{"type":"code","children":[{"text":"⬆"}]},{"text":" button in Quanta"}]}]}]}]}}' />
+<block type="slateTable" table.fixed table.celled>
+
+| Desktop / tablet | Mobile (≤767 px) |
+| --- | --- |
+| Quanta floats near the block, can fade after idle | Quanta pinned to top, always visible |
+| Main toolbar on the left, full height | Main toolbar at the bottom, 44 px compact |
+| Sidebar on the right as a side panel | Sidebar covers the whole screen |
+| `⋯` menu drops down inline | `⋯` menu slides up as a bottom sheet |
+| `Escape` key walks selection up | Tap the `⬆` button in Quanta |
+
+</block>
 
 Otherwise everything works the same: tapping a block selects it, tapping into text starts editing, the same fields and the same blocks. The mechanics are unchanged — only the placement and gestures differ.

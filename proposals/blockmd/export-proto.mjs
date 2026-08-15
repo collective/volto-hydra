@@ -32,6 +32,17 @@ const PROTO_TEXT = {
     '<block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />',
     '<block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />',
   ].join('\n'),
+  slateTable: [
+    '<block type="slateTable">',
+    '  <region name="table.rows">',
+    '    <block type="row">',
+    '      <region name="cells">',
+    '        <block type="cell" value="${td/slate}" />',
+    '      </region>',
+    '    </block>',
+    '  </region>',
+    '</block>',
+  ].join('\n'),
   codeExample: [
     '<block type="codeExample">',
     '  <region name="tabs" widget="object_list">',

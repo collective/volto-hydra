@@ -30,10 +30,11 @@ function semantic(v) {
     if (keys.length === 1 && keys[0] === 'text' && v.text === '') return undefined;
     const out = {};
     for (const k of keys.sort()) {
-      if (k === 'plaintext') continue;
+      if (k === 'plaintext' || k === 'key') continue; // derived / internal identity
+      if (v[k] === false) continue; // a false boolean is "off"
       const r = semantic(v[k]);
       if (r === undefined) continue;
-      if (k === 'styles' && r && typeof r === 'object' && !Array.isArray(r) && !Object.keys(r).length) continue;
+      if (r && typeof r === 'object' && !Array.isArray(r) && !Object.keys(r).length) continue;
       out[k] = r;
     }
     return out;

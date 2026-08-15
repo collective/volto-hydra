@@ -96,6 +96,15 @@ prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
   <block type="separator" _="${hr}" />
+  <block type="slateTable">
+    <region name="table.rows">
+      <block type="row">
+        <region name="cells">
+          <block type="cell" value="${td/slate}" />
+        </region>
+      </block>
+    </region>
+  </block>
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
@@ -167,7 +176,15 @@ What propagates and what doesn't:
 
 The two configurations below look similar but solve different problems. Pick by **who controls the structure** and **whether it repeats**:
 
-<block type="slateTable" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-19-r0","cells":[{"key":"tbl-19-r0c0","type":"header","value":[{"type":"p","children":[{"text":"You want…"}]}]},{"key":"tbl-19-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Use"}]}]},{"key":"tbl-19-r0c2","type":"header","value":[{"type":"p","children":[{"text":"How it&#39;s applied"}]}]}]},{"key":"tbl-19-r1","cells":[{"key":"tbl-19-r1c0","type":"data","value":[{"type":"p","children":[{"text":"A reusable snippet the editor "},{"type":"strong","children":[{"text":"inserts"}]},{"text":" where they choose — e.g. a contact CTA reused across many pages"}]}]},{"key":"tbl-19-r1c1","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"type":"code","children":[{"text":"allowedTemplates"}]}]}]}]},{"key":"tbl-19-r1c2","type":"data","value":[{"type":"p","children":[{"text":"Offered in the BlockChooser&#39;s \"Templates\" group and inserted "},{"type":"strong","children":[{"text":"as a block"}]},{"text":" (the block carries "},{"type":"code","children":[{"text":"templateId"}]},{"text":")."}]}]}]},{"key":"tbl-19-r2","cells":[{"key":"tbl-19-r2c0","type":"data","value":[{"type":"p","children":[{"text":"A layout "},{"type":"strong","children":[{"text":"forced across an entire field/region"}]},{"text":" — a branded header/footer, or a mandated page structure"}]}]},{"key":"tbl-19-r2c1","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"type":"code","children":[{"text":"allowedLayouts"}]}]}]}]},{"key":"tbl-19-r2c2","type":"data","value":[{"type":"p","children":[{"text":"Applied across the whole blocks field; the field&#39;s content is merged into the layout&#39;s slots. The editor can&#39;t restructure it."}]}]}]},{"key":"tbl-19-r3","cells":[{"key":"tbl-19-r3c0","type":"data","value":[{"type":"p","children":[{"text":"To let the editor "},{"type":"strong","children":[{"text":"choose"}]},{"text":" between a few layouts"}]}]},{"key":"tbl-19-r3c1","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"type":"code","children":[{"text":"allowedLayouts"}]}]},{"text":" (several, optionally "},{"type":"code","children":[{"text":"null"}]},{"text":")"}]}]},{"key":"tbl-19-r3c2","type":"data","value":[{"type":"p","children":[{"text":"Offered in the Layout dropdown; "},{"type":"code","children":[{"text":"null"}]},{"text":" = \"no layout\"."}]}]}]}]}}' />
+<block type="slateTable" table.fixed table.celled>
+
+| You want… | Use | How it's applied |
+| --- | --- | --- |
+| A reusable snippet the editor **inserts** where they choose — e.g. a contact CTA reused across many pages | **`allowedTemplates`** | Offered in the BlockChooser's "Templates" group and inserted **as a block** (the block carries `templateId`). |
+| A layout **forced across an entire field/region** — a branded header/footer, or a mandated page structure | **`allowedLayouts`** | Applied across the whole blocks field; the field's content is merged into the layout's slots. The editor can't restructure it. |
+| To let the editor **choose** between a few layouts | **`allowedLayouts`** (several, optionally `null`) | Offered in the Layout dropdown; `null` = "no layout". |
+
+</block>
 
 A **branded header/footer is the canonical `allowedLayouts` case**, *not* `allowedTemplates`: don't make the footer a `templateId` block the editor inserts — force a layout across the footer field. Within that layout, each block declares how locked it is:
 

@@ -130,6 +130,15 @@ assignments:
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
+  <block type="slateTable">
+    <region name="table.rows">
+      <block type="row">
+        <region name="cells">
+          <block type="cell" value="${td/slate}" />
+        </region>
+      </block>
+    </region>
+  </block>
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
@@ -370,7 +379,16 @@ Condition operators: `is`, `isNot`, `isSet`, `isNotSet`, `oneOf`, `notOneOf`, `c
 
 Each operator is driven by the field's **declared type**, never the value shape. A field reduces to one of four **surfaces**, and an operator used off its surface raises an error (a mis-authored rule fails loudly rather than silently mismatching):
 
-<block type="slateTable" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-34-r0","cells":[{"key":"tbl-34-r0c0","type":"header","value":[{"type":"p","children":[{"text":"surface"}]}]},{"key":"tbl-34-r0c1","type":"header","value":[{"type":"p","children":[{"text":"fields"}]}]},{"key":"tbl-34-r0c2","type":"header","value":[{"type":"p","children":[{"text":"operators"}]}]}]},{"key":"tbl-34-r1","cells":[{"key":"tbl-34-r1c0","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"string"}]}]}]},{"key":"tbl-34-r1c1","type":"data","value":[{"type":"p","children":[{"text":"text, textarea, url, Choice, "},{"type":"strong","children":[{"text":"slate"}]},{"text":" (its plaintext)"}]}]},{"key":"tbl-34-r1c2","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"is"}]},{"text":"/"},{"type":"code","children":[{"text":"isNot"}]},{"text":", "},{"type":"code","children":[{"text":"isSet"}]},{"text":", "},{"type":"code","children":[{"text":"oneOf"}]},{"text":"/"},{"type":"code","children":[{"text":"notOneOf"}]},{"text":", "},{"type":"code","children":[{"text":"contains"}]},{"text":"/"},{"type":"code","children":[{"text":"notContains"}]},{"text":" = "},{"type":"strong","children":[{"text":"substring"}]},{"text":", "},{"type":"code","children":[{"text":"regex"}]},{"text":"/"},{"type":"code","children":[{"text":"notRegex"}]}]}]}]},{"key":"tbl-34-r2","cells":[{"key":"tbl-34-r2c0","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"number"}]}]}]},{"key":"tbl-34-r2c1","type":"data","value":[{"type":"p","children":[{"text":"integer, float, number"}]}]},{"key":"tbl-34-r2c2","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"is"}]},{"text":"/"},{"type":"code","children":[{"text":"isNot"}]},{"text":", "},{"type":"code","children":[{"text":"oneOf"}]},{"text":", "},{"type":"code","children":[{"text":"isSet"}]},{"text":", "},{"type":"code","children":[{"text":"gt"}]},{"text":"/"},{"type":"code","children":[{"text":"gte"}]},{"text":"/"},{"type":"code","children":[{"text":"lt"}]},{"text":"/"},{"type":"code","children":[{"text":"lte"}]},{"text":" = compare"}]}]}]},{"key":"tbl-34-r3","cells":[{"key":"tbl-34-r3c0","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"boolean"}]}]}]},{"key":"tbl-34-r3c1","type":"data","value":[{"type":"p","children":[{"text":"boolean"}]}]},{"key":"tbl-34-r3c2","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"is"}]},{"text":"/"},{"type":"code","children":[{"text":"isNot"}]},{"text":", "},{"type":"code","children":[{"text":"isSet"}]}]}]}]},{"key":"tbl-34-r4","cells":[{"key":"tbl-34-r4c0","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"array"}]}]}]},{"key":"tbl-34-r4c1","type":"data","value":[{"type":"p","children":[{"text":"multiselect (its values), "},{"type":"strong","children":[{"text":"region"}]},{"text":" (its child block "},{"type":"strong","children":[{"text":"types"}]},{"text":")"}]}]},{"key":"tbl-34-r4c2","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"isSet"}]},{"text":", "},{"type":"code","children":[{"text":"is"}]},{"text":"/"},{"type":"code","children":[{"text":"isNot"}]},{"text":" = "},{"type":"strong","children":[{"text":"set-equality"}]},{"text":", "},{"type":"code","children":[{"text":"contains"}]},{"text":"/"},{"type":"code","children":[{"text":"notContains"}]},{"text":" = membership, "},{"type":"code","children":[{"text":"containsAny"}]},{"text":"/"},{"type":"code","children":[{"text":"containsAll"}]},{"text":" (+inverses), "},{"type":"code","children":[{"text":"gt"}]},{"text":"/"},{"type":"code","children":[{"text":"gte"}]},{"text":"/"},{"type":"code","children":[{"text":"lt"}]},{"text":"/"},{"type":"code","children":[{"text":"lte"}]},{"text":" = "},{"type":"strong","children":[{"text":"count"}]}]}]}]}]}}' />
+<block type="slateTable" table.fixed table.celled>
+
+| surface | fields | operators |
+| --- | --- | --- |
+| **string** | text, textarea, url, Choice, **slate** (its plaintext) | `is`/`isNot`, `isSet`, `oneOf`/`notOneOf`, `contains`/`notContains` = **substring**, `regex`/`notRegex` |
+| **number** | integer, float, number | `is`/`isNot`, `oneOf`, `isSet`, `gt`/`gte`/`lt`/`lte` = compare |
+| **boolean** | boolean | `is`/`isNot`, `isSet` |
+| **array** | multiselect (its values), **region** (its child block **types**) | `isSet`, `is`/`isNot` = **set-equality**, `contains`/`notContains` = membership, `containsAny`/`containsAll` (+inverses), `gt`/`gte`/`lt`/`lte` = **count** |
+
+</block>
 
 `oneOf` (scalar value ∈ set) and `containsAny` (array shares any with a set) differ only on the field side — `oneOf` is for a single-valued field, `containsAny` for a multiselect; `oneOf` on an array throws (use `containsAny`).
 
@@ -622,7 +640,17 @@ A mapping value is either a string (simple field rename) or `{ field, type }` (r
 
 When `type` is specified, the value is converted at runtime:
 
-<block type="slateTable" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-81-r0","cells":[{"key":"tbl-81-r0c0","type":"header","value":[{"type":"p","children":[{"text":"Type"}]}]},{"key":"tbl-81-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Conversion"}]}]}]},{"key":"tbl-81-r1","cells":[{"key":"tbl-81-r1c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"string"}]}]}]},{"key":"tbl-81-r1c1","type":"data","value":[{"type":"p","children":[{"text":"Arrays joined with "},{"type":"code","children":[{"text":"\", \""}]},{"text":"; image objects resolved to URL string"}]}]}]},{"key":"tbl-81-r2","cells":[{"key":"tbl-81-r2c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"link"}]}]}]},{"key":"tbl-81-r2c1","type":"data","value":[{"type":"p","children":[{"text":"String wrapped as "},{"type":"code","children":[{"text":"[{ \"@id\": value }]"}]},{"text":" (Volto link format)"}]}]}]},{"key":"tbl-81-r3","cells":[{"key":"tbl-81-r3c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"image"}]}]}]},{"key":"tbl-81-r3c1","type":"data","value":[{"type":"p","children":[{"text":"Pass through (expects "},{"type":"code","children":[{"text":"{ \"@id\", image_field, image_scales }"}]},{"text":")"}]}]}]},{"key":"tbl-81-r4","cells":[{"key":"tbl-81-r4c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"array"}]}]}]},{"key":"tbl-81-r4c1","type":"data","value":[{"type":"p","children":[{"text":"Non-arrays wrapped in "},{"type":"code","children":[{"text":"[value]"}]}]}]}]},{"key":"tbl-81-r5","cells":[{"key":"tbl-81-r5c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"(none)"}]}]}]},{"key":"tbl-81-r5c1","type":"data","value":[{"type":"p","children":[{"text":"Copied as-is"}]}]}]}]}}' />
+<block type="slateTable" table.fixed table.celled>
+
+| Type | Conversion |
+| --- | --- |
+| `string` | Arrays joined with `", "`; image objects resolved to URL string |
+| `link` | String wrapped as `[{ "@id": value }]` (Volto link format) |
+| `image` | Pass through (expects `{ "@id", image_field, image_scales }`) |
+| `array` | Non-arrays wrapped in `[value]` |
+| `(none)` | Copied as-is |
+
+</block>
 
 ### FieldMappingWidget
 
