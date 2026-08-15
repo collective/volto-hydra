@@ -90,12 +90,11 @@ export class AdminUIHelper {
   private async demoStep(target?: Locator): Promise<void> {
     if (!this.demoPacingMs) return;
     if (target) {
-      try {
-        await target.scrollIntoViewIfNeeded();
-        await target.hover({ timeout: 2000 });
-      } catch {
-        // Best-effort: a covered/animating target still records fine.
-      }
+      // Best-effort cursor move — hover auto-scrolls the target into view and is
+      // BOUNDED (timeout + catch). A bare scrollIntoViewIfNeeded is NOT bounded
+      // and hangs forever on a just-opened/animating container (e.g. the card
+      // grid's "Card Defaults" accordion), so it must not be used here.
+      await target.hover({ timeout: 1500 }).catch(() => {});
     }
     await this.page.waitForTimeout(this.demoPacingMs);
   }
@@ -110,23 +109,39 @@ export class AdminUIHelper {
   async setChoiceField(
     field: string,
     optionLabel: string,
-    options: { container?: string } = {}
+    options: { container?: string; multi?: boolean } = {}
   ): Promise<void> {
     const base = options.container ?? '#sidebar-properties';
-    const control = this.page
-      .locator(`${base} .field-wrapper-${field} .react-select__control`)
+    // Close any stray-open react-select menu first — some Choice fields auto-open
+    // their menu on focus (the card grid's colour field does), and its floating
+    // options would intercept the click on THIS field. Blur closes it (NOT
+    // Escape — hydra treats that as step-up/deselect).
+    await this.page.evaluate(() =>
+      (document.activeElement as HTMLElement | null)?.blur?.()
+    );
+    // Some blocks (the card grid) render their fieldset TWICE, so a plain
+    // .first() can grab a HIDDEN copy whose control never becomes clickable
+    // (a 240s hang). Scope everything to the VISIBLE field-wrapper.
+    const fieldWrap = this.page
+      .locator(`${base} .field-wrapper-${field}:visible`)
       .first();
-    // demoStep scrolls (best-effort) + hovers; control.click() auto-scrolls.
-    // A bare scrollIntoViewIfNeeded here can hang if the control's container is
-    // still settling (e.g. a just-opened accordion) — so rely on those instead.
+    const control = fieldWrap.locator('.react-select__control');
+    // demoStep hovers (bounded); control.click() auto-scrolls into view.
     await this.demoStep(control);
     await control.click();
-    // Wait for THIS field's menu to open before looking inside it — clicking the
-    // control right after a prior selection can race the menu re-render.
-    const menu = this.page.locator(
-      `${base} .field-wrapper-${field} .react-select__menu`
-    );
-    await menu.waitFor({ state: 'visible', timeout: 5000 });
+    // The open menu is a singleton (only one react-select is open at a time) and
+    // is NOT always a DOM descendant of its field-wrapper, so find it at page
+    // level.
+    const menu = this.page.locator('.react-select__menu');
+    // control.click() TOGGLES the menu. If the field started already-open (a
+    // prior focus can leave a react-select open), our click just closed it — so
+    // wait briefly, and if it didn't open, click again to (re)open.
+    try {
+      await menu.waitFor({ state: 'visible', timeout: 1500 });
+    } catch {
+      await control.click();
+      await menu.waitFor({ state: 'visible', timeout: 5000 });
+    }
     // react-select renders each option as a `.react-select__option` div (no
     // role="option"). Match the exact label with an anchored regex so e.g.
     // "Off white" doesn't also match "Off white highlight". Scope to this menu.
@@ -155,9 +170,17 @@ export class AdminUIHelper {
     // Wait for it in the DOM, then let click() auto-scroll it into the menu's
     // viewport (a long option list can keep an option attached-but-not-visible).
     await option.waitFor({ state: 'attached', timeout: 5000 });
-    await option.scrollIntoViewIfNeeded();
+    await option.scrollIntoViewIfNeeded().catch(() => {});
     await this.demoStep(option);
     await option.click();
+    // A multi-select keeps its menu OPEN after a pick (so you can add more), so
+    // blur to close it (NOT Escape — hydra reads that as step-up/deselect). A
+    // single-select closes on pick.
+    if (options.multi) {
+      await this.page.evaluate(() =>
+        (document.activeElement as HTMLElement | null)?.blur?.()
+      );
+    }
     await expect(menu).toHaveCount(0, { timeout: 5000 });
   }
 

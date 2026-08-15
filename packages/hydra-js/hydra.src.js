@@ -8098,7 +8098,31 @@ export class Bridge {
     const containerUid = containerBlock.getAttribute('data-block-uid');
     log('handleBlockSelector: container =', containerUid);
 
-    // Get all child blocks in this container
+    // Direct UID selector. The value is either a single uid (e.g. a
+    // carousel dot → that slide) or a space-separated word-list whose
+    // FIRST uid is the block to select — accordion panel headers carry
+    // `[panelUid, ...childUids]` (panel first), the rest of the list is
+    // only there for tryMakeBlockVisible's `~=` reveal match. Take the
+    // first token either way.
+    //
+    // This MUST run before the childBlocks===0 early-return below: the trigger
+    // can itself be the block's own node (a tab nav link carries data-block-uid)
+    // with the rest of the block as flat siblings, so it has zero nested
+    // children — returning early there swallowed the click and the block (e.g. a
+    // tab, so you could edit its title) never got selected.
+    if (selector !== '+1' && selector !== '-1') {
+      const targetUid = selector.trim().split(/\s+/)[0];
+      log('handleBlockSelector: direct selector targetUid =', targetUid);
+      // Hide outline during transition (same as +1/-1 path)
+      this._blockSelectorNavigating = true;
+      this.stopTransitionTracking();
+      window.parent.postMessage({ type: 'HIDE_BLOCK_UI' }, this.adminOrigin);
+      this.waitForBlockVisibleAndSelect(targetUid);
+      return;
+    }
+
+    // Get all child blocks in this container (only the +1/-1 cycling path needs
+    // them).
     const allNestedBlocks = containerBlock.querySelectorAll('[data-block-uid]');
     const childBlocks = Array.from(allNestedBlocks).filter((el) => {
       const parentContainer = el.parentElement?.closest('[data-block-uid]');
@@ -8108,23 +8132,6 @@ export class Bridge {
 
     if (childBlocks.length === 0) {
       log('handleBlockSelector: no child blocks found');
-      return;
-    }
-
-    // Direct UID selector. The value is either a single uid (e.g. a
-    // carousel dot → that slide) or a space-separated word-list whose
-    // FIRST uid is the block to select — accordion panel headers carry
-    // `[panelUid, ...childUids]` (panel first), the rest of the list is
-    // only there for tryMakeBlockVisible's `~=` reveal match. Take the
-    // first token either way.
-    if (selector !== '+1' && selector !== '-1') {
-      const targetUid = selector.trim().split(/\s+/)[0];
-      log('handleBlockSelector: direct selector targetUid =', targetUid);
-      // Hide outline during transition (same as +1/-1 path)
-      this._blockSelectorNavigating = true;
-      this.stopTransitionTracking();
-      window.parent.postMessage({ type: 'HIDE_BLOCK_UI' }, this.adminOrigin);
-      this.waitForBlockVisibleAndSelect(targetUid);
       return;
     }
 
