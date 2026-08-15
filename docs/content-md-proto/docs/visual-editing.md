@@ -82,8 +82,8 @@ assignments:
   - { uid: p-59, type: slate }
   - { uid: ce-60, type: codeExample }
 prototypes: |
-  <block type="title"      _="${h1}" />
-  <block type="slate"      value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
+  <block type="title" _="${h1}" />
+  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
@@ -91,7 +91,7 @@ prototypes: |
   </block>
 ---
 
-# Visual Editing
+# 
 
 ## HTML Annotations for Visual Editing
 
@@ -104,39 +104,13 @@ Add data attributes to your rendered HTML to enable progressively richer visual 
 
 Example of a fully annotated slide block:
 
-### Html
-
-```html
-<div class="slide" data-block-uid="slide-1">
-    <img data-edit-media="image" src="/big_news.jpg"/>
-    <h2 data-edit-text="title">Big News</h2>
-    <div data-edit-text="description">
-        Check out <b>hydra</b>, it will change everything
-    </div>
-    <a data-edit-link="url"
-       data-edit-text="buttonText"
-       href="/big_news">Read more</a>
-</div>
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-5-html-6481c1","label":"Html","language":"html","code":"<div class=\"slide\" data-block-uid=\"slide-1\">\n    <img data-edit-media=\"image\" src=\"/big_news.jpg\"/>\n    <h2 data-edit-text=\"title\">Big News</h2>\n    <div data-edit-text=\"description\">\n        Check out <b>hydra</b>, it will change everything\n    </div>\n    <a data-edit-link=\"url\"\n       data-edit-text=\"buttonText\"\n       href=\"/big_news\">Read more</a>\n</div>"}]}' />
 
 ## Comment Syntax
 
 If you can't modify the markup (e.g., using a 3rd party component library), use comment syntax to specify block attributes:
 
-### Html
-
-```html
-<!-- hydra block-uid=block-123
-     edit-text=title(.card-title)
-     edit-media=url(img)
-     edit-link=href(a.link) -->
-<div class="third-party-card">
-  <h3 class="card-title">Title</h3>
-  <img src="image.jpg">
-  <a class="link" href="...">Read more</a>
-</div>
-<!-- /hydra -->
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-8-html-5005a4","label":"Html","language":"html","code":"<!-- hydra block-uid=block-123\n     edit-text=title(.card-title)\n     edit-media=url(img)\n     edit-link=href(a.link) -->\n<div class=\"third-party-card\">\n  <h3 class=\"card-title\">Title</h3>\n  <img src=\"image.jpg\">\n  <a class=\"link\" href=\"...\">Read more</a>\n</div>\n<!-- /hydra -->"}]}' />
 
 - Attributes without selectors apply to the root element: `block-uid=xxx`
 - Attributes with selectors target child elements: `edit-text=title(.card-title)`
@@ -149,12 +123,7 @@ Supported attributes: `block-uid`, `block-readonly`, `edit-text`, `edit-link`, `
 
 Render optional fields **data-driven**: no data, no element. Don't render an empty element just to give the editor something to click — it leaks empty markup into your published page.
 
-### Jsx
-
-```jsx
-{block.heading && <h1 data-edit-text="heading">{block.heading}</h1>}
-{block.image && <img data-edit-media="image" src={block.image} />}
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-13-html-20bcae","label":"Jsx","language":"jsx","code":"{block.heading &amp;&amp; <h1 data-edit-text=\"heading\">{block.heading}</h1>}\n{block.image &amp;&amp; <img data-edit-media=\"image\" src={block.image} />}"}]}' />
 
 Plain truthiness is enough — you never need `.length` or a null-safe walk. Inka normalises a field the editor has cleared (widgets write `[]`, which is truthy) to absent before your renderer sees it.
 
@@ -168,12 +137,7 @@ Reveal replaces a per-block boolean only where "has data" and "should render" ar
 
 Add `data-linkable-allow` to elements that should navigate during edit mode (paging links, facet controls, etc.):
 
-### Html
-
-```html
-<a href="/page?pg=2" data-linkable-allow>Next</a>
-<select data-linkable-allow @change="handleFilter">...</select>
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-20-html-da86a1","label":"Html","language":"html","code":"<a href=\"/page?pg=2\" data-linkable-allow>Next</a>\n<select data-linkable-allow @change=\"handleFilter\">...</select>"}]}' />
 
 ## Field Path Syntax
 
@@ -194,21 +158,7 @@ Every `data-edit-*` attribute — `data-edit-text`, `data-edit-link`, `data-edit
 
 The two compose: `../content/headline` is "the parent block, its `content.headline`". `/` descends objects only — a region (`object_list` / `blocks_layout`) or a value is the end of a path (a region's children are separate blocks with their own `data-block-uid`).
 
-### Html
-
-```html
-<!-- page fields (not inside any block) -->
-<h1 data-edit-text="/title">My Page Title</h1>
-<p  data-edit-text="/description">Page description here</p>
-
-<!-- inside a nested block, edit the parent container's title -->
-<h3 data-edit-text="../title">Column Title</h3>
-
-<!-- fields nested on a widget:'object' — text, link and media all use the same path -->
-<h3 data-edit-text="content/headline">…</h3>
-<a  data-edit-link="content/href">…</a>
-<img data-edit-media="content/image" />
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-29-html-a5e4fc","label":"Html","language":"html","code":"<!-- page fields (not inside any block) -->\n<h1 data-edit-text=\"/title\">My Page Title</h1>\n<p  data-edit-text=\"/description\">Page description here</p>\n\n<!-- inside a nested block, edit the parent container&#39;s title -->\n<h3 data-edit-text=\"../title\">Column Title</h3>\n\n<!-- fields nested on a widget:&#39;object&#39; — text, link and media all use the same path -->\n<h3 data-edit-text=\"content/headline\">…</h3>\n<a  data-edit-link=\"content/href\">…</a>\n<img data-edit-media=\"content/image\" />"}]}' />
 
 This lets fixed parts of the page (headers), parent-block fields, and fields grouped inside an object all be edited in place, with one addressing model.
 
@@ -216,25 +166,11 @@ This lets fixed parts of the page (headers), parent-block fields, and fields gro
 
 Add `data-block-readonly` (or `<!-- hydra block-readonly -->` comment) to disable inline editing for all fields inside an element:
 
-### Html
-
-```html
-<div class="teaser" data-block-uid="teaser-1">
-  <div data-block-readonly>
-    <h2 data-edit-text="title">Target Page Title</h2>
-  </div>
-  <a data-edit-link="href" href="/target">Read more</a>
-</div>
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-33-html-6eefe4","label":"Html","language":"html","code":"<div class=\"teaser\" data-block-uid=\"teaser-1\">\n  <div data-block-readonly>\n    <h2 data-edit-text=\"title\">Target Page Title</h2>\n  </div>\n  <a data-edit-link=\"href\" href=\"/target\">Read more</a>\n</div>"}]}' />
 
 Or using comment syntax:
 
-### Html
-
-```html
-<!-- hydra block-readonly -->
-<div class="listing-item" data-block-uid="item-1">...</div>
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-35-html-9626f2","label":"Html","language":"html","code":"<!-- hydra block-readonly -->\n<div class=\"listing-item\" data-block-uid=\"item-1\">...</div>"}]}' />
 
 `data-block-readonly` is *your* call — use it when your frontend wants to lock a block for its own reasons (a teaser mirroring another page, a listing item).
 
@@ -249,17 +185,7 @@ When rendering Slate nodes to DOM, your renderer must follow these rules for `da
 
 hydra.js uses node-ids to map between Slate's data model and your DOM. When restoring cursor position after formatting changes, it walks your DOM counting Slate children.
 
-### Html
-
-```html
-Valid wrapper pattern:
-<strong data-node-id="0.1"><b data-node-id="0.1">bold</b></strong>
-Both elements have the same node-id, so they count as one Slate child.
-
-Invalid (missing node-id on wrapper):
-<span class="my-style"><strong data-node-id="0.1">bold</strong></span>
-This breaks cursor positioning because hydra.js can't correlate DOM structure to Slate structure.
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-42-html-7ddfd5","label":"Html","language":"html","code":"Valid wrapper pattern:\n<strong data-node-id=\"0.1\"><b data-node-id=\"0.1\">bold</b></strong>\nBoth elements have the same node-id, so they count as one Slate child.\n\nInvalid (missing node-id on wrapper):\n<span class=\"my-style\"><strong data-node-id=\"0.1\">bold</strong></span>\nThis breaks cursor positioning because hydra.js can&#39;t correlate DOM structure to Slate structure."}]}' />
 
 ## Non-editable content inside a slate field
 
@@ -270,13 +196,7 @@ Sometimes a renderer adds elements to slate output that are **not** part of the 
 
 hydra's DOM→Slate reader skips any child (without a `data-node-id`) that carries **either** attribute — treating it as chrome, not content. Without this, the element's text would be read back into the Slate value on every edit / select / delete over it, corrupting the value.
 
-### Html
-
-```html
-An <a data-node-id="0.1">external link<span class="external-icon"
-  aria-hidden="true" contenteditable="false">&#8599;</span></a>
-The icon is decoration: the caret skips it and it never enters the value.
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-47-html-a67f8c","label":"Html","language":"html","code":"An <a data-node-id=\"0.1\">external link<span class=\"external-icon\"\n  aria-hidden=\"true\" contenteditable=\"false\">&amp;#8599;</span></a>\nThe icon is decoration: the caret skips it and it never enters the value."}]}' />
 
 Contrast this with the wrapper rule above: a wrapper that holds real content carries the inner node's `data-node-id` (and neither of these attributes), so it IS read; decorative / non-editable chrome carries these attributes and is skipped.
 
@@ -295,50 +215,12 @@ A frontend renderer can therefore always assume one top-level node per slate fie
 
 Slate data structure (value is an array but always contains a single root node):
 
-### Json
-
-```json
-{
-  "value": [
-    {
-      "type": "p", "nodeId": "0",
-      "children": [
-        { "text": "Hello " },
-        { "type": "strong", "nodeId": "0.1",
-          "children": [{ "text": "world" }] },
-        { "text": "! Visit " },
-        { "type": "link", "nodeId": "0.3",
-          "data": { "url": "/about" },
-          "children": [{ "text": "our page" }] }
-      ]
-    }
-  ]
-}
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-56-json-a0b37e","label":"Json","language":"json","code":"{\n  \"value\": [\n    {\n      \"type\": \"p\", \"nodeId\": \"0\",\n      \"children\": [\n        { \"text\": \"Hello \" },\n        { \"type\": \"strong\", \"nodeId\": \"0.1\",\n          \"children\": [{ \"text\": \"world\" }] },\n        { \"text\": \"! Visit \" },\n        { \"type\": \"link\", \"nodeId\": \"0.3\",\n          \"data\": { \"url\": \"/about\" },\n          \"children\": [{ \"text\": \"our page\" }] }\n      ]\n    }\n  ]\n}"}]}' />
 
 Renderer:
 
-### Javascript
-
-```javascript
-function renderSlate(nodes) {
-  return (nodes || []).map(node => {
-    if (node.text !== undefined) return escapeHtml(node.text);
-    const tag = { p:'p', h1:'h1', h2:'h2', strong:'strong',
-                  em:'em', link:'a' }[node.type] || 'span';
-    const attrs = node.type === 'link'
-      ? ` href="${node.data?.url || '#'}"` : '';
-    return `<${tag} data-node-id="${node.nodeId}"${attrs}>${renderSlate(node.children)}</${tag}>`;
-  }).join('');
-}
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-58-javascript-3cee82","label":"Javascript","language":"javascript","code":"function renderSlate(nodes) {\n  return (nodes || []).map(node => {\n    if (node.text !== undefined) return escapeHtml(node.text);\n    const tag = { p:&#39;p&#39;, h1:&#39;h1&#39;, h2:&#39;h2&#39;, strong:&#39;strong&#39;,\n                  em:&#39;em&#39;, link:&#39;a&#39; }[node.type] || &#39;span&#39;;\n    const attrs = node.type === &#39;link&#39;\n      ? ` href=\"${node.data?.url || &#39;#&#39;}\"` : &#39;&#39;;\n    return `<${tag} data-node-id=\"${node.nodeId}\"${attrs}>${renderSlate(node.children)}</${tag}>`;\n  }).join(&#39;&#39;);\n}"}]}' />
 
 Usage:
 
-### Html
-
-```html
-<div data-block-uid="block-1" data-edit-text="value">
-  <!-- renderSlate(block.value) output goes here -->
-</div>
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-60-html-7e15f3","label":"Html","language":"html","code":"<div data-block-uid=\"block-1\" data-edit-text=\"value\">\n  <!-- renderSlate(block.value) output goes here -->\n</div>"}]}' />

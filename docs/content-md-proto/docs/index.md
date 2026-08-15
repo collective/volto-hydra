@@ -33,11 +33,11 @@ assignments:
   - { uid: p-9, type: slate }
   - { uid: listing-1, type: listing }
 prototypes: |
-  <block type="title"      _="${h1}" />
-  <block type="slate"      value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
+  <block type="title" _="${h1}" />
+  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
 ---
 
-# Docs
+# 
 
 A design-system-first page-builder toolkit. Strike the right balance for your site — make it easy for editors to create engagement while staying compliant.
 
@@ -66,4 +66,4 @@ The default preset is a Nuxt.js frontend deployed as an [SSG](https://hydra-nuxt
 
 To run Inka locally against your own frontend, see the **Run Locally** section of the [project README](https://github.com/collective/volto-hydra#run-locally).
 
-<block type="listing" uid="listing-1" headlineTag="h2" variation="summary" data='{"styles":{},"fieldMapping":{"@id":"href","title":"title","description":"description","image":"image"}}' />
+<block type="listing" headlineTag="h2" variation="summary" data='{"styles":{},"fieldMapping":{"@id":"href","title":"title","description":"description","image":"image"}}' />

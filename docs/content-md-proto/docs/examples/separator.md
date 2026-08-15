@@ -50,57 +50,64 @@ assignments:
   - { uid: ref-separator-json-data, type: codeExample }
   - { uid: ref-separator-rendering, type: codeExample }
 prototypes: |
-  <block type="title"      _="${h1}" />
-  <block type="slate"      value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
-  <block type="image"      description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" />
+  <block type="title" _="${h1}" />
+  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
+  <block type="separator" _="${hr}" />
+  <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+  <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+  <block type="codeExample">
+    <region name="tabs" widget="object_list">
+      <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
+    </region>
+  </block>
 ---
 
-# Separator
+# 
 
 A horizontal rule used to visually divide sections of content. Supports an alignment style property.
 
-![The separator example block being edited in Volto Hydra](/docs/images/separator-edit)
+<block type="image" url="/docs/images/separator-edit" alt="The separator example block being edited in Volto Hydra" align="center" size="l" />
 
-<block type="separator" uid="dee0a2a5-dda7-407d-be26-1cecf1ba55a6" data='{"styles":{"align":"full"}}' />
+<block type="separator" data='{"styles":{"align":"full"}}' />
 
-<block type="introduction" uid="be9ea3ae-29e1-41b8-b338-f32070a82675" data='{"value":[{"children":[{"text":"Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat."}],"type":"p"}]}' />
+<block type="introduction" data='{"value":[{"children":[{"text":"Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat."}],"type":"p"}]}' />
 
-<block type="separator" uid="cf7e08f3-b9a8-4604-b208-e3a8bc88ec83" data='{"styles":{"align":"full"}}' />
-
-Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
+<block type="separator" data='{"styles":{"align":"full"}}' />
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
 
-<block type="separator" uid="a4eccaa5-e954-4c35-9d1d-bd3ce3a68691" data='{"styles":{"align":"center"}}' />
+Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
 
-<block type="image" uid="d4d24182-f2b9-4f42-8775-92ceeabeb962" align="center" description="Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt." size="l" title="Title Image" url="/docs/examples/content-types/image-dark" data='{"credit":{}}' />
+<block type="separator" data='{"styles":{"align":"center"}}' />
 
-<block type="separator" uid="a10b2026-51da-421a-a2b7-1e9617362366" data='{"styles":{"align":"center"}}' />
+<block type="image" align="center" description="Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt." size="l" title="Title Image" url="/docs/examples/content-types/image-dark" data='{"credit":{}}' />
 
-<block type="image" uid="d65027a5-7bc8-476b-8061-779ba923b04a" align="right" description="Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt." size="l" title="Title Image" url="/docs/examples/content-types/image-dark" data='{"credit":{},"styles":{"size:noprefix":"large"}}' />
+<block type="separator" data='{"styles":{"align":"center"}}' />
+
+<block type="image" align="right" description="Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt." size="l" title="Title Image" url="/docs/examples/content-types/image-dark" data='{"credit":{},"styles":{"size:noprefix":"large"}}' />
 
 ## Text Heading H2
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem iusto odio dignissim qui blandit praesent luptatum zzril delenit auguevel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore blandit praesent luptatum zzril qu. Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.&#x20;
 
-<block type="separator" uid="da5327a4-144c-4327-a38e-98a58643f9d0" data='{"styles":{"align":"left"}}' />
+<block type="separator" data='{"styles":{"align":"left"}}' />
 
-<block type="image" uid="9128144d-66f8-4943-8b1d-253cb11431de" align="left" description="Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt." size="m" title="Title Image" url="/docs/examples/content-types/image-dark" data='{"credit":{},"styles":{"size:noprefix":"medium"}}' />
-
-### Text Heading H3
-
-Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem iusto odio dignissim qui blandit praesent luptatum zzril delenit auguevel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore blandit praesent luptatum zzril qu. Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.&#x20;
-
-<block type="separator" uid="ef3f8f79-11c3-4495-b98f-15f0568645b5" data='{"styles":{"align":"left"}}' />
-
-<block type="image" uid="9c102ef1-5044-41cf-9859-025b23a90c26" align="left" description="Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt." size="s" title="Title Image" url="/docs/examples/content-types/image-dark" data='{"credit":{},"styles":{"size:noprefix":"small"}}' />
+<block type="image" align="left" description="Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt." size="m" title="Title Image" url="/docs/examples/content-types/image-dark" data='{"credit":{},"styles":{"size:noprefix":"medium"}}' />
 
 ### Text Heading H3
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem iusto odio dignissim qui blandit praesent luptatum zzril delenit auguevel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore blandit praesent luptatum zzril qu. Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.&#x20;
 
-<block type="codeExample" uid="ref-separator-schema" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="schema" data='{"tabs":[{"@id":"ref-separator-schema-javascript-3157d9","label":"Schema","language":"javascript","code":"{\n  \"separator\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"styles\": {\n          \"title\": \"Styles\"\n        }\n      }\n    }\n  }\n}"}]}' />
+<block type="separator" data='{"styles":{"align":"left"}}' />
 
-<block type="codeExample" uid="ref-separator-json-data" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="json-data" data='{"tabs":[{"@id":"ref-separator-json-data-json-9d890c","label":"JSON Block Data","language":"json","code":"{\n  \"@type\": \"separator\",\n  \"styles\": {\n    \"align\": \"center\"\n  }\n}"}]}' />
+<block type="image" align="left" description="Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt." size="s" title="Title Image" url="/docs/examples/content-types/image-dark" data='{"credit":{},"styles":{"size:noprefix":"small"}}' />
 
-<block type="codeExample" uid="ref-separator-rendering" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="rendering" data='{"tabs":[{"@id":"ref-separator-rendering-jsx-470901","label":"React","language":"jsx","code":"function SeparatorBlock({ block }) {\n  const align = block.styles?.align || &#39;full&#39;;\n\n  return (\n    <div data-block-uid={block[&#39;@uid&#39;]} className={`separator-block separator-${align}`}>\n      <hr />\n    </div>\n  );\n}"},{"@id":"ref-separator-rendering-vue-4281a1","label":"Vue","language":"vue","code":"<template>\n  <div :data-block-uid=\"block[&#39;@uid&#39;]\" :class=\"&#39;separator-block separator-&#39; + (block.styles?.align || &#39;full&#39;)\">\n    <hr />\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>"},{"@id":"ref-separator-rendering-svelte-8c1d19","label":"Svelte","language":"svelte","code":"<script>\n  export let block;\n</script>\n\n<div data-block-uid={block[&#39;@uid&#39;]} class=\"separator-block separator-{block.styles?.align || &#39;full&#39;}\">\n  <hr />\n</div>"}]}' />
+### Text Heading H3
+
+Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem iusto odio dignissim qui blandit praesent luptatum zzril delenit auguevel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore blandit praesent luptatum zzril qu. Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.&#x20;
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="schema" data='{"tabs":[{"@id":"ref-separator-schema-javascript-3157d9","label":"Schema","language":"javascript","code":"{\n  \"separator\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"styles\": {\n          \"title\": \"Styles\"\n        }\n      }\n    }\n  }\n}"}]}' />
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="json-data" data='{"tabs":[{"@id":"ref-separator-json-data-json-9d890c","label":"JSON Block Data","language":"json","code":"{\n  \"@type\": \"separator\",\n  \"styles\": {\n    \"align\": \"center\"\n  }\n}"}]}' />
+
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator" slotId="rendering" data='{"tabs":[{"@id":"ref-separator-rendering-jsx-470901","label":"React","language":"jsx","code":"function SeparatorBlock({ block }) {\n  const align = block.styles?.align || &#39;full&#39;;\n\n  return (\n    <div data-block-uid={block[&#39;@uid&#39;]} className={`separator-block separator-${align}`}>\n      <hr />\n    </div>\n  );\n}"},{"@id":"ref-separator-rendering-vue-4281a1","label":"Vue","language":"vue","code":"<template>\n  <div :data-block-uid=\"block[&#39;@uid&#39;]\" :class=\"&#39;separator-block separator-&#39; + (block.styles?.align || &#39;full&#39;)\">\n    <hr />\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>"},{"@id":"ref-separator-rendering-svelte-8c1d19","label":"Svelte","language":"svelte","code":"<script>\n  export let block;\n</script>\n\n<div data-block-uid={block[&#39;@uid&#39;]} class=\"separator-block separator-{block.styles?.align || &#39;full&#39;}\">\n  <hr />\n</div>"}]}' />

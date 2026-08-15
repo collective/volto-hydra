@@ -19,7 +19,7 @@ title: Images
 assignments:
   - { uid: title-1, type: title }
 prototypes: |
-  <block type="title"      _="${h1}" />
+  <block type="title" _="${h1}" />
 ---
 
-# Images
+# 

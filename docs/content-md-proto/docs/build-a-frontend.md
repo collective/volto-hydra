@@ -91,8 +91,8 @@ assignments:
   - { uid: ul-67, type: slate }
   - { uid: p-68, type: slate }
 prototypes: |
-  <block type="title"      _="${h1}" />
-  <block type="slate"      value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
+  <block type="title" _="${h1}" />
+  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
@@ -100,7 +100,7 @@ prototypes: |
   </block>
 ---
 
-# Build a frontend
+# 
 
 The actual code you write will depend on the framework you choose. You can look at these examples to help you:
 
@@ -114,87 +114,19 @@ Before you dive into the steps, here's what your frontend ends up doing.
 
 To make a site editable with Inka you break a page into:
 
-- **Blocks fields** — one or more named, ordered lists of blocks. Each is a schema property with `widget: 'blocks_layout'`; the field name is a key inside the page's `blocks_layout` dict (the default field is `items`, plus e.g. `header`, `footer`). Every field's blocks live in the page's single shared `blocks` dict; the field only records ordering.
-- **Blocks** — discrete visual elements with a schema and settings that can be moved and edited.Type, title, icon etc. so the user can pick from a menu.Fields: string, image, link etc. each with their own sidebar widget.`slate` is a special field that contains JSON for a paragraph, heading etc.`blocks` fields let a block hold other blocks.
+<block type="slate" data='{"value":[{"type":"ul","children":[{"type":"li","children":[{"type":"strong","children":[{"text":"Blocks fields"}]},{"text":" — one or more named, ordered lists of blocks. Each is a schema property with "},{"type":"code","children":[{"text":"widget: &#39;blocks_layout&#39;"}]},{"text":"; the field name is a key inside the page&#39;s "},{"type":"code","children":[{"text":"blocks_layout"}]},{"text":" dict (the default field is "},{"type":"code","children":[{"text":"items"}]},{"text":", plus e.g. "},{"type":"code","children":[{"text":"header"}]},{"text":", "},{"type":"code","children":[{"text":"footer"}]},{"text":"). Every field&#39;s blocks live in the page&#39;s single shared "},{"type":"code","children":[{"text":"blocks"}]},{"text":" dict; the field only records ordering."}]},{"type":"li","children":[{"type":"strong","children":[{"text":"Blocks"}]},{"text":" — discrete visual elements with a schema and settings that can be moved and edited."},{"type":"ul","children":[{"type":"li","children":[{"text":"Type, title, icon etc. so the user can pick from a menu."}]},{"type":"li","children":[{"text":"Fields: string, image, link etc. each with their own sidebar widget."},{"type":"ul","children":[{"type":"li","children":[{"type":"code","children":[{"text":"slate"}]},{"text":" is a special field that contains JSON for a paragraph, heading etc."}]},{"type":"li","children":[{"type":"code","children":[{"text":"blocks"}]},{"text":" fields let a block hold other blocks."}]}]}]}]}]}]}]}' />
 
 When the page loads inside Inka's edit iframe, you initialise the bridge and declare your blocks; otherwise you render normally from the API:
 
-### Js
-
-```js
-let bridge;
-
-if (window.name.startsWith('hydra')) {
-    bridge = initBridge({
-      page: {
-        schema: {
-          // Each blocks field (widget: 'blocks_layout') is a named list of
-          // blocks. The field name is the key inside the `blocks_layout` dict;
-          // the default field is `items`. Each has its own allowedBlocks.
-          properties: {
-            items:  { widget: 'blocks_layout', allowedBlocks: ['slate', 'grid', 'myimage'] },
-            header: { widget: 'blocks_layout', allowedBlocks: ['slate', 'image'], maxLength: 3 },
-            footer: { widget: 'blocks_layout', allowedBlocks: ['slate', 'link'] },
-          },
-        },
-      },
-      blocks: {
-        // we can add custom blocks (or alter builtin ones)
-        myimage: {
-          blockSchema: {
-            properties: {
-              image: { widget: 'image' },
-              url: { widget: 'url' },
-              caption: { type: 'string' },
-            }
-          }
-        }
-      },
-      onEditChange: (formData) => renderPage(formData),
-    });
-}
-else {
-    // When not editing, render from the server api
-    renderPage(await fetchContent(path));
-}
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-8-js-bf605e","label":"Js","language":"js","code":"let bridge;\n\nif (window.name.startsWith(&#39;hydra&#39;)) {\n    bridge = initBridge({\n      page: {\n        schema: {\n          // Each blocks field (widget: &#39;blocks_layout&#39;) is a named list of\n          // blocks. The field name is the key inside the `blocks_layout` dict;\n          // the default field is `items`. Each has its own allowedBlocks.\n          properties: {\n            items:  { widget: &#39;blocks_layout&#39;, allowedBlocks: [&#39;slate&#39;, &#39;grid&#39;, &#39;myimage&#39;] },\n            header: { widget: &#39;blocks_layout&#39;, allowedBlocks: [&#39;slate&#39;, &#39;image&#39;], maxLength: 3 },\n            footer: { widget: &#39;blocks_layout&#39;, allowedBlocks: [&#39;slate&#39;, &#39;link&#39;] },\n          },\n        },\n      },\n      blocks: {\n        // we can add custom blocks (or alter builtin ones)\n        myimage: {\n          blockSchema: {\n            properties: {\n              image: { widget: &#39;image&#39; },\n              url: { widget: &#39;url&#39; },\n              caption: { type: &#39;string&#39; },\n            }\n          }\n        }\n      },\n      onEditChange: (formData) => renderPage(formData),\n    });\n}\nelse {\n    // When not editing, render from the server api\n    renderPage(await fetchContent(path));\n}"}]}' />
 
 Page data ends up shaped like this — one shared `blocks` dict, and a region per named list inside `blocks_layout`:
 
-### Js
-
-```js
-{
-  ...
-  blocks: {
-    'text-1': { '@type': 'slate', ... },
-    'header-1': { '@type': 'image', ... },
-    'footer-1': { '@type': 'slate', ... }
-  },
-  blocks_layout: {
-    items: ['text-1'],     // main content region (the default)
-    header: ['header-1'],  // header region
-    footer: ['footer-1']   // footer region
-  }
-}
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-10-js-2e9648","label":"Js","language":"js","code":"{\n  ...\n  blocks: {\n    &#39;text-1&#39;: { &#39;@type&#39;: &#39;slate&#39;, ... },\n    &#39;header-1&#39;: { &#39;@type&#39;: &#39;image&#39;, ... },\n    &#39;footer-1&#39;: { &#39;@type&#39;: &#39;slate&#39;, ... }\n  },\n  blocks_layout: {\n    items: [&#39;text-1&#39;],     // main content region (the default)\n    header: [&#39;header-1&#39;],  // header region\n    footer: [&#39;footer-1&#39;]   // footer region\n  }\n}"}]}' />
 
 Then you augment the rendered HTML with `data-` attributes (or `<!-- hydra ... -->` comments) so Inka can find your blocks and editable fields:
 
-### Html
-
-```html
-<!-- hydra edit-text=title -->
-<div>Page Title</div>
-
-<div id=content>
-  <!-- hydra block-uid="1234" edit-text=title(p) edit-media=image(img) edit-link=url -->
-  <a href="http://go.to">
-    <img src="http://my.img"/>
-    <p>A caption</p>
-  </a>
-</div>
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-12-html-e0187e","label":"Html","language":"html","code":"<!-- hydra edit-text=title -->\n<div>Page Title</div>\n\n<div id=content>\n  <!-- hydra block-uid=\"1234\" edit-text=title(p) edit-media=image(img) edit-link=url -->\n  <a href=\"http://go.to\">\n    <img src=\"http://my.img\"/>\n    <p>A caption</p>\n  </a>\n</div>"}]}' />
 
 ### Deep-link anchors (fragments)
 
@@ -203,13 +135,7 @@ To let editors link to a spot *inside* a page, mark the element with a real `id`
 - `data-linkable-h1` … `data-linkable-h6="Label"` — a heading anchor **at that level**. Use these on your headings; the suffix is the level.
 - `data-linkable-id="Label"` — a **level-less** anchor (a figure, a defined term, any non-heading target).
 
-### Html
-
-```html
-<h2 id="pricing" data-linkable-h2="Pricing">Pricing</h2>
-<h3 id="enterprise" data-linkable-h3="Enterprise plan">Enterprise plan</h3>
-<figure id="fig-1" data-linkable-id="Figure 1">…</figure>
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-16-html-5cddab","label":"Html","language":"html","code":"<h2 id=\"pricing\" data-linkable-h2=\"Pricing\">Pricing</h2>\n<h3 id=\"enterprise\" data-linkable-h3=\"Enterprise plan\">Enterprise plan</h3>\n<figure id=\"fig-1\" data-linkable-id=\"Figure 1\">…</figure>"}]}' />
 
 Inka harvests these per block on render as `{ id, name, level }` and stores them in the block's data, so the object browser offers them as `path#pricing` link targets — as a nested list reflecting the page's structure. Both attributes must survive into your **published** render for the anchor to resolve at runtime — Inka only reads them in edit mode.
 
@@ -221,11 +147,7 @@ It's your choice which elements are linkable — a common pattern is to tag ever
 
 To build something *from* the anchors — an in-page navigation ("On this page") block — **derive the list from the page content you already render**, the same way you stamp the heading `id`s. That works identically published (no bridge, JS off) and while editing: structural edits (adding, removing, reordering heading blocks) re-render your frontend with fresh content, so the nav follows them. There is no bridge callback for this — the anchors ride in the ordinary edit-form data (`block._linkableAnchors`), which is what the object browser's link picker reads; a nav rebuilds itself from content on the next render.
 
->
->
-> existing
->
->
+<block type="slate" data='{"value":[{"type":"blockquote","children":[{"text":"One consequence: text typed into an "},{"type":"em","children":[{"text":"existing"}]},{"text":" heading updates the nav on the next render (when you blur the block), not on every keystroke — inline text edits don&#39;t re-render the frontend until they&#39;re flushed. Adding or removing headings updates it immediately."}]}]}' />
 
 If your anchors carry levels, pair the derived list with `buildAnchorTree(anchors)` (from `@volto-hydra/hydra-js`) to render a nested contents list; no levels means a flat list.
 
@@ -247,9 +169,7 @@ The page has a template with the static parts of your theme like header and foot
 
 On page setup, take the path and make a [REST API call to the contents endpoint](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/content-types.html) to get the JSON for this page.
 
-- You can use `@plone/client` for this
-- In some frameworks (such as Nuxt.js) it's better to use their built-in fetch
-- You can also use the [Plone GraphQL API](https://2022.training.plone.org/gatsby/data.html)Note: this is just a wrapper on the REST API rather than a server-side implementation, so it's not more efficient than using the REST API directly
+<block type="slate" data='{"value":[{"type":"ul","children":[{"type":"li","children":[{"text":"You can use "},{"type":"code","children":[{"text":"@plone/client"}]},{"text":" for this"}]},{"type":"li","children":[{"text":"In some frameworks (such as Nuxt.js) it&#39;s better to use their built-in fetch"}]},{"type":"li","children":[{"text":"You can also use the "},{"type":"link","data":{"url":"https://2022.training.plone.org/gatsby/data.html"},"children":[{"text":"Plone GraphQL API"}]},{"type":"ul","children":[{"type":"li","children":[{"text":"Note: this is just a wrapper on the REST API rather than a server-side implementation, so it&#39;s not more efficient than using the REST API directly"}]}]}]}]}]}' />
 
 ## 4. Render Page Metadata
 
@@ -274,8 +194,7 @@ Give `Block` an `@type: "empty"` case: a container region with no `defaultBlockT
 
 Several helper functions get reused in many blocks:
 
-1. **Generating a URL for links** — all REST API URLs are relative to the API URL, so you need to convert these to the right frontend URL
-2. **Generating a URL for an image** — blocks have image data in many formats so a helper function is usefulYou may also decide to use your framework or hosting solution for image resizing
+<block type="slate" data='{"value":[{"type":"ol","children":[{"type":"li","children":[{"type":"strong","children":[{"text":"Generating a URL for links"}]},{"text":" — all REST API URLs are relative to the API URL, so you need to convert these to the right frontend URL"}]},{"type":"li","children":[{"type":"strong","children":[{"text":"Generating a URL for an image"}]},{"text":" — blocks have image data in many formats so a helper function is useful"},{"type":"ul","children":[{"type":"li","children":[{"text":"You may also decide to use your framework or hosting solution for image resizing"}]}]}]}]}]}' />
 
 ## 8. Listing Blocks
 

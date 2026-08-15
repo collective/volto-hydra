@@ -28,17 +28,19 @@ assignments:
   - { uid: 603e7230-53ed-4364-977d-4bfd11809a35, type: slate }
   - { uid: 1923851d-b62e-45b7-8425-aa047aaa6e76, type: slate }
 prototypes: |
-  <block type="title"      _="${h1}" />
-  <block type="slate"      value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
+  <block type="title" _="${h1}" />
+  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
+  <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+  <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
 ---
 
-# Another Page
+# 
 
-<block type="description" uid="2e449c25-d897-4c7a-b5ac-793175ea55ee" />
+<block type="description" />
 
 And carajillo aromatic affogato instant cream grinder kopi panna. Qui robusta milk and dripper variety caffeine grinder mazagran irish chicory grounds. Filter cream con so robust steamed wings coffee. Spoon panna lungo skinny brewed qui aroma aged id grinder. Spoon aromatic so decaffeinated at dark acerbic siphon and redeye at mug.
 
-<block type="image" uid="fcb94dd6-652b-4b79-b823-7e42f1a75228" align="right" description="" image_field="image" size="l" title="penguin4.jpg" url="/images/penguin4.jpg" data='{"credit":{}}' />
+<block type="image" align="right" description="" image_field="image" size="l" title="penguin4.jpg" url="/images/penguin4.jpg" data='{"credit":{}}' />
 
 Carajillo cappuccino grinder whipped luwak filter café blue coffee affogato cultivar spoon grounds. Carajillo viennese lait cream single pot lait extraction. Luwak french so instant latte seasonal caramelization carajillo pot medium. Mazagran milk cultivar barista caffeine medium breve ristretto cortado crema brewed aged extraction irish. Mazagran pumpkin arabica spice aroma sit café origin redeye as chicory cream irish turkish cream.
 

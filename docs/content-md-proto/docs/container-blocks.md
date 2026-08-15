@@ -105,18 +105,9 @@ assignments:
   - { uid: h-78, type: slate }
   - { uid: ul-79, type: slate }
 prototypes: |
-  <block type="title"      _="${h1}" />
-  <block type="slate"      value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
-  <block type="separator"  _="${hr}" />
-  <block type="slateTable">
-    <region name="rows">
-      <block type="row">
-        <region name="cells">
-          <block type="cell" value="${td/slate}" />
-        </region>
-      </block>
-    </region>
-  </block>
+  <block type="title" _="${h1}" />
+  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
+  <block type="separator" _="${hr}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
@@ -124,7 +115,7 @@ prototypes: |
   </block>
 ---
 
-# Container Blocks
+# 
 
 A block — or the page itself — is divided into **regions**, and each region holds an ordered list of blocks. Sliders have a slides region, grids have columns, accordions have panels; a page has its main `items` region (and optionally a header, footer, …).
 
@@ -141,78 +132,11 @@ Both look and behave the same in the editor — selecting, dragging, nesting —
 
 Each child has its own `@type` and schema (from `blocks`). The blocks live in the parent's shared `blocks` dict; the region's name is a key in the parent's shared `blocks_layout` dict that holds the ordering:
 
-### Javascript
-
-```javascript
-// Schema definition — a 'slides' region on a slider block
-slides: {
-    title: 'Slides',
-    widget: 'blocks_layout',
-    allowedBlocks: ['slide', 'image'],
-    defaultBlockType: 'slide',
-    maxLength: 10,
-}
-
-// Resulting data — blocks in the shared dict, ordering under blocks_layout.slides
-{
-  "@type": "slider",
-  "blocks": {
-    "slide-1": { "@type": "slide", "title": "First" },
-    "slide-2": { "@type": "image", "url": "..." }
-  },
-  "blocks_layout": { "slides": ["slide-1", "slide-2"] }
-}
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-8-javascript-d2f77e","label":"Javascript","language":"javascript","code":"// Schema definition — a &#39;slides&#39; region on a slider block\nslides: {\n    title: &#39;Slides&#39;,\n    widget: &#39;blocks_layout&#39;,\n    allowedBlocks: [&#39;slide&#39;, &#39;image&#39;],\n    defaultBlockType: &#39;slide&#39;,\n    maxLength: 10,\n}\n\n// Resulting data — blocks in the shared dict, ordering under blocks_layout.slides\n{\n  \"@type\": \"slider\",\n  \"blocks\": {\n    \"slide-1\": { \"@type\": \"slide\", \"title\": \"First\" },\n    \"slide-2\": { \"@type\": \"image\", \"url\": \"...\" }\n  },\n  \"blocks_layout\": { \"slides\": [\"slide-1\", \"slide-2\"] }\n}"}]}' />
 
 A block can declare several `blocks_layout` regions; they all share the one `blocks` dict, and each region gets its own list under `blocks_layout`.
 
-> The region name is a key inside `blocks_layout` — not a top-level field.
->
->
->
-> blocks\_layout.\<region>
->
->
->
->
->
->
->
-> json // ✅ CORRECT — ordering keyed inside the shared blocks\_layout dict { "@type": "slider", "blocks": { … }, "blocks\_layout": { "slides": \["slide-1", "slide-2"] } }  // ❌ WRONG — an ad-hoc top-level \`slides\` field holding { items: \[...] } { "@type": "slider", "blocks": { … }, "slides": { "items": \["slide-1", "slide-2"] } }&#x20;
->
->
->
-> look
->
->
->
-> slides
->
->
->
-> not a registered field
->
->
->
-> silently drops it on save
->
->
->
-> Why these persist
->
->
->
-> blocks\_layout
->
->
->
-> blocks\_layout\[\<region>]
->
->
->
-> \<region>.items
->
->
+<block type="slate" data='{"value":[{"type":"blockquote","children":[{"type":"strong","children":[{"text":"The region name is a key inside "},{"type":"code","children":[{"text":"blocks_layout"}]},{"text":" — not a top-level field."}]},{"text":" The ordering list lives at "},{"type":"code","children":[{"text":"blocks_layout.<region>"}]},{"text":" (a plain array of ids). A tempting mistake is to store it as a top-level field named after the region:  "},{"text":"<!-- codeExample: json -->"},{"text":" "},{"type":"code","children":[{"text":"json // ✅ CORRECT — ordering keyed inside the shared blocks_layout dict { \"@type\": \"slider\", \"blocks\": { … }, \"blocks_layout\": { \"slides\": [\"slide-1\", \"slide-2\"] } }  // ❌ WRONG — an ad-hoc top-level `slides` field holding { items: [...] } { \"@type\": \"slider\", \"blocks\": { … }, \"slides\": { \"items\": [\"slide-1\", \"slide-2\"] } } "}]},{"text":"  The wrong form may "},{"type":"em","children":[{"text":"look"}]},{"text":" fine in a frontend that reads it back the same way, but "},{"type":"code","children":[{"text":"slides"}]},{"text":" is "},{"type":"strong","children":[{"text":"not a registered field"}]},{"text":", so the backend "},{"type":"strong","children":[{"text":"silently drops it on save"}]},{"text":" (see "},{"type":"link","data":{"url":"#why-these-persist-and-separate-top-level-fields-dont"},"children":[{"text":"Why these persist"}]},{"text":") — and tools that walk the shared dict (the block path map, the sanity checks, the editor&#39;s reorder/drag) never see the region, because they look under "},{"type":"code","children":[{"text":"blocks_layout"}]},{"text":", never at a field named for the region. Renderers must read the ordering from "},{"type":"code","children":[{"text":"blocks_layout[<region>]"}]},{"text":", not from "},{"type":"code","children":[{"text":"<region>.items"}]},{"text":"."}]}]}' />
 
 ## Multiple regions
 
@@ -220,30 +144,7 @@ A container (or the page) can declare more than one **region** — each a schema
 
 Storage is a property of **each region, not the container**: every region independently chooses `widget: 'blocks_layout'` or `widget: 'object_list'`, and a single container may **mix** them — e.g. a `blocks_layout` region for body content alongside an `object_list` region for a set of inline cards. A blocks\_layout region keys its ordering inside the shared `blocks_layout` dict (its children in the shared `blocks` dict); an object\_list region stores its items inline on its own field. So "is this container object\_list or blocks\_layout?" is never a meaningful question — you look at the region. Every blocks\_layout region's children still share the one `blocks` dict; the regions only partition *ordering*.
 
-### Javascript
-
-```javascript
-// Schema definition — a page with a header, main content, and a footer
-properties: {
-    header: { widget: 'blocks_layout', title: 'Header', allowedBlocks: ['slate', 'image'], maxLength: 3 },
-    items:  { widget: 'blocks_layout', allowedBlocks: ['slate', 'image'] },
-    footer: { widget: 'blocks_layout', title: 'Footer', allowedBlocks: ['slate', 'link'] },
-}
-
-// Resulting data — ONE shared blocks dict, one list per blocks field
-{
-  "blocks": {
-    "header-1": { "@type": "image" },
-    "hero-1":   { "@type": "slate" },
-    "footer-1": { "@type": "slate" }
-  },
-  "blocks_layout": {
-    "header": ["header-1"],
-    "items":  ["hero-1"],
-    "footer": ["footer-1"]
-  }
-}
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-14-javascript-3ea062","label":"Javascript","language":"javascript","code":"// Schema definition — a page with a header, main content, and a footer\nproperties: {\n    header: { widget: &#39;blocks_layout&#39;, title: &#39;Header&#39;, allowedBlocks: [&#39;slate&#39;, &#39;image&#39;], maxLength: 3 },\n    items:  { widget: &#39;blocks_layout&#39;, allowedBlocks: [&#39;slate&#39;, &#39;image&#39;] },\n    footer: { widget: &#39;blocks_layout&#39;, title: &#39;Footer&#39;, allowedBlocks: [&#39;slate&#39;, &#39;link&#39;] },\n}\n\n// Resulting data — ONE shared blocks dict, one list per blocks field\n{\n  \"blocks\": {\n    \"header-1\": { \"@type\": \"image\" },\n    \"hero-1\":   { \"@type\": \"slate\" },\n    \"footer-1\": { \"@type\": \"slate\" }\n  },\n  \"blocks_layout\": {\n    \"header\": [\"header-1\"],\n    \"items\":  [\"hero-1\"],\n    \"footer\": [\"footer-1\"]\n  }\n}"}]}' />
 
 Each blocks field has its own `allowedBlocks` / `maxLength`. A declared field appears in the editor even when empty (it gets a seeded empty block so it is editable and a drop target).
 
@@ -257,59 +158,13 @@ The backend deserializer only saves values for **registered fields**. `blocks` a
 
 The other storage choice for a region. Instead of ordering in the shared `blocks_layout` dict, all items share one inline schema and are stored as an array with an ID field, at the field itself. (To place the array deeper — e.g. `block.table.rows` — nest the field inside a `widget: 'object'`; see below.)
 
-### Javascript
-
-```javascript
-// Schema
-slides: {
-    title: 'Slides',
-    widget: 'object_list',
-    idField: '@id',
-    schema: {
-        properties: {
-            title: { title: 'Title' },
-            image: { title: 'Image', widget: 'image' },
-            description: { title: 'Description', widget: 'slate' },
-        }
-    }
-}
-
-// Resulting data — the array is stored at the field
-{
-  "@type": "slider",
-  "slides": [
-    { "@id": "slide-1", "title": "First", "image": "..." },
-    { "@id": "slide-2", "title": "Second", "image": "..." }
-  ]
-}
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-21-javascript-83a0dc","label":"Javascript","language":"javascript","code":"// Schema\nslides: {\n    title: &#39;Slides&#39;,\n    widget: &#39;object_list&#39;,\n    idField: &#39;@id&#39;,\n    schema: {\n        properties: {\n            title: { title: &#39;Title&#39; },\n            image: { title: &#39;Image&#39;, widget: &#39;image&#39; },\n            description: { title: &#39;Description&#39;, widget: &#39;slate&#39; },\n        }\n    }\n}\n\n// Resulting data — the array is stored at the field\n{\n  \"@type\": \"slider\",\n  \"slides\": [\n    { \"@id\": \"slide-1\", \"title\": \"First\", \"image\": \"...\" },\n    { \"@id\": \"slide-2\", \"title\": \"Second\", \"image\": \"...\" }\n  ]\n}"}]}' />
 
 ## object\_list with allowedBlocks: Typed Items
 
 When `allowedBlocks` is set on an `object_list`, items can have different types (like `blocks_layout`) but are still stored as an array. Each item's type is stored in the field specified by `typeField` (defaults to `'@type'`) and its schema is looked up from `blocks`:
 
-### Javascript
-
-```javascript
-facets: {
-    title: 'Facets',
-    widget: 'object_list',
-    allowedBlocks: ['checkboxFacet', 'selectFacet'],
-    typeField: 'type',
-    defaultBlockType: 'checkboxFacet',
-}
-
-// Resulting data
-{
-  "@type": "search",
-  "facets": [
-    { "@id": "facet-1", "type": "checkboxFacet",
-      "title": "Content Type", "field": "portal_type" },
-    { "@id": "facet-2", "type": "selectFacet",
-      "title": "Subject", "field": "Subject" }
-  ]
-}
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-24-javascript-6781ed","label":"Javascript","language":"javascript","code":"facets: {\n    title: &#39;Facets&#39;,\n    widget: &#39;object_list&#39;,\n    allowedBlocks: [&#39;checkboxFacet&#39;, &#39;selectFacet&#39;],\n    typeField: &#39;type&#39;,\n    defaultBlockType: &#39;checkboxFacet&#39;,\n}\n\n// Resulting data\n{\n  \"@type\": \"search\",\n  \"facets\": [\n    { \"@id\": \"facet-1\", \"type\": \"checkboxFacet\",\n      \"title\": \"Content Type\", \"field\": \"portal_type\" },\n    { \"@id\": \"facet-2\", \"type\": \"selectFacet\",\n      \"title\": \"Subject\", \"field\": \"Subject\" }\n  ]\n}"}]}' />
 
 Both `blocks_layout` and `object_list` look the same in the editing UI and blocks can be dragged between them — data is automatically adapted when moving between formats (ID fields added/stripped, type fields set appropriately).
 
@@ -319,33 +174,11 @@ A `widget: 'object'` field groups sub-fields under one key. Its `schema.properti
 
 An **`object_list`** inside an object stores its array at `object.<field>`:
 
-### Javascript
-
-```javascript
-// A table block whose rows live at block.table.rows
-table: {
-    widget: 'object',
-    schema: { properties: {
-        rows: { widget: 'object_list', idField: 'key',
-                schema: { properties: { cells: { widget: 'object_list', idField: 'key' /* … */ } } } },
-    } },
-}
-// data
-{ "@type": "slateTable", "table": { "rows": [ { "key": "r1", "cells": [ /* … */ ] } ] } }
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-29-javascript-dd9f7e","label":"Javascript","language":"javascript","code":"// A table block whose rows live at block.table.rows\ntable: {\n    widget: &#39;object&#39;,\n    schema: { properties: {\n        rows: { widget: &#39;object_list&#39;, idField: &#39;key&#39;,\n                schema: { properties: { cells: { widget: &#39;object_list&#39;, idField: &#39;key&#39; /* … */ } } } },\n    } },\n}\n// data\n{ \"@type\": \"slateTable\", \"table\": { \"rows\": [ { \"key\": \"r1\", \"cells\": [ /* … */ ] } ] } }"}]}' />
 
 A **`blocks_layout`** inside an object makes the object its own mini-container: it holds its own `blocks` dict + `blocks_layout`, just like a columns/grid container block, one level deeper:
 
-### Javascript
-
-```javascript
-table: { widget: 'object', schema: { properties: {
-    body: { widget: 'blocks_layout' },
-} } }
-// data
-{ "@type": "slateTable",
-  "table": { "blocks": { "b1": { /* … */ } }, "blocks_layout": { "body": ["b1"] } } }
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-31-javascript-f90eb4","label":"Javascript","language":"javascript","code":"table: { widget: &#39;object&#39;, schema: { properties: {\n    body: { widget: &#39;blocks_layout&#39; },\n} } }\n// data\n{ \"@type\": \"slateTable\",\n  \"table\": { \"blocks\": { \"b1\": { /* … */ } }, \"blocks_layout\": { \"body\": [\"b1\"] } } }"}]}' />
 
 A **plain field** inside an object is edited in the canvas like any top-level field — address it inline with its `/`-path (`data-edit-text="content/headline"`, and the same for `data-edit-link` / `data-edit-media`). The object is *transparent*: `content/headline` writes back to `block.content.headline`, never a flat key. See [Field Path Syntax](visual-editing.md#field-path-syntax) for the full grammar (`/` object descent, `..` = parent block, `/field` = page).
 
@@ -357,11 +190,7 @@ This replaces `dataPath`: declare the container inside the object rather than ho
 
 A block's schema is a standard [Volto block schema](https://6.docs.plone.org/volto/blocks/editcomponent.html) (fieldsets, `properties`, widgets, `default`, etc.). Inka reads three container-oriented `widget` values plus a few per-field keys — those are:
 
-| `widget` | Storage | Key fields |
-| --- | --- | --- |
-| `blocks_layout` | children are ids in the parent's shared `blocks` dict; this field's name is a region key under `blocks_layout` | `allowedBlocks`, `maxLength`, `allowedTemplates` |
-| `object_list` | inline array on the field itself | `idField` (default `@id`), `schema` (item schema), `allowedBlocks` + `typeField` (typed items), `defaultBlockType`, `maxLength`, `addMode: 'table'` |
-| `object` | groups sub-fields under one key; sub-fields (plain OR the two container widgets above) nest inside | `schema` (the nested properties) |
+<block type="slateTable" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-37-r0","cells":[{"key":"tbl-37-r0c0","type":"header","value":[{"type":"p","children":[{"type":"code","children":[{"text":"widget"}]}]}]},{"key":"tbl-37-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Storage"}]}]},{"key":"tbl-37-r0c2","type":"header","value":[{"type":"p","children":[{"text":"Key fields"}]}]}]},{"key":"tbl-37-r1","cells":[{"key":"tbl-37-r1c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"blocks_layout"}]}]}]},{"key":"tbl-37-r1c1","type":"data","value":[{"type":"p","children":[{"text":"children are ids in the parent&#39;s shared "},{"type":"code","children":[{"text":"blocks"}]},{"text":" dict; this field&#39;s name is a region key under "},{"type":"code","children":[{"text":"blocks_layout"}]}]}]},{"key":"tbl-37-r1c2","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"allowedBlocks"}]},{"text":", "},{"type":"code","children":[{"text":"maxLength"}]},{"text":", "},{"type":"code","children":[{"text":"allowedTemplates"}]}]}]}]},{"key":"tbl-37-r2","cells":[{"key":"tbl-37-r2c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"object_list"}]}]}]},{"key":"tbl-37-r2c1","type":"data","value":[{"type":"p","children":[{"text":"inline array on the field itself"}]}]},{"key":"tbl-37-r2c2","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"idField"}]},{"text":" (default "},{"type":"code","children":[{"text":"@id"}]},{"text":"), "},{"type":"code","children":[{"text":"schema"}]},{"text":" (item schema), "},{"type":"code","children":[{"text":"allowedBlocks"}]},{"text":" + "},{"type":"code","children":[{"text":"typeField"}]},{"text":" (typed items), "},{"type":"code","children":[{"text":"defaultBlockType"}]},{"text":", "},{"type":"code","children":[{"text":"maxLength"}]},{"text":", "},{"type":"code","children":[{"text":"addMode: &#39;table&#39;"}]}]}]}]},{"key":"tbl-37-r3","cells":[{"key":"tbl-37-r3c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"object"}]}]}]},{"key":"tbl-37-r3c1","type":"data","value":[{"type":"p","children":[{"text":"groups sub-fields under one key; sub-fields (plain OR the two container widgets above) nest inside"}]}]},{"key":"tbl-37-r3c2","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"schema"}]},{"text":" (the nested properties)"}]}]}]}]}}' />
 
 All three can nest inside `object`, and a container may mix a `blocks_layout` region and an `object_list` region. Everything else in a field def (`title`, `default`, `type`, `choices`, `mode`, …) is plain Volto and behaves as documented there.
 
@@ -369,23 +198,7 @@ All three can nest inside `object`, and a container may mix a `blocks_layout` re
 
 Add `data-block-uid` to each child element. You don't need to mark the container element itself:
 
-### Html
-
-```html
-<div class="slider" data-block-uid="slider-1">
-  <div class="slide" data-block-uid="slide-1"
-       data-block-add="right">
-    <img src="/news.jpg"/>
-    <h2>Big News</h2>
-  </div>
-  <div class="slide" data-block-uid="slide-2"
-       data-block-add="right">
-    ...
-  </div>
-  <a data-block-selector="-1">Prev</a>
-  <a data-block-selector="+1">Next</a>
-</div>
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-41-javascript-85a3e1","label":"Html","language":"html","code":"<div class=\"slider\" data-block-uid=\"slider-1\">\n  <div class=\"slide\" data-block-uid=\"slide-1\"\n       data-block-add=\"right\">\n    <img src=\"/news.jpg\"/>\n    <h2>Big News</h2>\n  </div>\n  <div class=\"slide\" data-block-uid=\"slide-2\"\n       data-block-add=\"right\">\n    ...\n  </div>\n  <a data-block-selector=\"-1\">Prev</a>\n  <a data-block-selector=\"+1\">Next</a>\n</div>"}]}' />
 
 - **`data-block-add="bottom|right"`** — Controls where the '+' button appears. By default it will be the opposite of its parent. Use "bottom" for vertical stacking, "right" for horizontal.
 - **`data-block-selector="-1|+1|blockId"`** — Tag paging buttons so sidebar selection can navigate paged containers.
@@ -395,29 +208,7 @@ Add `data-block-uid` to each child element. You don't need to mark the container
 
 Set `addMode: 'table'` for table-like structures (rows containing cells). This lets users add and remove columns as easily as rows. The rows live inside a `table` object field (`block.table.rows`) — no `dataPath`:
 
-### Javascript
-
-```javascript
-table: {
-    widget: 'object',
-    schema: { properties: {
-        rows: {
-            widget: 'object_list',
-            idField: 'key',
-            addMode: 'table',
-            schema: { properties: {
-                cells: {
-                    widget: 'object_list',
-                    idField: 'key',
-                    schema: { properties: {
-                        value: { title: 'Content', widget: 'slate' },
-                    } },
-                },
-            } },
-        },
-    } },
-}
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-45-javascript-1cff8e","label":"Javascript","language":"javascript","code":"table: {\n    widget: &#39;object&#39;,\n    schema: { properties: {\n        rows: {\n            widget: &#39;object_list&#39;,\n            idField: &#39;key&#39;,\n            addMode: &#39;table&#39;,\n            schema: { properties: {\n                cells: {\n                    widget: &#39;object_list&#39;,\n                    idField: &#39;key&#39;,\n                    schema: { properties: {\n                        value: { title: &#39;Content&#39;, widget: &#39;slate&#39; },\n                    } },\n                },\n            } },\n        },\n    } },\n}"}]}' />
 
 ## Empty Blocks
 
@@ -435,16 +226,7 @@ Empty blocks are stripped before saving. Render them as empty space; Inka puts a
 
 The rules above mean a region with a `defaultBlockType`, or a single-entry `allowedBlocks`, is *never* empty — it always seeds a block of that type. To declare a region that should sit **empty until an editor adds something**, while still restricting **what** they can add, set **`defaultBlockType: "empty"`** and do **not** list `"empty"` in `allowedBlocks`:
 
-### Javascript
-
-```javascript
-announcement: {
-    widget: 'blocks_layout',
-    allowedLayouts: ['/templates/site-announcement'],
-    allowedBlocks: ['globalAlert'], // the only thing an editor can add
-    defaultBlockType: 'empty',      // ...but empty by default (no band shown)
-}
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-53-javascript-f4d972","label":"Javascript","language":"javascript","code":"announcement: {\n    widget: &#39;blocks_layout&#39;,\n    allowedLayouts: [&#39;/templates/site-announcement&#39;],\n    allowedBlocks: [&#39;globalAlert&#39;], // the only thing an editor can add\n    defaultBlockType: &#39;empty&#39;,      // ...but empty by default (no band shown)\n}"}]}' />
 
 This is the one case where `"empty"` is a **configured** default rather than the fallback Inka inserts for an ambiguous region. The seed and the add diverge on purpose:
 
@@ -464,16 +246,7 @@ If your container renders its children by delegating each one to your central bl
 
 The trap is a **custom** container renderer that only expects specific child types — a `contextNavigation` that walks `navItem`/`listing` children, say. Don't hand-roll an allow-list that rejects anything else, or a seeded `empty` will throw and break the whole container. Route non-special children through your central dispatch instead of throwing:
 
-### Javascript
-
-```javascript
-for (const childId of items) {
-    const child = blocks[childId];
-    if (child['@type'] === 'navItem') { /* nav-specific rendering */ }
-    else if (child['@type'] === 'listing') { /* expand listing */ }
-    else renderBlock(childId, child);   // empty (or anything else) → central dispatch, never throw
-}
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-62-javascript-4ebff8","label":"Javascript","language":"javascript","code":"for (const childId of items) {\n    const child = blocks[childId];\n    if (child[&#39;@type&#39;] === &#39;navItem&#39;) { /* nav-specific rendering */ }\n    else if (child[&#39;@type&#39;] === &#39;listing&#39;) { /* expand listing */ }\n    else renderBlock(childId, child);   // empty (or anything else) → central dispatch, never throw\n}"}]}' />
 
 Two more things a renderer must survive once the user picks a type for a seeded empty:
 
@@ -486,36 +259,7 @@ You can have one container type whose children are all kept the same `@type`, wi
 
 Declare `itemTypeField` on the *blocks field* — its value names a sibling field on the same schema whose value drives every child's `@type`. The sibling field is typically rendered with `widget: 'blockTypeSelect'`, which computes its `choices` from the blocks field's `allowedBlocks` at render time:
 
-### Javascript
-
-```javascript
-blocks: {
-    gridBlock: {
-        blockSchema: {
-            properties: {
-                slides: {
-                    widget: 'blocks_layout',
-                    itemTypeField: 'variation',         // sync trigger
-                    allowedBlocks: ['teaser', 'image'],
-                },
-                variation: {
-                    widget: 'blockTypeSelect',          // dropdown
-                },
-            },
-        },
-    },
-    teaser: {
-        fieldMappings: {
-            '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },
-        },
-    },
-    image: {
-        fieldMappings: {
-            '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },
-        },
-    },
-}
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-68-javascript-cdad0c","label":"Javascript","language":"javascript","code":"blocks: {\n    gridBlock: {\n        blockSchema: {\n            properties: {\n                slides: {\n                    widget: &#39;blocks_layout&#39;,\n                    itemTypeField: &#39;variation&#39;,         // sync trigger\n                    allowedBlocks: [&#39;teaser&#39;, &#39;image&#39;],\n                },\n                variation: {\n                    widget: &#39;blockTypeSelect&#39;,          // dropdown\n                },\n            },\n        },\n    },\n    teaser: {\n        fieldMappings: {\n            &#39;@default&#39;: { &#39;@id&#39;: &#39;href&#39;, &#39;title&#39;: &#39;title&#39;, &#39;image&#39;: &#39;preview_image&#39; },\n        },\n    },\n    image: {\n        fieldMappings: {\n            &#39;@default&#39;: { &#39;@id&#39;: &#39;href&#39;, &#39;title&#39;: &#39;alt&#39;, &#39;image&#39;: &#39;url&#39; },\n        },\n    },\n}"}]}' />
 
 The relationship is local: read the schema and you can see "the children of `slides` get their `@type` from `variation`" right next to the field declaration. Works the same for `widget: 'blocks_layout'` and `widget: 'object_list'` children.
 
@@ -523,19 +267,7 @@ The relationship is local: read the schema and you can see "the children of `sli
 
 On top of type syncing you can also have field *values* centrally controlled at the parent — set once on the parent, applied to every child. Add ONE enhancer on the parent:
 
-### Javascript
-
-```javascript
-gridBlock: {
-    blockSchema: {
-        properties: {
-            slides: { widget: 'blocks_layout', itemTypeField: 'variation', allowedBlocks: ['teaser', 'image'] },
-            variation: { widget: 'blockTypeSelect' },
-        },
-    },
-    schemaEnhancer: { inheritSchemaFrom: {} },
-}
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-72-javascript-521655","label":"Javascript","language":"javascript","code":"gridBlock: {\n    blockSchema: {\n        properties: {\n            slides: { widget: &#39;blocks_layout&#39;, itemTypeField: &#39;variation&#39;, allowedBlocks: [&#39;teaser&#39;, &#39;image&#39;] },\n            variation: { widget: &#39;blockTypeSelect&#39; },\n        },\n    },\n    schemaEnhancer: { inheritSchemaFrom: {} },\n}"}]}' />
 
 `inheritSchemaFrom` does two things automatically:
 
@@ -544,32 +276,10 @@ gridBlock: {
 
 The parent declares **what it claims** per child block type via `parentControlled`. If absent, the default is: parent claims everything *not* listed in the child's `fieldMappings['@default']` mapping. The default works for typical cases; set `parentControlled` only when you want a different split (e.g. keep a meta-toggle field editable per-child):
 
-### Javascript
-
-```javascript
-listing: {
-    schemaEnhancer: {
-        inheritSchemaFrom: {
-            typeField: 'variation',
-            mappingField: 'fieldMapping',
-            // Only these fields are claimed by listing for teaser children.
-            // The rest (including teaser's `overwrite` toggle) stay editable.
-            parentControlled: {
-                teaser: ['head_title', 'openLinkInNewTab', 'styles'],
-            },
-        },
-    },
-}
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-76-javascript-6b52c5","label":"Javascript","language":"javascript","code":"listing: {\n    schemaEnhancer: {\n        inheritSchemaFrom: {\n            typeField: &#39;variation&#39;,\n            mappingField: &#39;fieldMapping&#39;,\n            // Only these fields are claimed by listing for teaser children.\n            // The rest (including teaser&#39;s `overwrite` toggle) stay editable.\n            parentControlled: {\n                teaser: [&#39;head_title&#39;, &#39;openLinkInNewTab&#39;, &#39;styles&#39;],\n            },\n        },\n    },\n}"}]}' />
 
 When `parentControlled[childType]` is set, it **replaces** the `@default` fallback for that child type. Both sides — the parent's "Item Defaults" fieldset and the child's hidden fields — are computed from the same single rule, so they can never get out of sync.
 
 ### Recipe options
 
-- **`inheritSchemaFrom`** — schemaEnhancer recipe; surfaces parent-claimed fields on the parent and hides them on children.
-- **`itemTypeField`** — declared on a `blocks_layout`/`object_list` field; names the sibling field whose value drives every child's `@type`.
-- **`typeField`** — names the sibling field directly on `inheritSchemaFrom`. Use this when there is no blocks field to declare `itemTypeField` on (e.g. listings — see [Listings](listings.md)).
-- **`mappingField`** — name of the field where a per-block `fieldMapping` override is stored. Required for the `FieldMappingWidget` to appear.
-- **`parentControlled`** — `{ childType: [fieldName, ...] }` per-child-type override. Replaces the `fieldMappings['@default']` fallback.
-- **`defaultsField`** — prefix for the inherited fields on the parent's "Item Defaults" fieldset (default: `'itemDefaults'`).
-- **`blockTypeSelect`** widget options:**`blocksField`** — which sub-blocks field's `allowedBlocks` to use for the choices. Auto-discovers if omitted. Set to `'..'` when the choices should come from the *enclosing parent's* `allowedSiblingTypes`.**`filterConvertibleFrom`** — only offer types whose `fieldMappings` accept the named source. Typically `'@default'` for listings (every item type must be populatable from canonical content fields).
+<block type="slate" data='{"value":[{"type":"ul","children":[{"type":"li","children":[{"type":"strong","children":[{"type":"code","children":[{"text":"inheritSchemaFrom"}]}]},{"text":" — schemaEnhancer recipe; surfaces parent-claimed fields on the parent and hides them on children."}]},{"type":"li","children":[{"type":"strong","children":[{"type":"code","children":[{"text":"itemTypeField"}]}]},{"text":" — declared on a "},{"type":"code","children":[{"text":"blocks_layout"}]},{"text":"/"},{"type":"code","children":[{"text":"object_list"}]},{"text":" field; names the sibling field whose value drives every child&#39;s "},{"type":"code","children":[{"text":"@type"}]},{"text":"."}]},{"type":"li","children":[{"type":"strong","children":[{"type":"code","children":[{"text":"typeField"}]}]},{"text":" — names the sibling field directly on "},{"type":"code","children":[{"text":"inheritSchemaFrom"}]},{"text":". Use this when there is no blocks field to declare "},{"type":"code","children":[{"text":"itemTypeField"}]},{"text":" on (e.g. listings — see "},{"type":"link","data":{"url":"listings.md"},"children":[{"text":"Listings"}]},{"text":")."}]},{"type":"li","children":[{"type":"strong","children":[{"type":"code","children":[{"text":"mappingField"}]}]},{"text":" — name of the field where a per-block "},{"type":"code","children":[{"text":"fieldMapping"}]},{"text":" override is stored. Required for the "},{"type":"code","children":[{"text":"FieldMappingWidget"}]},{"text":" to appear."}]},{"type":"li","children":[{"type":"strong","children":[{"type":"code","children":[{"text":"parentControlled"}]}]},{"text":" — "},{"type":"code","children":[{"text":"{ childType: [fieldName, ...] }"}]},{"text":" per-child-type override. Replaces the "},{"type":"code","children":[{"text":"fieldMappings[&#39;@default&#39;]"}]},{"text":" fallback."}]},{"type":"li","children":[{"type":"strong","children":[{"type":"code","children":[{"text":"defaultsField"}]}]},{"text":" — prefix for the inherited fields on the parent&#39;s \"Item Defaults\" fieldset (default: "},{"type":"code","children":[{"text":"&#39;itemDefaults&#39;"}]},{"text":")."}]},{"type":"li","children":[{"type":"strong","children":[{"type":"code","children":[{"text":"blockTypeSelect"}]}]},{"text":" widget options:"},{"type":"ul","children":[{"type":"li","children":[{"type":"strong","children":[{"type":"code","children":[{"text":"blocksField"}]}]},{"text":" — which sub-blocks field&#39;s "},{"type":"code","children":[{"text":"allowedBlocks"}]},{"text":" to use for the choices. Auto-discovers if omitted. Set to "},{"type":"code","children":[{"text":"&#39;..&#39;"}]},{"text":" when the choices should come from the "},{"type":"em","children":[{"text":"enclosing parent&#39;s"}]},{"text":" "},{"type":"code","children":[{"text":"allowedSiblingTypes"}]},{"text":"."}]},{"type":"li","children":[{"type":"strong","children":[{"type":"code","children":[{"text":"filterConvertibleFrom"}]}]},{"text":" — only offer types whose "},{"type":"code","children":[{"text":"fieldMappings"}]},{"text":" accept the named source. Typically "},{"type":"code","children":[{"text":"&#39;@default&#39;"}]},{"text":" for listings (every item type must be populatable from canonical content fields)."}]}]}]}]}]}' />

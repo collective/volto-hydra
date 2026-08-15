@@ -44,39 +44,19 @@ assignments:
   - { uid: caa483f6-bc0f-4a5a-94d2-925897969928, type: slateTable }
   - { uid: e770913c-fb7b-4cf1-94a8-7eb6e24ff66e, type: slate }
 prototypes: |
-  <block type="title"      _="${h1}" />
-  <block type="slate"      value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
-  <block type="slateTable">
-    <region name="rows">
-      <block type="row">
-        <region name="cells">
-          <block type="cell" value="${td/slate}" />
-        </region>
-      </block>
-    </region>
-  </block>
-  <block type="gridBlock"  headline="${text}">
-    <region name="blocks" widget="blocks_layout" />
-  </block>
+  <block type="title" _="${h1}" />
+  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
+  <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+  <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
 ---
 
-# Typography - Page Title (H1, 48/56px)
+# 
 
-<block type="heading" uid="8fe8fc9b-221c-4c74-b66f-671d638222f3" alignment="left" heading="Heading (H2, 33/42px)" tag="h2" data='{"styles":{}}' />
+<block type="heading" alignment="left" heading="Heading (H2, 33/42px)" tag="h2" data='{"styles":{}}' />
 
-<block type="gridBlock">
+<block type="gridBlock" data='{"blocks":{"e5a7baea-d795-4e31-9145-53accbbe7bc3":{"@type":"teaser","description":"For grid blocks, the font of the headlines are variable, depending on the number of cells in the grid.","head_title":null,"href":[{"@id":"/docs/examples/content-types","@type":"Document","Description":"This section has a sample of content types available in this site.","Title":"Content Types","getRemoteUrl":null,"hasPreviewImage":null,"head_title":null,"image_field":"image","title":"Content Types"}],"styles":{"align":"left"},"title":"Teaser Title (H2, 30/36px)"}},"blocks_layout":{"items":["e5a7baea-d795-4e31-9145-53accbbe7bc3"]},"styles":{}}' />
 
-<block type="teaser" uid="e5a7baea-d795-4e31-9145-53accbbe7bc3" description="For grid blocks, the font of the headlines are variable, depending on the number of cells in the grid." title="Teaser Title (H2, 30/36px)" data='{"head_title":null,"href":[{"@id":"/docs/examples/content-types","@type":"Document","Description":"This section has a sample of content types available in this site.","Title":"Content Types","getRemoteUrl":null,"hasPreviewImage":null,"head_title":null,"image_field":"image","title":"Content Types"}],"styles":{"align":"left"}}' />
-
-</block>
-
-<block type="gridBlock">
-
-<block type="teaser" uid="c86e09b4-faaa-4f71-ba71-c3cf69f2d260" head_title="Teaser Headtitle (DIV, 14/18px)" title="Teaser Title (H3, 24/30px)" data='{"href":[{"@id":"/docs/examples/content-types","@type":"Document","Description":"This section has a sample of content types available in this site.","Title":"Content Types","getRemoteUrl":null,"hasPreviewImage":null,"head_title":null,"image_field":"image","title":"Content Types"}],"styles":{"align":"left"}}' />
-
-<block type="teaser" uid="92f80d54-c607-4360-8e2f-ca8dc6b792c5" description="Paragraph (p, 18px/24px). This section has a sample of content types available in this site." head_title="Teaser Headtitle (DIV, 14/18px)" title="Teaser Title (H3, 24/30px)" data='{"href":[{"@id":"/docs/examples/content-types","@type":"Document","Description":"This section has a sample of content types available in this site.","Title":"Content Types","getRemoteUrl":null,"hasPreviewImage":null,"head_title":null,"image_field":"image","title":"Content Types"}],"styles":{"align":"left"}}' />
-
-</block>
+<block type="gridBlock" data='{"blocks":{"92f80d54-c607-4360-8e2f-ca8dc6b792c5":{"@type":"teaser","description":"Paragraph (p, 18px/24px). This section has a sample of content types available in this site.","head_title":"Teaser Headtitle (DIV, 14/18px)","href":[{"@id":"/docs/examples/content-types","@type":"Document","Description":"This section has a sample of content types available in this site.","Title":"Content Types","getRemoteUrl":null,"hasPreviewImage":null,"head_title":null,"image_field":"image","title":"Content Types"}],"styles":{"align":"left"},"title":"Teaser Title (H3, 24/30px)"},"c86e09b4-faaa-4f71-ba71-c3cf69f2d260":{"@type":"teaser","head_title":"Teaser Headtitle (DIV, 14/18px)","href":[{"@id":"/docs/examples/content-types","@type":"Document","Description":"This section has a sample of content types available in this site.","Title":"Content Types","getRemoteUrl":null,"hasPreviewImage":null,"head_title":null,"image_field":"image","title":"Content Types"}],"styles":{"align":"left"},"title":"Teaser Title (H3, 24/30px)"}},"blocks_layout":{"items":["c86e09b4-faaa-4f71-ba71-c3cf69f2d260","92f80d54-c607-4360-8e2f-ca8dc6b792c5"]},"styles":{}}' />
 
 ## Text Heading H2 (H2, 30/36px)
 
@@ -98,40 +78,22 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
 
-<block type="introduction" uid="96e308ec-74e6-4ddd-bf31-4a9e66e0584e" data='{"value":[{"children":[{"text":"Text Heading H2 (H2, 36/48px)"}],"type":"h2"}]}' />
+<block type="introduction" data='{"value":[{"children":[{"text":"Text Heading H2 (H2, 36/48px)"}],"type":"h2"}]}' />
 
 Paragraph text (p, 24/33px) -> Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
 
-<block type="listing" uid="875e2811-edb6-4842-8cc0-246fa1be6f58" block="875e2811-edb6-4842-8cc0-246fa1be6f58" headline="Heading (H2, 33/42px)" headlineTag="h2" variation="default" data='{"query":[],"querystring":{"limit":"5","query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["File","Document"]}],"sort_on":"effective","sort_order":"descending","sort_order_boolean":"descending"},"styles":{}}' />
+<block type="listing" block="875e2811-edb6-4842-8cc0-246fa1be6f58" headline="Heading (H2, 33/42px)" headlineTag="h2" variation="default" data='{"query":[],"querystring":{"limit":"5","query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["File","Document"]}],"sort_on":"effective","sort_order":"descending","sort_order_boolean":"descending"},"styles":{}}' />
 
-<block type="image" uid="f4104455-1f80-4209-827d-416f2f07dec9" align="center" image_field="image" size="l" title="Caption Title (14/18px). Image" url="/docs/examples/content-types/image-dark" data='{"allow_image_download":false,"credit":{},"description":"Caption Description (14/18px). The Image content type can be used to upload an image in various formats (JPG, GIF, PNG, SVG). The uploaded image should always have a high resolution so that it can be used flexibly, for example as a banner image. Plone automatically delivers the images in the best scaling, so there is no need to scale images down manually."}' />
+<block type="image" align="center" image_field="image" size="l" title="Caption Title (14/18px). Image" url="/docs/examples/content-types/image-dark" data='{"allow_image_download":false,"credit":{},"description":"Caption Description (14/18px). The Image content type can be used to upload an image in various formats (JPG, GIF, PNG, SVG). The uploaded image should always have a high resolution so that it can be used flexibly, for example as a banner image. Plone automatically delivers the images in the best scaling, so there is no need to scale images down manually."}' />
 
-<block type="button" uid="dc27e427-babe-4497-a6ae-fdefeaba2d13" inneralign="left" title="Button text (button, 18/24px)" data='{"styles":{}}' />
+<block type="button" inneralign="left" title="Button text (button, 18/24px)" data='{"styles":{}}' />
 
-<block type="gridBlock">
+<block type="gridBlock" data='{"blocks":{"38e1fde4-8886-4673-9316-5e1b96bcc222":{"@type":"slate","plaintext":"Text Heading (H2, 30/36px)\nFor grid blocks, the font of the headlines are variable, depending on the number of cells in the grid.","value":[{"children":[{"text":"Text Heading (H2, 30/36px)"}],"type":"h2"},{"children":[{"text":"For grid blocks, the font of the headlines are variable, depending on the number of cells in the grid."}],"type":"p"}]}},"blocks_layout":{"items":["38e1fde4-8886-4673-9316-5e1b96bcc222"]},"styles":{}}' />
 
-## Text Heading (H2, 30/36px)
+<block type="gridBlock" data='{"blocks":{"a7ffd7f2-5dbf-4b5c-b24e-d10db0dff8df":{"@type":"slate","plaintext":"Text Heading (H3, 24/30px)\nParagraph Text (p, 18/24px)","value":[{"children":[{"text":"Text Heading (H3, 24/30px)"}],"type":"h2"},{"children":[{"text":"Paragraph Text (p, 18/24px)"}],"type":"p"}]},"c1163fcc-e2a4-4e81-b6ab-af537c8b4d56":{"@type":"slate","plaintext":"Text Heading (H3, 24/30px)\nParagraph Text (p, 18/24px)","value":[{"children":[{"text":"Text Heading (H3, 24/30px)"}],"type":"h2"},{"children":[{"text":"Paragraph Text (p, 18/24px)"}],"type":"p"}]}},"blocks_layout":{"items":["a7ffd7f2-5dbf-4b5c-b24e-d10db0dff8df","c1163fcc-e2a4-4e81-b6ab-af537c8b4d56"]},"styles":{}}' />
 
-For grid blocks, the font of the headlines are variable, depending on the number of cells in the grid.
+<block type="toc" variation="default" data='{"levels":["h2","h3"],"styles":{}}' />
 
-</block>
+<block type="slateTable" data='{"styles":{},"table":{"basic":false,"celled":true,"compact":false,"fixed":true,"hideHeaders":false,"inverted":false,"rows":[{"cells":[{"key":"do0ad","type":"header","value":[{"children":[{"text":"Table Header (THEAD, 18/24)"}],"type":"p"}]},{"key":"aav18","type":"header","value":[{"children":[{"text":"Table Header (THEAD, 18/24)"}],"type":"p"}]}],"key":"117r7"},{"cells":[{"key":"arr02","type":"data","value":[{"children":[{"text":"Table cell (td p, 18/24px)"}],"type":"p"}]},{"key":"81nda","type":"data","value":[{"children":[{"text":"Table cell (td p, 18/24px)"}],"type":"p"}]}],"key":"5psue"}],"striped":false}}' />
 
-<block type="gridBlock">
-
-## Text Heading (H3, 24/30px)
-
-Paragraph Text (p, 18/24px)
-
-## Text Heading (H3, 24/30px)
-
-Paragraph Text (p, 18/24px)
-
-</block>
-
-<block type="toc" uid="47cef702-7d66-4313-b3ec-585408735218" variation="default" data='{"levels":["h2","h3"],"styles":{}}' />
-
-| Table Header (THEAD, 18/24) | Table Header (THEAD, 18/24) |
-| --- | --- |
-| Table cell (td p, 18/24px) | Table cell (td p, 18/24px) |
-
-
+<block type="slate" data='{"value":[{"children":[{"text":""}],"type":"p"}]}' />

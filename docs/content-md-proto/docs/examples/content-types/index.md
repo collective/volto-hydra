@@ -23,12 +23,12 @@ assignments:
   - { uid: e3bb641a-0252-4fff-a6a0-80ce155d4ee5, type: listing }
   - { uid: fdb1dfd1-6073-4ad0-a147-c0709c39734d, type: slate }
 prototypes: |
-  <block type="title"      _="${h1}" />
-  <block type="slate"      value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
+  <block type="title" _="${h1}" />
+  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
 ---
 
-# Content Types
+# 
 
-<block type="listing" uid="e3bb641a-0252-4fff-a6a0-80ce155d4ee5" headlineTag="h2" variation="default" data='{"styles":{}}' />
+<block type="listing" headlineTag="h2" variation="default" data='{"styles":{}}' />
 
-
+<block type="slate" data='{"styles":{},"value":[{"children":[{"text":""}],"type":"p"}]}' />

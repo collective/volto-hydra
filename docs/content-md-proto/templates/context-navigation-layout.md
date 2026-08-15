@@ -9,9 +9,10 @@ description: Forced layout for 3rd-level pages — injects a contextNavigation
 assignments:
   - { uid: tpl-context-nav, type: contextNavigation }
   - { uid: tpl-default-slot, type: slate }
-
+prototypes: |
+  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
 ---
 
-<block type="contextNavigation" uid="tpl-context-nav" templateId="/templates/context-navigation-layout" templateInstanceId="context-navigation-layout-def-instance" slotId="context-navigation" ariaLabel="In this section" data='{"fixed":true,"readOnly":true,"blocks":{"tpl-cnav-listing":{"@type":"listing","variation":"navItem","fixed":true,"readOnly":true,"templateId":"/templates/context-navigation-layout","templateInstanceId":"context-navigation-layout-def-instance","slotId":"context-navigation-listing","fieldMapping":{"@id":{"field":"href","type":"link"},"title":{"field":"label"}},"querystring":{"query":[{"i":"path","o":"plone.app.querystring.operation.string.relativePath","v":".."},{"i":"portal_type","o":"plone.app.querystring.operation.selection.none","v":["Image","File"]},{"i":"exclude_from_nav","o":"plone.app.querystring.operation.boolean.isFalse","v":""}],"sort_on":"getObjPositionInParent","depth":4}}},"blocks_layout":{"items":["tpl-cnav-listing"]}}' />
+<block type="contextNavigation" templateId="/templates/context-navigation-layout" templateInstanceId="context-navigation-layout-def-instance" slotId="context-navigation" ariaLabel="In this section" data='{"fixed":true,"readOnly":true,"blocks":{"tpl-cnav-listing":{"@type":"listing","variation":"navItem","fixed":true,"readOnly":true,"templateId":"/templates/context-navigation-layout","templateInstanceId":"context-navigation-layout-def-instance","slotId":"context-navigation-listing","fieldMapping":{"@id":{"field":"href","type":"link"},"title":{"field":"label"}},"querystring":{"query":[{"i":"path","o":"plone.app.querystring.operation.string.relativePath","v":".."},{"i":"portal_type","o":"plone.app.querystring.operation.selection.none","v":["Image","File"]},{"i":"exclude_from_nav","o":"plone.app.querystring.operation.boolean.isFalse","v":""}],"sort_on":"getObjPositionInParent","depth":4}}},"blocks_layout":{"items":["tpl-cnav-listing"]}}' />
 
-<block type="slate" uid="tpl-default-slot" templateId="/templates/context-navigation-layout" templateInstanceId="context-navigation-layout-def-instance" slotId="default" data='{"value":[{"type":"p","children":[{"text":""}]}]}' />
+<block type="slate" templateId="/templates/context-navigation-layout" templateInstanceId="context-navigation-layout-def-instance" slotId="default" data='{"value":[{"type":"p","children":[{"text":""}]}]}' />

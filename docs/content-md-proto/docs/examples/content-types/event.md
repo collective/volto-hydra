@@ -42,11 +42,13 @@ assignments:
   - { uid: d3f1c443-583f-4e8e-a682-3bf25752a300, type: title }
   - { uid: b539ed36-442b-4c7d-8b9b-8af01963c206, type: eventMetadata }
   - { uid: 6e6979eb-af21-466f-b2de-3148144ac950, type: slate }
-
+prototypes: |
+  <block type="title" _="${h1}" />
+  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
 ---
 
-<block type="title" uid="d3f1c443-583f-4e8e-a682-3bf25752a300" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="title" data='{"fixed":true,"readOnly":true}' />
+<block type="title" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="title" data='{"fixed":true,"readOnly":true}' />
 
-<block type="eventMetadata" uid="b539ed36-442b-4c7d-8b9b-8af01963c206" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="event-metadata" data='{"fixed":true}' />
+<block type="eventMetadata" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="event-metadata" data='{"fixed":true}' />
 
-<block type="slate" uid="6e6979eb-af21-466f-b2de-3148144ac950" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="content" data='{"styles":{},"value":[{"children":[{"text":""}],"type":"p"}]}' />
+<block type="slate" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="content" data='{"styles":{},"value":[{"children":[{"text":""}],"type":"p"}]}' />

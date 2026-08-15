@@ -50,21 +50,13 @@ assignments:
   - { uid: h-25, type: slate }
   - { uid: ul-26, type: slate }
 prototypes: |
-  <block type="title"      _="${h1}" />
-  <block type="slate"      value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
-  <block type="image"      description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" />
-  <block type="slateTable">
-    <region name="rows">
-      <block type="row">
-        <region name="cells">
-          <block type="cell" value="${td/slate}" />
-        </region>
-      </block>
-    </region>
-  </block>
+  <block type="title" _="${h1}" />
+  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
+  <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+  <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
 ---
 
-# Editing text
+# 
 
 Click into any text in the preview that's marked inline-editable and start typing. There are two kinds of text fields: **simple text** (like a title) and **slate** (rich text — the body of a paragraph block, descriptions, etc.).
 
@@ -87,22 +79,11 @@ When you're typing in a slate field, certain markdown patterns are converted aut
 
 ### Block-level (start of a line, then space)
 
-| Type | Becomes |
-| --- | --- |
-| `## ` | Heading 2 |
-| `### ` | Heading 3 |
-| `> ` | Blockquote |
-| `- `, `+ `, `* ` | Bulleted list |
-| `1. `, `1) ` | Numbered list |
+<block type="slateTable" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-10-r0","cells":[{"key":"tbl-10-r0c0","type":"header","value":[{"type":"p","children":[{"text":"Type"}]}]},{"key":"tbl-10-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Becomes"}]}]}]},{"key":"tbl-10-r1","cells":[{"key":"tbl-10-r1c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"## "}]}]}]},{"key":"tbl-10-r1c1","type":"data","value":[{"type":"p","children":[{"text":"Heading 2"}]}]}]},{"key":"tbl-10-r2","cells":[{"key":"tbl-10-r2c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"### "}]}]}]},{"key":"tbl-10-r2c1","type":"data","value":[{"type":"p","children":[{"text":"Heading 3"}]}]}]},{"key":"tbl-10-r3","cells":[{"key":"tbl-10-r3c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"> "}]}]}]},{"key":"tbl-10-r3c1","type":"data","value":[{"type":"p","children":[{"text":"Blockquote"}]}]}]},{"key":"tbl-10-r4","cells":[{"key":"tbl-10-r4c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"- "}]},{"text":", "},{"type":"code","children":[{"text":"+ "}]},{"text":", "},{"type":"code","children":[{"text":"* "}]}]}]},{"key":"tbl-10-r4c1","type":"data","value":[{"type":"p","children":[{"text":"Bulleted list"}]}]}]},{"key":"tbl-10-r5","cells":[{"key":"tbl-10-r5c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"1. "}]},{"text":", "},{"type":"code","children":[{"text":"1) "}]}]}]},{"key":"tbl-10-r5c1","type":"data","value":[{"type":"p","children":[{"text":"Numbered list"}]}]}]}]}}' />
 
 ### Inline (around selected/typed text)
 
-| Type | Becomes |
-| --- | --- |
-| `` `code` `` | inline code |
-| `**bold**` or `__bold__` | **bold** |
-| `*italic*` or `_italic_` | *italic* |
-| `~~strikethrough~~` | ~~strikethrough~~ |
+<block type="slateTable" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-12-r0","cells":[{"key":"tbl-12-r0c0","type":"header","value":[{"type":"p","children":[{"text":"Type"}]}]},{"key":"tbl-12-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Becomes"}]}]}]},{"key":"tbl-12-r1","cells":[{"key":"tbl-12-r1c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"`code`"}]}]}]},{"key":"tbl-12-r1c1","type":"data","value":[{"type":"p","children":[{"text":"inline code"}]}]}]},{"key":"tbl-12-r2","cells":[{"key":"tbl-12-r2c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"**bold**"}]},{"text":" or "},{"type":"code","children":[{"text":"__bold__"}]}]}]},{"key":"tbl-12-r2c1","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"bold"}]}]}]}]},{"key":"tbl-12-r3","cells":[{"key":"tbl-12-r3c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"*italic*"}]},{"text":" or "},{"type":"code","children":[{"text":"_italic_"}]}]}]},{"key":"tbl-12-r3c1","type":"data","value":[{"type":"p","children":[{"type":"em","children":[{"text":"italic"}]}]}]}]},{"key":"tbl-12-r4","cells":[{"key":"tbl-12-r4c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"~~strikethrough~~"}]}]}]},{"key":"tbl-12-r4c1","type":"data","value":[{"type":"p","children":[{"type":"del","children":[{"text":"strikethrough"}]}]}]}]}]}}' />
 
 ### Backspace-at-start: unwrap
 
@@ -112,7 +93,7 @@ Press `Backspace` at the very start of a heading, list item, or blockquote and i
 
 Type `/` at the start of an empty text block to open a menu of block types you can convert to (heading, image, list, your custom blocks, …). Keep typing to filter (`/he` filters to heading); `Enter` picks the highlighted result; `Escape` dismisses without changing anything.
 
-![Empty paragraph showing the slash menu listing block types — Accordion, Columns, Description, etc.](/docs/images/slash-menu)
+<block type="image" url="/docs/images/slash-menu" alt="Empty paragraph showing the slash menu listing block types — Accordion, Columns, Description, etc." align="center" size="l" />
 
 The slash menu changes the block's `@type`. If you wanted to add a *new* block, see [Adding and moving blocks](adding-and-moving-blocks.md) instead.
 

@@ -23,12 +23,12 @@ assignments:
   - { uid: 183bf050-57b7-4841-b9c8-f9b5a15fe086, type: listing }
   - { uid: 2d181d1f-1fac-420a-b410-4f4d5379f8ea, type: slate }
 prototypes: |
-  <block type="title"      _="${h1}" />
-  <block type="slate"      value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
+  <block type="title" _="${h1}" />
+  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
 ---
 
-# Images
+# 
 
-<block type="listing" uid="183bf050-57b7-4841-b9c8-f9b5a15fe086" headlineTag="h2" variation="imageGallery" data='{"styles":{}}' />
+<block type="listing" headlineTag="h2" variation="imageGallery" data='{"styles":{}}' />
 
-
+<block type="slate" data='{"styles":{},"value":[{"children":[{"text":""}],"type":"p"}]}' />

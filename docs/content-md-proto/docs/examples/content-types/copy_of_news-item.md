@@ -32,15 +32,17 @@ assignments:
   - { uid: 8c686422-757e-4519-ae6a-ffcb4d107e22, type: introduction }
   - { uid: 944cfb1b-3ef7-425f-a5ef-eb9242429bfd, type: leadimage }
   - { uid: 6db5aa18-6fd8-4efe-9bc6-9cd6fc1dd0be, type: slate }
-
+prototypes: |
+  <block type="title" _="${h1}" />
+  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
 ---
 
-<block type="dateField" uid="ni-date-qrq6v50j" dateField="effective" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="date" data='{"showTime":false,"fixed":true,"readOnly":true}' />
+<block type="dateField" dateField="effective" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="date" data='{"showTime":false,"fixed":true,"readOnly":true}' />
 
-<block type="title" uid="a0ac0f60-667b-4b22-a49f-989f2ae8c3cc" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="title" data='{"fixed":true,"readOnly":true}' />
+<block type="title" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="title" data='{"fixed":true,"readOnly":true}' />
 
-<block type="introduction" uid="8c686422-757e-4519-ae6a-ffcb4d107e22" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data='{"value":[{"children":[{"text":"Cinnamon skinny medium panna americano spice affogato froth frappuccino that."}],"type":"p"}]}' />
+<block type="introduction" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data='{"value":[{"children":[{"text":"Cinnamon skinny medium panna americano spice affogato froth frappuccino that."}],"type":"p"}]}' />
 
-<block type="leadimage" uid="944cfb1b-3ef7-425f-a5ef-eb9242429bfd" align="center" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="lead-image" data='{"fixed":true}' />
+<block type="leadimage" align="center" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="lead-image" data='{"fixed":true}' />
 
-<block type="slate" uid="6db5aa18-6fd8-4efe-9bc6-9cd6fc1dd0be" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data='{"styles":{},"value":[{"children":[{"text":"Ristretto so chicory skinny ristretto au decaffeinated sugar that spoon shop crema ut pot lungo. Flavour that milk brewed flavour whipped kopi black and robusta. Bar sugar americano eu froth variety brewed acerbic steamed. Aroma est milk doppio frappuccino half cream filter french froth luwak. Acerbic plunger au barista flavour in froth trade."}],"type":"p"}]}' />
+<block type="slate" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data='{"styles":{},"value":[{"children":[{"text":"Ristretto so chicory skinny ristretto au decaffeinated sugar that spoon shop crema ut pot lungo. Flavour that milk brewed flavour whipped kopi black and robusta. Bar sugar americano eu froth variety brewed acerbic steamed. Aroma est milk doppio frappuccino half cream filter french froth luwak. Acerbic plunger au barista flavour in froth trade."}],"type":"p"}]}' />

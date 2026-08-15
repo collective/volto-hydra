@@ -11,13 +11,15 @@ assignments:
   - { uid: tpl-ni-title, type: title }
   - { uid: tpl-ni-leadimage, type: leadimage }
   - { uid: tpl-ni-content, type: slate }
-
+prototypes: |
+  <block type="title" _="${h1}" />
+  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
 ---
 
-<block type="dateField" uid="tpl-ni-date" dateField="effective" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="date" data='{"showTime":false,"fixed":true}' />
+<block type="dateField" dateField="effective" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="date" data='{"showTime":false,"fixed":true}' />
 
-<block type="title" uid="tpl-ni-title" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="title" data='{"fixed":true}' />
+<block type="title" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="title" data='{"fixed":true}' />
 
-<block type="leadimage" uid="tpl-ni-leadimage" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="lead-image" data='{"fixed":true}' />
+<block type="leadimage" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="lead-image" data='{"fixed":true}' />
 
-<block type="slate" uid="tpl-ni-content" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data='{"value":[{"type":"p","children":[{"text":""}]}]}' />
+<block type="slate" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data='{"value":[{"type":"p","children":[{"text":""}]}]}' />

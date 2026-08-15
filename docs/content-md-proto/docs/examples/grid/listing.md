@@ -32,18 +32,9 @@ assignments:
   - { uid: fc7973d9-34e3-484c-a20b-1af7eecd9879, type: title }
   - { uid: 5a361b25-3e19-4c06-866f-a2db6feed983, type: gridBlock }
 prototypes: |
-  <block type="title"      _="${h1}" />
-  <block type="gridBlock"  headline="${text}">
-    <region name="blocks" widget="blocks_layout" />
-  </block>
+  <block type="title" _="${h1}" />
 ---
 
-# Grid-Listing
+# 
 
-<block type="gridBlock">
-
-<block type="listing" uid="b940ae89-2b34-472b-aac8-f3d96dfe46f4" headlineTag="h2" variation="default" data='{"querystring":{"limit":"7","query":[{"i":"path","o":"plone.app.querystring.operation.string.absolutePath","v":"/docs/examples/grid"}],"sort_order":"ascending"},"styles":{}}' />
-
-<block type="listing" uid="0fae8b67-374c-4ca2-b3e0-86114e2f17e1" headlineTag="h2" variation="default" data='{"querystring":{"limit":"7","query":[{"i":"path","o":"plone.app.querystring.operation.string.absolutePath","v":"/docs/examples/grid"}],"sort_on":"getId","sort_order":"descending","sort_order_boolean":true},"styles":{}}' />
-
-</block>
+<block type="gridBlock" data='{"blocks":{"0fae8b67-374c-4ca2-b3e0-86114e2f17e1":{"@type":"listing","headlineTag":"h2","querystring":{"limit":"7","query":[{"i":"path","o":"plone.app.querystring.operation.string.absolutePath","v":"/docs/examples/grid"}],"sort_on":"getId","sort_order":"descending","sort_order_boolean":true},"styles":{},"variation":"default"},"b940ae89-2b34-472b-aac8-f3d96dfe46f4":{"@type":"listing","headlineTag":"h2","querystring":{"limit":"7","query":[{"i":"path","o":"plone.app.querystring.operation.string.absolutePath","v":"/docs/examples/grid"}],"sort_order":"ascending"},"styles":{},"variation":"default"}},"blocks_layout":{"items":["b940ae89-2b34-472b-aac8-f3d96dfe46f4","0fae8b67-374c-4ca2-b3e0-86114e2f17e1"]},"styles":{}}' />

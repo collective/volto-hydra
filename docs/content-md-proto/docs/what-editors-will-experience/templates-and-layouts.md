@@ -68,12 +68,13 @@ assignments:
   - { uid: h-42, type: slate }
   - { uid: p-43, type: slate }
 prototypes: |
-  <block type="title"      _="${h1}" />
-  <block type="slate"      value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
-  <block type="image"      description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" />
+  <block type="title" _="${h1}" />
+  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
+  <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+  <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
 ---
 
-# Templates and layouts
+# 
 
 A **template** is a piece of pre-built page structure that someone (often a developer or site admin) has saved separately. When you apply a template to a page, the page gets the template's structure overlaid: some blocks are fixed and can't be edited, some can be edited but not moved, and some are open slots where you fill in your own blocks.
 
@@ -118,7 +119,7 @@ Typical use: a "callout" block in the middle of a layout — every page has one,
 
 Regular blocks where you can do anything — add, edit, move, delete. The template marks regions as slots (with a `slotId`) and your existing content is placed into the matching slots when the template merges.
 
-![A snippet template applied to a page. The "Snippet Header" block is selected, rendered muted as a locked block. Its sidebar shows its content read-only — a "Text" field with the value "Snippet Header - From Template" — above the template's own read-only settings (Template Name, Save Location).](/docs/images/template-locked)
+<block type="image" url="/docs/images/template-locked" align="center" size="l" data='{"alt":"A snippet template applied to a page. The \"Snippet Header\" block is selected, rendered muted as a locked block. Its sidebar shows its content read-only — a \"Text\" field with the value \"Snippet Header - From Template\" — above the template&#39;s own read-only settings (Template Name, Save Location)."}' />
 
 ## Inserting between fixed blocks
 
@@ -142,8 +143,7 @@ Locked and fixed template blocks are the exception: they can't be moved at all (
 
 When `allowedLayouts` is configured for a page (or a region), the sidebar shows a **Layout** dropdown. Pick a different layout and:
 
-1. The new layout's structure replaces the old one.
-2. Your existing content is **redistributed** into the new layout's slots based on `slotId`:Content tagged with a slot name is placed into the matching slot in the new layout.Content with no slot tag falls into the `"default"` slot if the new layout has one; otherwise into the bottom or top slot, or is dropped.Fixed blocks with the same `slotId` get their editable content carried over (text, media); their structural settings come from the new layout.
+<block type="slate" data='{"value":[{"type":"ol","children":[{"type":"li","children":[{"text":"The new layout&#39;s structure replaces the old one."}]},{"type":"li","children":[{"text":"Your existing content is "},{"type":"strong","children":[{"text":"redistributed"}]},{"text":" into the new layout&#39;s slots based on "},{"type":"code","children":[{"text":"slotId"}]},{"text":":"},{"type":"ul","children":[{"type":"li","children":[{"text":"Content tagged with a slot name is placed into the matching slot in the new layout."}]},{"type":"li","children":[{"text":"Content with no slot tag falls into the "},{"type":"code","children":[{"text":"\"default\""}]},{"text":" slot if the new layout has one; otherwise into the bottom or top slot, or is dropped."}]},{"type":"li","children":[{"text":"Fixed blocks with the same "},{"type":"code","children":[{"text":"slotId"}]},{"text":" get their editable content carried over (text, media); their structural settings come from the new layout."}]}]}]}]}]}' />
 
 The point of `slotId` is that two layouts can share the same set of region names — switch between them and your content lands in the right places automatically.
 
@@ -161,7 +161,7 @@ Unlocking one template unlocks only *that* template. The rest of the page stays 
 
 Templates are saved when you **lock** them, not when you save the page. If you save the page while a template is still unlocked, you're prompted to lock it first.
 
-![A template's sidebar bar, locked (🔒) — the Template Settings show as read-only text. Clicking the lock unlocks it (🔓) and makes the template editable.](/docs/images/template-edit-locked)
+<block type="image" url="/docs/images/template-edit-locked" alt="A template's sidebar bar, locked (🔒) — the Template Settings show as read-only text. Clicking the lock unlocks it (🔓) and makes the template editable." align="center" size="l" />
 
 ## Template instances in the sidebar
 

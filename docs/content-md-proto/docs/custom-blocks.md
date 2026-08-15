@@ -114,17 +114,8 @@ assignments:
   - { uid: ce-88, type: codeExample }
   - { uid: p-89, type: slate }
 prototypes: |
-  <block type="title"      _="${h1}" />
-  <block type="slate"      value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
-  <block type="slateTable">
-    <region name="rows">
-      <block type="row">
-        <region name="cells">
-          <block type="cell" value="${td/slate}" />
-        </region>
-      </block>
-    </region>
-  </block>
+  <block type="title" _="${h1}" />
+  <block type="slate" value="${p|h2|h3|h4|h5|h6|ul|ol|blockquote/slate}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
@@ -132,7 +123,7 @@ prototypes: |
   </block>
 ---
 
-# Custom Blocks
+# 
 
 Define custom block types directly in your frontend configuration via the `blocks` option in `initBridge`. No Volto plugin deployment required. Each block type needs an `id`, `title`, and a `blockSchema` with its field properties.
 
@@ -140,38 +131,13 @@ Define custom block types directly in your frontend configuration via the `block
 
 `initBridge(options)` opens the iframe bridge and registers your frontend's page and block configuration with the admin. Call it once during page setup when running inside the admin iframe.
 
-### Js
-
-```js
-import { initBridge } from '@hydra-js/hydra.js';
-
-const bridge = initBridge({
-  page:        { /* page-level blocks fields */ },
-  blocks:      { /* block type registry */ },
-  voltoConfig: { /* other Volto settings */ },
-  onEditChange: (formData) => { /* re-render on edit */ },
-  pathToApiPath: (path) => path,
-  debug: false,
-});
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-4-js-dec45b","label":"Js","language":"js","code":"import { initBridge } from &#39;@hydra-js/hydra.js&#39;;\n\nconst bridge = initBridge({\n  page:        { /* page-level blocks fields */ },\n  blocks:      { /* block type registry */ },\n  voltoConfig: { /* other Volto settings */ },\n  onEditChange: (formData) => { /* re-render on edit */ },\n  pathToApiPath: (path) => path,\n  debug: false,\n});"}]}' />
 
 ### `page` — page-level blocks fields
 
 Defines the **blocks fields of a page** where blocks can live. `page.schema.properties` is keyed by field name; each `widget: 'blocks_layout'` entry is one blocks field. The field name is the key inside the page's `blocks_layout` dict (the default field is `items`), so they all persist inside the registered `blocks_layout` field.
 
-### Js
-
-```js
-page: {
-  schema: {
-    properties: {
-      items:  { widget: 'blocks_layout', title: 'Content', allowedBlocks: ['slate', 'image', 'slider'] },
-      header: { widget: 'blocks_layout', title: 'Header',  allowedBlocks: ['slate'], maxLength: 3 },
-      footer: { widget: 'blocks_layout', title: 'Footer',  allowedBlocks: ['slate', 'link'] },
-    },
-  },
-}
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-7-javascript-f817db","label":"Js","language":"js","code":"page: {\n  schema: {\n    properties: {\n      items:  { widget: &#39;blocks_layout&#39;, title: &#39;Content&#39;, allowedBlocks: [&#39;slate&#39;, &#39;image&#39;, &#39;slider&#39;] },\n      header: { widget: &#39;blocks_layout&#39;, title: &#39;Header&#39;,  allowedBlocks: [&#39;slate&#39;], maxLength: 3 },\n      footer: { widget: &#39;blocks_layout&#39;, title: &#39;Footer&#39;,  allowedBlocks: [&#39;slate&#39;, &#39;link&#39;] },\n    },\n  },\n}"}]}' />
 
 Per-field options:
 
@@ -193,23 +159,7 @@ Defaults and side effects:
 
 Defines or overrides individual block types. Each key is the block type name (matching what appears in `allowedBlocks` and `@type` on saved blocks).
 
-### Js
-
-```js
-blocks: {
-  slider: {                          // new custom block
-    id: 'slider',
-    title: 'Slider',
-    icon: 'data:...',
-    group: 'common',
-    mostUsed: true,
-    blockSchema: { properties: { /* fields */ } },
-  },
-  slate: {                           // override the built-in slate block
-    blockSchema: { /* override */ },
-  },
-}
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-14-js-c5449c","label":"Js","language":"js","code":"blocks: {\n  slider: {                          // new custom block\n    id: &#39;slider&#39;,\n    title: &#39;Slider&#39;,\n    icon: &#39;data:...&#39;,\n    group: &#39;common&#39;,\n    mostUsed: true,\n    blockSchema: { properties: { /* fields */ } },\n  },\n  slate: {                           // override the built-in slate block\n    blockSchema: { /* override */ },\n  },\n}"}]}' />
 
 Per-block options (most are passed through to Volto's block config):
 
@@ -239,60 +189,7 @@ The `Bridge` instance, which exposes additional API methods you can call from th
 
 ## Defining a custom block
 
-### Javascript
-
-```javascript
-const bridge = initBridge({
-    page: {
-        schema: {
-            properties: {
-                blocks_layout: {
-                    title: 'Content',
-                    allowedBlocks: ['slate', 'image', 'video', 'slider'],
-                },
-            },
-        },
-    },
-    blocks: {
-        slider: {
-            id: 'slider',
-            title: 'Slider',
-            icon: 'data:...',
-            group: 'common',
-            restricted: false,
-            mostUsed: true,
-            disableCustomSidebarEditForm: false,
-            blockSchema: {
-                properties: {
-                    slider_timing: {
-                        title: 'Delay',
-                        widget: 'float',
-                    },
-                    slides: {
-                        title: 'Slides',
-                        widget: 'blocks_layout',
-                        allowedBlocks: ['slide', 'image'],
-                        defaultBlockType: 'slide',
-                    }
-                },
-            }
-        },
-        slide: {
-            id: 'slide',
-            title: 'Slide',
-            blockSchema: {
-                properties: {
-                    url: { title: 'Link', widget: 'url' },
-                    title: { title: 'Title' },
-                    image: { title: 'Image', widget: 'image' },
-                    description: { title: 'Description',
-                                   widget: 'slate' },
-                },
-            },
-        },
-    },
-});
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-23-javascript-a47dd8","label":"Javascript","language":"javascript","code":"const bridge = initBridge({\n    page: {\n        schema: {\n            properties: {\n                blocks_layout: {\n                    title: &#39;Content&#39;,\n                    allowedBlocks: [&#39;slate&#39;, &#39;image&#39;, &#39;video&#39;, &#39;slider&#39;],\n                },\n            },\n        },\n    },\n    blocks: {\n        slider: {\n            id: &#39;slider&#39;,\n            title: &#39;Slider&#39;,\n            icon: &#39;data:...&#39;,\n            group: &#39;common&#39;,\n            restricted: false,\n            mostUsed: true,\n            disableCustomSidebarEditForm: false,\n            blockSchema: {\n                properties: {\n                    slider_timing: {\n                        title: &#39;Delay&#39;,\n                        widget: &#39;float&#39;,\n                    },\n                    slides: {\n                        title: &#39;Slides&#39;,\n                        widget: &#39;blocks_layout&#39;,\n                        allowedBlocks: [&#39;slide&#39;, &#39;image&#39;],\n                        defaultBlockType: &#39;slide&#39;,\n                    }\n                },\n            }\n        },\n        slide: {\n            id: &#39;slide&#39;,\n            title: &#39;Slide&#39;,\n            blockSchema: {\n                properties: {\n                    url: { title: &#39;Link&#39;, widget: &#39;url&#39; },\n                    title: { title: &#39;Title&#39; },\n                    image: { title: &#39;Image&#39;, widget: &#39;image&#39; },\n                    description: { title: &#39;Description&#39;,\n                                   widget: &#39;slate&#39; },\n                },\n            },\n        },\n    },\n});"}]}' />
 
 Child block types (like `slide` above) must be defined at the top level of `blocks`. You can also:
 
@@ -307,30 +204,7 @@ Child block types (like `slide` above) must be defined at the top level of `bloc
 
 Schema enhancers modify block schemas dynamically:
 
-### Javascript
-
-```javascript
-const bridge = initBridge({
-    blocks: {
-        myBlock: {
-            blockSchema: {
-                properties: {
-                    mode: {
-                        title: 'Mode', widget: 'select',
-                        choices: [['simple', 'Simple'], ['advanced', 'Advanced']],
-                    },
-                    advancedOptions: { title: 'Advanced Options', type: 'string' },
-                },
-            },
-            schemaEnhancer: {
-                fieldRules: {
-                    advancedOptions: { when: { mode: 'advanced' }, else: false },
-                },
-            },
-        },
-    },
-});
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-29-javascript-f2ef0c","label":"Javascript","language":"javascript","code":"const bridge = initBridge({\n    blocks: {\n        myBlock: {\n            blockSchema: {\n                properties: {\n                    mode: {\n                        title: &#39;Mode&#39;, widget: &#39;select&#39;,\n                        choices: [[&#39;simple&#39;, &#39;Simple&#39;], [&#39;advanced&#39;, &#39;Advanced&#39;]],\n                    },\n                    advancedOptions: { title: &#39;Advanced Options&#39;, type: &#39;string&#39; },\n                },\n            },\n            schemaEnhancer: {\n                fieldRules: {\n                    advancedOptions: { when: { mode: &#39;advanced&#39; }, else: false },\n                },\n            },\n        },\n    },\n});"}]}' />
 
 **`fieldRules`** — add, remove, or conditionally modify field definitions. The value for each rule key can be:
 
@@ -345,12 +219,7 @@ Condition operators: `is`, `isNot`, `isSet`, `isNotSet`, `oneOf`, `notOneOf`, `c
 
 Each operator is driven by the field's **declared type**, never the value shape. A field reduces to one of four **surfaces**, and an operator used off its surface raises an error (a mis-authored rule fails loudly rather than silently mismatching):
 
-| surface | fields | operators |
-| --- | --- | --- |
-| **string** | text, textarea, url, Choice, **slate** (its plaintext) | `is`/`isNot`, `isSet`, `oneOf`/`notOneOf`, `contains`/`notContains` = **substring**, `regex`/`notRegex` |
-| **number** | integer, float, number | `is`/`isNot`, `oneOf`, `isSet`, `gt`/`gte`/`lt`/`lte` = compare |
-| **boolean** | boolean | `is`/`isNot`, `isSet` |
-| **array** | multiselect (its values), **region** (its child block **types**) | `isSet`, `is`/`isNot` = **set-equality**, `contains`/`notContains` = membership, `containsAny`/`containsAll` (+inverses), `gt`/`gte`/`lt`/`lte` = **count** |
+<block type="slateTable" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-34-r0","cells":[{"key":"tbl-34-r0c0","type":"header","value":[{"type":"p","children":[{"text":"surface"}]}]},{"key":"tbl-34-r0c1","type":"header","value":[{"type":"p","children":[{"text":"fields"}]}]},{"key":"tbl-34-r0c2","type":"header","value":[{"type":"p","children":[{"text":"operators"}]}]}]},{"key":"tbl-34-r1","cells":[{"key":"tbl-34-r1c0","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"string"}]}]}]},{"key":"tbl-34-r1c1","type":"data","value":[{"type":"p","children":[{"text":"text, textarea, url, Choice, "},{"type":"strong","children":[{"text":"slate"}]},{"text":" (its plaintext)"}]}]},{"key":"tbl-34-r1c2","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"is"}]},{"text":"/"},{"type":"code","children":[{"text":"isNot"}]},{"text":", "},{"type":"code","children":[{"text":"isSet"}]},{"text":", "},{"type":"code","children":[{"text":"oneOf"}]},{"text":"/"},{"type":"code","children":[{"text":"notOneOf"}]},{"text":", "},{"type":"code","children":[{"text":"contains"}]},{"text":"/"},{"type":"code","children":[{"text":"notContains"}]},{"text":" = "},{"type":"strong","children":[{"text":"substring"}]},{"text":", "},{"type":"code","children":[{"text":"regex"}]},{"text":"/"},{"type":"code","children":[{"text":"notRegex"}]}]}]}]},{"key":"tbl-34-r2","cells":[{"key":"tbl-34-r2c0","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"number"}]}]}]},{"key":"tbl-34-r2c1","type":"data","value":[{"type":"p","children":[{"text":"integer, float, number"}]}]},{"key":"tbl-34-r2c2","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"is"}]},{"text":"/"},{"type":"code","children":[{"text":"isNot"}]},{"text":", "},{"type":"code","children":[{"text":"oneOf"}]},{"text":", "},{"type":"code","children":[{"text":"isSet"}]},{"text":", "},{"type":"code","children":[{"text":"gt"}]},{"text":"/"},{"type":"code","children":[{"text":"gte"}]},{"text":"/"},{"type":"code","children":[{"text":"lt"}]},{"text":"/"},{"type":"code","children":[{"text":"lte"}]},{"text":" = compare"}]}]}]},{"key":"tbl-34-r3","cells":[{"key":"tbl-34-r3c0","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"boolean"}]}]}]},{"key":"tbl-34-r3c1","type":"data","value":[{"type":"p","children":[{"text":"boolean"}]}]},{"key":"tbl-34-r3c2","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"is"}]},{"text":"/"},{"type":"code","children":[{"text":"isNot"}]},{"text":", "},{"type":"code","children":[{"text":"isSet"}]}]}]}]},{"key":"tbl-34-r4","cells":[{"key":"tbl-34-r4c0","type":"data","value":[{"type":"p","children":[{"type":"strong","children":[{"text":"array"}]}]}]},{"key":"tbl-34-r4c1","type":"data","value":[{"type":"p","children":[{"text":"multiselect (its values), "},{"type":"strong","children":[{"text":"region"}]},{"text":" (its child block "},{"type":"strong","children":[{"text":"types"}]},{"text":")"}]}]},{"key":"tbl-34-r4c2","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"isSet"}]},{"text":", "},{"type":"code","children":[{"text":"is"}]},{"text":"/"},{"type":"code","children":[{"text":"isNot"}]},{"text":" = "},{"type":"strong","children":[{"text":"set-equality"}]},{"text":", "},{"type":"code","children":[{"text":"contains"}]},{"text":"/"},{"type":"code","children":[{"text":"notContains"}]},{"text":" = membership, "},{"type":"code","children":[{"text":"containsAny"}]},{"text":"/"},{"type":"code","children":[{"text":"containsAll"}]},{"text":" (+inverses), "},{"type":"code","children":[{"text":"gt"}]},{"text":"/"},{"type":"code","children":[{"text":"gte"}]},{"text":"/"},{"type":"code","children":[{"text":"lt"}]},{"text":"/"},{"type":"code","children":[{"text":"lte"}]},{"text":" = "},{"type":"strong","children":[{"text":"count"}]}]}]}]}]}}' />
 
 `oneOf` (scalar value ∈ set) and `containsAny` (array shares any with a set) differ only on the field side — `oneOf` is for a single-valued field, `containsAny` for a multiselect; `oneOf` on an array throws (use `containsAny`).
 
@@ -359,57 +228,15 @@ Two extras drive **position-** and \*\*type-\*\*aware rules:
 - The virtual field **`@index`** reads a block's ordinal position within its parent `object_list` region (a `number` surface) — `{ '@index': { lt: 1 } }` means "first in my region", and `../@index` is the parent block's index. Distinct from a region's `count` (which counts children).
 - A rule whose **`set` is a block-type NAME** (a string) rather than a field definition is a **`@type` rule** — it changes the item's *type* by position, not a field. Declared as `typeRule` on a typed `object_list`; see [`typeRule` — position picks a typed item's `@type`](#typerule--position-picks-a-typed-items-type). The retype is applied by CONVERSION (a schema enhancer can't rewrite stored `@type`), which brings up the confirm described under [Drag / paste via conversion](#drag--paste-via-conversion).
 
-### Javascript
-
-```javascript
-schemaEnhancer: {
-    fieldRules: {
-        // multiselect `elements: ['image','date','tag']` — reveal each option's field
-        date: { when: { elements: { contains: 'date' } }, else: false },
-        media: { when: { elements: { containsAny: ['image', 'video'] } }, else: false },
-        layout: { when: { elements: { containsAll: ['image', 'date'] } }, else: false },
-        // scalar Choice
-        invert: { when: { colour: { oneOf: ['brand-dark', 'black'] } }, else: false },
-        // text: substring / pattern
-        cta: { when: { title: { contains: 'Sale' } }, else: false },
-        year: { when: { title: { regex: { pattern: '\\b20\\d\\d\\b', flags: 'i' } } }, else: false },
-    },
-}
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-38-javascript-4acd08","label":"Javascript","language":"javascript","code":"schemaEnhancer: {\n    fieldRules: {\n        // multiselect `elements: [&#39;image&#39;,&#39;date&#39;,&#39;tag&#39;]` — reveal each option&#39;s field\n        date: { when: { elements: { contains: &#39;date&#39; } }, else: false },\n        media: { when: { elements: { containsAny: [&#39;image&#39;, &#39;video&#39;] } }, else: false },\n        layout: { when: { elements: { containsAll: [&#39;image&#39;, &#39;date&#39;] } }, else: false },\n        // scalar Choice\n        invert: { when: { colour: { oneOf: [&#39;brand-dark&#39;, &#39;black&#39;] } }, else: false },\n        // text: substring / pattern\n        cta: { when: { title: { contains: &#39;Sale&#39; } }, else: false },\n        year: { when: { title: { regex: { pattern: &#39;\\\\b20\\\\d\\\\d\\\\b&#39;, flags: &#39;i&#39; } } }, else: false },\n    },\n}"}]}' />
 
 For a **region** (an `object_list` field, or a single `blocks_layout` region named by its region key), the array surface is its **child block types**, and the numeric operators **count** that region's children — only its own, never a cross-region total:
 
-### Javascript
-
-```javascript
-schemaEnhancer: {
-    fieldRules: {
-        // reveal a caption field only when the `body` region has an image block
-        caption: { when: { body: { contains: 'image' } }, else: false },
-        // offer "columns layout" only once the `columns` region has ≥2 blocks
-        columnsLayout: { when: { columns: { gte: 2 } }, else: false },
-        // "carousel options" only when the `slides` object_list has >1 item
-        carouselOptions: { when: { slides: { gt: 1 } }, else: false },
-    },
-}
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-40-javascript-c0236e","label":"Javascript","language":"javascript","code":"schemaEnhancer: {\n    fieldRules: {\n        // reveal a caption field only when the `body` region has an image block\n        caption: { when: { body: { contains: &#39;image&#39; } }, else: false },\n        // offer \"columns layout\" only once the `columns` region has ≥2 blocks\n        columnsLayout: { when: { columns: { gte: 2 } }, else: false },\n        // \"carousel options\" only when the `slides` object_list has >1 item\n        carouselOptions: { when: { slides: { gt: 1 } }, else: false },\n    },\n}"}]}' />
 
 To condition on a block's **position** rather than a field value, use the virtual field **`@index`** — a block's ordinal index within its parent `object_list` region (a `number` surface). It composes with the block-step grammar, so `../@index` is the parent block's index. Unlike the region's numeric ops (which *count* children), `@index` is *where this block sits*:
 
-### Javascript
-
-```javascript
-schemaEnhancer: {
-    fieldRules: {
-        // a table cell's blocks region: cap at one block when this cell is in the
-        // first row (a header row) — `../@index` is the cell's ROW index
-        blocks: [
-            { when: { '../../headerMode': { oneOf: ['row', 'both'] }, '../@index': { lt: 1 } }, set: { maxLength: 1 } },
-            { when: { '../../headerMode': { oneOf: ['col', 'both'] }, '@index':    { lt: 1 } }, set: { maxLength: 1 } },
-        ],
-    },
-}
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-42-javascript-bdaefa","label":"Javascript","language":"javascript","code":"schemaEnhancer: {\n    fieldRules: {\n        // a table cell&#39;s blocks region: cap at one block when this cell is in the\n        // first row (a header row) — `../@index` is the cell&#39;s ROW index\n        blocks: [\n            { when: { &#39;../../headerMode&#39;: { oneOf: [&#39;row&#39;, &#39;both&#39;] }, &#39;../@index&#39;: { lt: 1 } }, set: { maxLength: 1 } },\n            { when: { &#39;../../headerMode&#39;: { oneOf: [&#39;col&#39;, &#39;both&#39;] }, &#39;@index&#39;:    { lt: 1 } }, set: { maxLength: 1 } },\n        ],\n    },\n}"}]}' />
 
 A block that isn't an `object_list` item yields an unset `@index`, so comparisons are simply false (never an error). `lt: 1` is "first"; `lt: 2` is "first two", etc.
 
@@ -435,49 +262,13 @@ Each key in `fieldMappings` is either a **specific block type name**, **`@defaul
 
 Use these when blocks share fields that aren't part of the `@default` set — for example, facet types sharing `{ title, field, hidden }` or form field types sharing `{ label, description, required }`.
 
-### Javascript
-
-```javascript
-// Content item types: use @default (canonical fields) + explicit cross-mappings
-teaser: {
-    fieldMappings: {
-        '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },
-        image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },
-    },
-},
-image: {
-    fieldMappings: {
-        '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },
-        teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },
-    },
-},
-
-// Non-content types: use explicit hub-type mappings (NOT @default).
-// All facet types map through checkboxFacet as a hub:
-selectFacet:  { fieldMappings: { checkboxFacet: { title: 'title', field: 'field', hidden: 'hidden' } } },
-checkboxFacet: { fieldMappings: { selectFacet: { /* ... */ }, daterangeFacet: { /* ... */ } } },
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-53-javascript-6ea81c","label":"Javascript","language":"javascript","code":"// Content item types: use @default (canonical fields) + explicit cross-mappings\nteaser: {\n    fieldMappings: {\n        &#39;@default&#39;: { &#39;@id&#39;: &#39;href&#39;, &#39;title&#39;: &#39;title&#39;, &#39;image&#39;: &#39;preview_image&#39; },\n        image: { &#39;href&#39;: &#39;href&#39;, &#39;alt&#39;: &#39;title&#39;, &#39;url&#39;: &#39;preview_image&#39; },\n    },\n},\nimage: {\n    fieldMappings: {\n        &#39;@default&#39;: { &#39;@id&#39;: &#39;href&#39;, &#39;title&#39;: &#39;alt&#39;, &#39;image&#39;: &#39;url&#39; },\n        teaser: { &#39;href&#39;: &#39;href&#39;, &#39;title&#39;: &#39;alt&#39;, &#39;preview_image&#39;: &#39;url&#39; },\n    },\n},\n\n// Non-content types: use explicit hub-type mappings (NOT @default).\n// All facet types map through checkboxFacet as a hub:\nselectFacet:  { fieldMappings: { checkboxFacet: { title: &#39;title&#39;, field: &#39;field&#39;, hidden: &#39;hidden&#39; } } },\ncheckboxFacet: { fieldMappings: { selectFacet: { /* ... */ }, daterangeFacet: { /* ... */ } } },"}]}' />
 
 ### `@target` — copy from a linked content item
 
 `@target` maps a **linked** content item's attributes onto this block's own fields — the generic version of the Volto teaser's "copy from target" button. It maps *source content attributes* (`title`, `description`, `image`, …) to *this block's fields*. The item is whichever the block's **link field** points at (the `object_browser mode: 'link'` field — its stored snapshot is the source), so you don't name a URL field separately: "the url is the link in the mapping".
 
-### Javascript
-
-```javascript
-button: {
-    // The Label (title) syncs from the linked item's title.
-    fieldMappings: {
-        '@target': {
-            title: 'title',
-            description: 'description',
-            // image: the conversion is derived from the destination field's
-            // widget, so the value is assembled into the shape it expects.
-            image: 'preview_image',
-        },
-    },
-},
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-56-javascript-46bfa7","label":"Javascript","language":"javascript","code":"button: {\n    // The Label (title) syncs from the linked item&#39;s title.\n    fieldMappings: {\n        &#39;@target&#39;: {\n            title: &#39;title&#39;,\n            description: &#39;description&#39;,\n            // image: the conversion is derived from the destination field&#39;s\n            // widget, so the value is assembled into the shape it expects.\n            image: &#39;preview_image&#39;,\n        },\n    },\n},"}]}' />
 
 Declaring `@target` is the **only** opt-in — no per-block enhancer wiring. Each mapped field then shows a small **🔗 pull from linked** toggle in the sidebar (only when a target is selected). Every mapped field is one of two states:
 
@@ -488,21 +279,7 @@ Declaring `@target` is the **only** opt-in — no per-block enhancer wiring. Eac
 
 A `fieldMappings` value is usually a sibling **field name**. It may instead be a **region-crossing path** `<region>/<type|*>/<field>`, which reaches the `<field>` of a container region's children — the one place the path grammar crosses a region boundary. This bridges a **container** block (a region of child blocks) and a **value** block (a scalar field), so a block can convert between the two shapes:
 
-### Javascript
-
-```javascript
-tableHeaderCell: {                                   // the value form: one slate
-    blockSchema: { properties: { value: { widget: 'slate' } } },
-    // Declared ONCE on the value block; works both directions.
-    fieldMappings: { tableCell: { value: 'blocks/slate/value' } },
-},
-tableCell: {                                         // the container form
-    blockSchema: { properties: {
-        blocks: { widget: 'object_list', typeField: '@type',
-                  allowedBlocks: ['slate', 'image', 'video'] },
-    } },
-},
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-61-javascript-9a6e0e","label":"Javascript","language":"javascript","code":"tableHeaderCell: {                                   // the value form: one slate\n    blockSchema: { properties: { value: { widget: &#39;slate&#39; } } },\n    // Declared ONCE on the value block; works both directions.\n    fieldMappings: { tableCell: { value: &#39;blocks/slate/value&#39; } },\n},\ntableCell: {                                         // the container form\n    blockSchema: { properties: {\n        blocks: { widget: &#39;object_list&#39;, typeField: &#39;@type&#39;,\n                  allowedBlocks: [&#39;slate&#39;, &#39;image&#39;, &#39;video&#39;] },\n    } },\n},"}]}' />
 
 - **container → value (collapse)** — gather the region's matching children's `<field>`; slate values are **merged** into one (lossless), not truncated.
 - **value → container (expand)** — wrap the value in **one** child of `<type>` in the region.
@@ -514,20 +291,7 @@ Non-region scalar fields (`key`, `width`, …) carry over unchanged. This is the
 
 The bridge converts on demand; a **`@type` rule** on a typed `object_list` field decides *when*, by **position**. It is an ordinary `when`-based fieldRule (same grammar — `@index`, `../@index`, `../../<field>`, `oneOf`, `lt`, …) whose `set` is a block-**type name** instead of a field definition:
 
-### Javascript
-
-```javascript
-cells: {
-    widget: 'object_list', typeField: '@type',
-    allowedBlocks: ['tableCell', 'tableHeaderCell'],
-    typeRule: [
-        // header row OR header column → the value form
-        { when: { '../../headerMode': { oneOf: ['row', 'both'] }, '../@index': { lt: 1 } }, set: 'tableHeaderCell' },
-        { when: { '../../headerMode': { oneOf: ['col', 'both'] }, '@index': { lt: 1 } },     set: 'tableHeaderCell' },
-        { set: 'tableCell' },                                // otherwise the container form
-    ],
-},
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-66-javascript-11d07c","label":"Javascript","language":"javascript","code":"cells: {\n    widget: &#39;object_list&#39;, typeField: &#39;@type&#39;,\n    allowedBlocks: [&#39;tableCell&#39;, &#39;tableHeaderCell&#39;],\n    typeRule: [\n        // header row OR header column → the value form\n        { when: { &#39;../../headerMode&#39;: { oneOf: [&#39;row&#39;, &#39;both&#39;] }, &#39;../@index&#39;: { lt: 1 } }, set: &#39;tableHeaderCell&#39; },\n        { when: { &#39;../../headerMode&#39;: { oneOf: [&#39;col&#39;, &#39;both&#39;] }, &#39;@index&#39;: { lt: 1 } },     set: &#39;tableHeaderCell&#39; },\n        { set: &#39;tableCell&#39; },                                // otherwise the container form\n    ],\n},"}]}' />
 
 The rule is evaluated in the same pass that applies field defaults (run on every edit): each typed item's target `@type` is re-resolved, and when it differs from the stored `@type` the item is **converted in place** via the bridge above. So moving a row to/from row 0 flips its cells between `tableHeaderCell` (a slate `value`) and `tableCell` (a `blocks` container), losslessly — no imperative "re-type the cells" code. Only meaningful on a **typed** object\_list (a `typeField` item has an `@type` to rewrite); it settles in one pass (the target type re-resolves to itself once the item is in place).
 
@@ -557,26 +321,11 @@ The chooser popup survives only for the genuinely ambiguous case: a single block
 
 A mapping value is either a string (simple field rename) or `{ field, type }` (rename with type conversion):
 
-### Json
-
-```json
-{
-    "@id": { "field": "href", "type": "link" },
-    "title": "title",
-    "description": "description",
-    "image": "preview_image"
-}
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-79-json-1fc605","label":"Json","language":"json","code":"{\n    \"@id\": { \"field\": \"href\", \"type\": \"link\" },\n    \"title\": \"title\",\n    \"description\": \"description\",\n    \"image\": \"preview_image\"\n}"}]}' />
 
 When `type` is specified, the value is converted at runtime:
 
-| Type | Conversion |
-| --- | --- |
-| `string` | Arrays joined with `", "`; image objects resolved to URL string |
-| `link` | String wrapped as `[{ "@id": value }]` (Volto link format) |
-| `image` | Pass through (expects `{ "@id", image_field, image_scales }`) |
-| `array` | Non-arrays wrapped in `[value]` |
-| `(none)` | Copied as-is |
+<block type="slateTable" data='{"table":{"fixed":true,"compact":false,"basic":false,"celled":true,"inverted":false,"striped":false,"rows":[{"key":"tbl-81-r0","cells":[{"key":"tbl-81-r0c0","type":"header","value":[{"type":"p","children":[{"text":"Type"}]}]},{"key":"tbl-81-r0c1","type":"header","value":[{"type":"p","children":[{"text":"Conversion"}]}]}]},{"key":"tbl-81-r1","cells":[{"key":"tbl-81-r1c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"string"}]}]}]},{"key":"tbl-81-r1c1","type":"data","value":[{"type":"p","children":[{"text":"Arrays joined with "},{"type":"code","children":[{"text":"\", \""}]},{"text":"; image objects resolved to URL string"}]}]}]},{"key":"tbl-81-r2","cells":[{"key":"tbl-81-r2c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"link"}]}]}]},{"key":"tbl-81-r2c1","type":"data","value":[{"type":"p","children":[{"text":"String wrapped as "},{"type":"code","children":[{"text":"[{ \"@id\": value }]"}]},{"text":" (Volto link format)"}]}]}]},{"key":"tbl-81-r3","cells":[{"key":"tbl-81-r3c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"image"}]}]}]},{"key":"tbl-81-r3c1","type":"data","value":[{"type":"p","children":[{"text":"Pass through (expects "},{"type":"code","children":[{"text":"{ \"@id\", image_field, image_scales }"}]},{"text":")"}]}]}]},{"key":"tbl-81-r4","cells":[{"key":"tbl-81-r4c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"array"}]}]}]},{"key":"tbl-81-r4c1","type":"data","value":[{"type":"p","children":[{"text":"Non-arrays wrapped in "},{"type":"code","children":[{"text":"[value]"}]}]}]}]},{"key":"tbl-81-r5","cells":[{"key":"tbl-81-r5c0","type":"data","value":[{"type":"p","children":[{"type":"code","children":[{"text":"(none)"}]}]}]},{"key":"tbl-81-r5c1","type":"data","value":[{"type":"p","children":[{"text":"Copied as-is"}]}]}]}]}}' />
 
 ### FieldMappingWidget
 
@@ -593,14 +342,6 @@ The saved `fieldMapping` is read at render time by `expandListingBlocks` — no 
 
 When the editor pastes rich HTML into the page, Inka will eventually be able to recognise it as a custom block by matching against a CSS selector mapping. The proposed shape:
 
-### Javascript
-
-```javascript
-video: {
-    fieldMappings: {
-        'css:video': { 'src': 'url', 'caption[@class="alt"]': 'alt' },
-    },
-}
-```
+<block type="codeExample" data='{"tabs":[{"@id":"ce-88-javascript-e562d7","label":"Javascript","language":"javascript","code":"video: {\n    fieldMappings: {\n        &#39;css:video&#39;: { &#39;src&#39;: &#39;url&#39;, &#39;caption[@class=\"alt\"]&#39;: &#39;alt&#39; },\n    },\n}"}]}' />
 
 The `css:<selector>` key in `fieldMappings` matches a pasted HTML element; the value maps element attributes to block fields. Not yet implemented — open question on whether this should run via `htmlTagsToSlate` (bypassing slate conversion) or be encoded into slate so attributes/classes survive.
