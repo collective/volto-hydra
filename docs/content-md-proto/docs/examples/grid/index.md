@@ -52,6 +52,11 @@ prototypes: |
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
     </region>
   </block>
+order:
+  - grid-image
+  - listing
+  - teaser
+  - text
 ---
 
 # 

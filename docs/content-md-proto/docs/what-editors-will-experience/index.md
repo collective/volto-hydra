@@ -85,6 +85,13 @@ prototypes: |
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
     </region>
   </block>
+order:
+  - selecting-blocks
+  - editing-text
+  - links-and-media
+  - adding-and-moving-blocks
+  - containers
+  - templates-and-layouts
 ---
 
 # 

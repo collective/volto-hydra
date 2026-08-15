@@ -77,6 +77,24 @@ function prototypesYaml(used) {
 
 const flow = (o) => `{ ${Object.entries(o).map(([k, v]) => `${k}: ${v}`).join(', ')} }`;
 
+// Sibling order comes from the authored Sphinx {toctree}, not the lossy
+// __metadata__.json ordering. Recorded in the folder's own frontmatter; the
+// mount reads it back into getObjPositionInParent / uidPositionMap.
+const TOC = { root: resolve(INKA, 'docs'), mount: '/docs' };
+function toctreeOrder(contentPath) {
+  const rel = contentPath === TOC.mount ? '' : contentPath.replace(`${TOC.mount}/`, '');
+  for (const name of ['index.md', 'README.md']) {
+    const f = join(TOC.root, rel, name);
+    if (!existsSync(f)) continue;
+    const m = /```\{toctree\}([\s\S]*?)```/.exec(readFileSync(f, 'utf8'));
+    if (!m) return null;
+    return m[1].split('\n').map((l) => l.trim())
+      .filter((l) => l && !l.startsWith(':'))
+      .map((l) => l.replace(/.*<(.*)>/, '$1').split('/')[0]);
+  }
+  return null;
+}
+
 // --------------------------------------------------------------- tree --------
 function walk(dir, hits = []) {
   for (const name of readdirSync(dir)) {
@@ -95,6 +113,13 @@ for (const f of walk(SRC)) {
 const ROOT = items.find((i) => i['@type'] === 'Plone Site')?.['@id'];
 const canon = (id) => (id === ROOT ? '/' : id);
 const hasKids = new Set(items.map((i) => canon((i.parent || {})['@id'] ?? '')).filter(Boolean));
+const childrenOf = new Map(); // folder path -> child ids, in document order
+for (const d of items) {
+  const pid = canon((d.parent || {})['@id'] ?? '');
+  if (!pid || !d.id) continue;
+  if (!childrenOf.has(pid)) childrenOf.set(pid, []);
+  childrenOf.get(pid).push(d.id);
+}
 const pathFor = (id, folderish) => {
   const rel = canon(id).replace(/^\//, '');
   if (!rel) return 'index.md';
@@ -130,5 +155,25 @@ for (const d of items) {
   }
 }
 
-console.log(`\n${pages} pages -> ${OUT}`);
+// Second pass: fold sibling order into each folder's frontmatter. Insert it
+// textually before the closing `---` so the assignments/prototypes blocks are
+// left byte-for-byte intact (reparsing them would reformat the mapping).
+let ordered = 0;
+for (const [folderId, present] of childrenOf) {
+  const target = join(OUT, pathFor(folderId, true));
+  if (!existsSync(target)) continue;
+  const listed = toctreeOrder(folderId);
+  let order;
+  if (listed) {
+    const known = listed.filter((id) => present.includes(id));
+    order = [...known, ...present.filter((id) => !known.includes(id))];
+  } else if (present.length > 1) order = present;
+  else continue;
+  const orderYaml = YAML.stringify({ order }).trim();
+  const text = readFileSync(target, 'utf8');
+  writeFileSync(target, text.replace(/\n---\n/, `\n${orderYaml}\n---\n`));
+  ordered += 1;
+}
+
+console.log(`\n${pages} pages, ${ordered} folders ordered -> ${OUT}`);
 console.log(`~${tier3} tier-3 data tags of ${clean} blocks (${Math.round((1 - tier3 / clean) * 100)}% clean)`);

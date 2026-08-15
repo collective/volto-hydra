@@ -36,6 +36,20 @@ assignments:
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
+order:
+  - architecture
+  - build-a-frontend
+  - server-rendered-frontends
+  - live-preview
+  - custom-blocks
+  - container-blocks
+  - visual-editing
+  - what-editors-will-experience
+  - listings
+  - templates
+  - advanced
+  - examples
+  - images
 ---
 
 # 

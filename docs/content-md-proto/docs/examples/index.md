@@ -23,6 +23,32 @@ assignments:
   - { uid: examples-listing, type: listing }
 prototypes: |
   <block type="title" _="${h1}" />
+order:
+  - accordion
+  - button
+  - columns
+  - contextNavigation
+  - form
+  - grid
+  - heading
+  - hero
+  - highlight
+  - image-block
+  - introduction
+  - listing
+  - maps
+  - relatedItemsListing
+  - rssFeed
+  - search
+  - searchShortcuts
+  - separator
+  - slate
+  - slider
+  - table
+  - teaser
+  - toc
+  - video
+  - content-types
 ---
 
 # 

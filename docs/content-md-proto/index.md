@@ -63,6 +63,12 @@ prototypes: |
       <block type="teaser" title="${h/text}" description="${p/text}" />
     </region>
   </block>
+order:
+  - templates
+  - images
+  - plone-foundation.png
+  - docs
+  - search
 ---
 
 <block type="slate">

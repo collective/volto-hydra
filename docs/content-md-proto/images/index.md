@@ -26,6 +26,12 @@ assignments:
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
+order:
+  - penguin2.jpg
+  - penguin4.jpg
+  - penguin3.jpg
+  - penguin1.jpg
+  - quadrant
 ---
 
 # 
