@@ -70,6 +70,7 @@ prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="separator" _="${hr}" />
+  <block type="button" title="${p/text}" href="${p/link}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="codeExample">
@@ -81,7 +82,11 @@ prototypes: |
 
 # 
 
+<block type="slate">
+
 A call-to-action button with an editable label and link.
+
+</block>
 
 <block type="image" url="/docs/images/button-edit" alt="The button example block being edited in Volto Hydra" align="center" size="l" />
 
@@ -93,7 +98,13 @@ A call-to-action button with an editable label and link.
 
 </block>
 
-<block type="button" inneralign="left" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{"buttonAlign":"wide"}}' />
+<block type="button">
+
+[Button](/)
+
+<fields inneralign="left" data='{"styles":{"buttonAlign":"wide"}}' />
+
+</block>
 
 <block type="separator">
 
@@ -103,7 +114,13 @@ A call-to-action button with an editable label and link.
 
 </block>
 
-<block type="button" inneralign="center" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{"buttonAlign":"wide"}}' />
+<block type="button">
+
+[Button](/)
+
+<fields inneralign="center" data='{"styles":{"buttonAlign":"wide"}}' />
+
+</block>
 
 <block type="separator">
 
@@ -113,7 +130,13 @@ A call-to-action button with an editable label and link.
 
 </block>
 
-<block type="button" inneralign="right" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{"align":"full","buttonAlign":"wide"}}' />
+<block type="button">
+
+[Button](/)
+
+<fields inneralign="right" data='{"styles":{"align":"full","buttonAlign":"wide"}}' />
+
+</block>
 
 <block type="separator">
 
@@ -122,10 +145,20 @@ A call-to-action button with an editable label and link.
 <fields data='{"styles":{"align":"full"}}' />
 
 </block>
+
+<block type="slate">
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
 
-<block type="button" inneralign="left" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{}}' />
+</block>
+
+<block type="button">
+
+[Button](/)
+
+<fields inneralign="left" data='{"styles":{}}' />
+
+</block>
 
 <block type="separator">
 
@@ -135,9 +168,19 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidu
 
 </block>
 
+<block type="slate">
+
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
 
-<block type="button" inneralign="center" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{}}' />
+</block>
+
+<block type="button">
+
+[Button](/)
+
+<fields inneralign="center" data='{"styles":{}}' />
+
+</block>
 
 <block type="separator">
 
@@ -147,9 +190,19 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 </block>
 
+<block type="slate">
+
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
 
-<block type="button" inneralign="right" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{}}' />
+</block>
+
+<block type="button">
+
+[Button](/)
+
+<fields inneralign="right" data='{"styles":{}}' />
+
+</block>
 
 <block type="heading" alignment="left" heading="Button Block" tag="h2" data='{"styles":{"backgroundColor":"grey"}}' />
 
@@ -161,7 +214,13 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 </block>
 
-<block type="button" inneralign="left" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{"backgroundColor":"grey","buttonAlign":"wide"}}' />
+<block type="button">
+
+[Button](/)
+
+<fields inneralign="left" data='{"styles":{"backgroundColor":"grey","buttonAlign":"wide"}}' />
+
+</block>
 
 <block type="separator">
 
@@ -171,7 +230,13 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 </block>
 
-<block type="button" inneralign="center" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{"backgroundColor":"grey","buttonAlign":"wide"}}' />
+<block type="button">
+
+[Button](/)
+
+<fields inneralign="center" data='{"styles":{"backgroundColor":"grey","buttonAlign":"wide"}}' />
+
+</block>
 
 <block type="separator">
 
@@ -181,43 +246,13 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 </block>
 
-<block type="button" inneralign="right" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{"backgroundColor":"grey","buttonAlign":"wide"}}' />
+<block type="button">
 
-<block type="separator">
+[Button](/)
 
----
-
-<fields data='{"styles":{"align":"full","backgroundColor":"grey"}}' />
+<fields inneralign="right" data='{"styles":{"backgroundColor":"grey","buttonAlign":"wide"}}' />
 
 </block>
-
-<block type="slate">
-
-Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
-
-<fields data='{"styles":{"backgroundColor":"grey"}}' />
-
-</block>
-
-<block type="button" inneralign="left" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{"backgroundColor":"grey","buttonAlign":"center"}}' />
-
-<block type="separator">
-
----
-
-<fields data='{"styles":{"align":"full","backgroundColor":"grey"}}' />
-
-</block>
-
-<block type="slate">
-
-Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
-
-<fields data='{"styles":{"backgroundColor":"grey"}}' />
-
-</block>
-
-<block type="button" inneralign="center" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{"backgroundColor":"grey","buttonAlign":"center"}}' />
 
 <block type="separator">
 
@@ -235,7 +270,61 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidu
 
 </block>
 
-<block type="button" inneralign="right" title="Button" data='{"href":[{"@id":"/","Description":"example","Title":"Example","hasPreviewImage":null,"title":"Example"}],"styles":{"backgroundColor":"grey","buttonAlign":"center"}}' />
+<block type="button">
+
+[Button](/)
+
+<fields inneralign="left" data='{"styles":{"backgroundColor":"grey","buttonAlign":"center"}}' />
+
+</block>
+
+<block type="separator">
+
+---
+
+<fields data='{"styles":{"align":"full","backgroundColor":"grey"}}' />
+
+</block>
+
+<block type="slate">
+
+Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
+
+<fields data='{"styles":{"backgroundColor":"grey"}}' />
+
+</block>
+
+<block type="button">
+
+[Button](/)
+
+<fields inneralign="center" data='{"styles":{"backgroundColor":"grey","buttonAlign":"center"}}' />
+
+</block>
+
+<block type="separator">
+
+---
+
+<fields data='{"styles":{"align":"full","backgroundColor":"grey"}}' />
+
+</block>
+
+<block type="slate">
+
+Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
+
+<fields data='{"styles":{"backgroundColor":"grey"}}' />
+
+</block>
+
+<block type="button">
+
+[Button](/)
+
+<fields inneralign="right" data='{"styles":{"backgroundColor":"grey","buttonAlign":"center"}}' />
+
+</block>
 
 <block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-button" slotId="schema">
 

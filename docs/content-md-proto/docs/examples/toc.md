@@ -72,7 +72,11 @@ prototypes: |
 
 # 
 
+<block type="slate">
+
 Renders a table of contents generated from heading blocks on the current page. It scans sibling blocks for headings and builds a navigation list.
+
+</block>
 
 <block type="image" url="/docs/images/toc-edit" alt="The toc example block being edited in Volto Hydra" align="center" size="l" />
 
@@ -100,11 +104,19 @@ Renders a table of contents generated from heading blocks on the current page. I
 
 ## Text Heading H2&#x20;
 
+<block type="slate">
+
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
+
+</block>
 
 ### Text Heading H3
 
+<block type="slate">
+
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
+
+</block>
 
 ## Lists
 
@@ -120,11 +132,23 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 ### Inline Styles
 
+<block type="slate">
+
 Text can be **bold** or *italic*.
+
+</block>
+
+<block type="slate">
 
 [Link internal](/docs/examples/heading)
 
+</block>
+
+<block type="slate">
+
 [Link external](https://www.google.com/)
+
+</block>
 
 <block type="separator">
 

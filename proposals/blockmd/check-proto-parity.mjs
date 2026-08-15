@@ -22,9 +22,21 @@ const INKA = resolve(HERE, '../..');
 const MD = resolve(INKA, 'docs/content-md-proto');
 const SRC = resolve(INKA, 'docs/content/content/content');
 
-/** Comparison view: drop plaintext, empty styles, and empty text leaves. */
+// A resolved link summary: an object-browser value carries only `@id` when
+// authored, but the stored JSON has the target's brain (capitalised `Title`,
+// `Description`, `hasPreviewImage`, ...) resolved in. The markdown carries the
+// `@id` alone; the API re-resolves the summary at read time. So compare on the
+// target only, and count what we drop -- this is the one place parity is not
+// byte-exact, and it must not be silent.
+let linksCollapsed = 0;
+const isLinkSummary = (o) => o && typeof o === 'object' && '@id' in o
+  && ('Title' in o || 'Description' in o || 'hasPreviewImage' in o);
+
+/** Comparison view: drop plaintext, empty styles, empty text leaves, and the
+ *  resolved half of a link summary. */
 function semantic(v) {
   if (Array.isArray(v)) return v.map(semantic).filter((x) => x !== undefined);
+  if (isLinkSummary(v)) { linksCollapsed += 1; return { '@id': v['@id'] }; }
   if (v && typeof v === 'object') {
     const keys = Object.keys(v);
     if (keys.length === 1 && keys[0] === 'text' && v.text === '') return undefined;
@@ -79,6 +91,8 @@ for (const md of walk(MD)) {
   problems.push(`DIFF  ${md.slice(MD.length + 1)}: ${!layoutOk ? 'layout; ' : ''}${badUids.length} block(s) [${badUids.slice(0, 3).map((u) => orig.blocks[u]['@type']).join(', ')}]`);
 }
 
-console.log(`\nparity: ${pass} pass, ${diff} diff, ${error} error  (${skip} skipped, no blocks)\n`);
+console.log(`\nparity: ${pass} pass, ${diff} diff, ${error} error  (${skip} skipped, no blocks)`);
+if (linksCollapsed) console.log(`  note: ${linksCollapsed} link summary compare(s) reduced to @id -- the resolved brain (Title/Description/hasPreviewImage) is the API's to restore, not stored in markdown\n`);
+else console.log('');
 for (const p of problems.slice(0, 30)) console.log(`  ${p}`);
 if (problems.length > 30) console.log(`  …and ${problems.length - 30} more`);

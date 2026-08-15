@@ -38,10 +38,22 @@ prototypes: |
 
 <block type="description" />
 
+<block type="slate">
+
 And carajillo aromatic affogato instant cream grinder kopi panna. Qui robusta milk and dripper variety caffeine grinder mazagran irish chicory grounds. Filter cream con so robust steamed wings coffee. Spoon panna lungo skinny brewed qui aroma aged id grinder. Spoon aromatic so decaffeinated at dark acerbic siphon and redeye at mug.
+
+</block>
 
 <block type="image" align="right" description="" image_field="image" size="l" title="penguin4.jpg" url="/images/penguin4.jpg" data='{"credit":{}}' />
 
+<block type="slate">
+
 Carajillo cappuccino grinder whipped luwak filter café blue coffee affogato cultivar spoon grounds. Carajillo viennese lait cream single pot lait extraction. Luwak french so instant latte seasonal caramelization carajillo pot medium. Mazagran milk cultivar barista caffeine medium breve ristretto cortado crema brewed aged extraction irish. Mazagran pumpkin arabica spice aroma sit café origin redeye as chicory cream irish turkish cream.
 
+</block>
+
+<block type="slate">
+
 Organic qui acerbic dark milk sit decaffeinated origin siphon. Affogato lait a mountain irish plunger spoon irish that cortado pot half single. Decaffeinated white carajillo lait foam kopi sugar blue café coffee single variety saucer wings steamed. Cappuccino macchiato spice caramelization saucer half mountain viennese. Froth affogato go robusta beans carajillo dark shot qui fair mocha.
+
+</block>

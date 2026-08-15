@@ -97,7 +97,11 @@ prototypes: |
 
 <block type="introduction" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data='{"value":[{"children":[{"text":"Highlight Title H2 "}],"type":"h2"}]}' />
 
+<block type="slate">
+
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat.&#x20;
+
+</block>
 
 <block type="separator">
 

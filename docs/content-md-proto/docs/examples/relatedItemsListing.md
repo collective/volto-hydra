@@ -46,7 +46,11 @@ prototypes: |
 
 # 
 
+<block type="slate">
+
 Renders the current page's related items relation field (default relatedItems). Its items are fetched at render time and shown with a configurable item type (variation).
+
+</block>
 
 ## Live example
 

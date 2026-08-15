@@ -61,7 +61,11 @@ prototypes: |
 
 # 
 
+<block type="slate">
+
 A prominent content section with a background image, overlay, title, rich text body, and an optional call-to-action link. Used for feature callouts and banners.
+
+</block>
 
 <block type="image" url="/docs/images/highlight-edit" alt="The highlight example block being edited in Volto Hydra" align="center" size="l" />
 

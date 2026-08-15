@@ -39,7 +39,11 @@ prototypes: |
 
 # 
 
+<block type="slate">
+
 A design-system-first page-builder toolkit. Strike the right balance for your site — make it easy for editors to create engagement while staying compliant.
+
+</block>
 
 ## Why Inka?
 
@@ -54,16 +58,32 @@ A design-system-first page-builder toolkit. Strike the right balance for your si
 
 ## Try the online demo
 
+<block type="slate">
+
 The fastest way to feel what Inka does is to log into the hosted demo and edit a real page against a real frontend.
 
+</block>
+
+<block type="slate">
+
 Open [hydra.pretagov.com](https://hydra.pretagov.com), log in, then:
+
+</block>
 
 - Open user preferences (bottom-left).
 - Pick one of the preset frontends, or paste in your own frontend URL.
 - Edit any page — every change updates the live preview.
 
+<block type="slate">
+
 The default preset is a Nuxt.js frontend deployed as an [SSG](https://hydra-nuxt-flowbrite.netlify.app/) to demonstrate scale-to-zero editing on free hosting. An [Astro example](https://github.com/collective/volto-hydra/tree/main/docs/examples/test-astro) demonstrates the [server-render pattern](./server-rendered-frontends.md) for static-first frameworks. See [Build a frontend › Deployment patterns](./build-a-frontend.md#deployment-patterns).
 
+</block>
+
+<block type="slate">
+
 To run Inka locally against your own frontend, see the **Run Locally** section of the [project README](https://github.com/collective/volto-hydra#run-locally).
+
+</block>
 
 <block type="listing" headlineTag="h2" variation="summary" data='{"styles":{},"fieldMapping":{"@id":"href","title":"title","description":"description","image":"image"}}' />

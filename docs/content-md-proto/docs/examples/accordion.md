@@ -100,6 +100,7 @@ prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="separator" _="${hr}" />
+  <block type="teaser" title="${h/text}" href="${h/link}" description="${p/text}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="slateTable">
@@ -125,7 +126,11 @@ prototypes: |
 
 # 
 
+<block type="slate">
+
 A collapsible panel group. Each panel is an object\_list item with a title and a content area that holds child blocks.
+
+</block>
 
 <block type="image" url="/docs/images/accordion-edit" alt="The accordion example block being edited in Volto Hydra" align="center" size="l" />
 

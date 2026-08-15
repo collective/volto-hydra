@@ -48,7 +48,11 @@ prototypes: |
 
 # 
 
+<block type="slate">
+
 A multi-field form with configurable field types, validation, and email submission. Fields are stored as a typed object\_list — each field has a field\_type that maps to a sub-block schema.
+
+</block>
 
 <block type="image" url="/docs/images/form-edit" alt="The form example block being edited in Volto Hydra" align="center" size="l" />
 

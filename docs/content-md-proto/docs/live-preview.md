@@ -52,13 +52,21 @@ prototypes: |
 
 # 
 
+<block type="slate">
+
 To make your site editable with Inka you load hydra.js in your frontend and call `initBridge()`. This sets up a two-way communication channel that handles authentication, page navigation, and live content updates.
+
+</block>
 
 ---
 
 ## Setting Up the Bridge
 
+<block type="slate">
+
 Call `initBridge()` with an `onEditChange` callback to receive live content updates as the user edits. Your frontend re-renders in real time. Outside edit mode, fetch content from the API as normal.
+
+</block>
 
 <block type="codeExample">
 
@@ -79,13 +87,25 @@ if (window.name.startsWith('hydra')) {
 
 </block>
 
+<block type="slate">
+
 The `formData` passed to `onEditChange` has the same structure as the Plone REST API response, so the same rendering code works for both live editing and normal page display.
+
+</block>
+
+<block type="slate">
 
 Either hashbang (`/#!/path`) or normal (`/path`) style paths are supported.
 
+</block>
+
 ## A Simple Page Renderer
 
+<block type="slate">
+
 Iterate `blocks_layout.items` and render each block by type. Add `data-block-uid` so Inka knows which block the user clicked.
+
+</block>
 
 <block type="codeExample">
 
@@ -138,7 +158,11 @@ Iterate `blocks_layout.items` and render each block by type. Add `data-block-uid
 
 ## Allowed Blocks and Page Regions
 
+<block type="slate">
+
 When initialising the bridge, you can configure rules for what blocks can be added to the page and where. Pages can have multiple blocks fields for different regions (e.g., header, content, footer), each with its own allowed block types and limits. These show as separate sections in the sidebar when no block is selected:
+
+</block>
 
 <block type="codeExample">
 

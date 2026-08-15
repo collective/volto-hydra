@@ -82,15 +82,31 @@ prototypes: |
 
 # 
 
+<block type="slate">
+
 Inka works with any frontend, including ones that have no client-side reactivity at all — pure server-rendered frameworks like **Astro**, **PHP**, **Django**, **Rails**, **Laravel**, **Symfony**, **Go html/template**. The bridge ships a built-in pattern for these: one config option on `initBridge` and one small endpoint on your server.
+
+</block>
 
 ## When you need this
 
+<block type="slate">
+
 If you're using React, Vue, Svelte, Solid, Next, Nuxt, or any framework with client-side reactivity, you don't need this. The bridge fires `FORM_DATA`, your framework reconciles the DOM, and only the changed nodes update. Contenteditable cursors, image loads, and scroll positions survive every edit "for free" because the virtual DOM diff doesn't touch unchanged nodes.
+
+</block>
+
+<block type="slate">
 
 Server-rendered-only frameworks have no such reconciliation. If you naively swapped the whole content area's `innerHTML` on every `FORM_DATA`, every keystroke would destroy contenteditable cursors, reload images, jump scroll, and reset IME state. The editing experience would be visibly broken.
 
+</block>
+
+<block type="slate">
+
 The fix is to update only the smallest block that changed, and let the rest of the DOM stay untouched. That's what the bridge does when you set `renderEndpoint`.
+
+</block>
 
 ## How it works
 
@@ -125,22 +141,42 @@ hydra.js bridge   ────►    FORM_DATA postMessage
 
 ### The diff rule (built into `hydra.js`)
 
+<block type="slate">
+
 `findChangedUnit(prevFormData, newFormData)` walks the new form data against the previous one looking for the shallowest changed subtree. At each container level:
+
+</block>
 
 - `items` array differs (add/remove/reorder) → **this container is the unit**
 - exactly one child differs AND `items` unchanged → recurse into that child
 - 2 or more children differ → this container is the unit
 - nothing differs → no-op (forms are equal)
 
+<block type="slate">
+
 Spans more than one nesting level (e.g. a block moved from one column to another) → falls back to `{ unit: 'page' }`. Most edits stay at one level because one focused field = one block.
+
+</block>
 
 ### The `data-block-uid` contract
 
+<block type="slate">
+
 For the bridge to swap `[data-block-uid=X].outerHTML` reliably, every block's **outermost rendered element** must carry `data-block-uid={id}`. This is Astro-only / server-only — reactive frontends don't care because their reconciliation finds DOM nodes via virtual DOM, not query selectors.
+
+</block>
+
+<block type="slate">
 
 The recommended pattern: write a `BlockRenderer` (or equivalent) wrapper in your templating language that puts the `<div data-block-uid={id}>` around every block before dispatching to the block's own template. Then block authors don't think about it — the wrapper IS the contract.
 
+</block>
+
+<block type="slate">
+
 That dispatch must also handle `@type: "empty"` — the placeholder Inka seeds into any container region with no `defaultBlockType` and more than one `allowedBlocks` — by rendering an empty, selectable slot (with its `data-block-uid`) rather than erroring. See [Empty Blocks](container-blocks.md#empty-blocks).
+
+</block>
 
 ## Worked example: Astro
 
@@ -224,7 +260,11 @@ function findBlockById(formData, blockId) {
 
 </block>
 
+<block type="slate">
+
 The full working example lives at [`docs/examples/test-astro/`](https://github.com/collective/volto-hydra/tree/main/docs/examples/test-astro) with block components in [`docs/examples/examples/astro/`](https://github.com/collective/volto-hydra/tree/main/docs/examples/examples/astro).
+
+</block>
 
 ## Worked example: PHP
 
@@ -295,7 +335,11 @@ function find_block_by_id($data, $blockId) {
 
 </block>
 
+<block type="slate">
+
 The HTML page that loads in the editor iframe just needs to pull in the bridge and call `initBridge` with the endpoint:
+
+</block>
 
 <block type="codeExample">
 
@@ -324,7 +368,11 @@ The HTML page that loads in the editor iframe just needs to pull in the bridge a
 
 ## Adapting for Django / Rails / Laravel / Symfony / Go
 
+<block type="slate">
+
 The recipe is the same in every framework — only the rendering call changes:
+
+</block>
 
 <block type="slateTable" table.fixed table.celled>
 
@@ -340,7 +388,11 @@ The recipe is the same in every framework — only the rendering call changes:
 
 </block>
 
+<block type="slate">
+
 Everything else — the diff, the POST, the swap, the `data-block-uid` contract — is identical because the bridge handles it.
+
+</block>
 
 ## Caveats
 

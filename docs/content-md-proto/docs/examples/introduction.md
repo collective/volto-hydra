@@ -62,7 +62,11 @@ prototypes: |
 
 # 
 
+<block type="slate">
+
 Displays the page's title and description as a styled header. The introduction block has no content of its own — it reads title and description from the page metadata.
+
+</block>
 
 <block type="image" url="/docs/images/introduction-edit" alt="The introduction example block being edited in Volto Hydra" align="center" size="l" />
 
@@ -76,7 +80,11 @@ Displays the page's title and description as a styled header. The introduction b
 
 <block type="introduction" data='{"value":[{"children":[{"text":"Highlight Title H2 "}],"type":"h2"}]}' />
 
+<block type="slate">
+
 Lorem ipsum vitae elit libero, a pharetra augue. Nulla vitae elit libero, a pharetra augue. Duis mollis, est non commodo luctus, nisi erat porttitor ligula, eget lacinia odio sem nec elit. Donec ullamcorper nulla non metus auctor fringilla. Vivamus sagittis lacus vel augue laoreet rutrum faucibus dolor auctor. Vestibulum id ligula porta felis euismod semper.
+
+</block>
 
 <block type="separator">
 
@@ -88,7 +96,11 @@ Lorem ipsum vitae elit libero, a pharetra augue. Nulla vitae elit libero, a phar
 
 ## Headline H2
 
+<block type="slate">
+
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
+
+</block>
 
 <block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction" slotId="schema">
 
