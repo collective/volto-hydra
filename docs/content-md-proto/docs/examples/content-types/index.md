@@ -26,7 +26,6 @@ assignments:
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
-  <block type="slate" value="${*/slate}" />
 order:
   - copy_of_event
   - copy_of_news-item

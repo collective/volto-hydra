@@ -53,7 +53,6 @@ assignments:
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
-  <block type="slate" value="${*/slate}" />
   <block type="separator" _="${hr}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
@@ -66,11 +65,7 @@ prototypes: |
 
 Advanced topics for optimising your Inka integration: lazy loading the bridge, authentication, and preventing reloads.
 
-<block type="separator">
-
 ---
-
-</block>
 
 ## Lazy Load the Bridge
 

@@ -90,7 +90,6 @@ assignments:
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
-  <block type="slate" value="${*/slate}" />
   <block type="separator" _="${hr}" />
   <block type="slateTable">
     <region name="table.rows">
@@ -134,11 +133,7 @@ const { items, paging } = await expandListingBlocks(layout, {
 
 </block>
 
-<block type="separator">
-
 ---
-
-</block>
 
 ## Example: Mixing Listings, Blocks and Paging
 

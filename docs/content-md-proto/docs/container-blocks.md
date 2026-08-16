@@ -121,7 +121,6 @@ assignments:
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
-  <block type="slate" value="${*/slate}" />
   <block type="separator" _="${hr}" />
   <block type="slateTable">
     <region name="table.rows">
@@ -150,11 +149,7 @@ You declare regions in your `blockSchema` (or the page schema), and **you choose
 
 Both look and behave the same in the editor — selecting, dragging, nesting — and blocks can be dragged from one to the other; only the JSON storage differs.
 
-<block type="separator">
-
 ---
-
-</block>
 
 ## blocks\_layout: a region in the shared dict
 

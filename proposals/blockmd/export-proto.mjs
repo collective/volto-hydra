@@ -30,12 +30,7 @@ const OUT = outArg > -1 ? resolve(process.argv[outArg + 1]) : resolve(INKA, 'doc
 // gridBlock, the long tail) fall to tier-3 data tags automatically.
 const PROTO_TEXT = {
   title: '<block type="title" _="${h1}" />',
-  slate: [
-    '<block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />',
-    // a "badly formed" multi-node slate (e.g. h2 + p in one value): the whole
-    // light-tag body becomes the value, since bare markdown would split it.
-    '<block type="slate" value="${*/slate}" />',
-  ].join('\n'),
+  slate: '<block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />',
   separator: '<block type="separator" _="${hr}" />',
   button: '<block type="button" title="${a/text}" href="${a/link}" />',
   // href is @id-only (the heading's link); the teaser's rendered title/

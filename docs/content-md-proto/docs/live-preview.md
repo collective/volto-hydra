@@ -43,7 +43,6 @@ assignments:
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
-  <block type="slate" value="${*/slate}" />
   <block type="separator" _="${hr}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
@@ -56,11 +55,7 @@ prototypes: |
 
 To make your site editable with Inka you load hydra.js in your frontend and call `initBridge()`. This sets up a two-way communication channel that handles authentication, page navigation, and live content updates.
 
-<block type="separator">
-
 ---
-
-</block>
 
 ## Setting Up the Bridge
 

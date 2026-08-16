@@ -53,7 +53,6 @@ assignments:
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
-  <block type="slate" value="${*/slate}" />
   <block type="button" title="${a/text}" href="${a/link}" />
   <block type="teaser" title="${h/text}" href="${h/link}" description="${p/text}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
@@ -142,9 +141,19 @@ Paragraph text (p, 24/33px) -> Lorem ipsum dolor sit amet, consetetur sadipscing
 
 <block type="button" inneralign="left" title="Button text (button, 18/24px)" data='{"styles":{}}' />
 
-<block type="gridBlock" data='{"blocks":[{"@type":"slate","plaintext":"Text Heading (H2, 30/36px)\nFor grid blocks, the font of the headlines are variable, depending on the number of cells in the grid.","value":[{"children":[{"text":"Text Heading (H2, 30/36px)"}],"type":"h2"},{"children":[{"text":"For grid blocks, the font of the headlines are variable, depending on the number of cells in the grid."}],"type":"p"}]}],"styles":{}}' />
+<block type="gridBlock">
 
-<block type="gridBlock" data='{"blocks":[{"@type":"slate","plaintext":"Text Heading (H3, 24/30px)\nParagraph Text (p, 18/24px)","value":[{"children":[{"text":"Text Heading (H3, 24/30px)"}],"type":"h2"},{"children":[{"text":"Paragraph Text (p, 18/24px)"}],"type":"p"}]},{"@type":"slate","plaintext":"Text Heading (H3, 24/30px)\nParagraph Text (p, 18/24px)","value":[{"children":[{"text":"Text Heading (H3, 24/30px)"}],"type":"h2"},{"children":[{"text":"Paragraph Text (p, 18/24px)"}],"type":"p"}]}],"styles":{}}' />
+<block type="slate" data='{"value":[{"children":[{"text":"Text Heading (H2, 30/36px)"}],"type":"h2"},{"children":[{"text":"For grid blocks, the font of the headlines are variable, depending on the number of cells in the grid."}],"type":"p"}]}' />
+
+</block>
+
+<block type="gridBlock">
+
+<block type="slate" data='{"value":[{"children":[{"text":"Text Heading (H3, 24/30px)"}],"type":"h2"},{"children":[{"text":"Paragraph Text (p, 18/24px)"}],"type":"p"}]}' />
+
+<block type="slate" data='{"value":[{"children":[{"text":"Text Heading (H3, 24/30px)"}],"type":"h2"},{"children":[{"text":"Paragraph Text (p, 18/24px)"}],"type":"p"}]}' />
+
+</block>
 
 <block type="toc" variation="default" data='{"levels":["h2","h3"],"styles":{}}' />
 
