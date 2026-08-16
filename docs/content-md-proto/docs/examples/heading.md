@@ -52,7 +52,7 @@ prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="separator" _="${hr}" />
-  <block type="teaser" title="${h/text}" href="${h/link}" description="${p/text}" />
+  <block type="teaser" explicit title="${h/text}" href="${h/link}" description="${p/text}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

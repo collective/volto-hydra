@@ -55,7 +55,7 @@ assignments:
   - { uid: 9e207ed1-8ea6-48a9-b74e-be16f3750eb7, type: teaser }
 prototypes: |
   <block type="title" _="${h1}" />
-  <block type="teaser" title="${h/text}" href="${h/link}" description="${p/text}" />
+  <block type="teaser" explicit title="${h/text}" href="${h/link}" description="${p/text}" />
   <block type="gridBlock" headline="${h/text}">
     <region name="blocks" widget="blocks_layout">
       <block type="teaser" title="${h/text}" description="${p/text}" />
