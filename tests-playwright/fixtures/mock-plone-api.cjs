@@ -1212,6 +1212,11 @@ async function initMarkdownMounts() {
   // were unchecked; this validates each item as it loads, loud but non-fatal, so
   // a --watch restart surfaces a problem while developing rather than at test time.
   const { validateContent } = await import('../../lib/content-validator.mjs');
+  // The complete block registry (core/behaviour + custom) is what the frontend
+  // renders with; a block whose @type isn't in it is drift the schema check flags.
+  const { sharedBlocksConfig } = await import('./shared-block-schemas.js');
+  const { allBlocksConfig } = await import('./core-block-schemas.js');
+  const schema = allBlocksConfig(sharedBlocksConfig);
   const problems = [];
   for (const { mountPath, dirPath } of mounts) {
     const { items, blobFiles } = readTree(dirPath);
@@ -1227,7 +1232,7 @@ async function initMarkdownMounts() {
           uidPositionMap[item.UID] = item.getObjPositionInParent;
         }
       }
-      if (process.env.SKIP_CONTENT_VALIDATION !== 'true') problems.push(...validateContent(item));
+      if (process.env.SKIP_CONTENT_VALIDATION !== 'true') problems.push(...validateContent(item, { schema }));
     }
     for (const [p, file] of blobFiles) markdownBlobs.set(urlFor(p), file);
     console.log(`Registered ${items.size} markdown items from ${dirPath} at ${mountPath}`);
