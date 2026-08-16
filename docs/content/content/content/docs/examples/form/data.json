@@ -12,7 +12,7 @@
       "default_from": "noreply@plone.org",
       "lastChange": 1710238630312,
       "remove_data_after_days": -1,
-      "send_email": true,
+      "send": false,
       "show_cancel": false,
       "store": true,
       "subblocks": [

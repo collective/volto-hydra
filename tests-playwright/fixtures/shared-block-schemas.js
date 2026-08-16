@@ -782,6 +782,12 @@ export const sharedBlocksConfig = {
         title: 'Teaser',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>',
         group: 'common',
+        // A listing can render its results as teasers (block-sync.spec.ts drives
+        // exactly this). The @default mapping projects a search result onto the
+        // teaser's fields, so `teaser` is a valid listing item type.
+        fieldMappings: {
+            '@default': { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'preview_image' },
+        },
     },
     // Image block: parents declare claims via inheritSchemaFrom.parentControlled.image.
     image: {
@@ -906,12 +912,24 @@ export const sharedBlocksConfig = {
                     description: 'You can add the value of a filled field in the form by inserting its ID between curly brackets preceded by $, example: ${field_id}; you can add also html elements such as links <a>, new line <br />, bold <b> and italic <i> formatting.',
                 },
             },
-            required: ['default_to', 'default_from', 'default_subject', 'captcha'],
+            // captcha is an optional anti-spam provider select — never required to
+            // save. The mail-delivery fields are required only when the form sends
+            // email; the fieldRules below drop them from `required` (and hide them)
+            // for a store-only form.
+            required: ['default_to', 'default_from', 'default_subject'],
         },
         schemaEnhancer: {
             fieldRules: {
                 // cancel_label only visible when show_cancel is checked
                 cancel_label: { when: { show_cancel: true }, else: false },
+                // Email-delivery settings only apply when `send` is on — hidden
+                // (and dropped from `required`) for a store-only form.
+                default_to: { when: { send: true }, else: false },
+                default_from: { when: { send: true }, else: false },
+                default_subject: { when: { send: true }, else: false },
+                mail_header: { when: { send: true }, else: false },
+                mail_footer: { when: { send: true }, else: false },
+                email_otp_verification: { when: { send: true }, else: false },
             },
         },
     },
