@@ -85,11 +85,7 @@ prototypes: |
 
 Inka works with any frontend, including ones that have no client-side reactivity at all — pure server-rendered frameworks like **Astro**, **PHP**, **Django**, **Rails**, **Laravel**, **Symfony**, **Go html/template**. The bridge ships a built-in pattern for these: one config option on `initBridge` and one small endpoint on your server.
 
-<block type="slate">
-
 ## When you need this
-
-</block>
 
 If you're using React, Vue, Svelte, Solid, Next, Nuxt, or any framework with client-side reactivity, you don't need this. The bridge fires `FORM_DATA`, your framework reconciles the DOM, and only the changed nodes update. Contenteditable cursors, image loads, and scroll positions survive every edit "for free" because the virtual DOM diff doesn't touch unchanged nodes.
 
@@ -97,11 +93,7 @@ Server-rendered-only frameworks have no such reconciliation. If you naively swap
 
 The fix is to update only the smallest block that changed, and let the rest of the DOM stay untouched. That's what the bridge does when you set `renderEndpoint`.
 
-<block type="slate">
-
 ## How it works
-
-</block>
 
 <block type="codeExample">
 
@@ -151,11 +143,7 @@ The recommended pattern: write a `BlockRenderer` (or equivalent) wrapper in your
 
 That dispatch must also handle `@type: "empty"` — the placeholder Inka seeds into any container region with no `defaultBlockType` and more than one `allowedBlocks` — by rendering an empty, selectable slot (with its `data-block-uid`) rather than erroring. See [Empty Blocks](container-blocks.md#empty-blocks).
 
-<block type="slate">
-
 ## Worked example: Astro
-
-</block>
 
 <block type="codeExample">
 
@@ -239,11 +227,7 @@ function findBlockById(formData, blockId) {
 
 The full working example lives at [`docs/examples/test-astro/`](https://github.com/collective/volto-hydra/tree/main/docs/examples/test-astro) with block components in [`docs/examples/examples/astro/`](https://github.com/collective/volto-hydra/tree/main/docs/examples/examples/astro).
 
-<block type="slate">
-
 ## Worked example: PHP
-
-</block>
 
 <block type="codeExample">
 
@@ -341,11 +325,7 @@ The HTML page that loads in the editor iframe just needs to pull in the bridge a
 
 ## Adapting for Django / Rails / Laravel / Symfony / Go
 
-<block type="slate">
-
 The recipe is the same in every framework — only the rendering call changes:
-
-</block>
 
 <block type="slateTable" table.fixed table.celled>
 
@@ -363,11 +343,7 @@ The recipe is the same in every framework — only the rendering call changes:
 
 Everything else — the diff, the POST, the swap, the `data-block-uid` contract — is identical because the bridge handles it.
 
-<block type="slate">
-
 ## Caveats
-
-</block>
 
 - **Network round trip per edit.** Faster than full reload (Sanity's approach) but slower than client-side reconciliation. For a typical edit (one block at a time) it's a few hundred bytes and a few milliseconds on a same-origin endpoint. Don't put the endpoint behind authentication that adds another round trip.
 - **`data-block-uid` MUST be the outer element.** A wrapper around the block from outside the renderer (e.g. a CSS-grid `<li>` your layout adds) will break `outerHTML` swaps — the swap would replace the wrapper too. Always wrap inside the renderer.

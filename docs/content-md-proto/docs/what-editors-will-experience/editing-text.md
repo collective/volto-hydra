@@ -70,19 +70,11 @@ prototypes: |
 
 Click into any text in the preview that's marked inline-editable and start typing. There are two kinds of text fields: **simple text** (like a title) and **slate** (rich text — the body of a paragraph block, descriptions, etc.).
 
-<block type="slate">
-
 ## Simple text
-
-</block>
 
 Click and type. `Enter` splits the field into two text blocks (when supported); `Backspace` at the start joins back. That's it.
 
-<block type="slate">
-
 ## Slate (rich text)
-
-</block>
 
 Slate fields are richer:
 
@@ -93,11 +85,7 @@ Slate fields are richer:
 
 ## Markdown shortcuts
 
-<block type="slate">
-
 When you're typing in a slate field, certain markdown patterns are converted automatically:
-
-</block>
 
 ### Block-level (start of a line, then space)
 
@@ -130,11 +118,7 @@ When you're typing in a slate field, certain markdown patterns are converted aut
 
 Press `Backspace` at the very start of a heading, list item, or blockquote and it converts back to a plain paragraph. Use this when a markdown shortcut grabbed you a heading you didn't actually want.
 
-<block type="slate">
-
 ## The slash menu
-
-</block>
 
 Type `/` at the start of an empty text block to open a menu of block types you can convert to (heading, image, list, your custom blocks, …). Keep typing to filter (`/he` filters to heading); `Enter` picks the highlighted result; `Escape` dismisses without changing anything.
 
@@ -142,11 +126,7 @@ Type `/` at the start of an empty text block to open a menu of block types you c
 
 The slash menu changes the block's `@type`. If you wanted to add a *new* block, see [Adding and moving blocks](adding-and-moving-blocks.md) instead.
 
-<block type="slate">
-
 ## Splitting and joining paragraphs
-
-</block>
 
 Inside a slate paragraph block:
 
@@ -155,19 +135,11 @@ Inside a slate paragraph block:
 
 These work the same in headings and lists.
 
-<block type="slate">
-
 ## Saving
-
-</block>
 
 There's no "save" inside a field — every keystroke is reflected in the page state, and changes are saved when you click the toolbar's **Save** button. Until you save, the green-dot/save indicator shows there are unsaved changes.
 
-<block type="slate">
-
 ## Things you can't do (yet)
-
-</block>
 
 - Pasting rich HTML doesn't currently preserve all formatting — pasted text comes in as plain.
 - A few markdown shortcuts (`#### ` for h4 etc.) aren't wired up; the supported set is the table above.

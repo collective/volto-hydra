@@ -64,11 +64,7 @@ prototypes: |
 
 The link picker, image picker, and upload dialog are part of Inka's chrome — they look the same on every site. What varies by design system is **which** links and images are click-to-edit in the preview: a site might wire up every link inline, or only a few "primary" links, with everything else editable from the sidebar. Same applies to images.
 
-<block type="slate">
-
 ## Editing a link
-
-</block>
 
 When the frontend has wired up a link field as inline-editable, clicking the link in the preview doesn't navigate — it opens the **link picker** instead. From the picker you can:
 
@@ -81,11 +77,7 @@ When the frontend has wired up a link field as inline-editable, clicking the lin
 
 The Quanta toolbar's link icon does the same thing and is available on slate text fields too — select some text, click the link icon, and the link picker opens for that text range.
 
-<block type="slate">
-
 ## Linking to a spot inside a page
-
-</block>
 
 Sometimes you don't want to link to the top of a page — you want to land the reader on a particular section. Browse to the page and **open it** in the picker: if it has no pages inside it, you'll go straight to its **Fragments** — the page's headings. Pick one and the link becomes `/that-page#that-heading`, so the browser scrolls straight to it.
 
@@ -100,11 +92,7 @@ Which spots are offered is up to the site's design system — most sites make ev
 
 ## Uploading media
 
-<block type="slate">
-
 When the frontend marks an image (or other media element) as inline-editable, you can:
-
-</block>
 
 ### Empty media element
 
@@ -126,19 +114,11 @@ Hover the image — controls appear. You can:
 
 The same actions are available from the sidebar field if you'd rather not click into the preview.
 
-<block type="slate">
-
 ## What gets stored
-
-</block>
 
 When you pick or upload an image, what gets stored on the block isn't a URL string — it's a small object containing the image's CMS path, the field name, and the available scales. The frontend resolves a specific scale at render time (so the same image data renders at thumbnail size in a listing and full size in a hero). You don't have to think about scales as an editor; they're a developer concern.
 
-<block type="slate">
-
 ## What's not (yet) inline-editable
-
-</block>
 
 A few media types currently still require sidebar editing:
 

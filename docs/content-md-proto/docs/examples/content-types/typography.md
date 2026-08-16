@@ -109,11 +109,7 @@ Paragraph (p, 18px/24px). This section has a sample of content types available i
 
 ## Text Heading H2 (H2, 30/36px)
 
-<block type="slate">
-
 Paragraph (p, 18px/24px)
-
-</block>
 
 - unordered list
 - unordered list

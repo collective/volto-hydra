@@ -49,11 +49,7 @@ prototypes: |
 
 Renders the current page's related items relation field (default relatedItems). Its items are fetched at render time and shown with a configurable item type (variation).
 
-<block type="slate">
-
 ## Live example
-
-</block>
 
 <block type="relatedItemsListing" relationField="relatedItems" variation="summary" />
 

@@ -151,11 +151,7 @@ prototypes: |
 
 Define custom block types directly in your frontend configuration via the `blocks` option in `initBridge`. No Volto plugin deployment required. Each block type needs an `id`, `title`, and a `blockSchema` with its field properties.
 
-<block type="slate">
-
 ## `initBridge()` Reference
-
-</block>
 
 `initBridge(options)` opens the iframe bridge and registers your frontend's page and block configuration with the admin. Call it once during page setup when running inside the admin iframe.
 
@@ -268,11 +264,7 @@ Per-block options (most are passed through to Volto's block config):
 
 The `Bridge` instance, which exposes additional API methods you can call from the frontend (e.g. `getAccessToken()`, `sendBlockUpdate()`, `sendBlockAction()`). See [Advanced › Custom Sidebar UI](advanced.md#custom-sidebar-and-cms-ui) for those.
 
-<block type="slate">
-
 ## Defining a custom block
-
-</block>
 
 <block type="codeExample">
 
@@ -342,11 +334,7 @@ Child block types (like `slide` above) must be defined at the top level of `bloc
 
 **A `widget: 'slate'` field holds one top-level node.** A slate field — like `description` on the `slide` above — stores a single paragraph, heading, or list, not a document of several. Pasting or typing multiple paragraphs into it flattens them back into one node; only the built-in `slate` *block* splits multi-node content into separate blocks. Design slate fields for single-node content, and use a `blocks_layout`/`object_list` of `slate` blocks when you need several. See [Visual Editing › One top-level node per slate field](visual-editing.md#one-top-level-node-per-slate-field).
 
-<block type="slate">
-
 ## Schema Enhancers
-
-</block>
 
 Schema enhancers modify block schemas dynamically:
 
@@ -478,11 +466,7 @@ A block that isn't an `object_list` item yields an unset `@index`, so comparison
 
 Field paths: `../field` for the parent block's field (and `@index` / `../@index` for position), `/field` for a page metadata field.
 
-<block type="slate">
-
 ## Block Conversion & fieldMappings
-
-</block>
 
 `fieldMappings` (plural) on a block config defines how fields map between block types (and from linked content). This enables:
 
@@ -680,11 +664,7 @@ When a parent block has `mappingField` set in its `inheritSchemaFrom` recipe, th
 
 The saved `fieldMapping` is read at render time by `expandListingBlocks` — no block registry access needed at render time.
 
-<block type="slate">
-
 ## HTML Paste Support (TODO)
-
-</block>
 
 When the editor pastes rich HTML into the page, Inka will eventually be able to recognise it as a custom block by matching against a CSS selector mapping. The proposed shape:
 

@@ -48,11 +48,7 @@ prototypes: |
 
 Renders entries from an external RSS feed. Its items are fetched at render time (by a fetcher you provide) and shown with a configurable item type (variation).
 
-<block type="slate">
-
 ## Live example
-
-</block>
 
 <block type="rssFeed" feedUrl="https://pypi.org/rss/project/plone/releases.xml" variation="default" />
 

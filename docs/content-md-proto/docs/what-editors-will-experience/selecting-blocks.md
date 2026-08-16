@@ -84,11 +84,7 @@ prototypes: |
 
 The editor has two modes when a block is selected: **text mode** (you're editing inside the block) and **block mode** (the whole block is selected as a unit).
 
-<block type="slate">
-
 ## Text mode
-
-</block>
 
 Click on a block in the preview. If the frontend marks any of its fields as inline-editable, the cursor goes into that field and you can start typing.
 
@@ -101,11 +97,7 @@ Click on a block in the preview. If the frontend marks any of its fields as inli
 
 ## Block mode
 
-<block type="slate">
-
 Press `Escape` to leave text editing. The block stays selected, but you're no longer inside any specific field.
-
-</block>
 
 <block type="slate" data='{"value":[{"type":"ul","children":[{"type":"li","children":[{"text":"A full border appears around the block (visually stronger than the text-mode hint)."}]},{"type":"li","children":[{"text":"Keyboard shortcuts now operate on the whole block:"},{"type":"ul","children":[{"type":"li","children":[{"type":"strong","children":[{"text":"Arrow Up / Down"}]},{"text":" — move selection to the previous / next sibling block (container-aware: jumps into and out of containers)."}]},{"type":"li","children":[{"type":"strong","children":[{"text":"Enter"}]},{"text":" — add a new block after this one."}]},{"type":"li","children":[{"type":"strong","children":[{"text":"Delete / Backspace"}]},{"text":" — remove the selected block."}]}]}]}]}]}' />
 
@@ -115,11 +107,7 @@ Press `Escape` again to **deselect** (or go up to the parent container if this b
 
 ## Multi-selection
 
-<block type="slate">
-
 You can select multiple blocks at once and operate on the group.
-
-</block>
 
 <block type="slateTable" table.fixed table.celled>
 
@@ -143,11 +131,7 @@ While multiple blocks are selected:
 
 ## Selecting from the sidebar
 
-<block type="slate">
-
 The sidebar is the other way to navigate selection — useful when the block you want is offscreen, buried inside a paged container (e.g. a specific slide of a slider), or you just prefer keyboard / pointer nav over hunting in the preview.
-
-</block>
 
 ### The parent chain (going up)
 
@@ -203,10 +187,6 @@ If the container has multiple blocks fields (e.g. a header field and a body fiel
 
 Some containers paginate their children — a slider only renders the active slide; an accordion only the expanded panel. Use the children list to pick a slide / panel that's not currently visible — the preview scrolls and pages to it automatically.
 
-<block type="slate">
-
 ## Selecting page-level fields
-
-</block>
 
 The page itself has metadata fields (title, description, preview image). Some are inline-editable in the preview (e.g. clicking the rendered `<h1>` to edit the page title); all are editable from the sidebar when no block is selected.
