@@ -16,6 +16,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { LINK_FIELDS, refStrings, refFailure } = require('../../lib/content-refs.cjs');
 
 // Content types whose payload lives in a separate blob file, mapped to the
 // data.json field holding the blob_path. Add a type here and it gets the same
@@ -337,14 +338,12 @@ function checkIntegrity(contentDir) {
 
   // Pass 2c: link/media reference integrity across every block (nested included).
   //
-  // Every reference-bearing field must point at something that EXISTS or is a
-  // recognized external/resource form. A reference the validator cannot verify
-  // is a FAILURE, not a skip. The old version only looked at `url` when it was a
-  // STRING and treated broken refs as warnings — so an image block storing
-  // `url: [{ "@id": "/images/test-image" }]` (object_browser ARRAY form) pointing
-  // at a nonexistent object was never checked, and 5 such dead blocks shipped
-  // while this gate reported "Links: N ok, 0 broken".
-  const LINK_FIELDS = ['url', 'href', 'image', 'preview_image', 'preview_image_link', 'backgroundImage'];
+  // Reference checking (LINK_FIELDS / refStrings / refFailure) is shared with the
+  // format-agnostic content validator via lib/content-refs.cjs -- one copy, so a
+  // dead-ref rule can't drift between the two. refFailure takes existence probes
+  // over this tree's uid/path maps.
+  const hasUid = (uid) => uidMap.has(uid);
+  const hasPath = (p) => pathMap.has(p);
 
   function* walkBlocks(blocks) {
     for (const [bid, block] of Object.entries(blocks || {})) {
@@ -356,56 +355,11 @@ function checkIntegrity(contentDir) {
     }
   }
 
-  // Extract every reference string from a field value in any shape it takes:
-  //   "…"                  plain string
-  //   [{ "@id": "…" }, …]   object_browser / image array
-  //   { "@id": "…" }        single relation
-  function refStrings(val) {
-    const out = [];
-    const pushId = (o) => { if (o && typeof o === 'object' && typeof o['@id'] === 'string') out.push(o['@id']); };
-    if (typeof val === 'string') out.push(val);
-    else if (Array.isArray(val)) val.forEach(pushId);
-    else if (val && typeof val === 'object') pushId(val);
-    return out.filter((s) => s !== '');
-  }
-
-  // Classify a reference. Returns null when verified/recognized, or a reason
-  // string when it is a failure. NOTHING is silently accepted — an unrecognized
-  // form returns a reason so it fails loudly.
-  function refFailure(ref) {
-    const ru = ref.match(/resolveuid\/([a-f0-9]{10,})/);
-    if (ru) return uidMap.has(ru[1]) ? null : `broken resolveuid/${ru[1]}`;
-    if (/^https?:\/\//.test(ref)) return null;             // external — well-formed, unverifiable offline
-    if (/^(mailto:|tel:|data:)/.test(ref)) return null;    // known schemes
-    if (ref.startsWith('#')) return null;                  // in-page anchor
-    // Static frontend media assets (e.g. generated doc demo clips served from
-    // the frontend's public/ dir, like `/docs/cards/x.mp4`) — not Plone
-    // content, verifiable only in a built frontend, like external URLs.
-    if (/\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i.test(ref)) return null;
-    if (ref.startsWith('/') || ref.startsWith('../')) {
-      // strip ../ prefixes, scale suffixes (@@images/…) and resource views (/++…)
-      let base = ref.replace(/^(\.\.\/)+/, '');
-      if (!base.startsWith('/')) base = '/' + base;
-      base = base.split('/@@')[0].split('/++')[0].replace(/\/+$/, '') || '/';
-      return pathMap.has(base) ? null : `path not in content: ${base}`;
-    }
-    // Plone action / browser-view URLs relative to the current context (they
-    // don't match the absolute-path branch above). These are UI actions, not
-    // content references — they resolve at runtime for whatever container the
-    // page lives in, so they can't (and shouldn't) be checked as content paths.
-    // e.g. `./add?type=Document` (add form), `./edit`, `@@some-view`, `++resource++…`.
-    const relAction = ref.replace(/^\.\//, '');
-    if (/^(@@|\+\+)/.test(relAction)) return null;
-    if (/^(add|edit|view|delete|sharing|contents|folder_contents|login|logout|history)(\?|\/|#|$)/.test(relAction))
-      return null;
-    return `unrecognized reference form: ${ref.slice(0, 60)}`;
-  }
-
   function checkBlockRefs(rel, bid, block) {
     for (const field of LINK_FIELDS) {
       if (!(field in block)) continue;
       for (const ref of refStrings(block[field])) {
-        const reason = refFailure(ref);
+        const reason = refFailure(ref, { hasUid, hasPath });
         if (reason) {
           stats.linksBroken += 1;
           errors.push(`  ${rel}: block ${bid} (${block['@type']}) ${field}: ${reason}`);

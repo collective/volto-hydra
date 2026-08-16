@@ -1207,17 +1207,6 @@ async function initMarkdownMounts() {
     ({ dirPath }) => fs.existsSync(path.join(dirPath, 'index.md')));
   if (!mounts.length) return;
   const { readTree } = await import('../../lib/markdown-mount.mjs');
-  // Format-agnostic content validation (blocks_layout integrity). The
-  // distribution validator is gated on __metadata__.json, so markdown mounts
-  // were unchecked; this validates each item as it loads, loud but non-fatal, so
-  // a --watch restart surfaces a problem while developing rather than at test time.
-  const { validateContent } = await import('../../lib/content-validator.mjs');
-  // The complete block registry (core/behaviour + custom) is what the frontend
-  // renders with; a block whose @type isn't in it is drift the schema check flags.
-  const { sharedBlocksConfig } = await import('./shared-block-schemas.js');
-  const { allBlocksConfig } = await import('./core-block-schemas.js');
-  const schema = allBlocksConfig(sharedBlocksConfig);
-  const problems = [];
   for (const { mountPath, dirPath } of mounts) {
     const { items, blobFiles } = readTree(dirPath);
     const urlFor = (p) => (mountPath === '/' ? p : mountPath + (p === '/' ? '' : p));
@@ -1232,14 +1221,25 @@ async function initMarkdownMounts() {
           uidPositionMap[item.UID] = item.getObjPositionInParent;
         }
       }
-      if (process.env.SKIP_CONTENT_VALIDATION !== 'true') problems.push(...validateContent(item, { schema }));
     }
     for (const [p, file] of blobFiles) markdownBlobs.set(urlFor(p), file);
     console.log(`Registered ${items.size} markdown items from ${dirPath} at ${mountPath}`);
   }
-  if (problems.length) {
-    console.log(`[content-check] ${problems.length} problem(s) in markdown content:`);
-    for (const m of problems.slice(0, 30)) console.log(`  ${m}`);
+  // Format-agnostic content validation over the whole loaded tree: blocks_layout
+  // integrity, schema type-check (a block @type the frontend can't render), and
+  // cross-tree references (an href/image pointing at content that doesn't exist).
+  // The distribution validator is gated on __metadata__.json, so markdown mounts
+  // were unchecked; this is loud but non-fatal (SKIP_CONTENT_VALIDATION opts out),
+  // so a --watch restart surfaces a problem while developing, not at test time.
+  if (process.env.SKIP_CONTENT_VALIDATION !== 'true') {
+    const { validateTree } = await import('../../lib/content-validator.mjs');
+    const { sharedBlocksConfig } = await import('./shared-block-schemas.js');
+    const { allBlocksConfig } = await import('./core-block-schemas.js');
+    const problems = validateTree(markdownItems, { schema: allBlocksConfig(sharedBlocksConfig) });
+    if (problems.length) {
+      console.log(`[content-check] ${problems.length} problem(s) in markdown content:`);
+      for (const m of problems.slice(0, 30)) console.log(`  ${m}`);
+    }
   }
 }
 
