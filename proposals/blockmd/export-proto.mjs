@@ -32,7 +32,7 @@ const PROTO_TEXT = {
   title: '<block type="title" _="${h1}" />',
   slate: '<block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />',
   separator: '<block type="separator" _="${hr}" />',
-  button: '<block type="button" title="${a/text}" href="${a/link}" />',
+  button: '<block type="button" explicit title="${p/text}" href="${p/link}" />',
   // href is @id-only (the heading's link); the teaser's rendered title/
   // description/hasPreviewImage are RESOLVED from the target by the mount, not
   // stored redundantly here. block.title (the heading text) is the teaser's own

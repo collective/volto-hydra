@@ -86,7 +86,7 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 *This is Italics.*
 
-<block type="slate" data='{"value":[{"children":[{"text":""},{"text":""},{"children":[{"text":"This is link."}],"data":{"url":"https://www.google.com/"},"type":"link"},{"text":""}],"type":"p"}]}' />
+[This is link.](https://www.google.com/)
 
 ## This is H2
 

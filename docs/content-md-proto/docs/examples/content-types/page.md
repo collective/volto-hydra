@@ -126,9 +126,9 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 Text can be **bold** or *Italic*.
 
-<block type="slate" data='{"styles":{},"value":[{"children":[{"text":""},{"children":[{"text":"Link internal "}],"data":{"url":"/docs/examples/button"},"type":"link"},{"text":""}],"type":"p"}]}' />
+[Link internal ](/docs/examples/button)
 
-<block type="slate" data='{"styles":{},"value":[{"children":[{"text":""},{"children":[{"text":"Link external"}],"data":{"url":"https://www.google.com"},"type":"link"},{"text":""}],"type":"p"}]}' />
+[Link external](https://www.google.com)
 
 <block type="separator">
 
