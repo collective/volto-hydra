@@ -119,7 +119,12 @@ Before you dive into the steps, here's what your frontend ends up doing.
 
 To make a site editable with Inka you break a page into:
 
-<block type="slate" data='{"value":[{"type":"ul","children":[{"type":"li","children":[{"type":"strong","children":[{"text":"Blocks fields"}]},{"text":" — one or more named, ordered lists of blocks. Each is a schema property with "},{"type":"code","children":[{"text":"widget: &#39;blocks_layout&#39;"}]},{"text":"; the field name is a key inside the page&#39;s "},{"type":"code","children":[{"text":"blocks_layout"}]},{"text":" dict (the default field is "},{"type":"code","children":[{"text":"items"}]},{"text":", plus e.g. "},{"type":"code","children":[{"text":"header"}]},{"text":", "},{"type":"code","children":[{"text":"footer"}]},{"text":"). Every field&#39;s blocks live in the page&#39;s single shared "},{"type":"code","children":[{"text":"blocks"}]},{"text":" dict; the field only records ordering."}]},{"type":"li","children":[{"type":"strong","children":[{"text":"Blocks"}]},{"text":" — discrete visual elements with a schema and settings that can be moved and edited."},{"type":"ul","children":[{"type":"li","children":[{"text":"Type, title, icon etc. so the user can pick from a menu."}]},{"type":"li","children":[{"text":"Fields: string, image, link etc. each with their own sidebar widget."},{"type":"ul","children":[{"type":"li","children":[{"type":"code","children":[{"text":"slate"}]},{"text":" is a special field that contains JSON for a paragraph, heading etc."}]},{"type":"li","children":[{"type":"code","children":[{"text":"blocks"}]},{"text":" fields let a block hold other blocks."}]}]}]}]}]}]}]}' />
+- **Blocks fields** — one or more named, ordered lists of blocks. Each is a schema property with `widget: 'blocks_layout'`; the field name is a key inside the page's `blocks_layout` dict (the default field is `items`, plus e.g. `header`, `footer`). Every field's blocks live in the page's single shared `blocks` dict; the field only records ordering.
+- **Blocks** — discrete visual elements with a schema and settings that can be moved and edited.
+  - Type, title, icon etc. so the user can pick from a menu.
+  - Fields: string, image, link etc. each with their own sidebar widget.
+    - `slate` is a special field that contains JSON for a paragraph, heading etc.
+    - `blocks` fields let a block hold other blocks.
 
 When the page loads inside Inka's edit iframe, you initialise the bridge and declare your blocks; otherwise you render normally from the API:
 
@@ -241,7 +246,7 @@ It's your choice which elements are linkable — a common pattern is to tag ever
 
 To build something *from* the anchors — an in-page navigation ("On this page") block — **derive the list from the page content you already render**, the same way you stamp the heading `id`s. That works identically published (no bridge, JS off) and while editing: structural edits (adding, removing, reordering heading blocks) re-render your frontend with fresh content, so the nav follows them. There is no bridge callback for this — the anchors ride in the ordinary edit-form data (`block._linkableAnchors`), which is what the object browser's link picker reads; a nav rebuilds itself from content on the next render.
 
-<block type="slate" data='{"value":[{"type":"blockquote","children":[{"text":"One consequence: text typed into an "},{"type":"em","children":[{"text":"existing"}]},{"text":" heading updates the nav on the next render (when you blur the block), not on every keystroke — inline text edits don&#39;t re-render the frontend until they&#39;re flushed. Adding or removing headings updates it immediately."}]}]}' />
+> One consequence: text typed into an *existing* heading updates the nav on the next render (when you blur the block), not on every keystroke — inline text edits don't re-render the frontend until they're flushed. Adding or removing headings updates it immediately.
 
 If your anchors carry levels, pair the derived list with `buildAnchorTree(anchors)` (from `@volto-hydra/hydra-js`) to render a nested contents list; no levels means a flat list.
 
@@ -263,7 +268,10 @@ The page has a template with the static parts of your theme like header and foot
 
 On page setup, take the path and make a [REST API call to the contents endpoint](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/content-types.html) to get the JSON for this page.
 
-<block type="slate" data='{"value":[{"type":"ul","children":[{"type":"li","children":[{"text":"You can use "},{"type":"code","children":[{"text":"@plone/client"}]},{"text":" for this"}]},{"type":"li","children":[{"text":"In some frameworks (such as Nuxt.js) it&#39;s better to use their built-in fetch"}]},{"type":"li","children":[{"text":"You can also use the "},{"type":"link","data":{"url":"https://2022.training.plone.org/gatsby/data.html"},"children":[{"text":"Plone GraphQL API"}]},{"type":"ul","children":[{"type":"li","children":[{"text":"Note: this is just a wrapper on the REST API rather than a server-side implementation, so it&#39;s not more efficient than using the REST API directly"}]}]}]}]}]}' />
+- You can use `@plone/client` for this
+- In some frameworks (such as Nuxt.js) it's better to use their built-in fetch
+- You can also use the [Plone GraphQL API](https://2022.training.plone.org/gatsby/data.html)
+  - Note: this is just a wrapper on the REST API rather than a server-side implementation, so it's not more efficient than using the REST API directly
 
 ## 4. Render Page Metadata
 
@@ -288,7 +296,9 @@ Give `Block` an `@type: "empty"` case: a container region with no `defaultBlockT
 
 Several helper functions get reused in many blocks:
 
-<block type="slate" data='{"value":[{"type":"ol","children":[{"type":"li","children":[{"type":"strong","children":[{"text":"Generating a URL for links"}]},{"text":" — all REST API URLs are relative to the API URL, so you need to convert these to the right frontend URL"}]},{"type":"li","children":[{"type":"strong","children":[{"text":"Generating a URL for an image"}]},{"text":" — blocks have image data in many formats so a helper function is useful"},{"type":"ul","children":[{"type":"li","children":[{"text":"You may also decide to use your framework or hosting solution for image resizing"}]}]}]}]}]}' />
+1. **Generating a URL for links** — all REST API URLs are relative to the API URL, so you need to convert these to the right frontend URL
+2. **Generating a URL for an image** — blocks have image data in many formats so a helper function is useful
+   - You may also decide to use your framework or hosting solution for image resizing
 
 ## 8. Listing Blocks
 

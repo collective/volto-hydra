@@ -99,7 +99,11 @@ Click on a block in the preview. If the frontend marks any of its fields as inli
 
 Press `Escape` to leave text editing. The block stays selected, but you're no longer inside any specific field.
 
-<block type="slate" data='{"value":[{"type":"ul","children":[{"type":"li","children":[{"text":"A full border appears around the block (visually stronger than the text-mode hint)."}]},{"type":"li","children":[{"text":"Keyboard shortcuts now operate on the whole block:"},{"type":"ul","children":[{"type":"li","children":[{"type":"strong","children":[{"text":"Arrow Up / Down"}]},{"text":" — move selection to the previous / next sibling block (container-aware: jumps into and out of containers)."}]},{"type":"li","children":[{"type":"strong","children":[{"text":"Enter"}]},{"text":" — add a new block after this one."}]},{"type":"li","children":[{"type":"strong","children":[{"text":"Delete / Backspace"}]},{"text":" — remove the selected block."}]}]}]}]}]}' />
+- A full border appears around the block (visually stronger than the text-mode hint).
+- Keyboard shortcuts now operate on the whole block:
+  - **Arrow Up / Down** — move selection to the previous / next sibling block (container-aware: jumps into and out of containers).
+  - **Enter** — add a new block after this one.
+  - **Delete / Backspace** — remove the selected block.
 
 Press `Escape` again to **deselect** (or go up to the parent container if this block is inside one). Each `Escape` walks one step up the hierarchy.
 

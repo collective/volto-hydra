@@ -144,7 +144,11 @@ Locked and fixed template blocks are the exception: they can't be moved at all (
 
 When `allowedLayouts` is configured for a page (or a region), the sidebar shows a **Layout** dropdown. Pick a different layout and:
 
-<block type="slate" data='{"value":[{"type":"ol","children":[{"type":"li","children":[{"text":"The new layout&#39;s structure replaces the old one."}]},{"type":"li","children":[{"text":"Your existing content is "},{"type":"strong","children":[{"text":"redistributed"}]},{"text":" into the new layout&#39;s slots based on "},{"type":"code","children":[{"text":"slotId"}]},{"text":":"},{"type":"ul","children":[{"type":"li","children":[{"text":"Content tagged with a slot name is placed into the matching slot in the new layout."}]},{"type":"li","children":[{"text":"Content with no slot tag falls into the "},{"type":"code","children":[{"text":"\"default\""}]},{"text":" slot if the new layout has one; otherwise into the bottom or top slot, or is dropped."}]},{"type":"li","children":[{"text":"Fixed blocks with the same "},{"type":"code","children":[{"text":"slotId"}]},{"text":" get their editable content carried over (text, media); their structural settings come from the new layout."}]}]}]}]}]}' />
+1. The new layout's structure replaces the old one.
+2. Your existing content is **redistributed** into the new layout's slots based on `slotId`:
+   - Content tagged with a slot name is placed into the matching slot in the new layout.
+   - Content with no slot tag falls into the `"default"` slot if the new layout has one; otherwise into the bottom or top slot, or is dropped.
+   - Fixed blocks with the same `slotId` get their editable content carried over (text, media); their structural settings come from the new layout.
 
 The point of `slotId` is that two layouts can share the same set of region names — switch between them and your content lands in the right places automatically.
 
