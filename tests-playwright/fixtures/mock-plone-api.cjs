@@ -129,6 +129,10 @@ const MARKDOWN_BLOB_MIME = {
 const markdownItems = new Map();   // url path -> raw content
 const markdownBlobs = new Map();   // url path -> absolute blob file
 let ready = Promise.resolve();
+// The ESM loaders (readTree, validateTree, schema) are imported once at startup
+// and held so a mount can be reloaded SYNCHRONOUSLY (on a watcher change or a
+// cache miss) without re-awaiting a dynamic import.
+let mdRuntime = null;
 
 // Map UIDs to URL paths (for resolveuid endpoint)
 const uidToPathMap = {};
@@ -537,29 +541,33 @@ function formatSearchItem(content, baseUrl) {
  * @returns {Object|null} The raw content object or null if not found
  */
 function loadRawContentFromDisk(urlPath) {
-  // A markdown mount is read whole at startup, so serve from that first.
-  if (markdownItems.has(urlPath)) return markdownItems.get(urlPath);
-
-  // First check contentDirMap (for pre-scanned content)
-  const dirInfo = contentDirMap[urlPath];
-  if (dirInfo) {
-    const dataPath = path.join(dirInfo.dirPath, 'data.json');
-    if (fs.existsSync(dataPath)) {
-      return JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+  // Read from the loaded caches: a markdown item, or a JSON data.json on disk.
+  // Markdown is a whole-tree cache; JSON is read per-path here.
+  const readCached = () => {
+    if (markdownItems.has(urlPath)) return markdownItems.get(urlPath);
+    const dirInfo = contentDirMap[urlPath];
+    if (dirInfo && !dirInfo.markdown) {
+      const dataPath = path.join(dirInfo.dirPath, 'data.json');
+      if (fs.existsSync(dataPath)) return JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
     }
-  }
-
-  // Fallback: try to find content directly from disk for paths not in map
-  // This allows new content files added during tests to be found
-  for (const { mountPath, dirPath } of CONTENT_MOUNTS) {
-    const relativePath = mountPath === '/' ? urlPath : urlPath.replace(mountPath, '');
-    const contentDir = path.join(dirPath, relativePath.replace(/^\//, ''));
-    const dataPath = path.join(contentDir, 'data.json');
-    if (fs.existsSync(dataPath)) {
-      return JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+    for (const { mountPath, dirPath } of CONTENT_MOUNTS) {
+      const relativePath = mountPath === '/' ? urlPath : urlPath.replace(mountPath, '');
+      const dataPath = path.join(dirPath, relativePath.replace(/^\//, ''), 'data.json');
+      if (fs.existsSync(dataPath)) return JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
     }
-  }
+    return null;
+  };
 
+  const hit = readCached();
+  if (hit != null) return hit;
+  // Miss: reload the mount that owns this path (format-agnostic -- markdown
+  // re-reads its tree, JSON rescans) and retry once. Content added since startup
+  // is picked up here rather than needing a restart.
+  const mount = mountFor(urlPath);
+  if (mount) {
+    reloadMount(mount);
+    return readCached();
+  }
   return null;
 }
 
@@ -1198,49 +1206,70 @@ function getSiteRoot() {
   };
 }
 
-/**
- * Load every markdown mount. A markdown tree is one with an index.md at its
- * root; a distribution tree has plone_site_root/data.json instead.
- */
-async function initMarkdownMounts() {
-  const mounts = CONTENT_MOUNTS.filter(
-    ({ dirPath }) => fs.existsSync(path.join(dirPath, 'index.md')));
-  if (!mounts.length) return;
-  const { readTree } = await import('../../lib/markdown-mount.mjs');
-  for (const { mountPath, dirPath } of mounts) {
-    const { items, blobFiles } = readTree(dirPath);
-    const urlFor = (p) => (mountPath === '/' ? p : mountPath + (p === '/' ? '' : p));
-    for (const [p, item] of items) {
-      const urlPath = urlFor(p);
-      item['@id'] = urlPath;
-      markdownItems.set(urlPath, item);
-      contentDirMap[urlPath] = { dirPath, markdown: true };
-      if (item.UID) {
-        uidToPathMap[item.UID] = urlPath;
-        if (item.getObjPositionInParent !== undefined) {
-          uidPositionMap[item.UID] = item.getObjPositionInParent;
-        }
-      }
+/** A markdown tree is one with an index.md at its root; a distribution tree has
+ *  plone_site_root/data.json instead. */
+const isMarkdownMount = (mount) => fs.existsSync(path.join(mount.dirPath, 'index.md'));
+
+/** The mount that owns a url path (the ContentSource for it). '/' owns everything. */
+function mountFor(urlPath) {
+  return CONTENT_MOUNTS.find((m) => m.mountPath === '/'
+    || urlPath === m.mountPath || urlPath.startsWith(`${m.mountPath}/`));
+}
+
+/** (Re)load ONE markdown mount into the shared caches, then validate the tree.
+ *  Synchronous (uses the held mdRuntime), so a miss or a watcher change can drive
+ *  it. Additive, like the JSON rescan: it refreshes/adds items but a full restart
+ *  is what clears deletions. */
+function loadMarkdownMount(mount) {
+  if (!mdRuntime) return;
+  const { readTree, validateTree, schema } = mdRuntime;
+  const { mountPath, dirPath } = mount;
+  const { items, blobFiles } = readTree(dirPath);
+  const urlFor = (p) => (mountPath === '/' ? p : mountPath + (p === '/' ? '' : p));
+  for (const [p, item] of items) {
+    const urlPath = urlFor(p);
+    item['@id'] = urlPath;
+    markdownItems.set(urlPath, item);
+    contentDirMap[urlPath] = { dirPath, markdown: true };
+    if (item.UID) {
+      uidToPathMap[item.UID] = urlPath;
+      if (item.getObjPositionInParent !== undefined) uidPositionMap[item.UID] = item.getObjPositionInParent;
     }
-    for (const [p, file] of blobFiles) markdownBlobs.set(urlFor(p), file);
-    console.log(`Registered ${items.size} markdown items from ${dirPath} at ${mountPath}`);
   }
-  // Format-agnostic content validation over the whole loaded tree: blocks_layout
-  // integrity, schema type-check (a block @type the frontend can't render), and
-  // cross-tree references (an href/image pointing at content that doesn't exist).
-  // The distribution validator is gated on __metadata__.json, so markdown mounts
-  // were unchecked; this is loud but non-fatal (SKIP_CONTENT_VALIDATION opts out),
-  // so a --watch restart surfaces a problem while developing, not at test time.
+  for (const [p, file] of blobFiles) markdownBlobs.set(urlFor(p), file);
+  console.log(`Registered ${items.size} markdown items from ${dirPath} at ${mountPath}`);
+  // Content validation over the whole loaded tree: blocks_layout integrity, schema
+  // type-check, and cross-tree references. Loud but non-fatal so a --watch restart
+  // (or a reload) surfaces a problem while developing, not at test time.
   if (process.env.SKIP_CONTENT_VALIDATION !== 'true') {
-    const { validateTree } = await import('../../lib/content-validator.mjs');
-    const { sharedBlocksConfig } = await import('./shared-block-schemas.js');
-    const { allBlocksConfig } = await import('./core-block-schemas.js');
-    const problems = validateTree(markdownItems, { schema: allBlocksConfig(sharedBlocksConfig) });
+    const problems = validateTree(markdownItems, { schema });
     if (problems.length) {
       console.log(`[content-check] ${problems.length} problem(s) in markdown content:`);
       for (const m of problems.slice(0, 30)) console.log(`  ${m}`);
     }
   }
+}
+
+/** Reload one mount, format-agnostically -- the ContentSource.reload() seam that
+ *  both the watcher and the cache-miss path call, so neither is JSON-specific. */
+function reloadMount(mount) {
+  if (isMarkdownMount(mount)) { loadMarkdownMount(mount); return; }
+  if (mount.mountPath !== '/' && fs.existsSync(path.join(mount.dirPath, 'data.json'))) {
+    contentDirMap[mount.mountPath] = { dirPath: mount.dirPath, dirName: path.basename(mount.dirPath) };
+  }
+  scanContentDir(mount.dirPath, mount.mountPath);
+}
+
+/** Import the ESM loaders once, hold them, and load every markdown mount. */
+async function initMarkdownMounts() {
+  const mounts = CONTENT_MOUNTS.filter(isMarkdownMount);
+  if (!mounts.length) return;
+  const { readTree } = await import('../../lib/markdown-mount.mjs');
+  const { validateTree } = await import('../../lib/content-validator.mjs');
+  const { sharedBlocksConfig } = await import('./shared-block-schemas.js');
+  const { allBlocksConfig } = await import('./core-block-schemas.js');
+  mdRuntime = { readTree, validateTree, schema: allBlocksConfig(sharedBlocksConfig) };
+  for (const mount of mounts) loadMarkdownMount(mount);
 }
 
 // Scan content directories on startup (content loaded on-demand)
@@ -1280,7 +1309,9 @@ function setupContentWatchers() {
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => {
       timer = null;
-      initContentDirMap();
+      // Reload every mount through the format-agnostic seam -- markdown trees
+      // reload and re-validate too, not just the JSON contentDirMap.
+      for (const mount of CONTENT_MOUNTS) reloadMount(mount);
     }, debounceMs);
   };
   for (const { dirPath } of CONTENT_MOUNTS) {
