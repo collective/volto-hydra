@@ -51,6 +51,7 @@ assignments:
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
+  <block type="slate" value="${*/slate}" />
   <block type="separator" _="${hr}" />
   <block type="teaser" title="${h/text}" href="${h/link}" description="${p/text}" />
   <block type="codeExample">

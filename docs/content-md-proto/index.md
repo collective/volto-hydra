@@ -50,6 +50,7 @@ assignments:
   - { uid: 2fac7e5d-affb-4a8e-969f-2fac4d08e0fd, type: slate }
 prototypes: |
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
+  <block type="slate" value="${*/slate}" />
   <block type="separator" _="${hr}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
@@ -104,13 +105,37 @@ Compliance or engagement is a false choice. You decide where the dial sits for e
 
 <block type="gridBlock">
 
-<block type="slate" data='{"value":[{"children":[{"children":[{"text":"Visual Editing"}],"type":"strong"}],"type":"p"},{"children":[{"text":"True WYSIWYG with drag-and-drop blocks. No special frontend framework required — just HTML attributes."}],"type":"p"}]}' />
+<block type="slate">
 
-<block type="slate" data='{"value":[{"children":[{"children":[{"text":"Multi frontend, multi backend"}],"type":"strong"}],"type":"p"},{"children":[{"text":"Use React, Vue, Nuxt, Next.js or any stack, and switch channels mid-edit."}],"type":"p"}]}' />
+**Visual Editing**
 
-<block type="slate" data='{"value":[{"children":[{"children":[{"text":"Truly Decoupled"}],"type":"strong"}],"type":"p"},{"children":[{"text":"Your frontend is independent code you own. Upgrade the CMS without rewriting your site; switch frameworks and get the same editing experience."}],"type":"p"}]}' />
+True WYSIWYG with drag-and-drop blocks. No special frontend framework required — just HTML attributes.
 
-<block type="slate" data='{"value":[{"children":[{"children":[{"text":"Open Source"}],"type":"strong"}],"type":"p"},{"children":[{"text":"Secure, scalable Plone backend. Host anywhere, control your costs and security."}],"type":"p"}]}' />
+</block>
+
+<block type="slate">
+
+**Multi frontend, multi backend**
+
+Use React, Vue, Nuxt, Next.js or any stack, and switch channels mid-edit.
+
+</block>
+
+<block type="slate">
+
+**Truly Decoupled**
+
+Your frontend is independent code you own. Upgrade the CMS without rewriting your site; switch frameworks and get the same editing experience.
+
+</block>
+
+<block type="slate">
+
+**Open Source**
+
+Secure, scalable Plone backend. Host anywhere, control your costs and security.
+
+</block>
 
 </block>
 
@@ -411,14 +436,27 @@ export const POST = async ({ request }) => {
 
 <block type="gridBlock">
 
-<block type="slate" data='{"value":[{"children":[{"text":""},{"text":"You can use this site to test Inka Edit."}],"type":"p"},{"children":[{"text":""},{"children":[{"text":"Disclaimer"}],"type":"strong"},{"text":": This instance is reset every night, so all changes will be lost afterwards."}],"type":"p"}]}' />
+<block type="slate">
+
+You can use this site to test Inka Edit.
+
+**Disclaimer**: This instance is reset every night, so all changes will be lost afterwards.
+
+</block>
 
 You can **log in** and use it as an admin user using these **credentials**:\
 \
 username: **admin**\
 password: **admin**
 
-<block type="slate" data='{"value":[{"children":[{"text":"This site uses some recommended "},{"children":[{"text":"add-ons"}],"type":"strong"},{"text":":"}],"type":"p"},{"children":[{"children":[{"text":"Some blocks that are suitable to be used with volto-light-theme."}],"type":"li"},{"children":[{"text":""},{"children":[{"text":"volto-form-block"}],"data":{"url":"https://github.com/collective/volto-form-block"},"type":"link"},{"text":""}],"type":"li"}],"type":"ul"}]}' />
+<block type="slate">
+
+This site uses some recommended **add-ons**:
+
+- Some blocks that are suitable to be used with volto-light-theme.
+- [volto-form-block](https://github.com/collective/volto-form-block)
+
+</block>
 
 </block>
 

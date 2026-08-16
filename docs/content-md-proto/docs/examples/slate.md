@@ -62,6 +62,7 @@ assignments:
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
+  <block type="slate" value="${*/slate}" />
   <block type="separator" _="${hr}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
@@ -80,7 +81,11 @@ Rich text block powered by the Slate editor. Supports paragraphs, headings, list
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
 
+<block type="separator">
+
 ---
+
+</block>
 
 **This is bold text.**
 
@@ -100,11 +105,19 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 - This is unordered list
 - This is unordered list
 
+<block type="separator">
+
 ---
+
+</block>
 
 <block type="heading" alignment="left" tag="h2" data='{"heading":" Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. "}' />
 
+<block type="separator">
+
 ---
+
+</block>
 
 ## Überschrift zweiter Ordnung (Headline H2)
 

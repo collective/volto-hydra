@@ -14,6 +14,7 @@ assignments:
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
+  <block type="slate" value="${*/slate}" />
 ---
 
 <block type="dateField" dateField="effective" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="date" data='{"showTime":false,"fixed":true}' />

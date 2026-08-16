@@ -25,6 +25,7 @@ assignments:
   - { id: tpl-rendering-svelte-000000 }
 prototypes: |
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
+  <block type="slate" value="${*/slate}" />
   <block type="separator" _="${hr}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">

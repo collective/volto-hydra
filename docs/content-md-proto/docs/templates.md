@@ -96,6 +96,7 @@ assignments:
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
+  <block type="slate" value="${*/slate}" />
   <block type="separator" _="${hr}" />
   <block type="slateTable">
     <region name="table.rows">
@@ -117,7 +118,11 @@ prototypes: |
 
 Templates allow editors to centrally control content and reuse content. They allow a developer to not have to hard code layout decisions and instead use rules to apply user layouts in template content stored separately from the page, or give the user a choice on which layout they want.
 
+<block type="separator">
+
 ---
+
+</block>
 
 ## Template Concepts
 

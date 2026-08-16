@@ -73,6 +73,7 @@ assignments:
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
+  <block type="slate" value="${*/slate}" />
   <block type="separator" _="${hr}" />
   <block type="slateTable">
     <region name="table.rows">
@@ -94,7 +95,11 @@ prototypes: |
 
 Instead of combining editing and rendering into one framework and codebase, these are separated and during editing a two way communication channel is opened across an iframe so that the editing UI is no longer part of the frontend code. Instead a small JS file called hydra.js is included in your frontend during editing that handles the iframe bridge communication to Inka which is running in the same browser window.
 
+<block type="separator">
+
 ---
+
+</block>
 
 ## Architecture Overview
 

@@ -26,6 +26,7 @@ assignments:
 prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
+  <block type="slate" value="${*/slate}" />
 blobs:
   - file: penguin2.jpg
     uid: 05bace45294c45d5ab93de883e7ce702
