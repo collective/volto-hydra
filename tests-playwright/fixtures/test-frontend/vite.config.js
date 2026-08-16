@@ -32,6 +32,7 @@ export default defineConfig({
       '/helpers.js': path.resolve(__dirname, '../../../packages/helpers/index.js'),
       '/build-block-path-map.js': path.resolve(__dirname, '../../../packages/hydra-js/buildBlockPathMap.js'),
       '/shared-block-schemas.js': path.resolve(__dirname, '../shared-block-schemas.js'),
+      '/core-block-schemas.js': path.resolve(__dirname, '../core-block-schemas.js'),
     },
   },
 });

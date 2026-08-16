@@ -139,6 +139,7 @@
         import { initBridge, getAccessToken } from '/hydra.js';
         import { expandListingBlocks, ploneFetchItems, relatedItemsFetcher, searchShortcutsFetcher, rssFetcher, expandTemplates, expandTemplatesSync, contentPath } from '/helpers.js';
         import { sharedBlocksConfig } from '/shared-block-schemas.js';
+        import { coreBlocksConfig } from '/core-block-schemas.js';
 
         // Parse page numbers from URL query params (format: ?pg_{blockId}={pageNumber})
         function getPagesFromUrl() {
@@ -474,7 +475,7 @@
                                 },
                             },
                         },
-                        blocks: { ...sharedBlocksConfig },
+                        blocks: { ...coreBlocksConfig, ...sharedBlocksConfig },
                         debug: true,
                         // Pass onEditChange before init() sends INIT to avoid race condition
                         onEditChange: (formData) => {
