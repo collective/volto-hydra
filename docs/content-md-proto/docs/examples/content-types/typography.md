@@ -139,15 +139,15 @@ Paragraph text (p, 24/33px) -> Lorem ipsum dolor sit amet, consetetur sadipscing
 
 <block type="gridBlock">
 
-<block type="slate" data='{"value":[{"children":[{"text":"Text Heading (H2, 30/36px)"}],"type":"h2"},{"children":[{"text":"For grid blocks, the font of the headlines are variable, depending on the number of cells in the grid."}],"type":"p"}]}' />
+**Text Heading (H2, 30/36px)** For grid blocks, the font of the headlines are variable, depending on the number of cells in the grid.
 
 </block>
 
 <block type="gridBlock">
 
-<block type="slate" data='{"value":[{"children":[{"text":"Text Heading (H3, 24/30px)"}],"type":"h2"},{"children":[{"text":"Paragraph Text (p, 18/24px)"}],"type":"p"}]}' />
+**Text Heading (H3, 24/30px)** Paragraph Text (p, 18/24px)
 
-<block type="slate" data='{"value":[{"children":[{"text":"Text Heading (H3, 24/30px)"}],"type":"h2"},{"children":[{"text":"Paragraph Text (p, 18/24px)"}],"type":"p"}]}' />
+**Text Heading (H3, 24/30px)** Paragraph Text (p, 18/24px)
 
 </block>
 

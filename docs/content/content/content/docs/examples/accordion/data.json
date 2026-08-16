@@ -502,25 +502,29 @@
                         "type": "data",
                         "value": [
                           {
+                            "type": "p",
                             "children": [
                               {
-                                "text": "Heading H3"
-                              }
-                            ],
-                            "type": "h2"
-                          },
-                          {
-                            "children": [
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H3"
+                                  }
+                                ]
+                              },
                               {
-                                "text": "Heading H2"
-                              }
-                            ],
-                            "type": "h3"
-                          },
-                          {
-                            "children": [
+                                "text": " "
+                              },
                               {
-                                "text": "Text can be "
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H2"
+                                  }
+                                ]
+                              },
+                              {
+                                "text": " Text can be "
                               },
                               {
                                 "children": [
@@ -554,12 +558,8 @@
                                   "url": "/"
                                 },
                                 "type": "link"
-                              },
-                              {
-                                "text": " "
                               }
-                            ],
-                            "type": "p"
+                            ]
                           }
                         ]
                       },
@@ -568,25 +568,29 @@
                         "type": "data",
                         "value": [
                           {
+                            "type": "p",
                             "children": [
                               {
-                                "text": "Heading H3"
-                              }
-                            ],
-                            "type": "h2"
-                          },
-                          {
-                            "children": [
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H3"
+                                  }
+                                ]
+                              },
                               {
-                                "text": "Heading H2"
-                              }
-                            ],
-                            "type": "h3"
-                          },
-                          {
-                            "children": [
+                                "text": " "
+                              },
                               {
-                                "text": "Text can be "
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H2"
+                                  }
+                                ]
+                              },
+                              {
+                                "text": " Text can be "
                               },
                               {
                                 "children": [
@@ -620,12 +624,8 @@
                                   "url": "/"
                                 },
                                 "type": "link"
-                              },
-                              {
-                                "text": " "
                               }
-                            ],
-                            "type": "p"
+                            ]
                           }
                         ]
                       },
@@ -634,25 +634,29 @@
                         "type": "data",
                         "value": [
                           {
+                            "type": "p",
                             "children": [
                               {
-                                "text": "Heading H3"
-                              }
-                            ],
-                            "type": "h2"
-                          },
-                          {
-                            "children": [
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H3"
+                                  }
+                                ]
+                              },
                               {
-                                "text": "Heading H2"
-                              }
-                            ],
-                            "type": "h3"
-                          },
-                          {
-                            "children": [
+                                "text": " "
+                              },
                               {
-                                "text": "Text can be "
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H2"
+                                  }
+                                ]
+                              },
+                              {
+                                "text": " Text can be "
                               },
                               {
                                 "children": [
@@ -686,12 +690,8 @@
                                   "url": "/"
                                 },
                                 "type": "link"
-                              },
-                              {
-                                "text": " "
                               }
-                            ],
-                            "type": "p"
+                            ]
                           }
                         ]
                       }
@@ -705,25 +705,29 @@
                         "type": "data",
                         "value": [
                           {
+                            "type": "p",
                             "children": [
                               {
-                                "text": "Heading H3"
-                              }
-                            ],
-                            "type": "h2"
-                          },
-                          {
-                            "children": [
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H3"
+                                  }
+                                ]
+                              },
                               {
-                                "text": "Heading H2"
-                              }
-                            ],
-                            "type": "h3"
-                          },
-                          {
-                            "children": [
+                                "text": " "
+                              },
                               {
-                                "text": "Text can be "
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H2"
+                                  }
+                                ]
+                              },
+                              {
+                                "text": " Text can be "
                               },
                               {
                                 "children": [
@@ -757,12 +761,8 @@
                                   "url": "/"
                                 },
                                 "type": "link"
-                              },
-                              {
-                                "text": " "
                               }
-                            ],
-                            "type": "p"
+                            ]
                           }
                         ]
                       },
@@ -771,25 +771,29 @@
                         "type": "data",
                         "value": [
                           {
+                            "type": "p",
                             "children": [
                               {
-                                "text": "Heading H3"
-                              }
-                            ],
-                            "type": "h2"
-                          },
-                          {
-                            "children": [
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H3"
+                                  }
+                                ]
+                              },
                               {
-                                "text": "Heading H2"
-                              }
-                            ],
-                            "type": "h3"
-                          },
-                          {
-                            "children": [
+                                "text": " "
+                              },
                               {
-                                "text": "Text can be "
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H2"
+                                  }
+                                ]
+                              },
+                              {
+                                "text": " Text can be "
                               },
                               {
                                 "children": [
@@ -823,12 +827,8 @@
                                   "url": "/"
                                 },
                                 "type": "link"
-                              },
-                              {
-                                "text": " "
                               }
-                            ],
-                            "type": "p"
+                            ]
                           }
                         ]
                       },
@@ -837,25 +837,29 @@
                         "type": "data",
                         "value": [
                           {
+                            "type": "p",
                             "children": [
                               {
-                                "text": "Heading H3"
-                              }
-                            ],
-                            "type": "h2"
-                          },
-                          {
-                            "children": [
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H3"
+                                  }
+                                ]
+                              },
                               {
-                                "text": "Heading H2"
-                              }
-                            ],
-                            "type": "h3"
-                          },
-                          {
-                            "children": [
+                                "text": " "
+                              },
                               {
-                                "text": "Text can be "
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H2"
+                                  }
+                                ]
+                              },
+                              {
+                                "text": " Text can be "
                               },
                               {
                                 "children": [
@@ -889,12 +893,8 @@
                                   "url": "/"
                                 },
                                 "type": "link"
-                              },
-                              {
-                                "text": " "
                               }
-                            ],
-                            "type": "p"
+                            ]
                           }
                         ]
                       }
@@ -908,25 +908,29 @@
                         "type": "data",
                         "value": [
                           {
+                            "type": "p",
                             "children": [
                               {
-                                "text": "Heading H3"
-                              }
-                            ],
-                            "type": "h2"
-                          },
-                          {
-                            "children": [
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H3"
+                                  }
+                                ]
+                              },
                               {
-                                "text": "Heading H2"
-                              }
-                            ],
-                            "type": "h3"
-                          },
-                          {
-                            "children": [
+                                "text": " "
+                              },
                               {
-                                "text": "Text can be "
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H2"
+                                  }
+                                ]
+                              },
+                              {
+                                "text": " Text can be "
                               },
                               {
                                 "children": [
@@ -960,12 +964,8 @@
                                   "url": "/"
                                 },
                                 "type": "link"
-                              },
-                              {
-                                "text": " "
                               }
-                            ],
-                            "type": "p"
+                            ]
                           }
                         ]
                       },
@@ -974,25 +974,29 @@
                         "type": "data",
                         "value": [
                           {
+                            "type": "p",
                             "children": [
                               {
-                                "text": "Heading H3"
-                              }
-                            ],
-                            "type": "h2"
-                          },
-                          {
-                            "children": [
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H3"
+                                  }
+                                ]
+                              },
                               {
-                                "text": "Heading H2"
-                              }
-                            ],
-                            "type": "h3"
-                          },
-                          {
-                            "children": [
+                                "text": " "
+                              },
                               {
-                                "text": "Text can be "
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H2"
+                                  }
+                                ]
+                              },
+                              {
+                                "text": " Text can be "
                               },
                               {
                                 "children": [
@@ -1026,12 +1030,8 @@
                                   "url": "/"
                                 },
                                 "type": "link"
-                              },
-                              {
-                                "text": " "
                               }
-                            ],
-                            "type": "p"
+                            ]
                           }
                         ]
                       },
@@ -1040,25 +1040,29 @@
                         "type": "data",
                         "value": [
                           {
+                            "type": "p",
                             "children": [
                               {
-                                "text": "Heading H3"
-                              }
-                            ],
-                            "type": "h2"
-                          },
-                          {
-                            "children": [
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H3"
+                                  }
+                                ]
+                              },
                               {
-                                "text": "Heading H2"
-                              }
-                            ],
-                            "type": "h3"
-                          },
-                          {
-                            "children": [
+                                "text": " "
+                              },
                               {
-                                "text": "Text can be "
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H2"
+                                  }
+                                ]
+                              },
+                              {
+                                "text": " Text can be "
                               },
                               {
                                 "children": [
@@ -1092,12 +1096,8 @@
                                   "url": "/"
                                 },
                                 "type": "link"
-                              },
-                              {
-                                "text": " "
                               }
-                            ],
-                            "type": "p"
+                            ]
                           }
                         ]
                       }
@@ -1617,25 +1617,29 @@
                         "type": "data",
                         "value": [
                           {
+                            "type": "p",
                             "children": [
                               {
-                                "text": "Heading H3"
-                              }
-                            ],
-                            "type": "h2"
-                          },
-                          {
-                            "children": [
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H3"
+                                  }
+                                ]
+                              },
                               {
-                                "text": "Heading H2"
-                              }
-                            ],
-                            "type": "h3"
-                          },
-                          {
-                            "children": [
+                                "text": " "
+                              },
                               {
-                                "text": "Text can be "
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H2"
+                                  }
+                                ]
+                              },
+                              {
+                                "text": " Text can be "
                               },
                               {
                                 "children": [
@@ -1669,12 +1673,8 @@
                                   "url": "/"
                                 },
                                 "type": "link"
-                              },
-                              {
-                                "text": " "
                               }
-                            ],
-                            "type": "p"
+                            ]
                           }
                         ]
                       },
@@ -1683,25 +1683,29 @@
                         "type": "data",
                         "value": [
                           {
+                            "type": "p",
                             "children": [
                               {
-                                "text": "Heading H3"
-                              }
-                            ],
-                            "type": "h2"
-                          },
-                          {
-                            "children": [
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H3"
+                                  }
+                                ]
+                              },
                               {
-                                "text": "Heading H2"
-                              }
-                            ],
-                            "type": "h3"
-                          },
-                          {
-                            "children": [
+                                "text": " "
+                              },
                               {
-                                "text": "Text can be "
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H2"
+                                  }
+                                ]
+                              },
+                              {
+                                "text": " Text can be "
                               },
                               {
                                 "children": [
@@ -1735,12 +1739,8 @@
                                   "url": "/"
                                 },
                                 "type": "link"
-                              },
-                              {
-                                "text": " "
                               }
-                            ],
-                            "type": "p"
+                            ]
                           }
                         ]
                       },
@@ -1749,25 +1749,29 @@
                         "type": "data",
                         "value": [
                           {
+                            "type": "p",
                             "children": [
                               {
-                                "text": "Heading H3"
-                              }
-                            ],
-                            "type": "h2"
-                          },
-                          {
-                            "children": [
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H3"
+                                  }
+                                ]
+                              },
                               {
-                                "text": "Heading H2"
-                              }
-                            ],
-                            "type": "h3"
-                          },
-                          {
-                            "children": [
+                                "text": " "
+                              },
                               {
-                                "text": "Text can be "
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H2"
+                                  }
+                                ]
+                              },
+                              {
+                                "text": " Text can be "
                               },
                               {
                                 "children": [
@@ -1801,12 +1805,8 @@
                                   "url": "/"
                                 },
                                 "type": "link"
-                              },
-                              {
-                                "text": " "
                               }
-                            ],
-                            "type": "p"
+                            ]
                           }
                         ]
                       }
@@ -1820,25 +1820,29 @@
                         "type": "data",
                         "value": [
                           {
+                            "type": "p",
                             "children": [
                               {
-                                "text": "Heading H3"
-                              }
-                            ],
-                            "type": "h2"
-                          },
-                          {
-                            "children": [
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H3"
+                                  }
+                                ]
+                              },
                               {
-                                "text": "Heading H2"
-                              }
-                            ],
-                            "type": "h3"
-                          },
-                          {
-                            "children": [
+                                "text": " "
+                              },
                               {
-                                "text": "Text can be "
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H2"
+                                  }
+                                ]
+                              },
+                              {
+                                "text": " Text can be "
                               },
                               {
                                 "children": [
@@ -1872,12 +1876,8 @@
                                   "url": "/"
                                 },
                                 "type": "link"
-                              },
-                              {
-                                "text": " "
                               }
-                            ],
-                            "type": "p"
+                            ]
                           }
                         ]
                       },
@@ -1886,25 +1886,29 @@
                         "type": "data",
                         "value": [
                           {
+                            "type": "p",
                             "children": [
                               {
-                                "text": "Heading H3"
-                              }
-                            ],
-                            "type": "h2"
-                          },
-                          {
-                            "children": [
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H3"
+                                  }
+                                ]
+                              },
                               {
-                                "text": "Heading H2"
-                              }
-                            ],
-                            "type": "h3"
-                          },
-                          {
-                            "children": [
+                                "text": " "
+                              },
                               {
-                                "text": "Text can be "
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H2"
+                                  }
+                                ]
+                              },
+                              {
+                                "text": " Text can be "
                               },
                               {
                                 "children": [
@@ -1938,12 +1942,8 @@
                                   "url": "/"
                                 },
                                 "type": "link"
-                              },
-                              {
-                                "text": " "
                               }
-                            ],
-                            "type": "p"
+                            ]
                           }
                         ]
                       },
@@ -1952,25 +1952,29 @@
                         "type": "data",
                         "value": [
                           {
+                            "type": "p",
                             "children": [
                               {
-                                "text": "Heading H3"
-                              }
-                            ],
-                            "type": "h2"
-                          },
-                          {
-                            "children": [
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H3"
+                                  }
+                                ]
+                              },
                               {
-                                "text": "Heading H2"
-                              }
-                            ],
-                            "type": "h3"
-                          },
-                          {
-                            "children": [
+                                "text": " "
+                              },
                               {
-                                "text": "Text can be "
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H2"
+                                  }
+                                ]
+                              },
+                              {
+                                "text": " Text can be "
                               },
                               {
                                 "children": [
@@ -2004,12 +2008,8 @@
                                   "url": "/"
                                 },
                                 "type": "link"
-                              },
-                              {
-                                "text": " "
                               }
-                            ],
-                            "type": "p"
+                            ]
                           }
                         ]
                       }
@@ -2023,25 +2023,29 @@
                         "type": "data",
                         "value": [
                           {
+                            "type": "p",
                             "children": [
                               {
-                                "text": "Heading H3"
-                              }
-                            ],
-                            "type": "h2"
-                          },
-                          {
-                            "children": [
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H3"
+                                  }
+                                ]
+                              },
                               {
-                                "text": "Heading H2"
-                              }
-                            ],
-                            "type": "h3"
-                          },
-                          {
-                            "children": [
+                                "text": " "
+                              },
                               {
-                                "text": "Text can be "
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H2"
+                                  }
+                                ]
+                              },
+                              {
+                                "text": " Text can be "
                               },
                               {
                                 "children": [
@@ -2075,12 +2079,8 @@
                                   "url": "/"
                                 },
                                 "type": "link"
-                              },
-                              {
-                                "text": " "
                               }
-                            ],
-                            "type": "p"
+                            ]
                           }
                         ]
                       },
@@ -2089,25 +2089,29 @@
                         "type": "data",
                         "value": [
                           {
+                            "type": "p",
                             "children": [
                               {
-                                "text": "Heading H3"
-                              }
-                            ],
-                            "type": "h2"
-                          },
-                          {
-                            "children": [
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H3"
+                                  }
+                                ]
+                              },
                               {
-                                "text": "Heading H2"
-                              }
-                            ],
-                            "type": "h3"
-                          },
-                          {
-                            "children": [
+                                "text": " "
+                              },
                               {
-                                "text": "Text can be "
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H2"
+                                  }
+                                ]
+                              },
+                              {
+                                "text": " Text can be "
                               },
                               {
                                 "children": [
@@ -2141,12 +2145,8 @@
                                   "url": "/"
                                 },
                                 "type": "link"
-                              },
-                              {
-                                "text": " "
                               }
-                            ],
-                            "type": "p"
+                            ]
                           }
                         ]
                       },
@@ -2155,25 +2155,29 @@
                         "type": "data",
                         "value": [
                           {
+                            "type": "p",
                             "children": [
                               {
-                                "text": "Heading H3"
-                              }
-                            ],
-                            "type": "h2"
-                          },
-                          {
-                            "children": [
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H3"
+                                  }
+                                ]
+                              },
                               {
-                                "text": "Heading H2"
-                              }
-                            ],
-                            "type": "h3"
-                          },
-                          {
-                            "children": [
+                                "text": " "
+                              },
                               {
-                                "text": "Text can be "
+                                "type": "strong",
+                                "children": [
+                                  {
+                                    "text": "Heading H2"
+                                  }
+                                ]
+                              },
+                              {
+                                "text": " Text can be "
                               },
                               {
                                 "children": [
@@ -2207,12 +2211,8 @@
                                   "url": "/"
                                 },
                                 "type": "link"
-                              },
-                              {
-                                "text": " "
                               }
-                            ],
-                            "type": "p"
+                            ]
                           }
                         ]
                       }

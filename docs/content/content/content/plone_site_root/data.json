@@ -103,6 +103,7 @@
           "plaintext": "Visual Editing. True WYSIWYG with drag-and-drop blocks. No special frontend framework required — just HTML attributes.",
           "value": [
             {
+              "type": "p",
               "children": [
                 {
                   "children": [
@@ -111,17 +112,11 @@
                     }
                   ],
                   "type": "strong"
-                }
-              ],
-              "type": "p"
-            },
-            {
-              "children": [
+                },
                 {
-                  "text": "True WYSIWYG with drag-and-drop blocks. No special frontend framework required — just HTML attributes."
+                  "text": " True WYSIWYG with drag-and-drop blocks. No special frontend framework required — just HTML attributes."
                 }
-              ],
-              "type": "p"
+              ]
             }
           ]
         },
@@ -130,6 +125,7 @@
           "plaintext": "Multi frontend, multi backend. Use React, Vue, Nuxt, Next.js or any stack, and switch channels mid-edit.",
           "value": [
             {
+              "type": "p",
               "children": [
                 {
                   "children": [
@@ -138,17 +134,11 @@
                     }
                   ],
                   "type": "strong"
-                }
-              ],
-              "type": "p"
-            },
-            {
-              "children": [
+                },
                 {
-                  "text": "Use React, Vue, Nuxt, Next.js or any stack, and switch channels mid-edit."
+                  "text": " Use React, Vue, Nuxt, Next.js or any stack, and switch channels mid-edit."
                 }
-              ],
-              "type": "p"
+              ]
             }
           ]
         },
@@ -157,6 +147,7 @@
           "plaintext": "Truly Decoupled. Your frontend is independent code you own. Upgrade the CMS without rewriting your site; switch frameworks and get the same editing experience.",
           "value": [
             {
+              "type": "p",
               "children": [
                 {
                   "children": [
@@ -165,17 +156,11 @@
                     }
                   ],
                   "type": "strong"
-                }
-              ],
-              "type": "p"
-            },
-            {
-              "children": [
+                },
                 {
-                  "text": "Your frontend is independent code you own. Upgrade the CMS without rewriting your site; switch frameworks and get the same editing experience."
+                  "text": " Your frontend is independent code you own. Upgrade the CMS without rewriting your site; switch frameworks and get the same editing experience."
                 }
-              ],
-              "type": "p"
+              ]
             }
           ]
         },
@@ -184,6 +169,7 @@
           "plaintext": "Open Source. Secure, scalable Plone backend. Host anywhere, control your costs and security.",
           "value": [
             {
+              "type": "p",
               "children": [
                 {
                   "children": [
@@ -192,17 +178,11 @@
                     }
                   ],
                   "type": "strong"
-                }
-              ],
-              "type": "p"
-            },
-            {
-              "children": [
+                },
                 {
-                  "text": "Secure, scalable Plone backend. Host anywhere, control your costs and security."
+                  "text": " Secure, scalable Plone backend. Host anywhere, control your costs and security."
                 }
-              ],
-              "type": "p"
+              ]
             }
           ]
         }
@@ -588,20 +568,10 @@
           "plaintext": "  You can use this site to test Plone 6.\n Disclaimer : This instance is reset every night, so all changes will be lost afterwards.",
           "value": [
             {
+              "type": "p",
               "children": [
                 {
-                  "text": ""
-                },
-                {
-                  "text": "You can use this site to test Inka Edit."
-                }
-              ],
-              "type": "p"
-            },
-            {
-              "children": [
-                {
-                  "text": ""
+                  "text": "You can use this site to test Inka Edit. "
                 },
                 {
                   "children": [
@@ -614,8 +584,7 @@
                 {
                   "text": ": This instance is reset every night, so all changes will be lost afterwards."
                 }
-              ],
-              "type": "p"
+              ]
             }
           ]
         },
@@ -624,6 +593,7 @@
           "plaintext": "This site uses some recommended add-ons :\n and some blocks that are suitable to be used with volto-light-theme.  volto-form-block ",
           "value": [
             {
+              "type": "p",
               "children": [
                 {
                   "text": "This site uses some recommended "
@@ -637,45 +607,20 @@
                   "type": "strong"
                 },
                 {
-                  "text": ":"
-                }
-              ],
-              "type": "p"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "text": "Some blocks that are suitable to be used with volto-light-theme."
-                    }
-                  ],
-                  "type": "li"
+                  "text": ": Some blocks that are suitable to be used with volto-light-theme. "
                 },
                 {
                   "children": [
                     {
-                      "text": ""
-                    },
-                    {
-                      "children": [
-                        {
-                          "text": "volto-form-block"
-                        }
-                      ],
-                      "data": {
-                        "url": "https://github.com/collective/volto-form-block"
-                      },
-                      "type": "link"
-                    },
-                    {
-                      "text": ""
+                      "text": "volto-form-block"
                     }
                   ],
-                  "type": "li"
+                  "data": {
+                    "url": "https://github.com/collective/volto-form-block"
+                  },
+                  "type": "link"
                 }
-              ],
-              "type": "ul"
+              ]
             }
           ]
         },
@@ -708,7 +653,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": ":\n\nusername: "
+                  "text": ": username: "
                 },
                 {
                   "children": [
@@ -719,7 +664,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": "\npassword: "
+                  "text": " password: "
                 },
                 {
                   "children": [
