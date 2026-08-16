@@ -938,6 +938,41 @@ function enrichImageBrains(obj, baseUrl) {
 }
 
 /**
+ * Resolve an object-browser link (a block's `href`/`link`) that carries ONLY an
+ * `@id` -- the non-redundant form the markdown mount stores -- into a fresh
+ * summary of its target (title/description/hasPreviewImage), the way a listing
+ * resolves its items. A link that already carries an embedded summary (the
+ * distribution/JSON form, snapshotted at edit time) is left untouched, so this
+ * changes only markdown-mount content and cannot alter existing fixtures.
+ *
+ * This is a DELIBERATE divergence from Plone, which snapshots block links at edit
+ * time and never re-resolves them: the markdown owns the reference, the server
+ * resolves the label, so the stored title cannot go stale.
+ */
+const LINK_FIELDS = new Set(['href', 'link']);
+const isBareLink = (o) => o && typeof o === 'object' && !Array.isArray(o)
+  && typeof o['@id'] === 'string' && Object.keys(o).length === 1;
+
+function resolveHrefLinks(obj, baseUrl) {
+  if (Array.isArray(obj)) return obj.map((x) => resolveHrefLinks(x, baseUrl));
+  if (!obj || typeof obj !== 'object') return obj;
+  const out = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (LINK_FIELDS.has(key) && Array.isArray(value) && value.length && value.every(isBareLink)) {
+      out[key] = value.map((item) => {
+        const path = item['@id'].startsWith('http') ? new URL(item['@id']).pathname : item['@id'];
+        const raw = loadRawContentFromDisk(path);
+        if (!raw) return item; // external / unresolvable -> keep the bare @id
+        return { ...formatSearchItem(raw, baseUrl), '@id': `${baseUrl}${path}` };
+      });
+    } else {
+      out[key] = resolveHrefLinks(value, baseUrl);
+    }
+  }
+  return out;
+}
+
+/**
  * Get folder child items sorted by __metadata__.json ordering.
  * Like Plone's content serializer, returns summary representations of children.
  */
@@ -1072,7 +1107,7 @@ function enrichContent(content, urlPath, baseUrl, expandList = []) {
   // 2. Turn relation fields into summaries of their target (RelationChoiceFieldSerializer)
   // 3. Add image_scales to anything summary-shaped (image_field + @id)
   return enrichImageBrains(
-    summarizeRelations(resolveUidUrls(enriched), baseUrl),
+    resolveHrefLinks(summarizeRelations(resolveUidUrls(enriched), baseUrl), baseUrl),
     baseUrl,
   );
 }

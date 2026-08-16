@@ -121,7 +121,11 @@ Templates allow editors to centrally control content and reuse content. They all
 
 ## Template Concepts
 
+<block type="slate">
+
 Templates:
+
+</block>
 
 - Can be created from any blocks
 - Are always edited in-context in the current page (user can switch in and out of template edit mode)
@@ -157,7 +161,11 @@ The slot a block lives in is identified by its `slotId`. This is the field name 
 
 ## Editing a template (central control)
 
+<block type="slate">
+
 The point of a template is that its locked parts are authored **once** and update **everywhere**. Templates are stored as their own normal content documents; a page only *references* one — its blocks carry the `templateId`. On render the merge injects the template's `fixed` / `fixed+readOnly` blocks and fills the slots with the page's own content.
+
+</block>
 
 To change a template for every page that uses it:
 
@@ -173,7 +181,11 @@ What propagates and what doesn't:
 
 **Reusing a template multiple times:** a page may apply the same template more than once (e.g. two of the same layout or snippet). Each use is a distinct *instance*; the merge gives every instance its own block ids, so they never collide.
 
+<block type="slate">
+
 ## Which mechanism for which use case?
+
+</block>
 
 The two configurations below look similar but solve different problems. Pick by **who controls the structure** and **whether it repeats**:
 
@@ -233,7 +245,11 @@ const items = expandTemplatesSync(layout, {
 
 (On the admin this map is derived from the block schema automatically. When you re-enter to expand a **single** object\_list array on its own, the `idField` shorthand is enough: `expandTemplatesSync(block.slides, { templateState, templates, idField: '@id' })`.)
 
+<block type="slate">
+
 ## allowedTemplates vs allowedLayouts
+
+</block>
 
 Configure templates in `page.schema.properties` on the blocks field:
 
@@ -263,7 +279,11 @@ initBridge({
 
 ## Applying Merge Rules
 
+<block type="slate">
+
 Use `expandTemplates` (async) or `expandTemplatesSync` (sync with pre-fetched templates) to merge template content during rendering.
+
+</block>
 
 - **Edit Mode**: These functions auto-detect edit mode via `isEditMode()` and pass blocks through unchanged (just adding `@uid`). The admin handles template merging and adds `nodeId` attributes for inline editing.
 - **SSR**: On SSR (no window), `isEditMode()` returns false so templates are expanded — this is correct since edit mode only exists in the browser iframe.
@@ -275,7 +295,11 @@ Use `expandTemplates` (async) or `expandTemplatesSync` (sync with pre-fetched te
 
 ## Pre-loading with loadTemplates
 
+<block type="slate">
+
 **`loadTemplates(data, loadTemplate)`** scans page data for `templateId` references and loads them all in parallel. It follows nested references (templates referencing other templates) and has a 5s per-template timeout. It only loads templates actually in the page data — `allowedLayouts` options are loaded on demand when a forced layout is applied.
+
+</block>
 
 <block type="codeExample">
 
@@ -324,7 +348,11 @@ Options:
 
 ## How the Merge Works
 
+<block type="slate">
+
 The merge algorithm follows these rules:
+
+</block>
 
 1. Remove the blocks with the `templateId` to replace, storing any that aren't fixed and readOnly by `slotId`.
 2. Insert in their place the template content: if fixed and readOnly, just insert it; if fixed, copy block content (not including block fields) from a page block with the same `slotId`; if a slot block, don't insert it, but insert the previous blocks with the same `slotId`.
@@ -352,7 +380,11 @@ After:   [Fixed Header] [User Block A] [User Block B] [Fixed Footer]
 
 ## Forcing Layouts
 
+<block type="slate">
+
 A **forced layout** (`allowedLayouts`) is applied **automatically across a whole blocks field** — unlike a **snippet** (`allowedTemplates`), which the *editor* inserts as a block where they choose (see the decision table above). Forcing is **your frontend's** call: you pass `allowedLayouts`, so you decide **which** layout to force and **when**.
+
+</block>
 
 Pass a static layout to always force one (e.g. a footer):
 

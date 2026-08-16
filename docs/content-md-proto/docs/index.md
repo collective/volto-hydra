@@ -56,7 +56,11 @@ order:
 
 A design-system-first page-builder toolkit. Strike the right balance for your site — make it easy for editors to create engagement while staying compliant.
 
+<block type="slate">
+
 ## Why Inka?
+
+</block>
 
 - **Compliance and engagement, not a trade-off** — you decide where the dial sits for each site, instead of choosing between locking editors down and letting the design system drift
 - **Design-system-first** — components declare what they tolerate, so off-system output can't be produced
@@ -69,7 +73,11 @@ A design-system-first page-builder toolkit. Strike the right balance for your si
 
 ## Try the online demo
 
+<block type="slate">
+
 The fastest way to feel what Inka does is to log into the hosted demo and edit a real page against a real frontend.
+
+</block>
 
 Open [hydra.pretagov.com](https://hydra.pretagov.com), log in, then:
 

@@ -153,7 +153,11 @@ Both look and behave the same in the editor — selecting, dragging, nesting —
 
 ## blocks\_layout: a region in the shared dict
 
+<block type="slate">
+
 Each child has its own `@type` and schema (from `blocks`). The blocks live in the parent's shared `blocks` dict; the region's name is a key in the parent's shared `blocks_layout` dict that holds the ordering:
+
+</block>
 
 <block type="codeExample">
 
@@ -188,7 +192,11 @@ A block can declare several `blocks_layout` regions; they all share the one `blo
 
 ## Multiple regions
 
+<block type="slate">
+
 A container (or the page) can declare more than one **region** — each a schema property with its own `allowedBlocks`. The default region is `items`.
+
+</block>
 
 Storage is a property of **each region, not the container**: every region independently chooses `widget: 'blocks_layout'` or `widget: 'object_list'`, and a single container may **mix** them — e.g. a `blocks_layout` region for body content alongside an `object_list` region for a set of inline cards. A blocks\_layout region keys its ordering inside the shared `blocks_layout` dict (its children in the shared `blocks` dict); an object\_list region stores its items inline on its own field. So "is this container object\_list or blocks\_layout?" is never a meaningful question — you look at the region. Every blocks\_layout region's children still share the one `blocks` dict; the regions only partition *ordering*.
 
@@ -229,7 +237,11 @@ Each blocks field has its own `allowedBlocks` / `maxLength`. A declared field ap
 
 The backend deserializer only saves values for **registered fields**. `blocks` and `blocks_layout` are registered behavior fields, so the entire `blocks_layout` dict — every list inside it — is stored verbatim. An ad-hoc top-level field like `footer_blocks` is **not** a registered field, so the backend **silently drops it on save**. (A footer might still appear on the live site if a layout template re-injects it on every load — but that footer is never actually persisted.) Keeping every region inside the registered `blocks_layout` dict makes them all persist for real.
 
+<block type="slate">
+
 ## object\_list: a region stored inline
+
+</block>
 
 The other storage choice for a region. Instead of ordering in the shared `blocks_layout` dict, all items share one inline schema and are stored as an array with an ID field, at the field itself. (To place the array deeper — e.g. `block.table.rows` — nest the field inside a `widget: 'object'`; see below.)
 
@@ -266,7 +278,11 @@ slides: {
 
 ## object\_list with allowedBlocks: Typed Items
 
+<block type="slate">
+
 When `allowedBlocks` is set on an `object_list`, items can have different types (like `blocks_layout`) but are still stored as an array. Each item's type is stored in the field specified by `typeField` (defaults to `'@type'`) and its schema is looked up from `blocks`:
+
+</block>
 
 <block type="codeExample">
 
@@ -297,7 +313,11 @@ facets: {
 
 Both `blocks_layout` and `object_list` look the same in the editing UI and blocks can be dragged between them — data is automatically adapted when moving between formats (ID fields added/stripped, type fields set appropriately).
 
+<block type="slate">
+
 ## widget: 'object': nesting fields (and containers) inside a block field
+
+</block>
 
 A `widget: 'object'` field groups sub-fields under one key. Its `schema.properties` are first-class — plain fields OR nested containers — and everything nests **inside** the object, exactly where the schema puts it. No `dataPath` indirection.
 
@@ -345,7 +365,11 @@ Blocks inside a nested container are edited in the canvas like any other contain
 
 This replaces `dataPath`: declare the container inside the object rather than hoisting it to the block's top level with a `dataPath` back-reference.
 
+<block type="slate">
+
 ## Container schema reference
+
+</block>
 
 A block's schema is a standard [Volto block schema](https://6.docs.plone.org/volto/blocks/editcomponent.html) (fieldsets, `properties`, widgets, `default`, etc.). Inka reads three container-oriented `widget` values plus a few per-field keys — those are:
 
@@ -361,7 +385,11 @@ A block's schema is a standard [Volto block schema](https://6.docs.plone.org/vol
 
 All three can nest inside `object`, and a container may mix a `blocks_layout` region and an `object_list` region. Everything else in a field def (`title`, `default`, `type`, `choices`, `mode`, …) is plain Volto and behaves as documented there.
 
+<block type="slate">
+
 ## Rendering Containers in Your Frontend
+
+</block>
 
 Add `data-block-uid` to each child element. You don't need to mark the container element itself:
 
@@ -393,7 +421,11 @@ Add `data-block-uid` to each child element. You don't need to mark the container
 
 ## Table Mode
 
+<block type="slate">
+
 Set `addMode: 'table'` for table-like structures (rows containing cells). This lets users add and remove columns as easily as rows. The rows live inside a `table` object field (`block.table.rows`) — no `dataPath`:
+
+</block>
 
 <block type="codeExample">
 
@@ -425,7 +457,11 @@ table: {
 
 ## Empty Blocks
 
+<block type="slate">
+
 A container region can never be truly empty. When its last child is deleted, Inka fills it back in — but *what* it inserts depends on the region's config:
+
+</block>
 
 - If the region has a **`defaultBlockType`**, that type is added.
 - If the region allows exactly **one** `allowedBlocks` type, that type is added.
@@ -494,7 +530,11 @@ Two more things a renderer must survive once the user picks a type for a seeded 
 
 ## Synchronised Block Types in a Container
 
+<block type="slate">
+
 You can have one container type whose children are all kept the same `@type`, with the editor picking that type once on the parent. When the type changes, every child is converted (using each child's `fieldMappings`); when a new child is added it gets the selected type.
+
+</block>
 
 Declare `itemTypeField` on the *blocks field* — its value names a sibling field on the same schema whose value drives every child's `@type`. The sibling field is typically rendered with `widget: 'blockTypeSelect'`, which computes its `choices` from the blocks field's `allowedBlocks` at render time:
 

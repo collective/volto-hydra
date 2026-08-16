@@ -66,7 +66,11 @@ A **container block** holds other blocks inside it — sliders, columns, accordi
 
 This page covers operations that change container structure: wrap a selection, unwrap a container, drag the edge of a container to absorb or expel adjacent blocks, and convert a container's type while keeping the children.
 
+<block type="slate">
+
 ## Wrap
+
+</block>
 
 Select one or more blocks (see [Selecting blocks](selecting-blocks.md)), then choose **Wrap in...** from the Quanta toolbar dropdown (or sidebar block actions). A popup shows container types that:
 
@@ -79,7 +83,11 @@ Pick one. The selected blocks are pulled out of their original positions and pla
 
 Use this to retroactively group content — e.g. wrap two paragraphs and an image into a card, or wrap three columns of content into a row.
 
+<block type="slate">
+
 ## Unwrap
+
+</block>
 
 Select a container in block mode (one Escape from text mode). Choose **Unwrap container** from the Quanta toolbar dropdown.
 
@@ -87,7 +95,11 @@ The container's children are promoted to the parent at the container's position,
 
 Unwrap is **disabled** when the parent wouldn't accept some of the children — for example, if the children are columns and the parent's `allowedBlocks` doesn't include columns. Hover the disabled action for the reason.
 
+<block type="slate">
+
 ## Edge-drag
+
+</block>
 
 When a container is selected (block mode), thin **edge handles** appear on the container's borders. Drag a handle:
 
@@ -102,7 +114,11 @@ This makes a container feel like a resizable divider: drag its edge to "grow" it
 
 Edge handles only appear when the container is selected. They don't render on edges where there's nothing to do (the page edge, or against a fixed/readonly block that can't be moved).
 
+<block type="slate">
+
 ## Convert (change container type)
+
+</block>
 
 In the Quanta toolbar dropdown, **Convert to...** lists block types this block can be converted to. For containers, conversion preserves the children:
 
@@ -113,11 +129,19 @@ In the Quanta toolbar dropdown, **Convert to...** lists block types this block c
 
 Use this to reshape an existing layout — e.g. a 2-column row into a 3-column grid, or columns into an accordion.
 
+<block type="slate">
+
 ## The `section` block
+
+</block>
 
 `section` is a generic container that accepts any child block type. It's useful when you don't have a more specific container for what you're building — a "marketing section", a "case study block", a "page break with anything inside". Frontends typically render it as a `<section>` element with optional styling.
 
+<block type="slate">
+
 ## Limits
+
+</block>
 
 - A container with `fixed` or `readOnly: true` (typically inherited from a template) can't be unwrapped or have its children rearranged via edge-drag. You can still edit child blocks if the children themselves aren't readonly.
 - A container's `maxLength` caps how many children it can hold — wrap and edge-drag respect this. The action shows disabled with a tooltip if respecting it would mean refusing the operation.

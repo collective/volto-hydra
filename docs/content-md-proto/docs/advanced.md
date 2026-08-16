@@ -69,7 +69,11 @@ Advanced topics for optimising your Inka integration: lazy loading the bridge, a
 
 ## Lazy Load the Bridge
 
+<block type="slate">
+
 Detect the admin iframe and load the bridge only when needed. `window.name` is set by Inka to indicate mode:
+
+</block>
 
 - **`hydra-edit:<origin>`** — edit mode (e.g., `hydra-edit:http://localhost:3001`)
 - **`hydra-view:<origin>`** — view mode (e.g., `hydra-view:http://localhost:3001`)
@@ -117,7 +121,11 @@ if (inAdminIframe) {
 
 ## Authentication
 
+<block type="slate">
+
 As soon as the editor logs into the hydra editor, your frontend should use the same auth token to access the REST API with the same privileges and render private content.
+
+</block>
 
 The `access_token` is passed as a URL parameter on initial load and automatically stored in `sessionStorage` by hydra.js. On SPA navigation, the URL param is gone but the token persists in `sessionStorage`. Use the `getAccessToken()` helper:
 
@@ -168,17 +176,29 @@ export default function Blog({ params }) {
 
 ## Preventing Reloads
 
+<block type="slate">
+
 If you wish to make the editing experience smoother you can register for `onRoute` callbacks to prevent the frontend being forced to reload at certain times using the hydra editor. (TODO)
+
+</block>
 
 ## Custom Sidebar and CMS UI
 
+<block type="slate">
+
 If the auto-generated sidebar UI from your block or content schemas isn't suitable, the React Volto framework has an addon system that lets you override CMS components — at widget level, block-settings level, or even whole views like Contents or Site Settings. For example, you might want to replace the image picker with a custom map editor.
+
+</block>
 
 - [Volto Block Edit Component documentation](https://6.docs.plone.org/volto/blocks/editcomponent.html)
 
 ## Custom Visual Editing (TODO)
 
+<block type="slate">
+
 In some cases you might want to provide editors with more visual editing inside the preview than Inka currently supports out of the box. For example, a newly created table block might display a form to set the initial number of columns and rows. The bridge exposes the following hooks to make this possible:
+
+</block>
 
 - **`sendBlockUpdate`** — send an updated version of the block back to the admin after frontend-side changes (TODO).
 - **`sendBlockAction`** — perform actions like select, add, move, copy or remove blocks, or invoke custom actions on the Volto block edit component.
@@ -186,7 +206,11 @@ In some cases you might want to provide editors with more visual editing inside 
 
 ## Custom API Endpoints
 
+<block type="slate">
+
 With an open-source headless CMS you have a choice between creating custom server-side functionality as:
+
+</block>
 
 - A separately deployed microservice, or
 - An [API endpoint addon](https://2022.training.plone.org/mastering-plone/endpoints.html) attached to the backend API server.

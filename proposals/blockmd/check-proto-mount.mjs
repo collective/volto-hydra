@@ -85,31 +85,26 @@ for (const f of walkFiles(SRC)) {
 const rootJsonId = Object.values(byId).find((d) => d['@type'] === 'Plone Site')?.['@id'];
 const jsonFor = (p) => byId[p] ?? Object.values(byId).find((d) => canonId(d['@id'], rootJsonId) === p);
 
-// Block types that RENDER their href summary. A teaser shows href[0].title /
-// description / hasPreviewImage when `overwrite` is off (teaser.md:80); a button
-// or link renders only href[0]['@id'] (button.md:70), so its embedded href.title
-// is edit-time cruft no consumer reads -- checking it would be a false positive.
-const RENDERS_HREF_SUMMARY = new Set(['teaser']);
-
-// The link collapse compares only @id, so a dropped rendered sub-field (a
-// teaser's href.title) would pass silently. Check the RENDERED href fields
-// directly: title is a hard requirement (the frontend shows it when overwrite is
-// off); hasPreviewImage is a reported residual (the clean link carries @id+title
-// but not the preview flag yet).
-function hrefRender(served, stored) {
-  const out = { titleBad: [], previewGap: 0 };
-  for (const [uid, sb] of Object.entries(stored)) {
-    if (!RENDERS_HREF_SUMMARY.has(sb['@type'])) continue;
-    const s = Array.isArray(sb.href) && sb.href[0]?.['@id'] ? sb.href[0] : null;
-    if (!s || s.title === undefined) continue; // no rendered title to preserve
-    const v = served?.[uid]?.href?.[0] ?? {};
-    if (v.title !== s.title) out.titleBad.push(`${sb['@type']} href.title ${JSON.stringify(v.title)}!=${JSON.stringify(s.title)}`);
-    if (s.hasPreviewImage && v.hasPreviewImage === undefined) out.previewGap += 1;
+// Links must be NON-REDUNDANT: the markdown stores only `@id`; a link's rendered
+// title/description/hasPreviewImage are RESOLVED from the target by the mount
+// (resolveHrefLinks, verified live), never snapshotted here. So a decoded href/
+// link must be `@id`-only -- an extra key means the redundant snapshot crept
+// back in (e.g. a teaser regressing to /linkitem).
+function hrefRedundant(blocks) {
+  const bad = [];
+  for (const b of Object.values(blocks || {})) {
+    for (const k of ['href', 'link']) {
+      if (!Array.isArray(b[k])) continue;
+      for (const item of b[k]) {
+        const extra = item && typeof item === 'object' ? Object.keys(item).filter((kk) => kk !== '@id') : [];
+        if (extra.length) bad.push(`${b['@type']}.${k} carries ${extra.join(',')}`);
+      }
+    }
   }
-  return out;
+  return bad;
 }
 
-let pass = 0, blockDiff = 0, stateDiff = 0, error = 0, skip = 0, noOrder = 0, renderDiff = 0, previewGap = 0;
+let pass = 0, blockDiff = 0, stateDiff = 0, error = 0, skip = 0, noOrder = 0, renderDiff = 0;
 const problems = [];
 for (const [id, item] of items) {
   // Blob items (Image/File synthesised from `blobs:`) have no data.json of
@@ -132,8 +127,7 @@ for (const [id, item] of items) {
   const folderishOk = orig.is_folderish === undefined || item.is_folderish === orig.is_folderish;
   if (item.getObjPositionInParent === undefined && orig.getObjPositionInParent != null) noOrder += 1;
 
-  const render = hrefRender(item.blocks, orig.blocks);
-  previewGap += render.previewGap;
+  const redundant = hrefRedundant(item.blocks);
 
   if (badUids.length || !layoutOk) {
     blockDiff += 1;
@@ -141,9 +135,9 @@ for (const [id, item] of items) {
   } else if (!parentOk || !folderishOk) {
     stateDiff += 1;
     problems.push(`STATE  ${id}: ${!parentOk ? 'parent ' : ''}${!folderishOk ? 'is_folderish' : ''}`);
-  } else if (render.titleBad.length) {
+  } else if (redundant.length) {
     renderDiff += 1;
-    problems.push(`RENDER ${id}: ${render.titleBad.slice(0, 2).join('; ')}`);
+    problems.push(`REDUND ${id}: ${redundant.slice(0, 2).join('; ')}`);
   } else pass += 1;
 }
 
@@ -164,10 +158,10 @@ for (const [p, file] of blobFiles) {
 }
 problems.push(...blobBad);
 
-console.log(`\nproto mount: ${pass} pass, ${blockDiff} block-diff, ${stateDiff} state-diff, ${renderDiff} render-diff, ${error} error  (${skip} skipped)`);
+console.log(`\nproto mount: ${pass} pass, ${blockDiff} block-diff, ${stateDiff} state-diff, ${renderDiff} redundant-link, ${error} error  (${skip} skipped)`);
 console.log(`blobs: ${blobOk}/${blobFiles.size} reconstruct (fields + size + bytes) vs JSON`);
+console.log('links: stored @id-only; title/description/hasPreviewImage resolved from target by the mount');
 if (noOrder) console.log(`  gap: ${noOrder} item(s) have a JSON position but no sibling order (exporter does not yet emit \`order:\`)`);
-if (previewGap) console.log(`  gap: ${previewGap} teaser href(s) drop hasPreviewImage (clean link carries @id+title, not the preview flag)`);
 console.log('');
 for (const p of problems.slice(0, 30)) console.log(`  ${p}`);
 if (problems.length > 30) console.log(`  …and ${problems.length - 30} more`);

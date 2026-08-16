@@ -86,7 +86,11 @@ Templates let editors reuse a layout consistently across many pages without copy
 
 The two share the same merge rules; the difference is just where they're applied.
 
+<block type="slate">
+
 ## What you'll see in the editor
+
+</block>
 
 When a template is applied to a page, blocks fall into three categories:
 
@@ -124,11 +128,19 @@ Regular blocks where you can do anything — add, edit, move, delete. The templa
 
 ## Inserting between fixed blocks
 
+<block type="slate">
+
 You **can't** insert a new block between two adjacent fixed/readonly template blocks — the "+" button is hidden in those positions and DnD is rejected. This is intentional: the template author put those fixed blocks side-by-side on purpose, and the editor inserting between them would break the layout's intent.
+
+</block>
 
 If you need to add content there, you may need to switch to a different layout (one whose structure has a slot in that position) or talk to whoever maintains the templates.
 
+<block type="slate">
+
 ## Moving content in and out of slots
+
+</block>
 
 A block belongs to whichever **slot it currently sits in** — and you change that just by moving it. A block always takes on the slot it *lands* in; it never keeps the slot it came from.
 
@@ -140,7 +152,11 @@ A template is anchored by its fixed blocks at the top and/or bottom, with its sl
 
 Locked and fixed template blocks are the exception: they can't be moved at all (unless you're editing the template itself), so they never change slots.
 
+<block type="slate">
+
 ## Switching the layout
+
+</block>
 
 When `allowedLayouts` is configured for a page (or a region), the sidebar shows a **Layout** dropdown. Pick a different layout and:
 
@@ -148,7 +164,11 @@ When `allowedLayouts` is configured for a page (or a region), the sidebar shows 
 
 The point of `slotId` is that two layouts can share the same set of region names — switch between them and your content lands in the right places automatically.
 
+<block type="slate">
+
 ## Editing content inside a template
+
+</block>
 
 A template's own (fixed) blocks are **locked** by default — you can edit *this page's* content, but not the template. To change the template itself, **unlock** it: select one of its blocks and click the 🔒 on its **sidebar bar** ("Template: *name*"), on the block's **Quanta toolbar**, or **Edit template** in the bar's `⋯` menu. The 🔒 becomes 🔓, and the template's blocks — plus its Name / Save Location — become editable.
 
@@ -166,8 +186,16 @@ Templates are saved when you **lock** them, not when you save the page. If you s
 
 ## Template instances in the sidebar
 
+<block type="slate">
+
 When a template is applied, the template's blocks are grouped under a single virtual entry in the sidebar block list — you'll see "Template: Article Layout" rather than each fixed/readonly block as a separate row. Expand it to see the structure inside.
+
+</block>
 
 ## Inserting a template as a block
 
+<block type="slate">
+
 When `allowedTemplates` is configured on a field, the BlockChooser's Templates group shows the list. Pick one and the template's content is inserted at the current position as a block (just like adding any other block). Editor-side this is the simpler case — once inserted, the template's blocks behave the same as if a layout had placed them (lock icons, fixed-but-editable, slots).
+
+</block>

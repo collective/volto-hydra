@@ -94,7 +94,11 @@ Strike the right balance for your site. Make it easy for editors to create engag
 
 ## Why Inka
 
+<block type="slate">
+
 Compliance or engagement is a false choice. You decide where the dial sits for each site.
+
+</block>
 
 <block type="image" align="center" size="l" url="/images/quadrant/@@download/image/quadrant.svg" />
 

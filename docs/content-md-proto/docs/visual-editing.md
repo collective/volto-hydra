@@ -108,7 +108,11 @@ prototypes: |
 
 ## HTML Annotations for Visual Editing
 
+<block type="slate">
+
 Add data attributes to your rendered HTML to enable progressively richer visual editing:
+
+</block>
 
 - **`data-block-uid="blockId"`** — Click-to-select blocks. Hydra.js adds click handlers and shows a blue outline and Quanta toolbar on selected blocks.
 - **`data-edit-text="fieldName"`** — Inline text editing. For simple text, click and type directly. For rich text (slate widget), select text to apply formatting via the Quanta toolbar.
@@ -138,7 +142,11 @@ Example of a fully annotated slide block:
 
 ## Comment Syntax
 
+<block type="slate">
+
 If you can't modify the markup (e.g., using a 3rd party component library), use comment syntax to specify block attributes:
+
+</block>
 
 <block type="codeExample">
 
@@ -166,7 +174,11 @@ If you can't modify the markup (e.g., using a 3rd party component library), use 
 
 Supported attributes: `block-uid`, `block-readonly`, `edit-text`, `edit-link`, `edit-media`, `block-add`
 
+<block type="slate">
+
 ## Optional Fields — empty means absent
+
+</block>
 
 Render optional fields **data-driven**: no data, no element. Don't render an empty element just to give the editor something to click — it leaks empty markup into your published page.
 
@@ -189,7 +201,11 @@ Reveal is best-effort. Inka offers any field whose type could be edited inline, 
 
 Reveal replaces a per-block boolean only where "has data" and "should render" are the same thing. When they genuinely differ — the author has content but wants it hidden, or a field should appear only in certain configurations — add your own field and drive it with [`fieldRules`](custom-blocks.md#schema-enhancers).
 
+<block type="slate">
+
 ## Allowed Navigation (data-linkable-allow)
+
+</block>
 
 Add `data-linkable-allow` to elements that should navigate during edit mode (paging links, facet controls, etc.):
 
@@ -206,7 +222,11 @@ Add `data-linkable-allow` to elements that should navigate during edit mode (pag
 
 ## Field Path Syntax
 
+<block type="slate">
+
 Every `data-edit-*` attribute — `data-edit-text`, `data-edit-link`, `data-edit-media` — takes a Unix-style **field path**, resolved the same way for all three. A path has two independent axes:
+
+</block>
 
 **Which block** (the leading part):
 
@@ -245,7 +265,11 @@ The two compose: `../content/headline` is "the parent block, its `content.headli
 
 This lets fixed parts of the page (headers), parent-block fields, and fields grouped inside an object all be edited in place, with one addressing model.
 
+<block type="slate">
+
 ## Readonly Regions
+
+</block>
 
 Add `data-block-readonly` (or `<!-- hydra block-readonly -->` comment) to disable inline editing for all fields inside an element:
 
@@ -281,7 +305,11 @@ Or using comment syntax:
 
 You do **not** need it for template content. Inka already knows which blocks a template marks read-only from the block data and enforces that itself, so your renderer doesn't need to detect template blocks or mark them.
 
+<block type="slate">
+
 ## Renderer Node-ID Rules
+
+</block>
 
 When rendering Slate nodes to DOM, your renderer must follow these rules for `data-node-id`:
 
@@ -308,7 +336,11 @@ This breaks cursor positioning because hydra.js can't correlate DOM structure to
 
 ## Non-editable content inside a slate field
 
+<block type="slate">
+
 Sometimes a renderer adds elements to slate output that are **not** part of the editable content — a decorative icon (an "opens in a new tab" glyph), a generated chip, an embedded non-editable widget. These have no `data-node-id` (they aren't Slate nodes), and they must be marked so that **both** the editor's caret and hydra's DOM→Slate reader skip them:
+
+</block>
 
 - **`contenteditable="false"`** — the browser treats the element as a non-editable island: the caret steps over it, backspace/delete removes it as a unit, and selection includes it whole. Add this to anything that must not be typed into.
 - **`aria-hidden="true"`** — for purely decorative chrome (e.g. icons), so assistive tech ignores it too.
@@ -329,7 +361,11 @@ The icon is decoration: the caret skips it and it never enters the value.
 
 Contrast this with the wrapper rule above: a wrapper that holds real content carries the inner node's `data-node-id` (and neither of these attributes), so it IS read; decorative / non-editable chrome carries these attributes and is skipped.
 
+<block type="slate">
+
 ## One top-level node per slate field
+
+</block>
 
 A slate field's `value` is an array, but it always holds exactly **one top-level node** — a single paragraph, heading, list, or blockquote. Inline content (bold, links, …) lives in that node's `children`.
 
@@ -340,7 +376,11 @@ Editing can transiently produce more than one top-level node — pasting multipl
 
 A frontend renderer can therefore always assume one top-level node per slate field; it never has to handle a multi-node `value`.
 
+<block type="slate">
+
 ## Complete Slate Rendering Example
+
+</block>
 
 Slate data structure (value is an array but always contains a single root node):
 

@@ -54,7 +54,7 @@ prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="button" title="${a/text}" href="${a/link}" />
-  <block type="teaser" title="${h/text}" description="${p/text}" href="${a/linkitem}" />
+  <block type="teaser" title="${h/text}" href="${h/link}" description="${p/text}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="slateTable">
@@ -81,11 +81,9 @@ prototypes: |
 
 <block type="teaser">
 
-### Teaser Title (H2, 30/36px)
+### [Teaser Title (H2, 30/36px)](/docs/examples/content-types)
 
 For grid blocks, the font of the headlines are variable, depending on the number of cells in the grid.
-
-[Content Types](/docs/examples/content-types)
 
 <fields data='{"head_title":null,"styles":{"align":"left"}}' />
 
@@ -99,11 +97,9 @@ For grid blocks, the font of the headlines are variable, depending on the number
 
 <block type="teaser">
 
-### Teaser Title (H3, 24/30px)
+### [Teaser Title (H3, 24/30px)](/docs/examples/content-types)
 
 Paragraph (p, 18px/24px). This section has a sample of content types available in this site.
-
-[Content Types](/docs/examples/content-types)
 
 <fields head_title="Teaser Headtitle (DIV, 14/18px)" data='{"styles":{"align":"left"}}' />
 
@@ -113,7 +109,11 @@ Paragraph (p, 18px/24px). This section has a sample of content types available i
 
 ## Text Heading H2 (H2, 30/36px)
 
+<block type="slate">
+
 Paragraph (p, 18px/24px)
+
+</block>
 
 - unordered list
 - unordered list

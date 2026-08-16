@@ -98,7 +98,11 @@ order:
 
 This guide is for **content editors** using an Inka-powered site. It covers how to use the editor — how to select things, edit text, add and move blocks, work with containers and templates — without assuming you know how the site was built.
 
+<block type="slate">
+
 ## Inka mechanics vs your site's design system
+
+</block>
 
 Two layers are stacked on the editor screen:
 
@@ -107,7 +111,11 @@ Two layers are stacked on the editor screen:
 
 If something in this guide doesn't match what you see, it's almost always because your design system named or styled it differently — the underlying interaction is still the same.
 
+<block type="slate">
+
 ## What you see
+
+</block>
 
 The editor screen has three regions:
 
@@ -146,20 +154,32 @@ A **Settings** button at the bottom of the panel manages the saved URLs (add, re
 
 ## Two ways to edit any field
 
+<block type="slate">
+
 Most fields can be edited from either side:
+
+</block>
 
 - **From the preview** — click the rendered text/image/link directly and start typing or replacing media.
 - **From the sidebar** — find the field in the block's settings panel and edit it there.
 
 Sidebar editing is always available. Inline editing depends on the frontend supporting it for that field; some fields show a thin underline when hovered to signal they're inline-editable. Either way the result is the same — there's only one source of truth.
 
+<block type="slate">
+
 ## What's a block?
+
+</block>
 
 A block is a discrete piece of page content with a type (slate, image, listing, slider, etc.), a schema (its fields), and a position. Blocks can be added, removed, moved, and configured. Some blocks contain other blocks — those are called **container blocks** (columns, accordion, slider, grids, sections).
 
 The page itself is a list of blocks (sometimes split across multiple regions like header / content / footer). When you click into the preview, you're clicking on a block.
 
+<block type="slate">
+
 ## When in doubt — Escape
+
+</block>
 
 Pressing `Escape` is always safe. It progressively backs out:
 
@@ -169,7 +189,11 @@ Pressing `Escape` is always safe. It progressively backs out:
 
 So `Escape` repeatedly takes you up one level at a time. See [Selecting blocks](selecting-blocks.md) for what selection looks like at each level.
 
+<block type="slate">
+
 ## Editing on a phone
+
+</block>
 
 On narrow screens (≤767 px) the editor reshapes into a two-bar layout: the **Quanta toolbar** pins to the top of the viewport — always visible, never fades — and the **main toolbar** (Save, Cancel, Frontend switcher, Settings shortcut) sits as a compact bar at the bottom. The iframe canvas fills the space in between. There is no side panel: the sidebar opens as a full-screen sheet, popups slide up from the bottom, and the link editor takes over the top bar.
 

@@ -55,7 +55,7 @@ assignments:
   - { uid: 9e207ed1-8ea6-48a9-b74e-be16f3750eb7, type: teaser }
 prototypes: |
   <block type="title" _="${h1}" />
-  <block type="teaser" title="${h/text}" description="${p/text}" href="${a/linkitem}" />
+  <block type="teaser" title="${h/text}" href="${h/link}" description="${p/text}" />
   <block type="gridBlock" headline="${h/text}">
     <region name="blocks" widget="blocks_layout">
       <block type="teaser" title="${h/text}" description="${p/text}" />
@@ -71,11 +71,9 @@ prototypes: |
 
 <block type="teaser">
 
-### Teaser Title H2
+### [Teaser Title H2](/docs/examples/content-types/page)
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
-
-[Page](/docs/examples/content-types/page)
 
 <fields head_title="Head title" data='{"preview_image":[],"styles":{"align":"left"}}' />
 
@@ -87,11 +85,9 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="teaser">
 
-### Teaser Title H2
+### [Teaser Title H2](/docs/examples/content-types/page)
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
-
-[Page](/docs/examples/content-types/page)
 
 <fields head_title="Head title" data='{"styles":{"align":"left"}}' />
 
@@ -99,11 +95,9 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="teaser">
 
-### Teaser Title H2
+### [Teaser Title H2](/docs/examples/content-types/page)
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
-
-[Page](/docs/examples/content-types/page)
 
 <fields head_title="Head title" data='{"styles":{"align":"left"}}' />
 
@@ -117,11 +111,9 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="teaser">
 
-### Teaser Title H2
+### [Teaser Title H2](/docs/examples/content-types/page)
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu.
-
-[Page](/docs/examples/content-types/page)
 
 <fields head_title="Head title" data='{"styles":{"align":"left"}}' />
 
@@ -129,11 +121,9 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="teaser">
 
-### Teaser Title H2
+### [Teaser Title H2](/docs/examples/content-types/page)
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu.
-
-[Page](/docs/examples/content-types/page)
 
 <fields head_title="Head title" data='{"styles":{"align":"left"}}' />
 
@@ -145,11 +135,9 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="teaser">
 
-### Teaser Title H2
+### [Teaser Title H2](/docs/examples/content-types/page)
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl.
-
-[Page](/docs/examples/content-types/page)
 
 <fields head_title="Head title" data='{"styles":{"align":"left"}}' />
 
@@ -157,11 +145,9 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="teaser">
 
-### Teaser Title H2
+### [Teaser Title H2](/docs/examples/content-types/page)
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl.
-
-[Page](/docs/examples/content-types/page)
 
 <fields head_title="Head title" data='{"styles":{"align":"left"}}' />
 
@@ -169,11 +155,9 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="teaser">
 
-### Teaser Title H2
+### [Teaser Title H2](/docs/examples/content-types/page)
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl.
-
-[Page](/docs/examples/content-types/page)
 
 <fields head_title="Head title" data='{"styles":{"align":"left"}}' />
 
@@ -181,11 +165,9 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="teaser">
 
-### Teaser Title H2
+### [Teaser Title H2](/docs/examples/content-types/page)
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl.
-
-[Page](/docs/examples/content-types/page)
 
 <fields head_title="Head title" data='{"styles":{"align":"left"}}' />
 

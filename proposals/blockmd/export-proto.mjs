@@ -33,7 +33,11 @@ const PROTO_TEXT = {
   slate: '<block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />',
   separator: '<block type="separator" _="${hr}" />',
   button: '<block type="button" title="${a/text}" href="${a/link}" />',
-  teaser: '<block type="teaser" title="${h/text}" description="${p/text}" href="${a/linkitem}" />',
+  // href is @id-only (the heading's link); the teaser's rendered title/
+  // description/hasPreviewImage are RESOLVED from the target by the mount, not
+  // stored redundantly here. block.title (the heading text) is the teaser's own
+  // override, shown only when overwrite is on.
+  teaser: '<block type="teaser" title="${h/text}" href="${h/link}" description="${p/text}" />',
   image: [
     '<block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />',
     '<block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />',

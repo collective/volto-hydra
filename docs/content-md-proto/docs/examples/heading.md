@@ -52,7 +52,7 @@ prototypes: |
   <block type="title" _="${h1}" />
   <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="separator" _="${hr}" />
-  <block type="teaser" title="${h/text}" description="${p/text}" href="${a/linkitem}" />
+  <block type="teaser" title="${h/text}" href="${h/link}" description="${p/text}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
@@ -101,7 +101,11 @@ Lorem ipsum vitae elit libero, a pharetra augue. Nulla vitae elit libero, a phar
 
 ## Headline H2
 
+<block type="slate">
+
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
+
+</block>
 
 ### Headline H3
 
@@ -121,11 +125,9 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <block type="teaser">
 
-### Teaser Title H2
+### [Teaser Title H2](/docs/examples/content-types/page)
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
-
-[Page](/docs/examples/content-types/page)
 
 <fields data='{"head_title":null,"styles":{"align":"left"}}' />
 

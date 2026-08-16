@@ -98,7 +98,11 @@ Instead of combining editing and rendering into one framework and codebase, thes
 
 ## Architecture Overview
 
+<block type="slate">
+
 You could think of it as splitting Volto into two parts, Rendering and CMS UI/Admin UI while keeping the same UI and then making the Rendering part easily replaceable with other implementations.
+
+</block>
 
 <block type="codeExample">
 
@@ -132,14 +136,22 @@ You could think of it as splitting Volto into two parts, Rendering and CMS UI/Ad
 
 ## The iframe ↔ admin bridge
 
+<block type="slate">
+
 During editing the frontend is loaded inside an iframe owned by Inka's admin UI. The two communicate via `postMessage` over the iframe boundary:
+
+</block>
 
 - **Admin → frontend**: form-data updates, selection changes, route changes.
 - **Frontend → admin**: which block was clicked (selection), which slate node holds the cursor, where blocks live in the rendered DOM, slate transform requests so the admin can compute the new value.
 
 This split lets the frontend stay 100% headless when not in admin (just renders content), while the admin gets full visual editing without the frontend having to know any React, any block-form widgets, or any sidebar UI.
 
+<block type="slate">
+
 ## The chrome pattern
+
+</block>
 
 Selection outlines, the Quanta toolbar, drag handles, edge handles, the empty-block "+" — none of these are rendered by the frontend. They're rendered in the admin (React) layered above the iframe. The frontend only:
 
@@ -149,7 +161,11 @@ Selection outlines, the Quanta toolbar, drag handles, edge handles, the empty-bl
 
 The benefit: a frontend's CSS can never break the editing UI, because the editing UI doesn't live in the frontend. Switching frontends mid-edit (Nuxt → Next → Astro) works because the bridge protocol is the same — only the rendered DOM changes. Server-only frameworks without client-side reactivity (Astro, PHP, Django, Rails) participate via the [server-render pattern](./server-rendered-frontends.md) — same bridge protocol, plus a small HTTP endpoint the bridge POSTs to.
 
+<block type="slate">
+
 ## Slate (rich text) transforms
+
+</block>
 
 When the editor types in a slate field, the frontend doesn't compute the new slate value itself — the admin does, by running the slate transform against the previous slate value. The frontend's job is to:
 
@@ -158,7 +174,11 @@ When the editor types in a slate field, the frontend doesn't compute the new sla
 
 This is why every slate node needs a `data-node-id` attribute on its rendered HTML — without one, the admin can't track the cursor across re-renders. See [Visual Editing › Renderer Node-ID Rules](visual-editing.md#renderer-node-id-rules).
 
+<block type="slate">
+
 ## Template membership (edit-side slot assignment)
+
+</block>
 
 A block's template membership — `templateId`, `templateInstanceId`, `slotId`, `fixed`, `readOnly` — is not intrinsic to the block; the admin **assigns** it at edit time. The [merge](templates.md#how-the-merge-works) reads these fields to place content at render time. Crucially, assignment is **gated on edit mode** — editing a template is a different act from moving content around inside a template you're *not* editing:
 
@@ -184,7 +204,11 @@ If none apply, the position is **outside every template** and the function retur
 
 In normal mode the net effect matches the merge's own placement rules (a top/bottom slot outside a fixed anchor): dropping a block past a **free** edge flows it into that slot; dropping it past a **both-anchored** edge exits it to the surrounding page region. The drag scan that decides the drop position lives in `hydra.js` and, on a distance tie between coincident edges, prefers the deeper (inner) edge so a reorder inside a container isn't ejected to the outer level.
 
+<block type="slate">
+
 ## URL flattening and `publicURL`
+
+</block>
 
 Volto's stock URL helpers (`flattenToAppURL`, `isInternalURL`, `toPublicURL`) assume there's one "public URL" — usually the same origin the admin runs on, configured via `RAZZLE_PUBLIC_URL`. In Inka the admin and the published frontend(s) live on different origins, and the editor switches between published frontends at will, so there is no single public URL.
 
@@ -200,13 +224,21 @@ Saved frontends come from two sources, merged: the `RAZZLE_DEFAULT_IFRAME_URL` e
 
 What we deliberately did NOT shadow: `UniversalLink`'s fallback `href` when an item is empty, Volto's admin-side `Robots.txt` / `Sitemap.xml` generators, `ContentMetadataTags` / `AlternateHrefLangs` in the admin's `<head>`, and the `RegistryImageWidget` site-logo URL. All of these inherit the dynamic `publicURL` transparently, and in an Inka deployment the authoritative `robots.txt` / `sitemap.xml` / SEO tags are served by the frontends, not the admin.
 
+<block type="slate">
+
 ## Building a frontend
+
+</block>
 
 The steps for creating an Inka-compatible frontend are the same across frameworks: catch-all route → fetch page from Plone REST API → render blocks recursively → add `data-block-uid` and `data-edit-*` attributes on editable elements → load `hydra.js` only inside the admin iframe.
 
 See [Build a frontend](build-a-frontend.md) for the full step-by-step guide, or the example frontends: [Nuxt.js](https://github.com/collective/volto-hydra/tree/main/examples/nuxt-blog-starter), [Next.js](https://github.com/collective/volto-hydra/tree/main/examples/hydra-nextjs), [F7-Vue](https://github.com/collective/volto-hydra/tree/main/examples/hydra-vue-f7).
 
+<block type="slate">
+
 ## Layers of adoption
+
+</block>
 
 Inka is **additive**: each layer below works on its own, and each next row enhances editing without breaking what came before. You can ship at any row, mix rows on the same site, and add the next layer when you're ready.
 

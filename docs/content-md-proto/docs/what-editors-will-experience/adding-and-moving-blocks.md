@@ -76,7 +76,11 @@ prototypes: |
 
 The block chooser, slash menu, and drag handles are part of Inka and look the same everywhere. What you can pick from those choosers — the list of block types — comes from your site's design system. One site might offer "Lead paragraph", "Pull quote", "Stat highlight"; another might just have "Text" and "Image". Mechanic is identical.
 
+<block type="slate">
+
 ## Adding a block
+
+</block>
 
 Three ways:
 
@@ -98,7 +102,11 @@ Press `Escape` to enter block mode, then `Enter`. A new block is created **after
 
 If the current block is itself a container, `Enter` creates a new container of the same type and the cursor lands inside it on the first typeable leaf — so you can keep typing without aiming. Useful for sliders, columns, accordions: hit `Enter` once and you're already in the next slide / column / panel.
 
+<block type="slate">
+
 ## Moving a block
+
+</block>
 
 ### Drag and drop
 
@@ -141,7 +149,11 @@ In block mode (after pressing `Escape`):
 
 `Arrow Up/Down` is **container-aware** — it walks across container boundaries. Pressing Down on the last block of a column jumps into the next column rather than getting stuck.
 
+<block type="slate">
+
 ## Working with multiple blocks at once
+
+</block>
 
 If you've selected multiple blocks (see [Selecting blocks](selecting-blocks.md)):
 
@@ -151,6 +163,10 @@ If you've selected multiple blocks (see [Selecting blocks](selecting-blocks.md))
 
 ## Empty containers
 
+<block type="slate">
+
 Container blocks can never be truly empty — when the last child is deleted, the container shows a placeholder block in its place, with a "+" in the middle for adding the next block. The placeholder is stripped automatically when you save, so it never ends up in the saved page.
+
+</block>
 
 Drop a block onto an empty container and it replaces the placeholder rather than landing alongside it.

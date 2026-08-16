@@ -115,7 +115,11 @@ The actual code you write will depend on the framework you choose. You can look 
 
 ## What an integrated frontend looks like
 
+<block type="slate">
+
 Before you dive into the steps, here's what your frontend ends up doing.
+
+</block>
 
 To make a site editable with Inka you break a page into:
 
@@ -245,21 +249,37 @@ To build something *from* the anchors — an in-page navigation ("On this page")
 
 If your anchors carry levels, pair the derived list with `buildAnchorTree(anchors)` (from `@volto-hydra/hydra-js`) to render a nested contents list; no levels means a flat list.
 
+<block type="slate">
+
 ## The steps
+
+</block>
 
 The steps involved in creating a frontend are roughly the same for all these frameworks:
 
+<block type="slate">
+
 ## 1. Create a Catch-All Route
+
+</block>
 
 Create a route for any path which goes to a single page.
 
 For example, in Nuxt.js you create a file `pages/[..slug].vue`.
 
+<block type="slate">
+
 ## 2. Build the Page Template
+
+</block>
 
 The page has a template with the static parts of your theme like header and footer. You might also check the content type to render each differently.
 
+<block type="slate">
+
 ## 3. Fetch Content from Plone REST API
+
+</block>
 
 On page setup, take the path and make a [REST API call to the contents endpoint](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/content-types.html) to get the JSON for this page.
 
@@ -267,7 +287,11 @@ On page setup, take the path and make a [REST API call to the contents endpoint]
 
 ## 4. Render Page Metadata
 
+<block type="slate">
+
 In your page template, fill title etc. from the content metadata.
+
+</block>
 
 ## 5. Navigation
 
@@ -284,7 +308,11 @@ In your page template, fill title etc. from the content metadata.
 
 Give `Block` an `@type: "empty"` case: a container region with no `defaultBlockType` and more than one `allowedBlocks` seeds an `empty` placeholder for the user to type in place, and any custom container renderer must route its children through `Block` so `empty` is handled rather than rejected. See [Empty Blocks](container-blocks.md#empty-blocks).
 
+<block type="slate">
+
 ## 7. Helper Functions
+
+</block>
 
 Several helper functions get reused in many blocks:
 
@@ -303,18 +331,30 @@ Several helper functions get reused in many blocks:
 
 ## 10. Error Pages
 
+<block type="slate">
+
 If your [REST API call returns an error](https://6.docs.plone.org/plone.restapi/docs/source/http-status-codes.html), handle this within the framework to display the error and set the status code.
+
+</block>
 
 ## 11. Search Blocks
 
+<block type="slate">
+
 If you choose to allow Volto's built-in Search Block for end-user customisable search:
+
+</block>
 
 - Render Facets/Filters (currently not as sub-blocks but this could change)
 - Build your query and make a [REST API call to query items](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/querystring.html)
 
 ## 12. Form Blocks
 
+<block type="slate">
+
 Form-block is a plugin that allows a visual form builder:
+
+</block>
 
 - Currently not a container with sub-blocks but this could change
 - Render each field type component (or limit which are available)
@@ -324,7 +364,11 @@ Form-block is a plugin that allows a visual form builder:
 
 ## Deployment patterns
 
+<block type="slate">
+
 Inka separates your production frontend from the editing experience, which gives you choice in how each is deployed.
+
+</block>
 
 ### SPA / Hybrid — full visual editing
 
