@@ -57,25 +57,21 @@ async function globalSetup() {
       : Infinity;
     const maxLabel = Number.isFinite(maxPages) ? `max ${maxPages} pages` : 'all pages';
 
-    // Fetch blocksConfig from the frontend so discovery can validate field
-    // data shapes, and the frontend-only key set so discovery can flag
-    // registered-but-unused types without false positives from mock-parent's
-    // own test baseline. Optional — skipped when MOCK_PARENT_URL/FRONTEND_URL
-    // aren't set.
-    let blocksConfig: Record<string, any> = {};
-    let frontendKeys: string[] = [];
-    if (process.env.MOCK_PARENT_URL && process.env.FRONTEND_URL) {
-      console.log(`[SETUP] Fetching blocksConfig via ${process.env.MOCK_PARENT_URL}...`);
-      ({ blocksConfig, frontendKeys } = await fetchBlocksConfig(
-        process.env.MOCK_PARENT_URL,
-        process.env.FRONTEND_URL,
-        discoverApi,
-      ));
-      console.log(
-        `[SETUP] Got ${Object.keys(blocksConfig).length} block schemas from frontend ` +
-          `(${frontendKeys.length} registered by frontend, rest baseline)`,
-      );
-    }
+    // Fetch the frontend's registered blocksConfig so discovery's schema-dependent
+    // checks (slate structure, data shape) actually run, plus the frontend key set
+    // so it can flag unregistered types without false positives from mock-parent's
+    // baseline. Prefer an explicit MOCK_PARENT_URL/FRONTEND_URL (a real frontend);
+    // otherwise fall back to the always-present mock test-frontend -- so these
+    // checks run in CI too, where they were previously skipped by leaving the env
+    // unset.
+    const mockParentUrl = process.env.MOCK_PARENT_URL || `${URLS.testFrontend}/mock-parent.html`;
+    const frontendUrl = process.env.FRONTEND_URL || URLS.testFrontend;
+    console.log(`[SETUP] Fetching blocksConfig via ${mockParentUrl}...`);
+    const { blocksConfig, frontendKeys } = await fetchBlocksConfig(mockParentUrl, frontendUrl, discoverApi);
+    console.log(
+      `[SETUP] Got ${Object.keys(blocksConfig).length} block schemas ` +
+        `(${frontendKeys.length} registered by frontend, rest baseline)`,
+    );
 
     console.log(`[SETUP] Discovering blocks from ${discoverApi} (${maxLabel})...`);
     const blocks = await discoverBlocks(discoverApi, maxPages, blocksConfig, frontendKeys);
@@ -83,27 +79,9 @@ async function globalSetup() {
     fs.writeFileSync(outPath, JSON.stringify(blocks, null, 2));
     console.log(`[SETUP] Wrote ${blocks.length} discovered blocks to ${outPath}`);
 
-    // The empty-region sweep needs block schemas (allowedBlocks/defaultBlockType)
-    // to know which regions seed an `empty`. block-sanity deliberately runs
-    // schema-less in CI (MOCK_PARENT_URL unset) to skip its strict schema checks,
-    // so fetch schemas JUST for this sweep — from the always-present mock
-    // test-frontend — without turning block-sanity's checks on. Best-effort: on
-    // failure the sweep is simply empty (its tests skip) rather than failing setup.
-    let ecConfig = blocksConfig;
-    if (Object.keys(ecConfig).length === 0) {
-      try {
-        ({ blocksConfig: ecConfig } = await fetchBlocksConfig(
-          `${URLS.testFrontend}/mock-parent.html`,
-          URLS.testFrontend,
-          discoverApi,
-        ));
-        console.log(`[SETUP] Fetched ${Object.keys(ecConfig).length} schemas from the mock frontend for empty-region detection`);
-      } catch (err) {
-        console.warn(`[SETUP] empty-region schema fetch failed (sweep will be empty): ${err}`);
-        ecConfig = {};
-      }
-    }
-    const emptyRegions = buildEmptyRegionCases(ecConfig, blocks);
+    // The empty-region sweep reuses the same schemas (allowedBlocks/defaultBlockType
+    // tell it which regions seed an `empty`).
+    const emptyRegions = buildEmptyRegionCases(blocksConfig, blocks);
     const emptyOutPath = path.resolve(__dirname, '../.discovered-empty-regions.json');
     fs.writeFileSync(emptyOutPath, JSON.stringify(emptyRegions, null, 2));
     console.log(`[SETUP] Wrote ${emptyRegions.length} empty-seeding container region(s) to ${emptyOutPath}`);
