@@ -1207,6 +1207,12 @@ async function initMarkdownMounts() {
     ({ dirPath }) => fs.existsSync(path.join(dirPath, 'index.md')));
   if (!mounts.length) return;
   const { readTree } = await import('../../lib/markdown-mount.mjs');
+  // Format-agnostic content validation (blocks_layout integrity). The
+  // distribution validator is gated on __metadata__.json, so markdown mounts
+  // were unchecked; this validates each item as it loads, loud but non-fatal, so
+  // a --watch restart surfaces a problem while developing rather than at test time.
+  const { validateContent } = await import('../../lib/content-validator.mjs');
+  const problems = [];
   for (const { mountPath, dirPath } of mounts) {
     const { items, blobFiles } = readTree(dirPath);
     const urlFor = (p) => (mountPath === '/' ? p : mountPath + (p === '/' ? '' : p));
@@ -1221,9 +1227,14 @@ async function initMarkdownMounts() {
           uidPositionMap[item.UID] = item.getObjPositionInParent;
         }
       }
+      if (process.env.SKIP_CONTENT_VALIDATION !== 'true') problems.push(...validateContent(item));
     }
     for (const [p, file] of blobFiles) markdownBlobs.set(urlFor(p), file);
     console.log(`Registered ${items.size} markdown items from ${dirPath} at ${mountPath}`);
+  }
+  if (problems.length) {
+    console.log(`[content-check] ${problems.length} problem(s) in markdown content:`);
+    for (const m of problems.slice(0, 30)) console.log(`  ${m}`);
   }
 }
 
