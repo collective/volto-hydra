@@ -32,9 +32,20 @@ const LINK_KEYS = new Set(['@id', '@type', 'title', 'Title', 'description', 'Des
 const isLinkSummary = (o) => o && typeof o === 'object' && !Array.isArray(o)
   && '@id' in o && Object.keys(o).every((k) => LINK_KEYS.has(k));
 
+/** Adjacent bare-text leaves are one leaf in Slate (merged on normalise). */
+function mergeTextLeaves(items) {
+  const bare = (x) => x && typeof x === 'object' && Object.keys(x).length === 1 && typeof x.text === 'string';
+  const out = [];
+  for (const item of items) {
+    if (bare(item) && bare(out[out.length - 1])) out[out.length - 1] = { text: out[out.length - 1].text + item.text };
+    else out.push(item);
+  }
+  return out;
+}
+
 /** Comparison view: drop derived/default-nothing, collapse link summaries. */
 function semantic(v) {
-  if (Array.isArray(v)) return v.map(semantic).filter((x) => x !== undefined);
+  if (Array.isArray(v)) return mergeTextLeaves(v.map(semantic).filter((x) => x !== undefined));
   if (isLinkSummary(v)) return { '@id': v['@id'] };
   if (v && typeof v === 'object') {
     const keys = Object.keys(v);
