@@ -65,10 +65,35 @@ readable enough to hand/AI-author.
    `export-proto`/`export-tree`/`convert`/`check-*`/`normalize-*`, the duplicate
    `content-md`/`content-md-proto` copies — keep one loader + one validator.
 
+## Example-code path (removes the last sync step)
+
+Today `docs/examples/examples/{react,vue,svelte,astro}/` are the source, and
+`sync` COPIES their code into the codeExample blocks — the code lives in two
+places. Invert it so the markdown is the single source:
+
+```
+before:  snippet files (source) --sync--> codeExample blocks (copy)      # duplication
+after:   md codeExample (source) --extract--> snippet files (generated)
+                                  \--> check-examples reads the md
+```
+
+- **check-examples reads the md.** Decode the codeExample blocks via the loader
+  (`tabs[].{language, code}`) and run the SAME parsers it already uses (acorn +
+  acorn-jsx, `@vue/compiler-sfc`, `@astrojs/compiler`) per tab. Same validation,
+  sourced from the markdown, no snippet files needed as input.
+- **Generated files for the compiling frontends.** `test-react/App.jsx`,
+  `test-vue/App.vue`, `test-astro/.../render.ts` need real files to build; a
+  build step extracts each tab's code from the md and writes them as artifacts.
+
+So the codeExample block's code is authored in the md (readable, thanks to the
+greedy-bare emit) and everything else derives from it. This means **`sync`
+retires fully** — example code was the one apparent exception, and it isn't.
+
 ## Deleted at the end
 
 `sync.mjs`, `docs/content/content/**` + `inka-site/content/**` (JSON as source),
-`build-distribution-content.mjs`, the prototype scripts, the duplicate md trees.
+`build-distribution-content.mjs`, the prototype scripts, the duplicate md trees,
+the hand-authored `docs/examples/examples/**` snippet files (now generated).
 
 ## Risks
 
