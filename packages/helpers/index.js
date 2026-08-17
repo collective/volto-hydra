@@ -195,10 +195,30 @@ export function buildQuerystringSearchBody(
     });
   }
 
-  // Add facet filters from extraCriteria (keys starting with 'facet.')
+  // Add facet filters from extraCriteria (keys starting with 'facet.').
+  //
+  // A DATE-RANGE facet is a `facet.<field>.after` / `facet.<field>.before` key —
+  // a "from" and a "to" are TWO separate facets on the SAME index (so they don't
+  // collide on one `facet.<field>`), each carrying its direction in the key. They
+  // map to the Plone date operations `largerThan` / `lessThan` (a single scalar
+  // date value), which the catalog ANDs together into a range. Every other
+  // `facet.<field>` is a discrete-value facet → `selection.any` (an array).
+  const DATE_OPS = {
+    after: 'plone.app.querystring.operation.date.largerThan',
+    before: 'plone.app.querystring.operation.date.lessThan',
+  };
   for (const [key, value] of Object.entries(extraCriteria)) {
-    if (key.startsWith('facet.')) {
-      const field = key.replace('facet.', '');
+    if (!key.startsWith('facet.')) continue;
+    const field = key.replace('facet.', '');
+    const dateMatch = field.match(/^(.+)\.(after|before)$/);
+    if (dateMatch) {
+      // Date-range facet: `<index>.<after|before>` → a scalar date operation.
+      const [, index, direction] = dateMatch;
+      const v = Array.isArray(value) ? value[0] : value;
+      if (v) {
+        query.push({ i: index, o: DATE_OPS[direction], v });
+      }
+    } else {
       query.push({
         i: field,
         o: 'plone.app.querystring.operation.selection.any',
