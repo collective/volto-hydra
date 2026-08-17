@@ -18,7 +18,7 @@ rights: ""
 subjects: []
 title: Images
 assignments:
-  - { uid: title-1, type: title }
+  - { uid: title-1 }
 prototypes: |
   <block type="title" _="${h1}" />
 blobs:

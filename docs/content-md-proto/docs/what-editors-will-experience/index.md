@@ -24,51 +24,51 @@ subjects:
   - editing
 title: Editor Guide
 assignments:
-  - { uid: title-1, type: title }
-  - { uid: p-1, type: slate }
-  - { uid: h-2, type: slate }
-  - { uid: p-3, type: slate }
-  - { uid: ul-4, type: slate }
-  - { uid: p-5, type: slate }
-  - { uid: h-6, type: slate }
-  - { uid: p-7, type: slate }
-  - { uid: ce-8, type: codeExample }
+  - { uid: title-1 }
+  - { uid: p-1 }
+  - { uid: h-2 }
+  - { uid: p-3 }
+  - { uid: ul-4 }
+  - { uid: p-5 }
+  - { uid: h-6 }
+  - { uid: p-7 }
+  - { uid: ce-8 }
   - { id: ce-8-text-6b4738 }
-  - { uid: ul-9, type: slate }
-  - { uid: h-10, type: slate }
-  - { uid: p-11, type: slate }
-  - { uid: ul-12, type: slate }
-  - { uid: p-13, type: slate }
-  - { uid: img-14, type: image }
-  - { uid: h-15, type: slate }
-  - { uid: p-16, type: slate }
-  - { uid: ul-17, type: slate }
-  - { uid: p-18, type: slate }
-  - { uid: h-19, type: slate }
-  - { uid: p-20, type: slate }
-  - { uid: p-21, type: slate }
-  - { uid: h-22, type: slate }
-  - { uid: p-23, type: slate }
-  - { uid: ol-24, type: slate }
-  - { uid: p-25, type: slate }
-  - { uid: h-26, type: slate }
-  - { uid: p-27, type: slate }
-  - { uid: img-28, type: image }
-  - { uid: h-29, type: slate }
-  - { uid: p-30, type: slate }
-  - { uid: img-31, type: image }
-  - { uid: h-32, type: slate }
-  - { uid: p-33, type: slate }
-  - { uid: img-34, type: image }
-  - { uid: h-35, type: slate }
-  - { uid: p-36, type: slate }
-  - { uid: img-37, type: image }
-  - { uid: h-38, type: slate }
-  - { uid: tbl-39, type: slateTable }
-  - { uid: p-40, type: slate }
+  - { uid: ul-9 }
+  - { uid: h-10 }
+  - { uid: p-11 }
+  - { uid: ul-12 }
+  - { uid: p-13 }
+  - { uid: img-14 }
+  - { uid: h-15 }
+  - { uid: p-16 }
+  - { uid: ul-17 }
+  - { uid: p-18 }
+  - { uid: h-19 }
+  - { uid: p-20 }
+  - { uid: p-21 }
+  - { uid: h-22 }
+  - { uid: p-23 }
+  - { uid: ol-24 }
+  - { uid: p-25 }
+  - { uid: h-26 }
+  - { uid: p-27 }
+  - { uid: img-28 }
+  - { uid: h-29 }
+  - { uid: p-30 }
+  - { uid: img-31 }
+  - { uid: h-32 }
+  - { uid: p-33 }
+  - { uid: img-34 }
+  - { uid: h-35 }
+  - { uid: p-36 }
+  - { uid: img-37 }
+  - { uid: h-38 }
+  - { uid: tbl-39 }
+  - { uid: p-40 }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="slateTable">

@@ -22,22 +22,22 @@ subjects:
   - forms
 title: Form
 assignments:
-  - { uid: 00e8d49b-5b99-4d2f-83b3-7d69bc80b893, type: title }
-  - { uid: ref-form-description, type: slate }
-  - { uid: editor-screenshot, type: image }
-  - { uid: 3687103d-0766-4d5e-8aae-fc7e65c457a6, type: form }
-  - { uid: eb25b89c-d64a-4566-8e6e-71fd0f371964, type: slate }
-  - { uid: ref-form-schema, type: codeExample }
+  - { uid: 00e8d49b-5b99-4d2f-83b3-7d69bc80b893 }
+  - { uid: ref-form-description }
+  - { uid: editor-screenshot }
+  - { uid: 3687103d-0766-4d5e-8aae-fc7e65c457a6 }
+  - { uid: eb25b89c-d64a-4566-8e6e-71fd0f371964 }
+  - { uid: ref-form-schema }
   - { id: ref-form-schema-javascript-2285e7 }
-  - { uid: ref-form-json-data, type: codeExample }
+  - { uid: ref-form-json-data }
   - { id: ref-form-json-data-json-6e9c29 }
-  - { uid: ref-form-rendering, type: codeExample }
+  - { uid: ref-form-rendering }
   - { id: ref-form-rendering-jsx-29590c }
   - { id: ref-form-rendering-vue-3f1bde }
   - { id: ref-form-rendering-svelte-f8f39b }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="codeExample">
@@ -53,9 +53,9 @@ A multi-field form with configurable field types, validation, and email submissi
 
 <block type="image" url="/docs/images/form-edit" alt="The form example block being edited in Volto Hydra" align="center" size="l" />
 
-<block type="form" default_from="noreply@plone.org" title="A simple form" data='{"lastChange":1710238630312,"remove_data_after_days":-1,"send":false,"show_cancel":false,"store":true,"subblocks":[{"field_id":"1709833577467","field_type":"text","id":"1709833577467","label":"Name","required":true},{"field_id":"1709833592544","field_type":"from","id":"1709833592544","label":"Email","required":false,"use_as_bcc":false,"use_as_reply_to":false},{"field_id":"1709833604677","field_type":"textarea","id":"1709833604677","label":"Message","required":false},{"field_id":"1709833616406","field_type":"multiple_choice","id":"1709833616406","input_values":["Red","Green","Blue"],"label":"Select field","required":false}]}' />
+<block type="form" default_from="noreply@plone.org" title="A simple form" data-json='{"lastChange":1710238630312,"remove_data_after_days":-1,"send":false,"show_cancel":false,"store":true,"subblocks":[{"field_id":"1709833577467","field_type":"text","id":"1709833577467","label":"Name","required":true},{"field_id":"1709833592544","field_type":"from","id":"1709833592544","label":"Email","required":false,"use_as_bcc":false,"use_as_reply_to":false},{"field_id":"1709833604677","field_type":"textarea","id":"1709833604677","label":"Message","required":false},{"field_id":"1709833616406","field_type":"multiple_choice","id":"1709833616406","input_values":["Red","Green","Blue"],"label":"Select field","required":false}]}' />
 
-<block type="slate" data='{"styles":{},"value":[{"children":[{"text":""}],"type":"p"}]}' />
+<block type="slate" data-json='{"styles":{},"value":[{"children":[{"text":""}],"type":"p"}]}' />
 
 <block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form" slotId="schema">
 

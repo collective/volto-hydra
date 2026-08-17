@@ -22,19 +22,19 @@ subjects:
   - containers
 title: Grid Block
 assignments:
-  - { uid: title-1, type: title }
-  - { uid: ref-columns-description, type: slate }
-  - { uid: ref-columns-schema, type: codeExample }
+  - { uid: title-1 }
+  - { uid: ref-columns-description }
+  - { uid: ref-columns-schema }
   - { id: ref-columns-schema-javascript-45206c }
-  - { uid: ref-columns-json-data, type: codeExample }
+  - { uid: ref-columns-json-data }
   - { id: ref-columns-json-data-json-9ddfde }
-  - { uid: ref-columns-rendering, type: codeExample }
+  - { uid: ref-columns-rendering }
   - { id: ref-columns-rendering-jsx-a52cb0 }
   - { id: ref-columns-rendering-vue-526eec }
   - { id: ref-columns-rendering-svelte-9b4eec }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

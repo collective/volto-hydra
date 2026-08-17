@@ -24,43 +24,43 @@ rights: ""
 subjects: []
 title: Adding and moving blocks
 assignments:
-  - { uid: title-1, type: title }
-  - { uid: p-1, type: slate }
-  - { uid: h-2, type: slate }
-  - { uid: p-3, type: slate }
-  - { uid: h-4, type: slate }
-  - { uid: p-5, type: slate }
-  - { uid: p-6, type: slate }
-  - { uid: h-7, type: slate }
-  - { uid: p-8, type: slate }
-  - { uid: p-9, type: slate }
-  - { uid: h-10, type: slate }
-  - { uid: p-11, type: slate }
-  - { uid: p-12, type: slate }
-  - { uid: h-13, type: slate }
-  - { uid: h-14, type: slate }
-  - { uid: p-15, type: slate }
-  - { uid: ul-16, type: slate }
-  - { uid: p-17, type: slate }
-  - { uid: h-18, type: slate }
-  - { uid: p-19, type: slate }
-  - { uid: h-20, type: slate }
-  - { uid: p-21, type: slate }
-  - { uid: ul-22, type: slate }
-  - { uid: p-23, type: slate }
-  - { uid: h-24, type: slate }
-  - { uid: p-25, type: slate }
-  - { uid: tbl-26, type: slateTable }
-  - { uid: p-27, type: slate }
-  - { uid: h-28, type: slate }
-  - { uid: p-29, type: slate }
-  - { uid: ul-30, type: slate }
-  - { uid: h-31, type: slate }
-  - { uid: p-32, type: slate }
-  - { uid: p-33, type: slate }
+  - { uid: title-1 }
+  - { uid: p-1 }
+  - { uid: h-2 }
+  - { uid: p-3 }
+  - { uid: h-4 }
+  - { uid: p-5 }
+  - { uid: p-6 }
+  - { uid: h-7 }
+  - { uid: p-8 }
+  - { uid: p-9 }
+  - { uid: h-10 }
+  - { uid: p-11 }
+  - { uid: p-12 }
+  - { uid: h-13 }
+  - { uid: h-14 }
+  - { uid: p-15 }
+  - { uid: ul-16 }
+  - { uid: p-17 }
+  - { uid: h-18 }
+  - { uid: p-19 }
+  - { uid: h-20 }
+  - { uid: p-21 }
+  - { uid: ul-22 }
+  - { uid: p-23 }
+  - { uid: h-24 }
+  - { uid: p-25 }
+  - { uid: tbl-26 }
+  - { uid: p-27 }
+  - { uid: h-28 }
+  - { uid: p-29 }
+  - { uid: ul-30 }
+  - { uid: h-31 }
+  - { uid: p-32 }
+  - { uid: p-33 }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="slateTable">
     <region name="table.rows">
       <block type="row">

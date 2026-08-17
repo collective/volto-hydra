@@ -23,19 +23,19 @@ subjects:
   - media
 title: Slider Block
 assignments:
-  - { uid: title-1, type: title }
-  - { uid: ref-slider-description, type: slate }
-  - { uid: ref-slider-schema, type: codeExample }
+  - { uid: title-1 }
+  - { uid: ref-slider-description }
+  - { uid: ref-slider-schema }
   - { id: ref-slider-schema-javascript-ce9b5a }
-  - { uid: ref-slider-json-data, type: codeExample }
+  - { uid: ref-slider-json-data }
   - { id: ref-slider-json-data-json-c5167b }
-  - { uid: ref-slider-rendering, type: codeExample }
+  - { uid: ref-slider-rendering }
   - { id: ref-slider-rendering-jsx-87bcad }
   - { id: ref-slider-rendering-vue-6e69c4 }
   - { id: ref-slider-rendering-svelte-586973 }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

@@ -29,26 +29,26 @@ subjects:
   - media
 title: Teaser
 assignments:
-  - { uid: b986b92c-e180-42d3-b755-4728854e5a50, type: title }
-  - { uid: ref-teaser-description, type: slate }
-  - { uid: editor-screenshot, type: image }
-  - { uid: 61f0e286-0527-43a7-b8fe-29f1be40a8c3, type: teaser }
-  - { uid: 03fd3352-0845-4c70-9d01-805996bd127b, type: teaser }
-  - { uid: 530939e1-8579-4d37-a111-716475c00cac, type: teaser }
-  - { uid: 95648579-7116-401f-a448-e48938c88246, type: teaser }
-  - { uid: b798dde4-6a5d-4cef-9e25-fd532e1ea9a7, type: teaser }
-  - { uid: 620f0540-8c3d-422d-a1c6-47037b5dbfbc, type: teaser }
-  - { uid: ref-teaser-schema, type: codeExample }
+  - { uid: b986b92c-e180-42d3-b755-4728854e5a50 }
+  - { uid: ref-teaser-description }
+  - { uid: editor-screenshot }
+  - { uid: 61f0e286-0527-43a7-b8fe-29f1be40a8c3 }
+  - { uid: 03fd3352-0845-4c70-9d01-805996bd127b }
+  - { uid: 530939e1-8579-4d37-a111-716475c00cac }
+  - { uid: 95648579-7116-401f-a448-e48938c88246 }
+  - { uid: b798dde4-6a5d-4cef-9e25-fd532e1ea9a7 }
+  - { uid: 620f0540-8c3d-422d-a1c6-47037b5dbfbc }
+  - { uid: ref-teaser-schema }
   - { id: ref-teaser-schema-javascript-bfff08 }
-  - { uid: ref-teaser-json-data, type: codeExample }
+  - { uid: ref-teaser-json-data }
   - { id: ref-teaser-json-data-json-7f117c }
-  - { uid: ref-teaser-rendering, type: codeExample }
+  - { uid: ref-teaser-rendering }
   - { id: ref-teaser-rendering-jsx-d1dd76 }
   - { id: ref-teaser-rendering-vue-fc123a }
   - { id: ref-teaser-rendering-svelte-bf19cf }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="teaser" explicit title="${h/text}" href="${h/link}" description="${p/text}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
@@ -71,7 +71,7 @@ A content preview card that links to another page. Selecting a target page via t
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum.
 
-<fields head_title="Head title" data='{"styles":{"align":"center"}}' />
+<fields head_title="Head title" data-json='{"styles":{"align":"center"}}' />
 
 </block>
 
@@ -81,7 +81,7 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea.
 
-<fields head_title="Head title" data='{"styles":{"align":"left"}}' />
+<fields head_title="Head title" data-json='{"styles":{"align":"left"}}' />
 
 </block>
 
@@ -91,7 +91,7 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea.
 
-<fields head_title="Head title" data='{"styles":{"align":"right"}}' />
+<fields head_title="Head title" data-json='{"styles":{"align":"right"}}' />
 
 </block>
 
@@ -101,7 +101,7 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum.
 
-<fields data='{"styles":{"align":"center","backgroundColor":"grey"}}' />
+<fields data-json='{"styles":{"align":"center","backgroundColor":"grey"}}' />
 
 </block>
 
@@ -111,7 +111,7 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea.
 
-<fields data='{"styles":{"align":"left","backgroundColor":"grey"}}' />
+<fields data-json='{"styles":{"align":"left","backgroundColor":"grey"}}' />
 
 </block>
 
@@ -121,7 +121,7 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea.
 
-<fields data='{"styles":{"align":"right","backgroundColor":"grey"}}' />
+<fields data-json='{"styles":{"align":"right","backgroundColor":"grey"}}' />
 
 </block>
 

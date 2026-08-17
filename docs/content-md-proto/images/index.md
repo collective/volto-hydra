@@ -20,17 +20,17 @@ rights: ""
 subjects: []
 title: Images
 assignments:
-  - { uid: 55e93046-15ee-41f5-b63c-fde0d9b6ce52, type: title }
-  - { uid: 183bf050-57b7-4841-b9c8-f9b5a15fe086, type: gridBlock }
-  - { uid: gallery-penguin1, type: image }
-  - { uid: gallery-penguin2, type: image }
-  - { uid: gallery-penguin3, type: image }
-  - { uid: gallery-penguin4, type: image }
-  - { uid: gallery-quadrant, type: image }
-  - { uid: 2d181d1f-1fac-420a-b410-4f4d5379f8ea, type: slate }
+  - { uid: 55e93046-15ee-41f5-b63c-fde0d9b6ce52 }
+  - { uid: 183bf050-57b7-4841-b9c8-f9b5a15fe086 }
+  - { uid: gallery-penguin1 }
+  - { uid: gallery-penguin2 }
+  - { uid: gallery-penguin3 }
+  - { uid: gallery-penguin4 }
+  - { uid: gallery-quadrant }
+  - { uid: 2d181d1f-1fac-420a-b410-4f4d5379f8ea }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="gridBlock" headline="${h/text}">
@@ -77,4 +77,4 @@ blobs:
 
 </block>
 
-<block type="slate" data='{"styles":{},"value":[{"children":[{"text":""}],"type":"p"}]}' />
+<block type="slate" data-json='{"styles":{},"value":[{"children":[{"text":""}],"type":"p"}]}' />

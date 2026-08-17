@@ -20,12 +20,12 @@ rights: ""
 subjects: []
 title: Content Types
 assignments:
-  - { uid: 7f1d39a2-a57c-4b2a-93bd-4dd30ee3f6cc, type: title }
-  - { uid: e3bb641a-0252-4fff-a6a0-80ce155d4ee5, type: listing }
-  - { uid: fdb1dfd1-6073-4ad0-a147-c0709c39734d, type: slate }
+  - { uid: 7f1d39a2-a57c-4b2a-93bd-4dd30ee3f6cc }
+  - { uid: e3bb641a-0252-4fff-a6a0-80ce155d4ee5 }
+  - { uid: fdb1dfd1-6073-4ad0-a147-c0709c39734d }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
 order:
   - copy_of_event
   - copy_of_news-item
@@ -72,6 +72,6 @@ blobs:
 
 # 
 
-<block type="listing" headlineTag="h2" variation="default" data='{"styles":{}}' />
+<block type="listing" headlineTag="h2" variation="default" data-json='{"styles":{}}' />
 
-<block type="slate" data='{"styles":{},"value":[{"children":[{"text":""}],"type":"p"}]}' />
+<block type="slate" data-json='{"styles":{},"value":[{"children":[{"text":""}],"type":"p"}]}' />

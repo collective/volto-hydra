@@ -24,38 +24,38 @@ rights: ""
 subjects: []
 title: Links and media
 assignments:
-  - { uid: title-1, type: title }
-  - { uid: p-1, type: slate }
-  - { uid: h-2, type: slate }
-  - { uid: p-3, type: slate }
-  - { uid: ul-4, type: slate }
-  - { uid: img-5, type: image }
-  - { uid: p-6, type: slate }
-  - { uid: h-7, type: slate }
-  - { uid: p-8, type: slate }
-  - { uid: p-9, type: slate }
-  - { uid: img-10, type: image }
-  - { uid: p-11, type: slate }
-  - { uid: ul-12, type: slate }
-  - { uid: h-13, type: slate }
-  - { uid: p-14, type: slate }
-  - { uid: h-15, type: slate }
-  - { uid: p-16, type: slate }
-  - { uid: ul-17, type: slate }
-  - { uid: img-18, type: image }
-  - { uid: h-19, type: slate }
-  - { uid: p-20, type: slate }
-  - { uid: ul-21, type: slate }
-  - { uid: p-22, type: slate }
-  - { uid: h-23, type: slate }
-  - { uid: p-24, type: slate }
-  - { uid: h-25, type: slate }
-  - { uid: p-26, type: slate }
-  - { uid: ul-27, type: slate }
-  - { uid: p-28, type: slate }
+  - { uid: title-1 }
+  - { uid: p-1 }
+  - { uid: h-2 }
+  - { uid: p-3 }
+  - { uid: ul-4 }
+  - { uid: img-5 }
+  - { uid: p-6 }
+  - { uid: h-7 }
+  - { uid: p-8 }
+  - { uid: p-9 }
+  - { uid: img-10 }
+  - { uid: p-11 }
+  - { uid: ul-12 }
+  - { uid: h-13 }
+  - { uid: p-14 }
+  - { uid: h-15 }
+  - { uid: p-16 }
+  - { uid: ul-17 }
+  - { uid: img-18 }
+  - { uid: h-19 }
+  - { uid: p-20 }
+  - { uid: ul-21 }
+  - { uid: p-22 }
+  - { uid: h-23 }
+  - { uid: p-24 }
+  - { uid: h-25 }
+  - { uid: p-26 }
+  - { uid: ul-27 }
+  - { uid: p-28 }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
 ---
@@ -102,7 +102,7 @@ You'll see an empty placeholder with a prompt to **upload, browse, or drag in** 
 - Drag an image file from your desktop and drop it directly onto the placeholder.
 - Drag an image from another tab / source if your browser supports it.
 
-<block type="image" url="/docs/images/media-empty-placeholder" align="center" size="l" data='{"alt":"Empty image block selected — placeholder with image icon, \"Browse the site, drop an image...\" input, sidebar showing \"NO IMAGE SELECTED\"."}' />
+<block type="image" url="/docs/images/media-empty-placeholder" align="center" size="l" data-json='{"alt":"Empty image block selected — placeholder with image icon, \"Browse the site, drop an image...\" input, sidebar showing \"NO IMAGE SELECTED\"."}' />
 
 ### Replacing an existing media element
 

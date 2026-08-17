@@ -21,50 +21,50 @@ subjects:
   - frontend
 title: Server-rendered frontends
 assignments:
-  - { uid: title-1, type: title }
-  - { uid: p-1, type: slate }
-  - { uid: h-2, type: slate }
-  - { uid: p-3, type: slate }
-  - { uid: p-4, type: slate }
-  - { uid: p-5, type: slate }
-  - { uid: h-6, type: slate }
-  - { uid: ce-7, type: codeExample }
+  - { uid: title-1 }
+  - { uid: p-1 }
+  - { uid: h-2 }
+  - { uid: p-3 }
+  - { uid: p-4 }
+  - { uid: p-5 }
+  - { uid: h-6 }
+  - { uid: ce-7 }
   - { id: ce-7-text-316e7d }
-  - { uid: h-8, type: slate }
-  - { uid: p-9, type: slate }
-  - { uid: ul-10, type: slate }
-  - { uid: p-11, type: slate }
-  - { uid: h-12, type: slate }
-  - { uid: p-13, type: slate }
-  - { uid: p-14, type: slate }
-  - { uid: p-15, type: slate }
-  - { uid: h-16, type: slate }
-  - { uid: ce-17, type: codeExample }
+  - { uid: h-8 }
+  - { uid: p-9 }
+  - { uid: ul-10 }
+  - { uid: p-11 }
+  - { uid: h-12 }
+  - { uid: p-13 }
+  - { uid: p-14 }
+  - { uid: p-15 }
+  - { uid: h-16 }
+  - { uid: ce-17 }
   - { id: ce-17-astro-6cfb06 }
-  - { uid: ce-18, type: codeExample }
+  - { uid: ce-18 }
   - { id: ce-18-ts-ad6a37 }
-  - { uid: ce-19, type: codeExample }
+  - { uid: ce-19 }
   - { id: ce-19-ts-892388 }
-  - { uid: p-20, type: slate }
-  - { uid: h-21, type: slate }
-  - { uid: ce-22, type: codeExample }
+  - { uid: p-20 }
+  - { uid: h-21 }
+  - { uid: ce-22 }
   - { id: ce-22-php-e87720 }
-  - { uid: ce-23, type: codeExample }
+  - { uid: ce-23 }
   - { id: ce-23-php-9a04e4 }
-  - { uid: ce-24, type: codeExample }
+  - { uid: ce-24 }
   - { id: ce-24-php-ebbd45 }
-  - { uid: p-25, type: slate }
-  - { uid: ce-26, type: codeExample }
+  - { uid: p-25 }
+  - { uid: ce-26 }
   - { id: ce-26-html-476b8c }
-  - { uid: h-27, type: slate }
-  - { uid: p-28, type: slate }
-  - { uid: tbl-29, type: slateTable }
-  - { uid: p-30, type: slate }
-  - { uid: h-31, type: slate }
-  - { uid: ul-32, type: slate }
+  - { uid: h-27 }
+  - { uid: p-28 }
+  - { uid: tbl-29 }
+  - { uid: p-30 }
+  - { uid: h-31 }
+  - { uid: ul-32 }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="slateTable">
     <region name="table.rows">
       <block type="row">

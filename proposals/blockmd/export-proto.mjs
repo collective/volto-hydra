@@ -29,8 +29,10 @@ const OUT = outArg > -1 ? resolve(process.argv[outArg + 1]) : resolve(INKA, 'doc
 // Emit-capable prototypes, one text block per type. Types not here (slateTable,
 // gridBlock, the long tail) fall to tier-3 data tags automatically.
 const PROTO_TEXT = {
+  // slate is the catch-all; more specific same-specificity prototypes (title on an
+  // h1) are declared AFTER it so they win the CSS cascade tie.
+  slate: '<block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />',
   title: '<block type="title" _="${h1}" />',
-  slate: '<block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />',
   separator: '<block type="separator" _="${hr}" />',
   button: '<block type="button" explicit title="${p/text}" href="${p/link}" />',
   // href is @id-only (the heading's link); the teaser's rendered title/
@@ -81,6 +83,18 @@ const PROTOS = parsePrototypes(Object.values(PROTO_TEXT).join('\n'));
 function prototypesYaml(used) {
   const lines = Object.entries(PROTO_TEXT).filter(([t]) => used.has(t)).flatMap(([, txt]) => txt.split('\n'));
   return lines.length ? `prototypes: |\n${lines.map((l) => `  ${l}`).join('\n')}` : '';
+}
+
+/** Every @type in a block tree, descending into nested blocks + object_list items.
+ *  Assignments no longer carry the type, so the used-prototype set comes from here. */
+function collectTypes(blocks, out = new Set()) {
+  for (const b of Object.values(blocks || {})) {
+    if (!b || typeof b !== 'object') continue;
+    if (b['@type']) out.add(b['@type']);
+    if (b.blocks) collectTypes(b.blocks, out);
+    for (const v of Object.values(b)) if (Array.isArray(v)) for (const it of v) if (it && it.blocks) collectTypes(it.blocks, out);
+  }
+  return out;
 }
 
 const flow = (o) => `{ ${Object.entries(o).map(([k, v]) => `${k}: ${v}`).join(', ')} }`;
@@ -181,14 +195,14 @@ for (const d of items) {
 
   if (d.blocks && d.blocks_layout?.items?.length) {
     const { markdown, assignments } = emitPage(PROTOS, { blocks: d.blocks, blocks_layout: d.blocks_layout });
-    const used = new Set(assignments.map((a) => a.type).filter(Boolean));
+    const used = collectTypes(d.blocks);
     const asg = `assignments:\n${assignments.map((a) => `  - ${flow(a)}`).join('\n')}`;
     const proto = prototypesYaml(used);
     writeFileSync(dest, `---\n${front}\n${asg}\n${proto}\n---\n\n${markdown}\n`);
     pages += 1;
     // rough coverage: count self-closing data tags (tier-3) vs the rest
     tier3 += (markdown.match(/<block type="[^"]*"[^>]*\/>/g) || []).length;
-    clean += assignments.filter((a) => a.type).length;
+    clean += assignments.filter((a) => a.uid).length;
   } else {
     writeFileSync(dest, `---\n${front}\n---\n`);
   }

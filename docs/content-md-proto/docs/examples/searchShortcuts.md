@@ -22,22 +22,22 @@ subjects:
   - listings
 title: Search Shortcuts Block
 assignments:
-  - { uid: title-1, type: title }
-  - { uid: ref-searchShortcuts-description, type: slate }
-  - { uid: ss-live-heading, type: slate }
-  - { uid: ss-live-1, type: searchShortcuts }
-  - { uid: ref-searchShortcuts-schema, type: codeExample }
+  - { uid: title-1 }
+  - { uid: ref-searchShortcuts-description }
+  - { uid: ss-live-heading }
+  - { uid: ss-live-1 }
+  - { uid: ref-searchShortcuts-schema }
   - { id: ref-searchShortcuts-schema-javascript-980727 }
-  - { uid: ref-searchShortcuts-json-data, type: codeExample }
+  - { uid: ref-searchShortcuts-json-data }
   - { id: ref-searchShortcuts-json-data-json-b402fc }
-  - { uid: ref-searchShortcuts-rendering-intro, type: slate }
-  - { uid: ref-searchShortcuts-fetcher, type: codeExample }
+  - { uid: ref-searchShortcuts-rendering-intro }
+  - { uid: ref-searchShortcuts-fetcher }
   - { id: ref-searchShortcuts-fetcher-javascript-e7f760 }
-  - { uid: ref-searchShortcuts-rendering, type: codeExample }
+  - { uid: ref-searchShortcuts-rendering }
   - { id: ref-searchShortcuts-rendering-javascript-ab7111 }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

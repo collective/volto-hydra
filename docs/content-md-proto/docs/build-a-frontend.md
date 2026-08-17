@@ -22,82 +22,82 @@ subjects:
   - frontend
 title: Build a frontend
 assignments:
-  - { uid: title-1, type: title }
-  - { uid: p-1, type: slate }
-  - { uid: ul-2, type: slate }
-  - { uid: h-3, type: slate }
-  - { uid: p-4, type: slate }
-  - { uid: p-5, type: slate }
-  - { uid: ul-6, type: slate }
-  - { uid: p-7, type: slate }
-  - { uid: ce-8, type: codeExample }
+  - { uid: title-1 }
+  - { uid: p-1 }
+  - { uid: ul-2 }
+  - { uid: h-3 }
+  - { uid: p-4 }
+  - { uid: p-5 }
+  - { uid: ul-6 }
+  - { uid: p-7 }
+  - { uid: ce-8 }
   - { id: ce-8-js-bf605e }
-  - { uid: p-9, type: slate }
-  - { uid: ce-10, type: codeExample }
+  - { uid: p-9 }
+  - { uid: ce-10 }
   - { id: ce-10-js-2e9648 }
-  - { uid: p-11, type: slate }
-  - { uid: ce-12, type: codeExample }
+  - { uid: p-11 }
+  - { uid: ce-12 }
   - { id: ce-12-html-e0187e }
-  - { uid: h-13, type: slate }
-  - { uid: p-14, type: slate }
-  - { uid: ul-15, type: slate }
-  - { uid: ce-16, type: codeExample }
+  - { uid: h-13 }
+  - { uid: p-14 }
+  - { uid: ul-15 }
+  - { uid: ce-16 }
   - { id: ce-16-html-5cddab }
-  - { uid: p-17, type: slate }
-  - { uid: p-18, type: slate }
-  - { uid: p-19, type: slate }
-  - { uid: h-20, type: slate }
-  - { uid: p-21, type: slate }
-  - { uid: bq-22, type: slate }
-  - { uid: p-23, type: slate }
-  - { uid: h-24, type: slate }
-  - { uid: p-25, type: slate }
-  - { uid: h-26, type: slate }
-  - { uid: p-27, type: slate }
-  - { uid: p-28, type: slate }
-  - { uid: h-29, type: slate }
-  - { uid: p-30, type: slate }
-  - { uid: h-31, type: slate }
-  - { uid: p-32, type: slate }
-  - { uid: ul-33, type: slate }
-  - { uid: h-34, type: slate }
-  - { uid: p-35, type: slate }
-  - { uid: h-36, type: slate }
-  - { uid: ol-37, type: slate }
-  - { uid: h-38, type: slate }
-  - { uid: ol-39, type: slate }
-  - { uid: p-40, type: slate }
-  - { uid: h-41, type: slate }
-  - { uid: p-42, type: slate }
-  - { uid: ol-43, type: slate }
-  - { uid: h-44, type: slate }
-  - { uid: ul-45, type: slate }
-  - { uid: h-46, type: slate }
-  - { uid: ol-47, type: slate }
-  - { uid: h-48, type: slate }
-  - { uid: p-49, type: slate }
-  - { uid: h-50, type: slate }
-  - { uid: p-51, type: slate }
-  - { uid: ul-52, type: slate }
-  - { uid: h-53, type: slate }
-  - { uid: p-54, type: slate }
-  - { uid: ul-55, type: slate }
-  - { uid: h-56, type: slate }
-  - { uid: p-57, type: slate }
-  - { uid: h-58, type: slate }
-  - { uid: p-59, type: slate }
-  - { uid: ol-60, type: slate }
-  - { uid: p-61, type: slate }
-  - { uid: h-62, type: slate }
-  - { uid: p-63, type: slate }
-  - { uid: ol-64, type: slate }
-  - { uid: h-65, type: slate }
-  - { uid: p-66, type: slate }
-  - { uid: ul-67, type: slate }
-  - { uid: p-68, type: slate }
+  - { uid: p-17 }
+  - { uid: p-18 }
+  - { uid: p-19 }
+  - { uid: h-20 }
+  - { uid: p-21 }
+  - { uid: bq-22 }
+  - { uid: p-23 }
+  - { uid: h-24 }
+  - { uid: p-25 }
+  - { uid: h-26 }
+  - { uid: p-27 }
+  - { uid: p-28 }
+  - { uid: h-29 }
+  - { uid: p-30 }
+  - { uid: h-31 }
+  - { uid: p-32 }
+  - { uid: ul-33 }
+  - { uid: h-34 }
+  - { uid: p-35 }
+  - { uid: h-36 }
+  - { uid: ol-37 }
+  - { uid: h-38 }
+  - { uid: ol-39 }
+  - { uid: p-40 }
+  - { uid: h-41 }
+  - { uid: p-42 }
+  - { uid: ol-43 }
+  - { uid: h-44 }
+  - { uid: ul-45 }
+  - { uid: h-46 }
+  - { uid: ol-47 }
+  - { uid: h-48 }
+  - { uid: p-49 }
+  - { uid: h-50 }
+  - { uid: p-51 }
+  - { uid: ul-52 }
+  - { uid: h-53 }
+  - { uid: p-54 }
+  - { uid: ul-55 }
+  - { uid: h-56 }
+  - { uid: p-57 }
+  - { uid: h-58 }
+  - { uid: p-59 }
+  - { uid: ol-60 }
+  - { uid: p-61 }
+  - { uid: h-62 }
+  - { uid: p-63 }
+  - { uid: ol-64 }
+  - { uid: h-65 }
+  - { uid: p-66 }
+  - { uid: ul-67 }
+  - { uid: p-68 }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

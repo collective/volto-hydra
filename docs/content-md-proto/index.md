@@ -20,36 +20,36 @@ subjects: []
 table_of_contents: null
 title: Inka
 assignments:
-  - { uid: hero-headline, type: slate }
-  - { uid: hero-subhead, type: slate }
-  - { uid: hero-cta, type: slate }
-  - { uid: why-hydra-heading, type: slate }
-  - { uid: why-hydra-tagline, type: slate }
-  - { uid: why-hydra-quadrant, type: image }
-  - { uid: why-hydra-grid, type: gridBlock }
-  - { uid: box-visual, type: slate }
-  - { uid: box-frontend, type: slate }
-  - { uid: box-enterprise, type: slate }
-  - { uid: box-opensource, type: slate }
-  - { uid: quickstart-heading, type: slate }
-  - { uid: quickstart-code, type: codeExample }
+  - { uid: hero-headline }
+  - { uid: hero-subhead }
+  - { uid: hero-cta }
+  - { uid: why-hydra-heading }
+  - { uid: why-hydra-tagline }
+  - { uid: why-hydra-quadrant }
+  - { uid: why-hydra-grid }
+  - { uid: box-visual }
+  - { uid: box-frontend }
+  - { uid: box-enterprise }
+  - { uid: box-opensource }
+  - { uid: quickstart-heading }
+  - { uid: quickstart-code }
   - { id: tab-nuxt }
   - { id: tab-nextjs }
   - { id: tab-svelte }
   - { id: tab-vanilla }
   - { id: tab-astro }
-  - { uid: 303984b4-693a-408f-83f7-5a88b243d7db, type: slider }
-  - { uid: fae599f3-e7d4-451b-a413-84355c796b7e, type: gridBlock }
-  - { uid: c9f92df8-81fd-4259-a149-5c8798735350, type: slate }
-  - { uid: d78b666f-b07b-4036-9853-efe6263515aa, type: slate }
-  - { uid: d105783c-fa27-4c92-a3d9-6323adbe5e72, type: slate }
-  - { uid: 0ab1a8f7-2d26-4933-800c-2f10474afe63, type: separator }
-  - { uid: e972541f-b114-494b-a51e-cc8b11c8207d, type: slate }
-  - { uid: 9567ae6d-191c-43f1-91cc-4288bbb98f88, type: slate }
-  - { uid: 0d0c0506-f9bb-48d8-af0a-1352d81b45de, type: slate }
-  - { uid: 2fac7e5d-affb-4a8e-969f-2fac4d08e0fd, type: slate }
+  - { uid: 303984b4-693a-408f-83f7-5a88b243d7db }
+  - { uid: fae599f3-e7d4-451b-a413-84355c796b7e }
+  - { uid: c9f92df8-81fd-4259-a149-5c8798735350 }
+  - { uid: d78b666f-b07b-4036-9853-efe6263515aa }
+  - { uid: d105783c-fa27-4c92-a3d9-6323adbe5e72 }
+  - { uid: 0ab1a8f7-2d26-4933-800c-2f10474afe63 }
+  - { uid: e972541f-b114-494b-a51e-cc8b11c8207d }
+  - { uid: 9567ae6d-191c-43f1-91cc-4288bbb98f88 }
+  - { uid: 0d0c0506-f9bb-48d8-af0a-1352d81b45de }
+  - { uid: 2fac7e5d-affb-4a8e-969f-2fac4d08e0fd }
 prototypes: |
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="separator" _="${hr}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
@@ -88,7 +88,7 @@ Strike the right balance for your site. Make it easy for editors to create engag
 
 [Try the demo](https://hydra.pretagov.com/login?return_url=/)  ·  [Source on GitHub](https://github.com/collective/volto-hydra)
 
-<fields data='{"styles":{"backgroundColor":"grey"}}' />
+<fields data-json='{"styles":{"backgroundColor":"grey"}}' />
 
 </block>
 
@@ -403,7 +403,7 @@ export const POST = async ({ request }) => {
 
 </block>
 
-<block type="slider" data='{"autoplayDelay":4000,"autoplayEnabled":false,"autoplayJump":false,"slides":[{"@id":"b09f39ea-36c3-4f09-9a18-30aef3565a22","buttonText":"See all Content Types","description":"You can log in and experience currently working features (Volto like but on any frontend)","flagAlign":"left","head_title":"Welcome to Inka","href":[{"@id":"/docs/examples/content-types","@type":"Document","Description":"This section has a sample of content types available in this site.","Title":"Content Types","hasPreviewImage":null,"head_title":null,"image_field":"image","title":"Content Types"}],"preview_image":[{"@id":"/images/penguin1.jpg","@type":"Image","CreationDate":"2024-03-07T12:29:54+01:00","Creator":"admin","Date":"2024-03-07T12:30:08+01:00","Description":"","EffectiveDate":"None","ExpirationDate":"None","ModificationDate":"2024-03-07T12:30:08+01:00","Subject":[],"Title":"testimage","Type":"Bild","UID":"9abc1a813bcf46388e565b277bd8c6bf","author_name":null,"cmf_uid":null,"commentators":[],"created":"2024-03-07T11:29:54+00:00","description":"","effective":"1969-12-30T23:00:00+00:00","end":null,"exclude_from_nav":false,"expires":"2499-12-30T23:00:00+00:00","getIcon":true,"getId":"testimage.jpg","getObjSize":"2.0 MB","getPath":"/Plone/testimage.jpg","getRemoteUrl":null,"getURL":"http://localhost:3000/testimage.jpg","hasPreviewImage":null,"head_title":null,"id":"testimage.jpg","image_field":"image","in_response_to":null,"is_folderish":false,"last_comment_date":null,"listCreators":["admin"],"location":null,"mime_type":"image/jpeg","modified":"2024-03-07T11:30:08+00:00","nav_title":null,"portal_type":"Image","review_state":null,"start":null,"sync_uid":null,"title":"testimage","total_comments":0,"type_title":"Bild"}],"title":"You can use this site to test Inka"},{"@id":"ef8ceecc-7c1d-4e0a-9b67-a56e7d03f6e3","buttonText":"See all blocks","description":"Frontend freedom makes it easy to create beautiful and fast experiences","flagAlign":"right","head_title":"Welcome to Inka&#39;s many frontends","hideButton":false,"href":[{"@id":"/docs/examples","@type":"Document","Description":"","Title":"Blocks","hasPreviewImage":null,"head_title":null,"image_field":"","title":"Blocks"}],"preview_image":[{"@id":"/images/penguin2.jpg","@type":"Image","CreationDate":"2024-03-08T13:05:46+01:00","Creator":"admin","Date":"2024-03-08T13:05:46+01:00","Description":"","EffectiveDate":"None","ExpirationDate":"None","ModificationDate":"2024-03-08T13:05:46+01:00","Subject":[],"Title":"penguin2.jpg","Type":"Bild","UID":"05bace45294c45d5ab93de883e7ce702","author_name":null,"cmf_uid":null,"commentators":[],"created":"2024-03-08T12:05:46+00:00","description":"","effective":"1969-12-30T23:00:00+00:00","end":null,"exclude_from_nav":false,"expires":"2499-12-30T23:00:00+00:00","getIcon":true,"getId":"penguin2.jpg","getObjSize":"2.8 MB","getPath":"/Plone/images/penguin2.jpg","getRemoteUrl":null,"getURL":"http://localhost:3000/images/penguin2.jpg","hasPreviewImage":null,"head_title":null,"id":"penguin2.jpg","image_field":"image","in_response_to":null,"is_folderish":false,"last_comment_date":null,"listCreators":["admin"],"location":null,"mime_type":"image/jpeg","modified":"2024-03-08T12:05:46+00:00","nav_title":null,"portal_type":"Image","review_state":null,"start":null,"sync_uid":null,"title":"penguin2.jpg","total_comments":0,"type_title":"Bild"}],"title":"You are enjoying one of many possible frontends"}],"styles":{}}' />
+<block type="slider" data-json='{"autoplayDelay":4000,"autoplayEnabled":false,"autoplayJump":false,"slides":[{"@id":"b09f39ea-36c3-4f09-9a18-30aef3565a22","buttonText":"See all Content Types","description":"You can log in and experience currently working features (Volto like but on any frontend)","flagAlign":"left","head_title":"Welcome to Inka","href":[{"@id":"/docs/examples/content-types","@type":"Document","Description":"This section has a sample of content types available in this site.","Title":"Content Types","hasPreviewImage":null,"head_title":null,"image_field":"image","title":"Content Types"}],"preview_image":[{"@id":"/images/penguin1.jpg","@type":"Image","CreationDate":"2024-03-07T12:29:54+01:00","Creator":"admin","Date":"2024-03-07T12:30:08+01:00","Description":"","EffectiveDate":"None","ExpirationDate":"None","ModificationDate":"2024-03-07T12:30:08+01:00","Subject":[],"Title":"testimage","Type":"Bild","UID":"9abc1a813bcf46388e565b277bd8c6bf","author_name":null,"cmf_uid":null,"commentators":[],"created":"2024-03-07T11:29:54+00:00","description":"","effective":"1969-12-30T23:00:00+00:00","end":null,"exclude_from_nav":false,"expires":"2499-12-30T23:00:00+00:00","getIcon":true,"getId":"testimage.jpg","getObjSize":"2.0 MB","getPath":"/Plone/testimage.jpg","getRemoteUrl":null,"getURL":"http://localhost:3000/testimage.jpg","hasPreviewImage":null,"head_title":null,"id":"testimage.jpg","image_field":"image","in_response_to":null,"is_folderish":false,"last_comment_date":null,"listCreators":["admin"],"location":null,"mime_type":"image/jpeg","modified":"2024-03-07T11:30:08+00:00","nav_title":null,"portal_type":"Image","review_state":null,"start":null,"sync_uid":null,"title":"testimage","total_comments":0,"type_title":"Bild"}],"title":"You can use this site to test Inka"},{"@id":"ef8ceecc-7c1d-4e0a-9b67-a56e7d03f6e3","buttonText":"See all blocks","description":"Frontend freedom makes it easy to create beautiful and fast experiences","flagAlign":"right","head_title":"Welcome to Inka&#39;s many frontends","hideButton":false,"href":[{"@id":"/docs/examples","@type":"Document","Description":"","Title":"Blocks","hasPreviewImage":null,"head_title":null,"image_field":"","title":"Blocks"}],"preview_image":[{"@id":"/images/penguin2.jpg","@type":"Image","CreationDate":"2024-03-08T13:05:46+01:00","Creator":"admin","Date":"2024-03-08T13:05:46+01:00","Description":"","EffectiveDate":"None","ExpirationDate":"None","ModificationDate":"2024-03-08T13:05:46+01:00","Subject":[],"Title":"penguin2.jpg","Type":"Bild","UID":"05bace45294c45d5ab93de883e7ce702","author_name":null,"cmf_uid":null,"commentators":[],"created":"2024-03-08T12:05:46+00:00","description":"","effective":"1969-12-30T23:00:00+00:00","end":null,"exclude_from_nav":false,"expires":"2499-12-30T23:00:00+00:00","getIcon":true,"getId":"penguin2.jpg","getObjSize":"2.8 MB","getPath":"/Plone/images/penguin2.jpg","getRemoteUrl":null,"getURL":"http://localhost:3000/images/penguin2.jpg","hasPreviewImage":null,"head_title":null,"id":"penguin2.jpg","image_field":"image","in_response_to":null,"is_folderish":false,"last_comment_date":null,"listCreators":["admin"],"location":null,"mime_type":"image/jpeg","modified":"2024-03-08T12:05:46+00:00","nav_title":null,"portal_type":"Image","review_state":null,"start":null,"sync_uid":null,"title":"penguin2.jpg","total_comments":0,"type_title":"Bild"}],"title":"You are enjoying one of many possible frontends"}],"styles":{}}' />
 
 <block type="gridBlock">
 
@@ -419,7 +419,7 @@ This site uses some recommended **add-ons**: Some blocks that are suitable to be
 
 ---
 
-<fields data='{"styles":{"align":"full"}}' />
+<fields data-json='{"styles":{"align":"full"}}' />
 
 </block>
 

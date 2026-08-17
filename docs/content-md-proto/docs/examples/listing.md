@@ -24,25 +24,25 @@ subjects:
   - listings
 title: Listing
 assignments:
-  - { uid: 43068b6d-d8e9-4acc-912b-eabcdc650939, type: title }
-  - { uid: ref-listing-description, type: slate }
-  - { uid: editor-screenshot, type: image }
-  - { uid: 24280e07-e962-4414-8ee5-cdaf58ca5f35, type: listing }
-  - { uid: 53ececaa-4219-42a9-861d-862be364fd60, type: listing }
-  - { uid: 2a597dde-dd2b-4c66-816c-09e243a188f5, type: gridBlock }
-  - { uid: grid-listing-1, type: listing }
-  - { uid: c2eaacd0-4e96-4344-a0ac-26ed644fc503, type: slider }
-  - { uid: ref-listing-schema, type: codeExample }
+  - { uid: 43068b6d-d8e9-4acc-912b-eabcdc650939 }
+  - { uid: ref-listing-description }
+  - { uid: editor-screenshot }
+  - { uid: 24280e07-e962-4414-8ee5-cdaf58ca5f35 }
+  - { uid: 53ececaa-4219-42a9-861d-862be364fd60 }
+  - { uid: 2a597dde-dd2b-4c66-816c-09e243a188f5 }
+  - { uid: grid-listing-1 }
+  - { uid: c2eaacd0-4e96-4344-a0ac-26ed644fc503 }
+  - { uid: ref-listing-schema }
   - { id: ref-listing-schema-javascript-bd0476 }
-  - { uid: ref-listing-json-data, type: codeExample }
+  - { uid: ref-listing-json-data }
   - { id: ref-listing-json-data-json-829696 }
-  - { uid: ref-listing-rendering, type: codeExample }
+  - { uid: ref-listing-rendering }
   - { id: ref-listing-rendering-jsx-f33c73 }
   - { id: ref-listing-rendering-vue-3c4a00 }
   - { id: ref-listing-rendering-svelte-aca768 }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="codeExample">
@@ -63,13 +63,13 @@ Displays a list of content items from a query. The listing block fetches items f
 
 <block type="image" url="/docs/images/listing-edit" alt="The listing example block being edited in Volto Hydra" align="center" size="l" />
 
-<block type="listing" block="24280e07-e962-4414-8ee5-cdaf58ca5f35" headline="Listing: Default" headlineTag="h2" variation="default" data='{"query":[],"querystring":{"b_size":"4","limit":"10","query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Document"]},{"i":"Subject","o":"plone.app.querystring.operation.selection.none","v":["main folder"]}],"sort_on":"getId","sort_order":"ascending"},"styles":{"backgroundColor":"transparent"}}' />
+<block type="listing" block="24280e07-e962-4414-8ee5-cdaf58ca5f35" headline="Listing: Default" headlineTag="h2" variation="default" data-json='{"query":[],"querystring":{"b_size":"4","limit":"10","query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Document"]},{"i":"Subject","o":"plone.app.querystring.operation.selection.none","v":["main folder"]}],"sort_on":"getId","sort_order":"ascending"},"styles":{"backgroundColor":"transparent"}}' />
 
-<block type="listing" block="24280e07-e962-4414-8ee5-cdaf58ca5f35" headline="Listing: Summary" headlineTag="h2" variation="summary" data='{"query":[],"querystring":{"limit":"5","query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Document"]},{"i":"Subject","o":"plone.app.querystring.operation.selection.none","v":["main folder"]}],"sort_on":"getId","sort_order":"ascending"},"styles":{"backgroundColor":"grey"}}' />
+<block type="listing" block="24280e07-e962-4414-8ee5-cdaf58ca5f35" headline="Listing: Summary" headlineTag="h2" variation="summary" data-json='{"query":[],"querystring":{"limit":"5","query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Document"]},{"i":"Subject","o":"plone.app.querystring.operation.selection.none","v":["main folder"]}],"sort_on":"getId","sort_order":"ascending"},"styles":{"backgroundColor":"grey"}}' />
 
-<block type="gridBlock" headline="Listing: Grid (Teaser)" headlineTag="h2" data='{"blocks":[{"@type":"listing","querystring":{"limit":"6","query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Document"]},{"i":"Subject","o":"plone.app.querystring.operation.selection.none","v":["main folder"]}],"sort_on":"getId","sort_order":"ascending"},"variation":"teaser"}],"styles":{"backgroundColor":"transparent"}}' />
+<block type="gridBlock" headline="Listing: Grid (Teaser)" headlineTag="h2" data-json='{"blocks":[{"@type":"listing","querystring":{"limit":"6","query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Document"]},{"i":"Subject","o":"plone.app.querystring.operation.selection.none","v":["main folder"]}],"sort_on":"getId","sort_order":"ascending"},"variation":"teaser"}],"styles":{"backgroundColor":"transparent"}}' />
 
-<block type="slider" headline="Listing: Image Slider" headlineTag="h2" data='{"autoplayDelay":4000,"autoplayEnabled":false,"autoplayJump":false,"slides":[{"@id":"slider-listing-1","@type":"listing","fieldMapping":{"@id":"href","title":"alt","image":"url"},"querystring":{"query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Image"]}],"sort_order":"ascending"},"variation":"image"}],"styles":{}}' />
+<block type="slider" headline="Listing: Image Slider" headlineTag="h2" data-json='{"autoplayDelay":4000,"autoplayEnabled":false,"autoplayJump":false,"slides":[{"@id":"slider-listing-1","@type":"listing","fieldMapping":{"@id":"href","title":"alt","image":"url"},"querystring":{"query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Image"]}],"sort_order":"ascending"},"variation":"image"}],"styles":{}}' />
 
 <block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="schema">
 

@@ -23,36 +23,36 @@ rights: ""
 subjects: []
 title: Editing text
 assignments:
-  - { uid: title-1, type: title }
-  - { uid: p-1, type: slate }
-  - { uid: h-2, type: slate }
-  - { uid: p-3, type: slate }
-  - { uid: h-4, type: slate }
-  - { uid: p-5, type: slate }
-  - { uid: ul-6, type: slate }
-  - { uid: h-7, type: slate }
-  - { uid: p-8, type: slate }
-  - { uid: h-9, type: slate }
-  - { uid: tbl-10, type: slateTable }
-  - { uid: h-11, type: slate }
-  - { uid: tbl-12, type: slateTable }
-  - { uid: h-13, type: slate }
-  - { uid: p-14, type: slate }
-  - { uid: h-15, type: slate }
-  - { uid: p-16, type: slate }
-  - { uid: img-17, type: image }
-  - { uid: p-18, type: slate }
-  - { uid: h-19, type: slate }
-  - { uid: p-20, type: slate }
-  - { uid: ul-21, type: slate }
-  - { uid: p-22, type: slate }
-  - { uid: h-23, type: slate }
-  - { uid: p-24, type: slate }
-  - { uid: h-25, type: slate }
-  - { uid: ul-26, type: slate }
+  - { uid: title-1 }
+  - { uid: p-1 }
+  - { uid: h-2 }
+  - { uid: p-3 }
+  - { uid: h-4 }
+  - { uid: p-5 }
+  - { uid: ul-6 }
+  - { uid: h-7 }
+  - { uid: p-8 }
+  - { uid: h-9 }
+  - { uid: tbl-10 }
+  - { uid: h-11 }
+  - { uid: tbl-12 }
+  - { uid: h-13 }
+  - { uid: p-14 }
+  - { uid: h-15 }
+  - { uid: p-16 }
+  - { uid: img-17 }
+  - { uid: p-18 }
+  - { uid: h-19 }
+  - { uid: p-20 }
+  - { uid: ul-21 }
+  - { uid: p-22 }
+  - { uid: h-23 }
+  - { uid: p-24 }
+  - { uid: h-25 }
+  - { uid: ul-26 }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="slateTable">

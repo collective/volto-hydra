@@ -22,22 +22,22 @@ subjects:
   - listings
 title: Related Items Block
 assignments:
-  - { uid: title-1, type: title }
-  - { uid: ref-relatedItemsListing-description, type: slate }
-  - { uid: ri-live-heading, type: slate }
-  - { uid: ri-live-1, type: relatedItemsListing }
-  - { uid: ref-relatedItemsListing-schema, type: codeExample }
+  - { uid: title-1 }
+  - { uid: ref-relatedItemsListing-description }
+  - { uid: ri-live-heading }
+  - { uid: ri-live-1 }
+  - { uid: ref-relatedItemsListing-schema }
   - { id: ref-relatedItemsListing-schema-javascript-a1a504 }
-  - { uid: ref-relatedItemsListing-json-data, type: codeExample }
+  - { uid: ref-relatedItemsListing-json-data }
   - { id: ref-relatedItemsListing-json-data-json-ba9577 }
-  - { uid: ref-relatedItemsListing-rendering-intro, type: slate }
-  - { uid: ref-relatedItemsListing-fetcher, type: codeExample }
+  - { uid: ref-relatedItemsListing-rendering-intro }
+  - { uid: ref-relatedItemsListing-fetcher }
   - { id: ref-relatedItemsListing-fetcher-javascript-1c975d }
-  - { uid: ref-relatedItemsListing-rendering, type: codeExample }
+  - { uid: ref-relatedItemsListing-rendering }
   - { id: ref-relatedItemsListing-rendering-javascript-2b9d44 }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

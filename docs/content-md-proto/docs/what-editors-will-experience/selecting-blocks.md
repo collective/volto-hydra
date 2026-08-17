@@ -22,46 +22,46 @@ rights: ""
 subjects: []
 title: Selecting blocks
 assignments:
-  - { uid: title-1, type: title }
-  - { uid: p-1, type: slate }
-  - { uid: h-2, type: slate }
-  - { uid: p-3, type: slate }
-  - { uid: ul-4, type: slate }
-  - { uid: img-5, type: image }
-  - { uid: h-6, type: slate }
-  - { uid: p-7, type: slate }
-  - { uid: ul-8, type: slate }
-  - { uid: p-9, type: slate }
-  - { uid: img-10, type: image }
-  - { uid: h-11, type: slate }
-  - { uid: p-12, type: slate }
-  - { uid: tbl-13, type: slateTable }
-  - { uid: p-14, type: slate }
-  - { uid: ul-15, type: slate }
-  - { uid: img-16, type: image }
-  - { uid: h-17, type: slate }
-  - { uid: p-18, type: slate }
-  - { uid: h-19, type: slate }
-  - { uid: p-20, type: slate }
-  - { uid: ce-21, type: codeExample }
+  - { uid: title-1 }
+  - { uid: p-1 }
+  - { uid: h-2 }
+  - { uid: p-3 }
+  - { uid: ul-4 }
+  - { uid: img-5 }
+  - { uid: h-6 }
+  - { uid: p-7 }
+  - { uid: ul-8 }
+  - { uid: p-9 }
+  - { uid: img-10 }
+  - { uid: h-11 }
+  - { uid: p-12 }
+  - { uid: tbl-13 }
+  - { uid: p-14 }
+  - { uid: ul-15 }
+  - { uid: img-16 }
+  - { uid: h-17 }
+  - { uid: p-18 }
+  - { uid: h-19 }
+  - { uid: p-20 }
+  - { uid: ce-21 }
   - { id: ce-21-text-3d139a }
-  - { uid: p-22, type: slate }
-  - { uid: img-23, type: image }
-  - { uid: p-24, type: slate }
-  - { uid: h-25, type: slate }
-  - { uid: p-26, type: slate }
-  - { uid: ce-27, type: codeExample }
+  - { uid: p-22 }
+  - { uid: img-23 }
+  - { uid: p-24 }
+  - { uid: h-25 }
+  - { uid: p-26 }
+  - { uid: ce-27 }
   - { id: ce-27-text-19ff8a }
-  - { uid: ul-28, type: slate }
-  - { uid: p-29, type: slate }
-  - { uid: img-30, type: image }
-  - { uid: h-31, type: slate }
-  - { uid: p-32, type: slate }
-  - { uid: h-33, type: slate }
-  - { uid: p-34, type: slate }
+  - { uid: ul-28 }
+  - { uid: p-29 }
+  - { uid: img-30 }
+  - { uid: h-31 }
+  - { uid: p-32 }
+  - { uid: h-33 }
+  - { uid: p-34 }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="slateTable">
@@ -131,7 +131,7 @@ While multiple blocks are selected:
 - The Quanta toolbar dropdown offers actions that apply to all (e.g. "Wrap in...", see [Containers](containers.md)).
 - The sidebar shows the count and lists each selected block by type.
 
-<block type="image" url="/docs/images/multi-select" align="center" size="l" data='{"alt":"Two adjacent paragraphs multi-selected — combined bounding box, sidebar shows \"2 selected\", toolbar shows count badge."}' />
+<block type="image" url="/docs/images/multi-select" align="center" size="l" data-json='{"alt":"Two adjacent paragraphs multi-selected — combined bounding box, sidebar shows \"2 selected\", toolbar shows count badge."}' />
 
 ## Selecting from the sidebar
 
@@ -158,7 +158,7 @@ When a block is selected, the sidebar shows the **chain of parent containers** f
 
 Click any `‹` arrow to **navigate up** to that level. This does the same thing as pressing `Escape` repeatedly, but visibly — you can see what each parent is named, jump several levels in one click, and edit the parent's own settings (alignment, padding, …) inline without leaving the current selection.
 
-<block type="image" url="/docs/images/parent-chain" align="center" size="l" data='{"alt":"Sidebar showing parent chain for a slate inside a column inside columns. Three sections each with a `‹` arrow: Columns (\"My Columns Section\"), Column (\"Left Column\"), Text (current, body field shown)."}' />
+<block type="image" url="/docs/images/parent-chain" align="center" size="l" data-json='{"alt":"Sidebar showing parent chain for a slate inside a column inside columns. Three sections each with a `‹` arrow: Columns (\"My Columns Section\"), Column (\"Left Column\"), Text (current, body field shown)."}' />
 
 This works for any depth — nested columns, slider with templated children, accordion inside a section inside the page. The chain reflects the real DOM hierarchy.
 
@@ -185,7 +185,7 @@ Slides                    [+]
 
 If the container has multiple blocks fields (e.g. a header field and a body field), each appears as a separate section with its own children list and add button.
 
-<block type="image" url="/docs/images/children-list" align="center" size="l" data='{"alt":"Sidebar with a search container selected, showing two children-list sections — Facets (with three facet rows) and Results Listing (with one Listing row). Each row has a `⋮⋮` drag handle and a `>` drill-in arrow; each section has a `+` add button."}' />
+<block type="image" url="/docs/images/children-list" align="center" size="l" data-json='{"alt":"Sidebar with a search container selected, showing two children-list sections — Facets (with three facet rows) and Results Listing (with one Listing row). Each row has a `⋮⋮` drag handle and a `>` drill-in arrow; each section has a `+` add button."}' />
 
 ### Picking from the outline (for paged containers)
 

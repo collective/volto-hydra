@@ -21,22 +21,22 @@ subjects:
   - listings
 title: RSS Feed Block
 assignments:
-  - { uid: title-1, type: title }
-  - { uid: ref-rssFeed-description, type: slate }
-  - { uid: rss-live-heading, type: slate }
-  - { uid: rss-live-1, type: rssFeed }
-  - { uid: ref-rssFeed-schema, type: codeExample }
+  - { uid: title-1 }
+  - { uid: ref-rssFeed-description }
+  - { uid: rss-live-heading }
+  - { uid: rss-live-1 }
+  - { uid: ref-rssFeed-schema }
   - { id: ref-rssFeed-schema-javascript-d79cf2 }
-  - { uid: ref-rssFeed-json-data, type: codeExample }
+  - { uid: ref-rssFeed-json-data }
   - { id: ref-rssFeed-json-data-json-c55bf4 }
-  - { uid: ref-rssFeed-rendering-intro, type: slate }
-  - { uid: ref-rssFeed-fetcher, type: codeExample }
+  - { uid: ref-rssFeed-rendering-intro }
+  - { uid: ref-rssFeed-fetcher }
   - { id: ref-rssFeed-fetcher-javascript-7f0034 }
-  - { uid: ref-rssFeed-rendering, type: codeExample }
+  - { uid: ref-rssFeed-rendering }
   - { id: ref-rssFeed-rendering-javascript-df4061 }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

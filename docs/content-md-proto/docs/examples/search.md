@@ -31,22 +31,22 @@ subjects:
   - navigation
 title: Search
 assignments:
-  - { uid: f6d35d7e-6422-4496-8a65-f7cfd42fb519, type: title }
-  - { uid: ref-search-description, type: slate }
-  - { uid: editor-screenshot, type: image }
-  - { uid: 42b7d589-4d35-4b81-9fe9-ea17437beb81, type: search }
-  - { uid: 518c46e7-9823-4e03-aa3a-d2a9ec1746dd, type: search }
-  - { uid: ref-search-schema, type: codeExample }
+  - { uid: f6d35d7e-6422-4496-8a65-f7cfd42fb519 }
+  - { uid: ref-search-description }
+  - { uid: editor-screenshot }
+  - { uid: 42b7d589-4d35-4b81-9fe9-ea17437beb81 }
+  - { uid: 518c46e7-9823-4e03-aa3a-d2a9ec1746dd }
+  - { uid: ref-search-schema }
   - { id: ref-search-schema-javascript-8711ec }
-  - { uid: ref-search-json-data, type: codeExample }
+  - { uid: ref-search-json-data }
   - { id: ref-search-json-data-json-155258 }
-  - { uid: ref-search-rendering, type: codeExample }
+  - { uid: ref-search-rendering }
   - { id: ref-search-rendering-jsx-dd082e }
   - { id: ref-search-rendering-vue-3c1873 }
   - { id: ref-search-rendering-svelte-7ba7ad }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="codeExample">
@@ -62,9 +62,9 @@ A search interface with faceted filtering. Contains a child listing block for re
 
 <block type="image" url="/docs/images/search-edit" alt="The search example block being edited in Volto Hydra" align="center" size="l" />
 
-<block type="search" headline="Search with Facets" listingBodyTemplate="summary" facetsTitle="Filter by" data='{"facets":[{"@id":"facet-type","type":"checkboxFacet","title":"Content Type","field":{"value":"portal_type","label":"Type"},"multiple":true,"hidden":false},{"@id":"facet-subject","type":"checkboxFacet","title":"Tags","field":{"value":"Subject","label":"Tags"},"multiple":true,"hidden":false}],"query":{"b_size":"4","query":[{"i":"path","o":"plone.app.querystring.operation.string.absolutePath","v":"/"}],"sort_on":"effective","sort_order":"descending"},"showSearchInput":true,"showSortOn":true,"showTotalResults":true,"blocks":{"facet-listing":{"@type":"listing","variation":"summary","querystring":{"query":[{"i":"path","o":"plone.app.querystring.operation.string.absolutePath","v":"/"}],"sort_on":"effective","sort_order":"descending"}}},"blocks_layout":{"listing":["facet-listing"]}}' />
+<block type="search" headline="Search with Facets" listingBodyTemplate="summary" facetsTitle="Filter by" data-json='{"facets":[{"@id":"facet-type","type":"checkboxFacet","title":"Content Type","field":{"value":"portal_type","label":"Type"},"multiple":true,"hidden":false},{"@id":"facet-subject","type":"checkboxFacet","title":"Tags","field":{"value":"Subject","label":"Tags"},"multiple":true,"hidden":false}],"query":{"b_size":"4","query":[{"i":"path","o":"plone.app.querystring.operation.string.absolutePath","v":"/"}],"sort_on":"effective","sort_order":"descending"},"showSearchInput":true,"showSortOn":true,"showTotalResults":true,"blocks":{"facet-listing":{"@type":"listing","variation":"summary","querystring":{"query":[{"i":"path","o":"plone.app.querystring.operation.string.absolutePath","v":"/"}],"sort_on":"effective","sort_order":"descending"}}},"blocks_layout":{"listing":["facet-listing"]}}' />
 
-<block type="search" headline="Simple Search" data='{"query":{"b_size":"4","query":[{"i":"path","o":"plone.app.querystring.operation.string.absolutePath","v":"/"}],"sort_on":"effective","sort_order":"descending"},"showSearchInput":true,"showSortOn":true,"showTotalResults":true,"blocks":{"simple-listing":{"@type":"listing","variation":"default","querystring":{"query":[{"i":"path","o":"plone.app.querystring.operation.string.absolutePath","v":"/"}],"sort_on":"effective","sort_order":"descending"}}},"blocks_layout":{"listing":["simple-listing"]}}' />
+<block type="search" headline="Simple Search" data-json='{"query":{"b_size":"4","query":[{"i":"path","o":"plone.app.querystring.operation.string.absolutePath","v":"/"}],"sort_on":"effective","sort_order":"descending"},"showSearchInput":true,"showSortOn":true,"showTotalResults":true,"blocks":{"simple-listing":{"@type":"listing","variation":"default","querystring":{"query":[{"i":"path","o":"plone.app.querystring.operation.string.absolutePath","v":"/"}],"sort_on":"effective","sort_order":"descending"}}},"blocks_layout":{"listing":["simple-listing"]}}' />
 
 <block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-search" slotId="schema">
 

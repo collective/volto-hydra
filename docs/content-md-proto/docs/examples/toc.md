@@ -30,37 +30,37 @@ subjects:
   - navigation
 title: Table of Contents
 assignments:
-  - { uid: 537a9742-95f1-4930-9df3-d38766f54a71, type: title }
-  - { uid: ref-toc-description, type: slate }
-  - { uid: editor-screenshot, type: image }
-  - { uid: 22f22002-2159-4e42-942a-8ebc6e930ed5, type: toc }
-  - { uid: 60a17689-6437-4a88-bf2c-76a62351ca5b, type: separator }
-  - { uid: 89137ab1-3973-437f-be95-7e91586a4685, type: image }
-  - { uid: e83fea00-1714-4de7-9d79-8d0e749639a9, type: introduction }
-  - { uid: d91f58fa-4634-4aac-bd1d-5f2fc4b338ca, type: separator }
-  - { uid: b1cf3854-5836-4efc-897e-d003ceea19f0, type: slate }
-  - { uid: 43dd5fcf-3f52-469b-8ccc-57b785cf65b1, type: slate }
-  - { uid: fde62278-7792-46be-ba68-0d4d19a3a677, type: slate }
-  - { uid: 9313e80c-65d1-4d72-863f-fc1c17aba444, type: slate }
-  - { uid: 741da11b-703b-43ab-a9df-a7c1087d059a, type: slate }
-  - { uid: 2e03fd8c-f334-400e-a3a9-d0446e3a1512, type: slate }
-  - { uid: 372b9489-5dc4-44a7-a7a9-649c2bc282db, type: slate }
-  - { uid: c08671c1-ca6c-4a5a-85b8-5c856bc112df, type: slate }
-  - { uid: c95cd0fd-f914-4dca-9adb-f7438b0a3112, type: slate }
-  - { uid: 2b54caa5-1c1a-40f2-aacd-84abce141e79, type: slate }
-  - { uid: 09460f92-723d-402d-a0a5-76a15f2678ad, type: slate }
-  - { uid: 3e036171-0a20-47d0-a06a-a7f493b65186, type: separator }
-  - { uid: ref-toc-schema, type: codeExample }
+  - { uid: 537a9742-95f1-4930-9df3-d38766f54a71 }
+  - { uid: ref-toc-description }
+  - { uid: editor-screenshot }
+  - { uid: 22f22002-2159-4e42-942a-8ebc6e930ed5 }
+  - { uid: 60a17689-6437-4a88-bf2c-76a62351ca5b }
+  - { uid: 89137ab1-3973-437f-be95-7e91586a4685 }
+  - { uid: e83fea00-1714-4de7-9d79-8d0e749639a9 }
+  - { uid: d91f58fa-4634-4aac-bd1d-5f2fc4b338ca }
+  - { uid: b1cf3854-5836-4efc-897e-d003ceea19f0 }
+  - { uid: 43dd5fcf-3f52-469b-8ccc-57b785cf65b1 }
+  - { uid: fde62278-7792-46be-ba68-0d4d19a3a677 }
+  - { uid: 9313e80c-65d1-4d72-863f-fc1c17aba444 }
+  - { uid: 741da11b-703b-43ab-a9df-a7c1087d059a }
+  - { uid: 2e03fd8c-f334-400e-a3a9-d0446e3a1512 }
+  - { uid: 372b9489-5dc4-44a7-a7a9-649c2bc282db }
+  - { uid: c08671c1-ca6c-4a5a-85b8-5c856bc112df }
+  - { uid: c95cd0fd-f914-4dca-9adb-f7438b0a3112 }
+  - { uid: 2b54caa5-1c1a-40f2-aacd-84abce141e79 }
+  - { uid: 09460f92-723d-402d-a0a5-76a15f2678ad }
+  - { uid: 3e036171-0a20-47d0-a06a-a7f493b65186 }
+  - { uid: ref-toc-schema }
   - { id: ref-toc-schema-javascript-496d15 }
-  - { uid: ref-toc-json-data, type: codeExample }
+  - { uid: ref-toc-json-data }
   - { id: ref-toc-json-data-json-aaa910 }
-  - { uid: ref-toc-rendering, type: codeExample }
+  - { uid: ref-toc-rendering }
   - { id: ref-toc-rendering-jsx-ee2124 }
   - { id: ref-toc-rendering-vue-12aef2 }
   - { id: ref-toc-rendering-svelte-397c7f }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="separator" _="${hr}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
@@ -83,19 +83,19 @@ Renders a table of contents generated from heading blocks on the current page. I
 
 ---
 
-<fields data='{"styles":{"align":"full"}}' />
+<fields data-json='{"styles":{"align":"full"}}' />
 
 </block>
 
-<block type="image" align="wide" copyright_and_sources="Copyright: unsplash.com" description="Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt." size="l" title="Title Image" url="/docs/examples/content-types/image-dark" data='{"styles":{"size:noprefix":"large"}}' />
+<block type="image" align="wide" copyright_and_sources="Copyright: unsplash.com" description="Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt." size="l" title="Title Image" url="/docs/examples/content-types/image-dark" data-json='{"styles":{"size:noprefix":"large"}}' />
 
-<block type="introduction" data='{"value":[{"children":[{"text":"Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. "}],"type":"p"}]}' />
+<block type="introduction" data-json='{"value":[{"children":[{"text":"Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. "}],"type":"p"}]}' />
 
 <block type="separator">
 
 ---
 
-<fields data='{"styles":{"align":"full"}}' />
+<fields data-json='{"styles":{"align":"full"}}' />
 
 </block>
 
@@ -131,7 +131,7 @@ Text can be **bold** or *italic*.
 
 ---
 
-<fields data='{"styles":{"align":"left"}}' />
+<fields data-json='{"styles":{"align":"left"}}' />
 
 </block>
 

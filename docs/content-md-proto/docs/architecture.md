@@ -27,52 +27,52 @@ subjects:
   - editing
 title: How Inka Works
 assignments:
-  - { uid: title-1, type: title }
-  - { uid: p-1, type: slate }
-  - { uid: sep-2, type: separator }
-  - { uid: h-3, type: slate }
-  - { uid: p-4, type: slate }
-  - { uid: ce-5, type: codeExample }
+  - { uid: title-1 }
+  - { uid: p-1 }
+  - { uid: sep-2 }
+  - { uid: h-3 }
+  - { uid: p-4 }
+  - { uid: ce-5 }
   - { id: ce-5-bash-56c4ae }
-  - { uid: h-6, type: slate }
-  - { uid: p-7, type: slate }
-  - { uid: ul-8, type: slate }
-  - { uid: p-9, type: slate }
-  - { uid: h-10, type: slate }
-  - { uid: p-11, type: slate }
-  - { uid: ol-12, type: slate }
-  - { uid: p-13, type: slate }
-  - { uid: h-14, type: slate }
-  - { uid: p-15, type: slate }
-  - { uid: ol-16, type: slate }
-  - { uid: p-17, type: slate }
-  - { uid: h-18, type: slate }
-  - { uid: p-19, type: slate }
-  - { uid: ul-20, type: slate }
-  - { uid: p-21, type: slate }
-  - { uid: p-22, type: slate }
-  - { uid: ul-23, type: slate }
-  - { uid: p-24, type: slate }
-  - { uid: p-25, type: slate }
-  - { uid: ol-26, type: slate }
-  - { uid: p-27, type: slate }
-  - { uid: h-28, type: slate }
-  - { uid: p-29, type: slate }
-  - { uid: p-30, type: slate }
-  - { uid: p-31, type: slate }
-  - { uid: ul-32, type: slate }
-  - { uid: p-33, type: slate }
-  - { uid: p-34, type: slate }
-  - { uid: h-35, type: slate }
-  - { uid: p-36, type: slate }
-  - { uid: p-37, type: slate }
-  - { uid: h-38, type: slate }
-  - { uid: p-39, type: slate }
-  - { uid: tbl-40, type: slateTable }
-  - { uid: p-41, type: slate }
+  - { uid: h-6 }
+  - { uid: p-7 }
+  - { uid: ul-8 }
+  - { uid: p-9 }
+  - { uid: h-10 }
+  - { uid: p-11 }
+  - { uid: ol-12 }
+  - { uid: p-13 }
+  - { uid: h-14 }
+  - { uid: p-15 }
+  - { uid: ol-16 }
+  - { uid: p-17 }
+  - { uid: h-18 }
+  - { uid: p-19 }
+  - { uid: ul-20 }
+  - { uid: p-21 }
+  - { uid: p-22 }
+  - { uid: ul-23 }
+  - { uid: p-24 }
+  - { uid: p-25 }
+  - { uid: ol-26 }
+  - { uid: p-27 }
+  - { uid: h-28 }
+  - { uid: p-29 }
+  - { uid: p-30 }
+  - { uid: p-31 }
+  - { uid: ul-32 }
+  - { uid: p-33 }
+  - { uid: p-34 }
+  - { uid: h-35 }
+  - { uid: p-36 }
+  - { uid: p-37 }
+  - { uid: h-38 }
+  - { uid: p-39 }
+  - { uid: tbl-40 }
+  - { uid: p-41 }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="separator" _="${hr}" />
   <block type="slateTable">
     <region name="table.rows">

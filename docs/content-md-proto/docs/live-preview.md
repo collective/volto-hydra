@@ -23,26 +23,26 @@ subjects:
   - editing
 title: Live Preview
 assignments:
-  - { uid: title-1, type: title }
-  - { uid: p-1, type: slate }
-  - { uid: sep-2, type: separator }
-  - { uid: h-3, type: slate }
-  - { uid: p-4, type: slate }
-  - { uid: ce-5, type: codeExample }
+  - { uid: title-1 }
+  - { uid: p-1 }
+  - { uid: sep-2 }
+  - { uid: h-3 }
+  - { uid: p-4 }
+  - { uid: ce-5 }
   - { id: ce-5-javascript-3259a0 }
-  - { uid: p-6, type: slate }
-  - { uid: p-7, type: slate }
-  - { uid: h-8, type: slate }
-  - { uid: p-9, type: slate }
-  - { uid: ce-10, type: codeExample }
+  - { uid: p-6 }
+  - { uid: p-7 }
+  - { uid: h-8 }
+  - { uid: p-9 }
+  - { uid: ce-10 }
   - { id: ce-10-javascript-23153e }
-  - { uid: h-11, type: slate }
-  - { uid: p-12, type: slate }
-  - { uid: ce-13, type: codeExample }
+  - { uid: h-11 }
+  - { uid: p-12 }
+  - { uid: ce-13 }
   - { id: ce-13-javascript-4aeb0d }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="separator" _="${hr}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">

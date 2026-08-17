@@ -22,20 +22,20 @@ rights: ""
 subjects: []
 title: Docs
 assignments:
-  - { uid: title-1, type: title }
-  - { uid: p-1, type: slate }
-  - { uid: h-2, type: slate }
-  - { uid: ul-3, type: slate }
-  - { uid: h-4, type: slate }
-  - { uid: p-5, type: slate }
-  - { uid: p-6, type: slate }
-  - { uid: ul-7, type: slate }
-  - { uid: p-8, type: slate }
-  - { uid: p-9, type: slate }
-  - { uid: listing-1, type: listing }
+  - { uid: title-1 }
+  - { uid: p-1 }
+  - { uid: h-2 }
+  - { uid: ul-3 }
+  - { uid: h-4 }
+  - { uid: p-5 }
+  - { uid: p-6 }
+  - { uid: ul-7 }
+  - { uid: p-8 }
+  - { uid: p-9 }
+  - { uid: listing-1 }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
 order:
   - architecture
   - build-a-frontend
@@ -81,4 +81,4 @@ The default preset is a Nuxt.js frontend deployed as an [SSG](https://hydra-nuxt
 
 To run Inka locally against your own frontend, see the **Run Locally** section of the [project README](https://github.com/collective/volto-hydra#run-locally).
 
-<block type="listing" headlineTag="h2" variation="summary" data='{"styles":{},"fieldMapping":{"@id":"href","title":"title","description":"description","image":"image"}}' />
+<block type="listing" headlineTag="h2" variation="summary" data-json='{"styles":{},"fieldMapping":{"@id":"href","title":"title","description":"description","image":"image"}}' />

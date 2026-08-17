@@ -25,102 +25,102 @@ subjects:
   - frontend
 title: Container Blocks
 assignments:
-  - { uid: title-1, type: title }
-  - { uid: p-1, type: slate }
-  - { uid: p-2, type: slate }
-  - { uid: ul-3, type: slate }
-  - { uid: p-4, type: slate }
-  - { uid: sep-5, type: separator }
-  - { uid: h-6, type: slate }
-  - { uid: p-7, type: slate }
-  - { uid: ce-8, type: codeExample }
+  - { uid: title-1 }
+  - { uid: p-1 }
+  - { uid: p-2 }
+  - { uid: ul-3 }
+  - { uid: p-4 }
+  - { uid: sep-5 }
+  - { uid: h-6 }
+  - { uid: p-7 }
+  - { uid: ce-8 }
   - { id: ce-8-javascript-d2f77e }
-  - { uid: p-9, type: slate }
-  - { uid: bq-10, type: slate }
-  - { uid: h-11, type: slate }
-  - { uid: p-12, type: slate }
-  - { uid: p-13, type: slate }
-  - { uid: ce-14, type: codeExample }
+  - { uid: p-9 }
+  - { uid: bq-10 }
+  - { uid: h-11 }
+  - { uid: p-12 }
+  - { uid: p-13 }
+  - { uid: ce-14 }
   - { id: ce-14-javascript-3ea062 }
-  - { uid: p-15, type: slate }
-  - { uid: h-16, type: slate }
-  - { uid: p-17, type: slate }
-  - { uid: p-18, type: slate }
-  - { uid: h-19, type: slate }
-  - { uid: p-20, type: slate }
-  - { uid: ce-21, type: codeExample }
+  - { uid: p-15 }
+  - { uid: h-16 }
+  - { uid: p-17 }
+  - { uid: p-18 }
+  - { uid: h-19 }
+  - { uid: p-20 }
+  - { uid: ce-21 }
   - { id: ce-21-javascript-83a0dc }
-  - { uid: h-22, type: slate }
-  - { uid: p-23, type: slate }
-  - { uid: ce-24, type: codeExample }
+  - { uid: h-22 }
+  - { uid: p-23 }
+  - { uid: ce-24 }
   - { id: ce-24-javascript-6781ed }
-  - { uid: p-25, type: slate }
-  - { uid: h-26, type: slate }
-  - { uid: p-27, type: slate }
-  - { uid: p-28, type: slate }
-  - { uid: ce-29, type: codeExample }
+  - { uid: p-25 }
+  - { uid: h-26 }
+  - { uid: p-27 }
+  - { uid: p-28 }
+  - { uid: ce-29 }
   - { id: ce-29-javascript-dd9f7e }
-  - { uid: p-30, type: slate }
-  - { uid: ce-31, type: codeExample }
+  - { uid: p-30 }
+  - { uid: ce-31 }
   - { id: ce-31-javascript-f90eb4 }
-  - { uid: p-32, type: slate }
-  - { uid: p-33, type: slate }
-  - { uid: p-34, type: slate }
-  - { uid: h-35, type: slate }
-  - { uid: p-36, type: slate }
-  - { uid: tbl-37, type: slateTable }
-  - { uid: p-38, type: slate }
-  - { uid: h-39, type: slate }
-  - { uid: p-40, type: slate }
-  - { uid: ce-41, type: codeExample }
+  - { uid: p-32 }
+  - { uid: p-33 }
+  - { uid: p-34 }
+  - { uid: h-35 }
+  - { uid: p-36 }
+  - { uid: tbl-37 }
+  - { uid: p-38 }
+  - { uid: h-39 }
+  - { uid: p-40 }
+  - { uid: ce-41 }
   - { id: ce-41-javascript-85a3e1 }
-  - { uid: ul-42, type: slate }
-  - { uid: h-43, type: slate }
-  - { uid: p-44, type: slate }
-  - { uid: ce-45, type: codeExample }
+  - { uid: ul-42 }
+  - { uid: h-43 }
+  - { uid: p-44 }
+  - { uid: ce-45 }
   - { id: ce-45-javascript-1cff8e }
-  - { uid: h-46, type: slate }
-  - { uid: p-47, type: slate }
-  - { uid: ul-48, type: slate }
-  - { uid: p-49, type: slate }
-  - { uid: p-50, type: slate }
-  - { uid: h-51, type: slate }
-  - { uid: p-52, type: slate }
-  - { uid: ce-53, type: codeExample }
+  - { uid: h-46 }
+  - { uid: p-47 }
+  - { uid: ul-48 }
+  - { uid: p-49 }
+  - { uid: p-50 }
+  - { uid: h-51 }
+  - { uid: p-52 }
+  - { uid: ce-53 }
   - { id: ce-53-javascript-f4d972 }
-  - { uid: p-54, type: slate }
-  - { uid: ul-55, type: slate }
-  - { uid: p-56, type: slate }
-  - { uid: p-57, type: slate }
-  - { uid: h-58, type: slate }
-  - { uid: p-59, type: slate }
-  - { uid: p-60, type: slate }
-  - { uid: p-61, type: slate }
-  - { uid: ce-62, type: codeExample }
+  - { uid: p-54 }
+  - { uid: ul-55 }
+  - { uid: p-56 }
+  - { uid: p-57 }
+  - { uid: h-58 }
+  - { uid: p-59 }
+  - { uid: p-60 }
+  - { uid: p-61 }
+  - { uid: ce-62 }
   - { id: ce-62-javascript-4ebff8 }
-  - { uid: p-63, type: slate }
-  - { uid: ul-64, type: slate }
-  - { uid: h-65, type: slate }
-  - { uid: p-66, type: slate }
-  - { uid: p-67, type: slate }
-  - { uid: ce-68, type: codeExample }
+  - { uid: p-63 }
+  - { uid: ul-64 }
+  - { uid: h-65 }
+  - { uid: p-66 }
+  - { uid: p-67 }
+  - { uid: ce-68 }
   - { id: ce-68-javascript-cdad0c }
-  - { uid: p-69, type: slate }
-  - { uid: h-70, type: slate }
-  - { uid: p-71, type: slate }
-  - { uid: ce-72, type: codeExample }
+  - { uid: p-69 }
+  - { uid: h-70 }
+  - { uid: p-71 }
+  - { uid: ce-72 }
   - { id: ce-72-javascript-521655 }
-  - { uid: p-73, type: slate }
-  - { uid: ol-74, type: slate }
-  - { uid: p-75, type: slate }
-  - { uid: ce-76, type: codeExample }
+  - { uid: p-73 }
+  - { uid: ol-74 }
+  - { uid: p-75 }
+  - { uid: ce-76 }
   - { id: ce-76-javascript-6b52c5 }
-  - { uid: p-77, type: slate }
-  - { uid: h-78, type: slate }
-  - { uid: ul-79, type: slate }
+  - { uid: p-77 }
+  - { uid: h-78 }
+  - { uid: ul-79 }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="separator" _="${hr}" />
   <block type="slateTable">
     <region name="table.rows">

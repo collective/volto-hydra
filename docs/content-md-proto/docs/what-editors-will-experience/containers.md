@@ -22,40 +22,40 @@ rights: ""
 subjects: []
 title: Containers
 assignments:
-  - { uid: title-1, type: title }
-  - { uid: p-1, type: slate }
-  - { uid: p-2, type: slate }
-  - { uid: h-3, type: slate }
-  - { uid: p-4, type: slate }
-  - { uid: ol-5, type: slate }
-  - { uid: p-6, type: slate }
-  - { uid: img-7, type: image }
-  - { uid: p-8, type: slate }
-  - { uid: h-9, type: slate }
-  - { uid: p-10, type: slate }
-  - { uid: p-11, type: slate }
-  - { uid: p-12, type: slate }
-  - { uid: h-13, type: slate }
-  - { uid: p-14, type: slate }
-  - { uid: ul-15, type: slate }
-  - { uid: p-16, type: slate }
-  - { uid: img-17, type: image }
-  - { uid: p-18, type: slate }
-  - { uid: p-19, type: slate }
-  - { uid: h-20, type: slate }
-  - { uid: p-21, type: slate }
-  - { uid: ul-22, type: slate }
-  - { uid: img-23, type: image }
-  - { uid: p-24, type: slate }
-  - { uid: h-25, type: slate }
-  - { uid: p-26, type: slate }
-  - { uid: h-27, type: slate }
-  - { uid: ul-28, type: slate }
-  - { uid: h-29, type: slate }
-  - { uid: ul-30, type: slate }
+  - { uid: title-1 }
+  - { uid: p-1 }
+  - { uid: p-2 }
+  - { uid: h-3 }
+  - { uid: p-4 }
+  - { uid: ol-5 }
+  - { uid: p-6 }
+  - { uid: img-7 }
+  - { uid: p-8 }
+  - { uid: h-9 }
+  - { uid: p-10 }
+  - { uid: p-11 }
+  - { uid: p-12 }
+  - { uid: h-13 }
+  - { uid: p-14 }
+  - { uid: ul-15 }
+  - { uid: p-16 }
+  - { uid: img-17 }
+  - { uid: p-18 }
+  - { uid: p-19 }
+  - { uid: h-20 }
+  - { uid: p-21 }
+  - { uid: ul-22 }
+  - { uid: img-23 }
+  - { uid: p-24 }
+  - { uid: h-25 }
+  - { uid: p-26 }
+  - { uid: h-27 }
+  - { uid: ul-28 }
+  - { uid: h-29 }
+  - { uid: ul-30 }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
 ---
@@ -75,7 +75,7 @@ Select one or more blocks (see [Selecting blocks](selecting-blocks.md)), then ch
 
 Pick one. The selected blocks are pulled out of their original positions and placed as children of the new container, in the original order. The new container takes the first selected block's position.
 
-<block type="image" url="/docs/images/wrap-chooser" align="center" size="l" data='{"alt":"Two adjacent paragraphs multi-selected, \"Wrap in...\" chooser open showing container types in Most Used / Common groups."}' />
+<block type="image" url="/docs/images/wrap-chooser" align="center" size="l" data-json='{"alt":"Two adjacent paragraphs multi-selected, \"Wrap in...\" chooser open showing container types in Most Used / Common groups."}' />
 
 Use this to retroactively group content — e.g. wrap two paragraphs and an image into a card, or wrap three columns of content into a row.
 
@@ -109,7 +109,7 @@ In the Quanta toolbar dropdown, **Convert to...** lists block types this block c
 - **Layout shape conversion** — children move into the new container's layout field automatically (whether the source uses `blocks_layout` or `object_list`).
 - **Recursive child conversion** — if some children's `@type` isn't in the target's `allowedBlocks`, those children are themselves converted (using their `fieldMappings`) so they fit. If no path exists, the conversion target is shown disabled with a tooltip.
 
-<block type="image" url="/docs/images/container-convert" align="center" size="l" data='{"alt":"A grid container selected, \"Convert to...\" chooser open showing compatible target container types."}' />
+<block type="image" url="/docs/images/container-convert" align="center" size="l" data-json='{"alt":"A grid container selected, \"Convert to...\" chooser open showing compatible target container types."}' />
 
 Use this to reshape an existing layout — e.g. a 2-column row into a 3-column grid, or columns into an accordion.
 

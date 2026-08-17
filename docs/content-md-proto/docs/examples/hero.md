@@ -22,19 +22,19 @@ subjects:
   - media
 title: Hero Block
 assignments:
-  - { uid: title-1, type: title }
-  - { uid: ref-hero-description, type: slate }
-  - { uid: ref-hero-schema, type: codeExample }
+  - { uid: title-1 }
+  - { uid: ref-hero-description }
+  - { uid: ref-hero-schema }
   - { id: ref-hero-schema-javascript-698e6b }
-  - { uid: ref-hero-json-data, type: codeExample }
+  - { uid: ref-hero-json-data }
   - { id: ref-hero-json-data-json-fc17f8 }
-  - { uid: ref-hero-rendering, type: codeExample }
+  - { uid: ref-hero-rendering }
   - { id: ref-hero-rendering-jsx-46a2e5 }
   - { id: ref-hero-rendering-vue-337205 }
   - { id: ref-hero-rendering-svelte-a2ecf7 }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

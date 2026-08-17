@@ -26,19 +26,19 @@ subjects:
   - templates
 title: Context Navigation Block
 assignments:
-  - { uid: title-1, type: title }
-  - { uid: ref-contextNavigation-description, type: slate }
-  - { uid: ref-contextNavigation-schema, type: codeExample }
+  - { uid: title-1 }
+  - { uid: ref-contextNavigation-description }
+  - { uid: ref-contextNavigation-schema }
   - { id: ref-contextNavigation-schema-javascript-38f58f }
-  - { uid: ref-contextNavigation-json-data, type: codeExample }
+  - { uid: ref-contextNavigation-json-data }
   - { id: ref-contextNavigation-json-data-json-62b3b4 }
-  - { uid: ref-contextNavigation-rendering, type: codeExample }
+  - { uid: ref-contextNavigation-rendering }
   - { id: ref-contextNavigation-rendering-jsx-25968a }
   - { id: ref-contextNavigation-rendering-vue-af752b }
   - { id: ref-contextNavigation-rendering-svelte-a27836 }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

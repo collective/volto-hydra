@@ -21,82 +21,82 @@ subjects:
   - editing
 title: Visual Editing
 assignments:
-  - { uid: ve-title-1, type: title }
-  - { uid: h-1, type: slate }
-  - { uid: p-2, type: slate }
-  - { uid: ul-3, type: slate }
-  - { uid: p-4, type: slate }
-  - { uid: ce-5, type: codeExample }
+  - { uid: ve-title-1 }
+  - { uid: h-1 }
+  - { uid: p-2 }
+  - { uid: ul-3 }
+  - { uid: p-4 }
+  - { uid: ce-5 }
   - { id: ce-5-html-6481c1 }
-  - { uid: h-6, type: slate }
-  - { uid: p-7, type: slate }
-  - { uid: ce-8, type: codeExample }
+  - { uid: h-6 }
+  - { uid: p-7 }
+  - { uid: ce-8 }
   - { id: ce-8-html-5005a4 }
-  - { uid: ul-9, type: slate }
-  - { uid: p-10, type: slate }
-  - { uid: h-11, type: slate }
-  - { uid: p-12, type: slate }
-  - { uid: ce-13, type: codeExample }
+  - { uid: ul-9 }
+  - { uid: p-10 }
+  - { uid: h-11 }
+  - { uid: p-12 }
+  - { uid: ce-13 }
   - { id: ce-13-html-20bcae }
-  - { uid: p-14, type: slate }
-  - { uid: p-15, type: slate }
-  - { uid: p-16, type: slate }
-  - { uid: p-17, type: slate }
-  - { uid: h-18, type: slate }
-  - { uid: p-19, type: slate }
-  - { uid: ce-20, type: codeExample }
+  - { uid: p-14 }
+  - { uid: p-15 }
+  - { uid: p-16 }
+  - { uid: p-17 }
+  - { uid: h-18 }
+  - { uid: p-19 }
+  - { uid: ce-20 }
   - { id: ce-20-html-da86a1 }
-  - { uid: h-21, type: slate }
-  - { uid: p-22, type: slate }
-  - { uid: p-23, type: slate }
-  - { uid: ul-24, type: slate }
-  - { uid: p-25, type: slate }
-  - { uid: p-26, type: slate }
-  - { uid: ul-27, type: slate }
-  - { uid: p-28, type: slate }
-  - { uid: ce-29, type: codeExample }
+  - { uid: h-21 }
+  - { uid: p-22 }
+  - { uid: p-23 }
+  - { uid: ul-24 }
+  - { uid: p-25 }
+  - { uid: p-26 }
+  - { uid: ul-27 }
+  - { uid: p-28 }
+  - { uid: ce-29 }
   - { id: ce-29-html-a5e4fc }
-  - { uid: p-30, type: slate }
-  - { uid: h-31, type: slate }
-  - { uid: p-32, type: slate }
-  - { uid: ce-33, type: codeExample }
+  - { uid: p-30 }
+  - { uid: h-31 }
+  - { uid: p-32 }
+  - { uid: ce-33 }
   - { id: ce-33-html-6eefe4 }
-  - { uid: p-34, type: slate }
-  - { uid: ce-35, type: codeExample }
+  - { uid: p-34 }
+  - { uid: ce-35 }
   - { id: ce-35-html-9626f2 }
-  - { uid: p-36, type: slate }
-  - { uid: p-37, type: slate }
-  - { uid: h-38, type: slate }
-  - { uid: p-39, type: slate }
-  - { uid: ol-40, type: slate }
-  - { uid: p-41, type: slate }
-  - { uid: ce-42, type: codeExample }
+  - { uid: p-36 }
+  - { uid: p-37 }
+  - { uid: h-38 }
+  - { uid: p-39 }
+  - { uid: ol-40 }
+  - { uid: p-41 }
+  - { uid: ce-42 }
   - { id: ce-42-html-7ddfd5 }
-  - { uid: h-43, type: slate }
-  - { uid: p-44, type: slate }
-  - { uid: ul-45, type: slate }
-  - { uid: p-46, type: slate }
-  - { uid: ce-47, type: codeExample }
+  - { uid: h-43 }
+  - { uid: p-44 }
+  - { uid: ul-45 }
+  - { uid: p-46 }
+  - { uid: ce-47 }
   - { id: ce-47-html-a67f8c }
-  - { uid: p-48, type: slate }
-  - { uid: h-49, type: slate }
-  - { uid: p-50, type: slate }
-  - { uid: p-51, type: slate }
-  - { uid: ul-52, type: slate }
-  - { uid: p-53, type: slate }
-  - { uid: h-54, type: slate }
-  - { uid: p-55, type: slate }
-  - { uid: ce-56, type: codeExample }
+  - { uid: p-48 }
+  - { uid: h-49 }
+  - { uid: p-50 }
+  - { uid: p-51 }
+  - { uid: ul-52 }
+  - { uid: p-53 }
+  - { uid: h-54 }
+  - { uid: p-55 }
+  - { uid: ce-56 }
   - { id: ce-56-json-a0b37e }
-  - { uid: p-57, type: slate }
-  - { uid: ce-58, type: codeExample }
+  - { uid: p-57 }
+  - { uid: ce-58 }
   - { id: ce-58-javascript-3cee82 }
-  - { uid: p-59, type: slate }
-  - { uid: ce-60, type: codeExample }
+  - { uid: p-59 }
+  - { uid: ce-60 }
   - { id: ce-60-html-7e15f3 }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

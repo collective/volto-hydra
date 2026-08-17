@@ -24,53 +24,53 @@ rights: ""
 subjects: []
 title: Templates and layouts
 assignments:
-  - { uid: title-1, type: title }
-  - { uid: p-1, type: slate }
-  - { uid: p-2, type: slate }
-  - { uid: ul-3, type: slate }
-  - { uid: p-4, type: slate }
-  - { uid: h-5, type: slate }
-  - { uid: p-6, type: slate }
-  - { uid: h-7, type: slate }
-  - { uid: p-8, type: slate }
-  - { uid: ul-9, type: slate }
-  - { uid: p-10, type: slate }
-  - { uid: p-11, type: slate }
-  - { uid: h-12, type: slate }
-  - { uid: p-13, type: slate }
-  - { uid: ul-14, type: slate }
-  - { uid: p-15, type: slate }
-  - { uid: ul-16, type: slate }
-  - { uid: p-17, type: slate }
-  - { uid: h-18, type: slate }
-  - { uid: p-19, type: slate }
-  - { uid: img-20, type: image }
-  - { uid: h-21, type: slate }
-  - { uid: p-22, type: slate }
-  - { uid: p-23, type: slate }
-  - { uid: h-24, type: slate }
-  - { uid: p-25, type: slate }
-  - { uid: ul-26, type: slate }
-  - { uid: p-27, type: slate }
-  - { uid: p-28, type: slate }
-  - { uid: h-29, type: slate }
-  - { uid: p-30, type: slate }
-  - { uid: ol-31, type: slate }
-  - { uid: p-32, type: slate }
-  - { uid: h-33, type: slate }
-  - { uid: p-34, type: slate }
-  - { uid: p-35, type: slate }
-  - { uid: p-36, type: slate }
-  - { uid: ul-37, type: slate }
-  - { uid: p-38, type: slate }
-  - { uid: img-39, type: image }
-  - { uid: h-40, type: slate }
-  - { uid: p-41, type: slate }
-  - { uid: h-42, type: slate }
-  - { uid: p-43, type: slate }
+  - { uid: title-1 }
+  - { uid: p-1 }
+  - { uid: p-2 }
+  - { uid: ul-3 }
+  - { uid: p-4 }
+  - { uid: h-5 }
+  - { uid: p-6 }
+  - { uid: h-7 }
+  - { uid: p-8 }
+  - { uid: ul-9 }
+  - { uid: p-10 }
+  - { uid: p-11 }
+  - { uid: h-12 }
+  - { uid: p-13 }
+  - { uid: ul-14 }
+  - { uid: p-15 }
+  - { uid: ul-16 }
+  - { uid: p-17 }
+  - { uid: h-18 }
+  - { uid: p-19 }
+  - { uid: img-20 }
+  - { uid: h-21 }
+  - { uid: p-22 }
+  - { uid: p-23 }
+  - { uid: h-24 }
+  - { uid: p-25 }
+  - { uid: ul-26 }
+  - { uid: p-27 }
+  - { uid: p-28 }
+  - { uid: h-29 }
+  - { uid: p-30 }
+  - { uid: ol-31 }
+  - { uid: p-32 }
+  - { uid: h-33 }
+  - { uid: p-34 }
+  - { uid: p-35 }
+  - { uid: p-36 }
+  - { uid: ul-37 }
+  - { uid: p-38 }
+  - { uid: img-39 }
+  - { uid: h-40 }
+  - { uid: p-41 }
+  - { uid: h-42 }
+  - { uid: p-43 }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
 ---
@@ -120,7 +120,7 @@ Typical use: a "callout" block in the middle of a layout — every page has one,
 
 Regular blocks where you can do anything — add, edit, move, delete. The template marks regions as slots (with a `slotId`) and your existing content is placed into the matching slots when the template merges.
 
-<block type="image" url="/docs/images/template-locked" align="center" size="l" data='{"alt":"A snippet template applied to a page. The \"Snippet Header\" block is selected, rendered muted as a locked block. Its sidebar shows its content read-only — a \"Text\" field with the value \"Snippet Header - From Template\" — above the template&#39;s own read-only settings (Template Name, Save Location)."}' />
+<block type="image" url="/docs/images/template-locked" align="center" size="l" data-json='{"alt":"A snippet template applied to a page. The \"Snippet Header\" block is selected, rendered muted as a locked block. Its sidebar shows its content read-only — a \"Text\" field with the value \"Snippet Header - From Template\" — above the template&#39;s own read-only settings (Template Name, Save Location)."}' />
 
 ## Inserting between fixed blocks
 

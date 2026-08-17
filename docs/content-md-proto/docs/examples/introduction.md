@@ -31,26 +31,26 @@ subjects:
   - text
 title: Introduction
 assignments:
-  - { uid: 50727b9a-1f8a-4857-aab5-8acc6985bfc6, type: title }
-  - { uid: ref-introduction-description, type: slate }
-  - { uid: editor-screenshot, type: image }
-  - { uid: d0438a28-aaaf-4db1-8887-c9b3351787d3, type: separator }
-  - { uid: d35f209e-12c1-4a30-ae36-52f84a4a0b7b, type: introduction }
-  - { uid: d35f209e-12c1-4a30-ae36-52f84a4a0b7b-split-1, type: slate }
-  - { uid: cec08900-0334-4288-9ece-f5d15d4dd6f1, type: separator }
-  - { uid: 26accd80-9715-43ea-9b7c-aa0b3be7d0da, type: slate }
-  - { uid: 177de529-ce72-4721-a58c-15feadaf285e, type: slate }
-  - { uid: ref-introduction-schema, type: codeExample }
+  - { uid: 50727b9a-1f8a-4857-aab5-8acc6985bfc6 }
+  - { uid: ref-introduction-description }
+  - { uid: editor-screenshot }
+  - { uid: d0438a28-aaaf-4db1-8887-c9b3351787d3 }
+  - { uid: d35f209e-12c1-4a30-ae36-52f84a4a0b7b }
+  - { uid: d35f209e-12c1-4a30-ae36-52f84a4a0b7b-split-1 }
+  - { uid: cec08900-0334-4288-9ece-f5d15d4dd6f1 }
+  - { uid: 26accd80-9715-43ea-9b7c-aa0b3be7d0da }
+  - { uid: 177de529-ce72-4721-a58c-15feadaf285e }
+  - { uid: ref-introduction-schema }
   - { id: ref-introduction-schema-javascript-e14a03 }
-  - { uid: ref-introduction-json-data, type: codeExample }
+  - { uid: ref-introduction-json-data }
   - { id: ref-introduction-json-data-json-d959f7 }
-  - { uid: ref-introduction-rendering, type: codeExample }
+  - { uid: ref-introduction-rendering }
   - { id: ref-introduction-rendering-jsx-599242 }
   - { id: ref-introduction-rendering-vue-53106b }
   - { id: ref-introduction-rendering-svelte-9e2b59 }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="separator" _="${hr}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
@@ -71,11 +71,11 @@ Displays the page's title and description as a styled header. The introduction b
 
 ---
 
-<fields data='{"styles":{"align":"full"}}' />
+<fields data-json='{"styles":{"align":"full"}}' />
 
 </block>
 
-<block type="introduction" data='{"value":[{"children":[{"text":"Highlight Title H2 "}],"type":"h2"}]}' />
+<block type="introduction" data-json='{"value":[{"children":[{"text":"Highlight Title H2 "}],"type":"h2"}]}' />
 
 Lorem ipsum vitae elit libero, a pharetra augue. Nulla vitae elit libero, a pharetra augue. Duis mollis, est non commodo luctus, nisi erat porttitor ligula, eget lacinia odio sem nec elit. Donec ullamcorper nulla non metus auctor fringilla. Vivamus sagittis lacus vel augue laoreet rutrum faucibus dolor auctor. Vestibulum id ligula porta felis euismod semper.
 
@@ -83,7 +83,7 @@ Lorem ipsum vitae elit libero, a pharetra augue. Nulla vitae elit libero, a phar
 
 ---
 
-<fields data='{"styles":{"align":"full"}}' />
+<fields data-json='{"styles":{"align":"full"}}' />
 
 </block>
 

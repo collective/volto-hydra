@@ -32,21 +32,21 @@ subjects:
   - containers
 title: Grid
 assignments:
-  - { uid: d3f1c443-583f-4e8e-a682-3bf25752a300, type: title }
-  - { uid: ref-grid-description, type: slate }
-  - { uid: 616b625c-b79f-4881-8536-b67a9e401a7d, type: listing }
-  - { uid: 7624cf59-05d0-4055-8f55-5fd6597d84b0, type: slate }
-  - { uid: ref-grid-schema, type: codeExample }
+  - { uid: d3f1c443-583f-4e8e-a682-3bf25752a300 }
+  - { uid: ref-grid-description }
+  - { uid: 616b625c-b79f-4881-8536-b67a9e401a7d }
+  - { uid: 7624cf59-05d0-4055-8f55-5fd6597d84b0 }
+  - { uid: ref-grid-schema }
   - { id: ref-grid-schema-javascript-af1095 }
-  - { uid: ref-grid-json-data, type: codeExample }
+  - { uid: ref-grid-json-data }
   - { id: ref-grid-json-data-json-5ff79e }
-  - { uid: ref-grid-rendering, type: codeExample }
+  - { uid: ref-grid-rendering }
   - { id: ref-grid-rendering-jsx-f30d80 }
   - { id: ref-grid-rendering-vue-1d61ab }
   - { id: ref-grid-rendering-svelte-8158ec }
 prototypes: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="slate" value="${p|h*|ul|ol|blockquote/slate}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
@@ -63,9 +63,9 @@ order:
 
 A responsive grid that lays out child blocks in equal-width cells. The block uses Volto's standard shared-blocks shape — blocks is the dict of children, blocks\_layout.items is their order — and constrains the allowed types via allowedBlocks.
 
-<block type="listing" block="616b625c-b79f-4881-8536-b67a9e401a7d" headlineTag="h2" variation="default" data='{"query":[]}' />
+<block type="listing" block="616b625c-b79f-4881-8536-b67a9e401a7d" headlineTag="h2" variation="default" data-json='{"query":[]}' />
 
-<block type="slate" data='{"value":[{"children":[{"text":""}],"type":"p"}]}' />
+<block type="slate" data-json='{"value":[{"children":[{"text":""}],"type":"p"}]}' />
 
 <block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="schema">
 
