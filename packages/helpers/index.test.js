@@ -136,3 +136,95 @@ describe('buildQuerystringSearchBody — date-range facets', () => {
     );
   });
 });
+
+describe('buildQuerystringSearchBody — date-facet edge cases', () => {
+  // A cleared date input legitimately means "no filter", so an empty value must
+  // drop the criterion rather than send an empty `v` the catalog would choke on.
+  // Pinned because the `if (v)` guard is otherwise invisible: the criterion just
+  // silently isn't there.
+  test.each([
+    ['empty string', ''],
+    ['empty array', []],
+    ['undefined', undefined],
+    ['null', null],
+  ])('a %s date value adds no criterion at all', (_label, value) => {
+    const body = buildQuerystringSearchBody({}, {}, {
+      'facet.created.after': value,
+    });
+    expect(criteria(body, 'created')).toHaveLength(0);
+    expect(criteria(body, 'created.after')).toHaveLength(0);
+  });
+
+  test('an empty "after" still lets a populated "before" through', () => {
+    const body = buildQuerystringSearchBody({}, {}, {
+      'facet.created.after': '',
+      'facet.created.before': '2024-01-28',
+    });
+    const cs = criteria(body, 'created');
+    expect(cs).toHaveLength(1);
+    expect(cs[0].o).toBe('plone.app.querystring.operation.date.lessThan');
+    expect(cs[0].v).toBe('2024-01-28');
+  });
+
+  // Only a trailing `.after`/`.before` marks a date facet. Any other dotted
+  // field stays a discrete facet on the WHOLE dotted name — so tightening or
+  // loosening the regex can't silently reroute normal facets.
+  test.each([
+    'facet.foo.bar',
+    'facet.created.between',
+    'facet.after.something',
+  ])('%s stays a discrete selection.any facet', (key) => {
+    const body = buildQuerystringSearchBody({}, {}, { [key]: ['x'] });
+    const field = key.slice('facet.'.length);
+    const q = criterion(body, field);
+    expect(q).toBeTruthy();
+    expect(q.o).toBe('plone.app.querystring.operation.selection.any');
+    expect(q.v).toEqual(['x']);
+  });
+
+  // `^(.+)\.(after|before)$` is greedy, so only the LAST segment is read as the
+  // direction and everything before it is the index verbatim. Documents the
+  // behaviour for a malformed key rather than leaving it to chance.
+  test('a doubled direction suffix takes only the last segment as the direction', () => {
+    const body = buildQuerystringSearchBody({}, {}, {
+      'facet.created.after.before': '2024-01-02',
+    });
+    const q = criterion(body, 'created.after');
+    expect(q.o).toBe('plone.app.querystring.operation.date.lessThan');
+    expect(criterion(body, 'created')).toBeUndefined();
+  });
+
+  // A bare `facet.after` has no index before the direction, so the regex can't
+  // match (`(.+)` needs at least one character) and it stays discrete.
+  test('a bare direction with no index stays a discrete facet', () => {
+    const body = buildQuerystringSearchBody({}, {}, { 'facet.after': '2024-01-02' });
+    const q = criterion(body, 'after');
+    expect(q.o).toBe('plone.app.querystring.operation.selection.any');
+    expect(q.v).toEqual(['2024-01-02']);
+  });
+
+  // The value is passed through verbatim — no date parsing or validation here.
+  // Pinned so that if validation is ever added, this test is the one that fails
+  // and forces the decision to be explicit.
+  test('a non-date value is passed through unvalidated', () => {
+    const body = buildQuerystringSearchBody({}, {}, {
+      'facet.created.after': 'banana',
+    });
+    expect(criterion(body, 'created').v).toBe('banana');
+  });
+
+  test('extra array elements are ignored — the op takes a single scalar', () => {
+    const body = buildQuerystringSearchBody({}, {}, {
+      'facet.created.after': ['2024-01-02', '2024-06-01'],
+    });
+    const cs = criteria(body, 'created');
+    expect(cs).toHaveLength(1);
+    expect(cs[0].v).toBe('2024-01-02');
+  });
+
+  test('a non-facet key is left out of the query entirely', () => {
+    const body = buildQuerystringSearchBody({}, {}, { 'created.after': '2024-01-02' });
+    expect(criteria(body, 'created')).toHaveLength(0);
+    expect(criteria(body, 'created.after')).toHaveLength(0);
+  });
+});
