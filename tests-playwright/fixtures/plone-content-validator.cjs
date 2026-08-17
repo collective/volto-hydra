@@ -17,6 +17,25 @@
 const fs = require('fs');
 const path = require('path');
 
+/**
+ * Content ids that break their PARENT, not themselves.
+ *
+ * `BTreeFolder2Base.__getattr__` resolves an attribute miss out of `self._tree`,
+ * so a child whose id matches a name Plone reads off the container with
+ * `getattr(aq_base(container), name)` is returned instead of that attribute.
+ * Plone content is callable, so code like CMFDynamicViewFTI's
+ * `if safe_callable(layout): layout = layout()` then invokes the child on an
+ * acquisition-stripped object and dies in `aq_acquire(self, 'REQUEST')` —
+ * surfacing as a 500 on the container, with nothing wrong in the child.
+ *
+ * Only names that Dexterity does NOT keep as instance attributes are listed:
+ * an attribute that already exists never reaches `__getattr__`. `layout` is the
+ * one confirmed against a live site (it 500'd /components and is covered by
+ * tests/test_reserved_content_ids.py); the others are the same read pattern in
+ * CMFPlone/CMFDynamicViewFTI and are reserved to prevent a repeat.
+ */
+const RESERVED_CONTENT_IDS = new Set(['layout', 'default_page', 'index_html']);
+
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
@@ -153,6 +172,12 @@ function validate(contentDir) {
       errors.push(`  ${entry} has empty id`);
     } else if (/^_/.test(data.id)) {
       errors.push(`  ${entry} id "${data.id}" starts with underscore (Plone OFS rejects this at import)`);
+    } else if (RESERVED_CONTENT_IDS.has(data.id)) {
+      errors.push(
+        `  ${entry} id "${data.id}" is reserved — it shadows an attribute Plone ` +
+        `reads off the container, which makes the PARENT return 500 ` +
+        `(AttributeError). Rename it (e.g. "page-${data.id}").`,
+      );
     }
     if (data.UID) allUids.add(data.UID);
 
@@ -176,30 +201,51 @@ function validate(contentDir) {
     }
   }
 
-  // Every non-root listing should have its parent container also listed
-  for (const entry of listed) {
-    const parts = entry.split('/');
-    if (parts.length > 2 && parts[0] !== 'plone_site_root') {
-      const parentEntry = parts.slice(0, -2).join('/') + '/data.json';
-      if (!listed.has(parentEntry)) {
-        errors.push(`  ${entry} parent container missing: ${parentEntry}`);
-      }
-    }
-  }
-
-  // Ordering: parents must appear before their children in _data_files_
+  // Parent containers must be listed, and must be listed BEFORE their children.
+  //
+  // plone.exportimport walks _data_files_ in order and skips any object whose
+  // container does not exist yet — logging a WARNING, not an error, while
+  // create-site still exits 0. A mis-ordered manifest therefore ships a partial
+  // site with every gate green (this cost us 90 of 150 objects once).
+  //
+  // Derive the hierarchy from each item's `@id`, NOT from its directory path.
+  // Real distributions are UID-keyed and flat (`<uid>/data.json`), so the path
+  // carries no hierarchy at all and a path-derived parent silently no-ops —
+  // which is exactly why the check above it never fired. `@id` works for both
+  // the flat and the path-shaped layout.
   const listedList = meta._data_files_ || [];
-  const seenParents = new Set();
+  const entryId = new Map();
   for (const entry of listedList) {
-    const parts = entry.split('/');
-    if (parts.length > 2 && parts[0] !== 'plone_site_root') {
-      const parentEntry = parts.slice(0, -2).join('/') + '/data.json';
-      if (listed.has(parentEntry) && !seenParents.has(parentEntry)) {
-        errors.push(`  ${entry} appears before its parent ${parentEntry} in _data_files_`);
-      }
+    const entryPath = path.join(contentDir, entry);
+    if (!fs.existsSync(entryPath)) continue;  // reported by the on-disk check below
+    const atId = readJson(entryPath)['@id'];
+    if (typeof atId !== 'string' || !atId) {
+      errors.push(`  ${entry} has no @id — hierarchy cannot be determined`);
+      continue;
     }
-    seenParents.add(entry);
+    entryId.set(entry, atId);
   }
+  const idPosition = new Map();
+  listedList.forEach((entry, index) => {
+    const atId = entryId.get(entry);
+    if (atId !== undefined && !idPosition.has(atId)) idPosition.set(atId, index);
+  });
+  listedList.forEach((entry, index) => {
+    const atId = entryId.get(entry);
+    if (atId === undefined) return;
+    // A top-level item's parent is the site root, which always exists before
+    // content import begins.
+    const parentAtId = atId.slice(0, atId.lastIndexOf('/'));
+    if (!parentAtId) return;
+    const parentPosition = idPosition.get(parentAtId);
+    if (parentPosition === undefined) {
+      errors.push(`  ${entry} (${atId}) parent container missing: ${parentAtId}`);
+    } else if (parentPosition > index) {
+      errors.push(
+        `  ${entry} (${atId}) appears before its parent ${parentAtId} in _data_files_`,
+      );
+    }
+  });
 
   // Listed entries must exist on disk
   for (const entry of listed) {
@@ -448,18 +494,21 @@ function checkIntegrity(contentDir) {
     }
   }
 
-  // Parent containers (metadata cross-check for completeness)
+  // Parent containers (metadata cross-check for completeness). Uses the `@id`
+  // hierarchy via pathMap, not the directory path — see validate()'s note: our
+  // content is UID-keyed and flat, so a path-derived parent never resolves.
   const metaPath = path.join(contentDir, '__metadata__.json');
   if (fs.existsSync(metaPath)) {
     const meta = readJson(metaPath);
-    const listed = new Set(meta._data_files_ || []);
-    for (const entry of listed) {
-      const parts = entry.split('/');
-      if (parts.length > 2 && parts[0] !== 'plone_site_root') {
-        const parentEntry = parts.slice(0, -2).join('/') + '/data.json';
-        if (!listed.has(parentEntry)) {
-          errors.push(`  ${entry}: parent container missing (${parentEntry})`);
-        }
+    for (const entry of meta._data_files_ || []) {
+      const entryPath = path.join(contentDir, entry);
+      if (!fs.existsSync(entryPath)) continue;
+      const atId = readJson(entryPath)['@id'];
+      if (typeof atId !== 'string' || !atId) continue;  // validate() reports this
+      const parentAtId = atId.slice(0, atId.lastIndexOf('/'));
+      if (!parentAtId) continue;  // top-level: parent is the site root
+      if (!pathMap.has(parentAtId)) {
+        errors.push(`  ${entry}: parent container missing (${parentAtId})`);
       }
     }
   }
