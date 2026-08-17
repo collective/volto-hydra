@@ -67,33 +67,54 @@ readable enough to hand/AI-author.
 
 ## Example-code path (removes the last sync step)
 
-Today `docs/examples/examples/{react,vue,svelte,astro}/` are the source, and
-`sync` COPIES their code into the codeExample blocks — the code lives in two
-places. Invert it so the markdown is the single source:
+`docs/examples/examples/{react,vue,svelte,astro}/` are the renderer files — one
+per block × framework, which the test frontends COMPILE and check-examples
+VALIDATES. So they must stay real files (a frontend can't `import` a fence, and
+the md documents only a SELECTION, never the full renderer set). Today `sync`
+COPIES their code into the codeExample blocks — the duplication to remove.
 
+Fix: the files stay the source; the markdown **references** them, so nothing is
+copied. Use Sphinx's native `{literalinclude}`:
+
+```markdown
+### React
+
+```{literalinclude} ../../examples/react/ButtonBlock.jsx
+:language: jsx
 ```
-before:  snippet files (source) --sync--> codeExample blocks (copy)      # duplication
-after:   md codeExample (source) --extract--> snippet files (generated)
-                                  \--> check-examples reads the md
 ```
 
-- **check-examples reads the md.** Decode the codeExample blocks via the loader
-  (`tabs[].{language, code}`) and run the SAME parsers it already uses (acorn +
-  acorn-jsx, `@vue/compiler-sfc`, `@astrojs/compiler`) per tab. Same validation,
-  sourced from the markdown, no snippet files needed as input.
-- **Generated files for the compiling frontends.** `test-react/App.jsx`,
-  `test-vue/App.vue`, `test-astro/.../render.ts` need real files to build; a
-  build step extracts each tab's code from the md and writes them as artifacts.
+- **Reference, not copy.** The tab points at the file. Sphinx renders
+  `{literalinclude}` (shows the file's code) and the loader resolves the same
+  directive into the tab's `code`. **What's shown IS what's compiled and
+  tested** — no duplication, never stale, never a stub.
+- **check-examples reads the docs.** Decode the codeExample tabs (loader inlines
+  each `{literalinclude}`) and run the SAME parsers (acorn+jsx,
+  `@vue/compiler-sfc`, `@astrojs/compiler`) per tab.
+- **Coverage — every tested renderer must be shown**, one tab per block ×
+  framework. Gap today: astro **0/26**, react 10, vue/svelte 4 each. Close it by
+  adding the reference tabs.
 
-So the codeExample block's code is authored in the md (readable, thanks to the
-greedy-bare emit) and everything else derives from it. This means **`sync`
-retires fully** — example code was the one apparent exception, and it isn't.
+Rules for the referenced files (they ARE the doc examples):
+- **Exhibit the technique** — real field access + `data-block-uid`/`data-edit-*`
+  annotations + `slate`/`getImageUrl` usage. Simple != stubbed.
+- **Self-contained except three shared primitives**, referenced not shown:
+  `getImageUrl` (image), `slate` (SlateNode), `BlockRenderer` (containers only).
+  Direct sibling imports route through `BlockRenderer`.
+
+So `sync`'s code-copy is replaced by `{literalinclude}` references — `sync`
+retires, the renderer files remain the source, and nothing is duplicated.
+
+Loader change: when a codeExample tab's body is a `{literalinclude}` directive,
+read the referenced file for the code (else use the inline fence, for hand-
+written doc-only snippets). Sphinx needs no change.
 
 ## Deleted at the end
 
 `sync.mjs`, `docs/content/content/**` + `inka-site/content/**` (JSON as source),
-`build-distribution-content.mjs`, the prototype scripts, the duplicate md trees,
-the hand-authored `docs/examples/examples/**` snippet files (now generated).
+`build-distribution-content.mjs`, the prototype scripts, the duplicate md trees.
+(The `docs/examples/examples/**` renderer files STAY — they're the source, now
+referenced by `{literalinclude}` instead of copied.)
 
 ## Risks
 
