@@ -24,7 +24,7 @@ subjects:
   - listings
   - frontend
 title: Listings & Dynamic Blocks
-assignments:
+blocks-assignments:
   - { uid: title-1 }
   - { uid: p-1 }
   - { uid: p-2 }
@@ -87,10 +87,11 @@ assignments:
   - { uid: p-51 }
   - { uid: h-52 }
   - { uid: p-53 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" />
+blocks-tagged: |
   <block type="slateTable">
     <region name="table.rows">
       <block type="row">

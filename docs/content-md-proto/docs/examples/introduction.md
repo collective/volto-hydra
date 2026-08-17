@@ -30,7 +30,7 @@ subjects:
   - blocks
   - text
 title: Introduction
-assignments:
+blocks-assignments:
   - { uid: 50727b9a-1f8a-4857-aab5-8acc6985bfc6 }
   - { uid: ref-introduction-description }
   - { uid: editor-screenshot }
@@ -48,12 +48,13 @@ assignments:
   - { id: ref-introduction-rendering-jsx-599242 }
   - { id: ref-introduction-rendering-vue-53106b }
   - { id: ref-introduction-rendering-svelte-9e2b59 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

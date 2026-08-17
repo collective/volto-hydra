@@ -18,10 +18,10 @@ review_state: published
 rights: ""
 subjects: []
 title: Examples
-assignments:
+blocks-assignments:
   - { uid: title-1 }
   - { uid: examples-listing }
-prototypes: |
+blocks-matched: |
   <block type="title" _="${h1}" />
 order:
   - accordion

@@ -23,7 +23,7 @@ review_state: published
 rights: ""
 subjects: []
 title: Grid-image block
-assignments:
+blocks-assignments:
   - { uid: a1c1ca3e-6643-4e39-abda-3bf7846daeef }
   - { uid: f285924d-8f1c-4cc6-8505-5d506cf5fb7f }
   - { uid: 313a4e76-dc52-4c36-b8bf-5aac8b605eca }
@@ -53,10 +53,11 @@ assignments:
   - { uid: f4117857-1464-41c6-8e74-70f82f393891 }
   - { uid: ab3542da-d0d1-450e-abf3-a5f9e6f3eb97 }
   - { uid: a7d1d9b8-1caa-41cd-825e-15d4564a57f6 }
-prototypes: |
+blocks-matched: |
   <block type="title" _="${h1}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+blocks-tagged: |
   <block type="gridBlock" headline="${h/text}">
     <region name="blocks" widget="blocks_layout">
       <block type="teaser" title="${h/text}" description="${p/text}" />

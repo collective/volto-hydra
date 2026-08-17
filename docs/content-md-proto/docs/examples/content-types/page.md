@@ -27,7 +27,7 @@ rights: ""
 subjects:
   - content
 title: Page
-assignments:
+blocks-assignments:
   - { uid: d3f1c443-583f-4e8e-a682-3bf25752a300 }
   - { uid: 7c36a063-bd02-487b-b49a-fcbf1b00fbda }
   - { uid: 4ee2efb5-8180-41ec-90df-d8b9462bdd2a }
@@ -70,7 +70,7 @@ assignments:
   - { uid: 03cae937-57c6-42e8-9570-a104d11b5fcf }
   - { uid: ce4b6f34-ca2e-4d3b-a097-53628fa224e7 }
   - { uid: 9a3d1a33-d559-45af-846b-8a2a37a51e0d }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" />

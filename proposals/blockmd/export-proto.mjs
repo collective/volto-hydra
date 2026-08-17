@@ -34,12 +34,12 @@ const PROTO_TEXT = {
   slate: '<block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />',
   title: '<block type="title" _="${h1}" />',
   separator: '<block type="separator" _="${hr}" />',
-  button: '<block type="button" explicit title="${p/text}" href="${p/link}" />',
+  button: '<block type="button" title="${p/text}" href="${p/link}" />',
   // href is @id-only (the heading's link); the teaser's rendered title/
   // description/hasPreviewImage are RESOLVED from the target by the mount, not
   // stored redundantly here. block.title (the heading text) is the teaser's own
   // override, shown only when overwrite is on.
-  teaser: '<block type="teaser" explicit title="${h/text}" href="${h/link}" description="${p/text}" />',
+  teaser: '<block type="teaser" title="${h/text}" href="${h/link}" description="${p/text}" />',
   image: [
     '<block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />',
     '<block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />',
@@ -77,12 +77,23 @@ const PROTO_TEXT = {
     '</block>',
   ].join('\n'),
 };
-const PROTOS = parsePrototypes(Object.values(PROTO_TEXT).join('\n'));
+// Prototypes split into two frontmatter sections: `blocks-matched` (implicit --
+// auto-matched from bare markdown, source order = cascade) and `blocks-tagged`
+// (explicit -- require the tag). Section membership IS the explicit flag. Only
+// these leaves auto-match; button/teaser overlap common patterns and containers
+// need their tag (until greedy container matching lands), so those are tagged.
+const MATCHED = new Set(['slate', 'title', 'separator', 'image']);
+const isMatched = (t) => MATCHED.has(t);
+const textFor = (matched) => Object.entries(PROTO_TEXT)
+  .filter(([t]) => isMatched(t) === matched).map(([, v]) => v).join('\n');
+const PROTOS = [...parsePrototypes(textFor(true)), ...parsePrototypes(textFor(false), { explicit: true })];
 
-/** Only the prototypes a page's block types use, as a frontmatter block scalar. */
-function prototypesYaml(used) {
-  const lines = Object.entries(PROTO_TEXT).filter(([t]) => used.has(t)).flatMap(([, txt]) => txt.split('\n'));
-  return lines.length ? `prototypes: |\n${lines.map((l) => `  ${l}`).join('\n')}` : '';
+/** The prototypes a page uses, as a frontmatter block scalar for one section. */
+function sectionYaml(key, used, matched) {
+  const lines = Object.entries(PROTO_TEXT)
+    .filter(([t]) => used.has(t) && isMatched(t) === matched)
+    .flatMap(([, txt]) => txt.split('\n'));
+  return lines.length ? `${key}: |\n${lines.map((l) => `  ${l}`).join('\n')}` : '';
 }
 
 /** Every @type in a block tree, descending into nested blocks + object_list items.
@@ -196,9 +207,10 @@ for (const d of items) {
   if (d.blocks && d.blocks_layout?.items?.length) {
     const { markdown, assignments } = emitPage(PROTOS, { blocks: d.blocks, blocks_layout: d.blocks_layout });
     const used = collectTypes(d.blocks);
-    const asg = `assignments:\n${assignments.map((a) => `  - ${flow(a)}`).join('\n')}`;
-    const proto = prototypesYaml(used);
-    writeFileSync(dest, `---\n${front}\n${asg}\n${proto}\n---\n\n${markdown}\n`);
+    const asg = `blocks-assignments:\n${assignments.map((a) => `  - ${flow(a)}`).join('\n')}`;
+    const fmBody = [front, asg, sectionYaml('blocks-matched', used, true), sectionYaml('blocks-tagged', used, false)]
+      .filter(Boolean).join('\n');
+    writeFileSync(dest, `---\n${fmBody}\n---\n\n${markdown}\n`);
     pages += 1;
     // rough coverage: count self-closing data tags (tier-3) vs the rest
     tier3 += (markdown.match(/<block type="[^"]*"[^>]*\/>/g) || []).length;

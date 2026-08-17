@@ -23,7 +23,7 @@ subjects:
   - blocks
   - frontend
 title: Custom Blocks
-assignments:
+blocks-assignments:
   - { uid: cb-title-1 }
   - { uid: p-1 }
   - { uid: h-2 }
@@ -128,9 +128,10 @@ assignments:
   - { uid: ce-88 }
   - { id: ce-88-javascript-e562d7 }
   - { uid: p-89 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
+blocks-tagged: |
   <block type="slateTable">
     <region name="table.rows">
       <block type="row">

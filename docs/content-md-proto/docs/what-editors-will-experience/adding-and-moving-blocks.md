@@ -23,7 +23,7 @@ review_state: published
 rights: ""
 subjects: []
 title: Adding and moving blocks
-assignments:
+blocks-assignments:
   - { uid: title-1 }
   - { uid: p-1 }
   - { uid: h-2 }
@@ -58,9 +58,10 @@ assignments:
   - { uid: h-31 }
   - { uid: p-32 }
   - { uid: p-33 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
+blocks-tagged: |
   <block type="slateTable">
     <region name="table.rows">
       <block type="row">

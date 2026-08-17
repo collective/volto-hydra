@@ -23,7 +23,7 @@ rights: ""
 subjects:
   - templates
 title: Templates & Layouts
-assignments:
+blocks-assignments:
   - { uid: title-1 }
   - { uid: p-1 }
   - { uid: sep-2 }
@@ -93,10 +93,11 @@ assignments:
   - { uid: ce-60 }
   - { id: ce-60-javascript-0dbe99 }
   - { uid: p-61 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" />
+blocks-tagged: |
   <block type="slateTable">
     <region name="table.rows">
       <block type="row">

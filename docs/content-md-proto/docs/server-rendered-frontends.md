@@ -20,7 +20,7 @@ rights: ""
 subjects:
   - frontend
 title: Server-rendered frontends
-assignments:
+blocks-assignments:
   - { uid: title-1 }
   - { uid: p-1 }
   - { uid: h-2 }
@@ -62,9 +62,10 @@ assignments:
   - { uid: p-30 }
   - { uid: h-31 }
   - { uid: ul-32 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
+blocks-tagged: |
   <block type="slateTable">
     <region name="table.rows">
       <block type="row">

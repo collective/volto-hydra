@@ -31,7 +31,7 @@ subjects:
   - blocks
   - media
 title: Image
-assignments:
+blocks-assignments:
   - { uid: 4bfc973c-5fbf-45a3-819a-750a3eff4def }
   - { uid: ref-image-description }
   - { uid: editor-screenshot }
@@ -59,11 +59,12 @@ assignments:
   - { id: ref-image-rendering-jsx-a59bc5 }
   - { id: ref-image-rendering-vue-c3dead }
   - { id: ref-image-rendering-svelte-52a7e2 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

@@ -20,7 +20,7 @@ subjects:
   - blocks
   - listings
 title: RSS Feed Block
-assignments:
+blocks-assignments:
   - { uid: title-1 }
   - { uid: ref-rssFeed-description }
   - { uid: rss-live-heading }
@@ -34,9 +34,10 @@ assignments:
   - { id: ref-rssFeed-fetcher-javascript-7f0034 }
   - { uid: ref-rssFeed-rendering }
   - { id: ref-rssFeed-rendering-javascript-df4061 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
+blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

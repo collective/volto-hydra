@@ -23,7 +23,7 @@ review_state: published
 rights: ""
 subjects: []
 title: Grid-Teaser block
-assignments:
+blocks-assignments:
   - { uid: 828a7be1-0ab3-4663-9069-4581f5be63c1 }
   - { uid: 54548b1e-b99f-4679-9fc6-567e940c4926 }
   - { uid: 51483392-532d-45f4-a0b0-eb11426421fc }
@@ -53,9 +53,10 @@ assignments:
   - { uid: f5fbd1e2-4887-4bd4-96d0-646321a38e93 }
   - { uid: 31c656b3-5315-4460-8dd2-7ea623be0e75 }
   - { uid: 9e207ed1-8ea6-48a9-b74e-be16f3750eb7 }
-prototypes: |
+blocks-matched: |
   <block type="title" _="${h1}" />
-  <block type="teaser" explicit title="${h/text}" href="${h/link}" description="${p/text}" />
+blocks-tagged: |
+  <block type="teaser" title="${h/text}" href="${h/link}" description="${p/text}" />
   <block type="gridBlock" headline="${h/text}">
     <region name="blocks" widget="blocks_layout">
       <block type="teaser" title="${h/text}" description="${p/text}" />

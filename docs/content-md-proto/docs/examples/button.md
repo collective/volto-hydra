@@ -24,7 +24,7 @@ rights: ""
 subjects:
   - blocks
 title: Button
-assignments:
+blocks-assignments:
   - { uid: f3ee132b-6215-4e42-b26b-713f668eea61 }
   - { uid: ref-button-description }
   - { uid: editor-screenshot }
@@ -67,13 +67,14 @@ assignments:
   - { id: ref-button-rendering-jsx-ab4e0b }
   - { id: ref-button-rendering-vue-e704dd }
   - { id: ref-button-rendering-svelte-a8e495 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" />
-  <block type="button" explicit title="${p/text}" href="${p/link}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+blocks-tagged: |
+  <block type="button" title="${p/text}" href="${p/link}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

@@ -21,7 +21,7 @@ review_state: published
 rights: ""
 subjects: []
 title: Docs
-assignments:
+blocks-assignments:
   - { uid: title-1 }
   - { uid: p-1 }
   - { uid: h-2 }
@@ -33,7 +33,7 @@ assignments:
   - { uid: p-8 }
   - { uid: p-9 }
   - { uid: listing-1 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
 order:

@@ -27,13 +27,13 @@ rights: ""
 subjects:
   - news
 title: Another News Item
-assignments:
+blocks-assignments:
   - { uid: ni-date-qrq6v50j }
   - { uid: a0ac0f60-667b-4b22-a49f-989f2ae8c3cc }
   - { uid: 8c686422-757e-4519-ae6a-ffcb4d107e22 }
   - { uid: 944cfb1b-3ef7-425f-a5ef-eb9242429bfd }
   - { uid: 6db5aa18-6fd8-4efe-9bc6-9cd6fc1dd0be }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
 ---

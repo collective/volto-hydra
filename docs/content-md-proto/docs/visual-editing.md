@@ -20,7 +20,7 @@ rights: ""
 subjects:
   - editing
 title: Visual Editing
-assignments:
+blocks-assignments:
   - { uid: ve-title-1 }
   - { uid: h-1 }
   - { uid: p-2 }
@@ -94,9 +94,10 @@ assignments:
   - { uid: p-59 }
   - { uid: ce-60 }
   - { id: ce-60-html-7e15f3 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
+blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

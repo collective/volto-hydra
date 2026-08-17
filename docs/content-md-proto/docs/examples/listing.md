@@ -23,7 +23,7 @@ subjects:
   - blocks
   - listings
 title: Listing
-assignments:
+blocks-assignments:
   - { uid: 43068b6d-d8e9-4acc-912b-eabcdc650939 }
   - { uid: ref-listing-description }
   - { uid: editor-screenshot }
@@ -40,11 +40,12 @@ assignments:
   - { id: ref-listing-rendering-jsx-f33c73 }
   - { id: ref-listing-rendering-vue-3c4a00 }
   - { id: ref-listing-rendering-svelte-aca768 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

@@ -22,7 +22,7 @@ review_state: published
 rights: ""
 subjects: []
 title: Editing text
-assignments:
+blocks-assignments:
   - { uid: title-1 }
   - { uid: p-1 }
   - { uid: h-2 }
@@ -50,11 +50,12 @@ assignments:
   - { uid: p-24 }
   - { uid: h-25 }
   - { uid: ul-26 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+blocks-tagged: |
   <block type="slateTable">
     <region name="table.rows">
       <block type="row">

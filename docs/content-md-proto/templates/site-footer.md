@@ -6,10 +6,10 @@ review_state: published
 title: Site Footer
 description: Footer with social links and copyright
 effective: 2025-01-01T00:00:00
-assignments:
+blocks-assignments:
   - { uid: footer-social }
   - { uid: footer-copyright }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
 ---
 

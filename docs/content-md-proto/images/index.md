@@ -19,7 +19,7 @@ review_state: published
 rights: ""
 subjects: []
 title: Images
-assignments:
+blocks-assignments:
   - { uid: 55e93046-15ee-41f5-b63c-fde0d9b6ce52 }
   - { uid: 183bf050-57b7-4841-b9c8-f9b5a15fe086 }
   - { uid: gallery-penguin1 }
@@ -28,11 +28,12 @@ assignments:
   - { uid: gallery-penguin4 }
   - { uid: gallery-quadrant }
   - { uid: 2d181d1f-1fac-420a-b410-4f4d5379f8ea }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+blocks-tagged: |
   <block type="gridBlock" headline="${h/text}">
     <region name="blocks" widget="blocks_layout">
       <block type="teaser" title="${h/text}" description="${p/text}" />

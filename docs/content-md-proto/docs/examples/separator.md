@@ -24,7 +24,7 @@ subjects:
   - blocks
   - text
 title: Separator
-assignments:
+blocks-assignments:
   - { uid: 47b1e791-6f01-4b9b-a923-6658e7bc7871 }
   - { uid: ref-separator-description }
   - { uid: editor-screenshot }
@@ -55,12 +55,13 @@ assignments:
   - { id: ref-separator-rendering-jsx-470901 }
   - { id: ref-separator-rendering-vue-4281a1 }
   - { id: ref-separator-rendering-svelte-8c1d19 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

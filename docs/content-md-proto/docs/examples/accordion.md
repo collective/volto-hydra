@@ -21,7 +21,7 @@ subjects:
   - blocks
   - containers
 title: Accordion
-assignments:
+blocks-assignments:
   - { uid: fec13476-1231-42fc-84d5-b110e8e3c6e7 }
   - { uid: ref-accordion-description }
   - { uid: editor-screenshot }
@@ -97,13 +97,14 @@ assignments:
   - { id: ref-accordion-rendering-jsx-951c40 }
   - { id: ref-accordion-rendering-vue-e897ff }
   - { id: ref-accordion-rendering-svelte-a58cd5 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" />
-  <block type="teaser" explicit title="${h/text}" href="${h/link}" description="${p/text}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+blocks-tagged: |
+  <block type="teaser" title="${h/text}" href="${h/link}" description="${p/text}" />
   <block type="slateTable">
     <region name="table.rows">
       <block type="row">

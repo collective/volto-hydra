@@ -28,7 +28,7 @@ subjects:
   - blocks
   - media
 title: Teaser
-assignments:
+blocks-assignments:
   - { uid: b986b92c-e180-42d3-b755-4728854e5a50 }
   - { uid: ref-teaser-description }
   - { uid: editor-screenshot }
@@ -46,12 +46,13 @@ assignments:
   - { id: ref-teaser-rendering-jsx-d1dd76 }
   - { id: ref-teaser-rendering-vue-fc123a }
   - { id: ref-teaser-rendering-svelte-bf19cf }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="teaser" explicit title="${h/text}" href="${h/link}" description="${p/text}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+blocks-tagged: |
+  <block type="teaser" title="${h/text}" href="${h/link}" description="${p/text}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

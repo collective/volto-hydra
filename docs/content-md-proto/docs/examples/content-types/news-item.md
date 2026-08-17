@@ -21,7 +21,7 @@ rights: ""
 subjects:
   - news
 title: News Item
-assignments:
+blocks-assignments:
   - { uid: ni-date-m3i1uy1k }
   - { uid: d3f1c443-583f-4e8e-a682-3bf25752a300 }
   - { uid: f16a700c-3b02-47aa-9d08-ade7dea4f683 }
@@ -68,7 +68,7 @@ assignments:
   - { uid: 71c6a6c6-6f0b-4cf5-be93-23ad2af9b2c9 }
   - { uid: 09891614-7ed6-444c-9925-8589801ca8ea }
   - { uid: 8fe9052b-d9a4-48dd-ae47-80b256826aca }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" />

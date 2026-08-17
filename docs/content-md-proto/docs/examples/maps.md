@@ -21,7 +21,7 @@ subjects:
   - blocks
   - media
 title: Maps
-assignments:
+blocks-assignments:
   - { uid: 68370edd-bfe5-47fb-937e-16a19a3a92ad }
   - { uid: ref-maps-description }
   - { uid: editor-screenshot }
@@ -51,12 +51,13 @@ assignments:
   - { id: ref-maps-rendering-jsx-7fbc14 }
   - { id: ref-maps-rendering-vue-85ab6d }
   - { id: ref-maps-rendering-svelte-4d9083 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

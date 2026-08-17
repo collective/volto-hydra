@@ -21,7 +21,7 @@ subjects:
   - blocks
   - listings
 title: Related Items Block
-assignments:
+blocks-assignments:
   - { uid: title-1 }
   - { uid: ref-relatedItemsListing-description }
   - { uid: ri-live-heading }
@@ -35,9 +35,10 @@ assignments:
   - { id: ref-relatedItemsListing-fetcher-javascript-1c975d }
   - { uid: ref-relatedItemsListing-rendering }
   - { id: ref-relatedItemsListing-rendering-javascript-2b9d44 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
+blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

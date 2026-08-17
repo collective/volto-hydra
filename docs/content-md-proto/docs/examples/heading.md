@@ -24,7 +24,7 @@ subjects:
   - blocks
   - text
 title: Heading
-assignments:
+blocks-assignments:
   - { uid: e58cca3c-95d4-4819-951d-48415706bf41 }
   - { uid: ref-heading-description }
   - { uid: 4a0352d5-89df-48aa-944e-7270e81351d4 }
@@ -48,11 +48,12 @@ assignments:
   - { id: ref-heading-rendering-jsx-eb01a3 }
   - { id: ref-heading-rendering-vue-754dc2 }
   - { id: ref-heading-rendering-svelte-f5f71c }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" />
-  <block type="teaser" explicit title="${h/text}" href="${h/link}" description="${p/text}" />
+blocks-tagged: |
+  <block type="teaser" title="${h/text}" href="${h/link}" description="${p/text}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

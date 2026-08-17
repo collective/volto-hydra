@@ -21,7 +21,7 @@ subjects:
   - blocks
   - listings
 title: Search Shortcuts Block
-assignments:
+blocks-assignments:
   - { uid: title-1 }
   - { uid: ref-searchShortcuts-description }
   - { uid: ss-live-heading }
@@ -35,9 +35,10 @@ assignments:
   - { id: ref-searchShortcuts-fetcher-javascript-e7f760 }
   - { uid: ref-searchShortcuts-rendering }
   - { id: ref-searchShortcuts-rendering-javascript-ab7111 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
+blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

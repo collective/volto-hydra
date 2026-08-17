@@ -22,7 +22,7 @@ subjects:
   - containers
   - media
 title: Slider Block
-assignments:
+blocks-assignments:
   - { uid: title-1 }
   - { uid: ref-slider-description }
   - { uid: ref-slider-schema }
@@ -33,9 +33,10 @@ assignments:
   - { id: ref-slider-rendering-jsx-87bcad }
   - { id: ref-slider-rendering-vue-6e69c4 }
   - { id: ref-slider-rendering-svelte-586973 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
+blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

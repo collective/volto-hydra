@@ -23,7 +23,7 @@ review_state: published
 rights: ""
 subjects: []
 title: Grid-Text block
-assignments:
+blocks-assignments:
   - { uid: 828a7be1-0ab3-4663-9069-4581f5be63c1 }
   - { uid: 0f49cd2b-8040-402c-abca-a16618460f9d }
   - { uid: a601e49f-0062-4961-b6e5-2fc8ae69ade0 }
@@ -53,9 +53,10 @@ assignments:
   - { uid: efa522c2-3ec8-46f2-b951-9310028b01ef }
   - { uid: 103b3b0e-c54e-4d0a-bf84-6e28898260dd }
   - { uid: 019e7dd0-63b9-4421-8824-3544391e9b23 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
+blocks-tagged: |
   <block type="gridBlock" headline="${h/text}">
     <region name="blocks" widget="blocks_layout">
       <block type="teaser" title="${h/text}" description="${p/text}" />

@@ -31,7 +31,7 @@ subjects:
   - text
   - editing
 title: Text
-assignments:
+blocks-assignments:
   - { uid: ccff41c6-b733-4b88-b02e-4c07460a19e2 }
   - { uid: ref-text-description }
   - { uid: editor-screenshot }
@@ -59,12 +59,13 @@ assignments:
   - { id: ref-text-rendering-jsx-076433 }
   - { id: ref-text-rendering-vue-54b4b7 }
   - { id: ref-text-rendering-svelte-2aa474 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

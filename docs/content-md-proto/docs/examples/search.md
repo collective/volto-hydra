@@ -30,7 +30,7 @@ subjects:
   - listings
   - navigation
 title: Search
-assignments:
+blocks-assignments:
   - { uid: f6d35d7e-6422-4496-8a65-f7cfd42fb519 }
   - { uid: ref-search-description }
   - { uid: editor-screenshot }
@@ -44,11 +44,12 @@ assignments:
   - { id: ref-search-rendering-jsx-dd082e }
   - { id: ref-search-rendering-vue-3c1873 }
   - { id: ref-search-rendering-svelte-7ba7ad }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

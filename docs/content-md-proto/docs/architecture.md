@@ -26,7 +26,7 @@ subjects:
   - frontend
   - editing
 title: How Inka Works
-assignments:
+blocks-assignments:
   - { uid: title-1 }
   - { uid: p-1 }
   - { uid: sep-2 }
@@ -70,10 +70,11 @@ assignments:
   - { uid: p-39 }
   - { uid: tbl-40 }
   - { uid: p-41 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" />
+blocks-tagged: |
   <block type="slateTable">
     <region name="table.rows">
       <block type="row">

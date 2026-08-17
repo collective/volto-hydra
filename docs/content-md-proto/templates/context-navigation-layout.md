@@ -6,10 +6,10 @@ review_state: published
 title: Context Navigation Layout
 description: Forced layout for 3rd-level pages — injects a contextNavigation
   (auto-populated from sibling pages via listing+depth) above the page content.
-assignments:
+blocks-assignments:
   - { uid: tpl-context-nav }
   - { uid: tpl-default-slot }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
 ---
 

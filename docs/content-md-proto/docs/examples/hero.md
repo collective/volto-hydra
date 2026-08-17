@@ -21,7 +21,7 @@ subjects:
   - blocks
   - media
 title: Hero Block
-assignments:
+blocks-assignments:
   - { uid: title-1 }
   - { uid: ref-hero-description }
   - { uid: ref-hero-schema }
@@ -32,9 +32,10 @@ assignments:
   - { id: ref-hero-rendering-jsx-46a2e5 }
   - { id: ref-hero-rendering-vue-337205 }
   - { id: ref-hero-rendering-svelte-a2ecf7 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
+blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

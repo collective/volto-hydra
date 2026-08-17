@@ -17,9 +17,9 @@ review_state: published
 rights: ""
 subjects: []
 title: Images
-assignments:
+blocks-assignments:
   - { uid: title-1 }
-prototypes: |
+blocks-matched: |
   <block type="title" _="${h1}" />
 blobs:
   - file: accordion-edit.png

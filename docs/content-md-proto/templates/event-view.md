@@ -6,11 +6,11 @@ title: Event View
 review_state: published
 description: Layout template for Event content type pages
 effective: 2025-01-01T00:00:00
-assignments:
+blocks-assignments:
   - { uid: tpl-ev-title }
   - { uid: tpl-ev-metadata }
   - { uid: tpl-ev-content }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
 ---

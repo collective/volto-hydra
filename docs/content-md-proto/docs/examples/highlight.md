@@ -31,7 +31,7 @@ subjects:
   - blocks
   - text
 title: Highlight
-assignments:
+blocks-assignments:
   - { uid: af3c704a-1f80-48c8-843b-dc29368d43d9 }
   - { uid: ref-highlight-description }
   - { uid: editor-screenshot }
@@ -48,11 +48,12 @@ assignments:
   - { id: ref-highlight-rendering-jsx-659b6c }
   - { id: ref-highlight-rendering-vue-dd8730 }
   - { id: ref-highlight-rendering-svelte-d3a4c8 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

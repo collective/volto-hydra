@@ -21,14 +21,14 @@ rights: ""
 subjects:
   - content
 title: Another Page
-assignments:
+blocks-assignments:
   - { uid: af503055-b17f-4393-8f76-ee11b7b1aae8 }
   - { uid: 2e449c25-d897-4c7a-b5ac-793175ea55ee }
   - { uid: 7ea2d08f-0fe5-493e-bbd1-d53f5bd38bee }
   - { uid: fcb94dd6-652b-4b79-b823-7e42f1a75228 }
   - { uid: 603e7230-53ed-4364-977d-4bfd11809a35 }
   - { uid: 1923851d-b62e-45b7-8425-aa047aaa6e76 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />

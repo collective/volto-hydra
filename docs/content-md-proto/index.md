@@ -19,7 +19,7 @@ rights: ""
 subjects: []
 table_of_contents: null
 title: Inka
-assignments:
+blocks-assignments:
   - { uid: hero-headline }
   - { uid: hero-subhead }
   - { uid: hero-cta }
@@ -48,11 +48,12 @@ assignments:
   - { uid: 9567ae6d-191c-43f1-91cc-4288bbb98f88 }
   - { uid: 0d0c0506-f9bb-48d8-af0a-1352d81b45de }
   - { uid: 2fac7e5d-affb-4a8e-969f-2fac4d08e0fd }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="separator" _="${hr}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

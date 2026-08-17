@@ -21,7 +21,7 @@ review_state: published
 rights: ""
 subjects: []
 title: Containers
-assignments:
+blocks-assignments:
   - { uid: title-1 }
   - { uid: p-1 }
   - { uid: p-2 }
@@ -53,7 +53,7 @@ assignments:
   - { uid: ul-28 }
   - { uid: h-29 }
   - { uid: ul-30 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />

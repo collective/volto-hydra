@@ -21,7 +21,7 @@ subjects:
   - blocks
   - forms
 title: Form
-assignments:
+blocks-assignments:
   - { uid: 00e8d49b-5b99-4d2f-83b3-7d69bc80b893 }
   - { uid: ref-form-description }
   - { uid: editor-screenshot }
@@ -35,11 +35,12 @@ assignments:
   - { id: ref-form-rendering-jsx-29590c }
   - { id: ref-form-rendering-vue-3f1bde }
   - { id: ref-form-rendering-svelte-f8f39b }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

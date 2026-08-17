@@ -21,7 +21,7 @@ rights: ""
 subjects:
   - frontend
 title: Build a frontend
-assignments:
+blocks-assignments:
   - { uid: title-1 }
   - { uid: p-1 }
   - { uid: ul-2 }
@@ -95,9 +95,10 @@ assignments:
   - { uid: p-66 }
   - { uid: ul-67 }
   - { uid: p-68 }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
+blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

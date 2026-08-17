@@ -21,7 +21,7 @@ subjects:
   - blocks
   - containers
 title: Grid Block
-assignments:
+blocks-assignments:
   - { uid: title-1 }
   - { uid: ref-columns-description }
   - { uid: ref-columns-schema }
@@ -32,9 +32,10 @@ assignments:
   - { id: ref-columns-rendering-jsx-a52cb0 }
   - { id: ref-columns-rendering-vue-526eec }
   - { id: ref-columns-rendering-svelte-9b4eec }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
+blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

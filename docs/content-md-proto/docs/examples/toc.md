@@ -29,7 +29,7 @@ subjects:
   - blocks
   - navigation
 title: Table of Contents
-assignments:
+blocks-assignments:
   - { uid: 537a9742-95f1-4930-9df3-d38766f54a71 }
   - { uid: ref-toc-description }
   - { uid: editor-screenshot }
@@ -58,12 +58,13 @@ assignments:
   - { id: ref-toc-rendering-jsx-ee2124 }
   - { id: ref-toc-rendering-vue-12aef2 }
   - { id: ref-toc-rendering-svelte-397c7f }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

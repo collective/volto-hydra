@@ -31,7 +31,7 @@ subjects:
   - blocks
   - containers
 title: Grid
-assignments:
+blocks-assignments:
   - { uid: d3f1c443-583f-4e8e-a682-3bf25752a300 }
   - { uid: ref-grid-description }
   - { uid: 616b625c-b79f-4881-8536-b67a9e401a7d }
@@ -44,9 +44,10 @@ assignments:
   - { id: ref-grid-rendering-jsx-f30d80 }
   - { id: ref-grid-rendering-vue-1d61ab }
   - { id: ref-grid-rendering-svelte-8158ec }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
+blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />

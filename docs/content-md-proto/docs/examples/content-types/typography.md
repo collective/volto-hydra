@@ -20,7 +20,7 @@ rights: ""
 subjects:
   - content
 title: Typography - Page Title (H1, 48/56px)
-assignments:
+blocks-assignments:
   - { uid: a6cad3f3-57e8-4bb7-8ac2-b12096e974d2 }
   - { uid: 8fe8fc9b-221c-4c74-b66f-671d638222f3 }
   - { uid: 4be85eba-b165-4a87-8585-d8697616004d }
@@ -50,13 +50,14 @@ assignments:
   - { uid: 47cef702-7d66-4313-b3ec-585408735218 }
   - { uid: caa483f6-bc0f-4a5a-94d2-925897969928 }
   - { uid: e770913c-fb7b-4cf1-94a8-7eb6e24ff66e }
-prototypes: |
+blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="button" explicit title="${p/text}" href="${p/link}" />
-  <block type="teaser" explicit title="${h/text}" href="${h/link}" description="${p/text}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+blocks-tagged: |
+  <block type="button" title="${p/text}" href="${p/link}" />
+  <block type="teaser" title="${h/text}" href="${h/link}" description="${p/text}" />
   <block type="slateTable">
     <region name="table.rows">
       <block type="row">
