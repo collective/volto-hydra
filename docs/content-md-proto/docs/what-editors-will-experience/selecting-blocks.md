@@ -64,6 +64,11 @@ blocks-matched: |
   <block type="title" _="${h1}" />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+  <block type="codeExample">
+    <region name="tabs" widget="object_list">
+      <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
+    </region>
+  </block>
 blocks-tagged: |
   <block type="slateTable">
     <region name="table.rows">
@@ -72,11 +77,6 @@ blocks-tagged: |
           <block type="cell" value="${td/slate}" />
         </region>
       </block>
-    </region>
-  </block>
-  <block type="codeExample">
-    <region name="tabs" widget="object_list">
-      <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
     </region>
   </block>
 ---
@@ -142,8 +142,6 @@ The sidebar is the other way to navigate selection — useful when the block you
 
 When a block is selected, the sidebar shows the **chain of parent containers** from the root down to the block — one collapsible section per level. Each level has a `‹` arrow on the left.
 
-<block type="codeExample">
-
 ### Text
 
 ```text
@@ -155,8 +153,6 @@ When a block is selected, the sidebar shows the **chain of parent containers** f
          [Text body, …]
 ```
 
-</block>
-
 Click any `‹` arrow to **navigate up** to that level. This does the same thing as pressing `Escape` repeatedly, but visibly — you can see what each parent is named, jump several levels in one click, and edit the parent's own settings (alignment, padding, …) inline without leaving the current selection.
 
 <block type="image" url="/docs/images/parent-chain" align="center" size="l" data-json='{"alt":"Sidebar showing parent chain for a slate inside a column inside columns. Three sections each with a `‹` arrow: Columns (\"My Columns Section\"), Column (\"Left Column\"), Text (current, body field shown)."}' />
@@ -167,8 +163,6 @@ This works for any depth — nested columns, slider with templated children, acc
 
 When a container block is selected, the sidebar shows that container's **children** as a list, one row per child:
 
-<block type="codeExample">
-
 ### Text
 
 ```text
@@ -177,8 +171,6 @@ Slides                    [+]
 ⋮⋮  Slide 2                >
 ⋮⋮  Slide 3                >
 ```
-
-</block>
 
 - **`⋮⋮` drag handle** — drag to reorder children within the container.
 - **`>` drill-in arrow** — selects that child, scrolls the preview to it, switches the sidebar to its settings.

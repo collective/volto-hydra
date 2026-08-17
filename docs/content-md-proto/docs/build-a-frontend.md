@@ -98,7 +98,6 @@ blocks-assignments:
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
@@ -128,8 +127,6 @@ To make a site editable with Inka you break a page into:
     - `blocks` fields let a block hold other blocks.
 
 When the page loads inside Inka's edit iframe, you initialise the bridge and declare your blocks; otherwise you render normally from the API:
-
-<block type="codeExample">
 
 ### Js
 
@@ -171,11 +168,7 @@ else {
 }
 ```
 
-</block>
-
 Page data ends up shaped like this — one shared `blocks` dict, and a region per named list inside `blocks_layout`:
-
-<block type="codeExample">
 
 ### Js
 
@@ -195,11 +188,7 @@ Page data ends up shaped like this — one shared `blocks` dict, and a region pe
 }
 ```
 
-</block>
-
 Then you augment the rendered HTML with `data-` attributes (or `<!-- hydra ... -->` comments) so Inka can find your blocks and editable fields:
-
-<block type="codeExample">
 
 ### Html
 
@@ -216,16 +205,12 @@ Then you augment the rendered HTML with `data-` attributes (or `<!-- hydra ... -
 </div>
 ```
 
-</block>
-
 ### Deep-link anchors (fragments)
 
 To let editors link to a spot *inside* a page, mark the element with a real `id` (the `#fragment` the browser scrolls to) **and** a linkable-anchor attribute carrying the label shown in the link picker. The attribute you pick also records the anchor's **level**, so the picker (and consumers like an in-page navigation block) can show a hierarchy:
 
 - `data-linkable-h1` … `data-linkable-h6="Label"` — a heading anchor **at that level**. Use these on your headings; the suffix is the level.
 - `data-linkable-id="Label"` — a **level-less** anchor (a figure, a defined term, any non-heading target).
-
-<block type="codeExample">
 
 ### Html
 
@@ -234,8 +219,6 @@ To let editors link to a spot *inside* a page, mark the element with a real `id`
 <h3 id="enterprise" data-linkable-h3="Enterprise plan">Enterprise plan</h3>
 <figure id="fig-1" data-linkable-id="Figure 1">…</figure>
 ```
-
-</block>
 
 Inka harvests these per block on render as `{ id, name, level }` and stores them in the block's data, so the object browser offers them as `path#pricing` link targets — as a nested list reflecting the page's structure. Both attributes must survive into your **published** render for the anchor to resolve at runtime — Inka only reads them in edit mode.
 

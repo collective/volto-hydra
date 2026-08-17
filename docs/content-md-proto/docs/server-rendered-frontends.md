@@ -65,6 +65,11 @@ blocks-assignments:
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
+  <block type="codeExample">
+    <region name="tabs" widget="object_list">
+      <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
+    </region>
+  </block>
 blocks-tagged: |
   <block type="slateTable">
     <region name="table.rows">
@@ -73,11 +78,6 @@ blocks-tagged: |
           <block type="cell" value="${td/slate}" />
         </region>
       </block>
-    </region>
-  </block>
-  <block type="codeExample">
-    <region name="tabs" widget="object_list">
-      <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
     </region>
   </block>
 ---
@@ -95,8 +95,6 @@ Server-rendered-only frameworks have no such reconciliation. If you naively swap
 The fix is to update only the smallest block that changed, and let the rest of the DOM stay untouched. That's what the bridge does when you set `renderEndpoint`.
 
 ## How it works
-
-<block type="codeExample">
 
 ### Text
 
@@ -123,8 +121,6 @@ hydra.js bridge   ────►    FORM_DATA postMessage
                            (or renderContainer.innerHTML for page unit)
 ```
 
-</block>
-
 ### The diff rule (built into `hydra.js`)
 
 `findChangedUnit(prevFormData, newFormData)` walks the new form data against the previous one looking for the shallowest changed subtree. At each container level:
@@ -146,8 +142,6 @@ That dispatch must also handle `@type: "empty"` — the placeholder Inka seeds i
 
 ## Worked example: Astro
 
-<block type="codeExample">
-
 ### Js
 
 ```js
@@ -161,8 +155,6 @@ initBridge({
   renderContainer: '#content',   // optional, default '#content'
 });
 ```
-
-</block>
 
 <block type="codeExample">
 
@@ -187,8 +179,6 @@ const uid  = block?.['@uid'];
 ```
 
 </block>
-
-<block type="codeExample">
 
 ### Ts
 
@@ -224,13 +214,9 @@ function findBlockById(formData, blockId) {
 }
 ```
 
-</block>
-
 The full working example lives at [`docs/examples/test-astro/`](https://github.com/collective/volto-hydra/tree/main/docs/examples/test-astro) with block components in [`docs/examples/examples/astro/`](https://github.com/collective/volto-hydra/tree/main/docs/examples/examples/astro).
 
 ## Worked example: PHP
-
-<block type="codeExample">
 
 ### Php
 
@@ -244,8 +230,6 @@ The full working example lives at [`docs/examples/test-astro/`](https://github.c
 </div>
 ```
 
-</block>
-
 <block type="codeExample">
 
 ### Php
@@ -258,8 +242,6 @@ The full working example lives at [`docs/examples/test-astro/`](https://github.c
 ```
 
 </block>
-
-<block type="codeExample">
 
 ### Php
 
@@ -295,11 +277,7 @@ function find_block_by_id($data, $blockId) {
 }
 ```
 
-</block>
-
 The HTML page that loads in the editor iframe just needs to pull in the bridge and call `initBridge` with the endpoint:
-
-<block type="codeExample">
 
 ### Html
 
@@ -321,8 +299,6 @@ The HTML page that loads in the editor iframe just needs to pull in the bridge a
 </body>
 </html>
 ```
-
-</block>
 
 ## Adapting for Django / Rails / Laravel / Symfony / Go
 

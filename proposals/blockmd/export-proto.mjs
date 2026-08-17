@@ -82,7 +82,7 @@ const PROTO_TEXT = {
 // (explicit -- require the tag). Section membership IS the explicit flag. Only
 // these leaves auto-match; button/teaser overlap common patterns and containers
 // need their tag (until greedy container matching lands), so those are tagged.
-const MATCHED = new Set(['slate', 'title', 'separator', 'image']);
+const MATCHED = new Set(['slate', 'title', 'separator', 'image', 'codeExample']);
 const isMatched = (t) => MATCHED.has(t);
 const textFor = (matched) => Object.entries(PROTO_TEXT)
   .filter(([t]) => isMatched(t) === matched).map(([, v]) => v).join('\n');

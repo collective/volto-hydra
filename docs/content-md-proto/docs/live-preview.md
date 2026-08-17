@@ -44,7 +44,6 @@ blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" />
-blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
@@ -62,8 +61,6 @@ To make your site editable with Inka you load hydra.js in your frontend and call
 
 Call `initBridge()` with an `onEditChange` callback to receive live content updates as the user edits. Your frontend re-renders in real time. Outside edit mode, fetch content from the API as normal.
 
-<block type="codeExample">
-
 ### Javascript
 
 ```javascript
@@ -79,8 +76,6 @@ if (window.name.startsWith('hydra')) {
 }
 ```
 
-</block>
-
 The `formData` passed to `onEditChange` has the same structure as the Plone REST API response, so the same rendering code works for both live editing and normal page display.
 
 Either hashbang (`/#!/path`) or normal (`/path`) style paths are supported.
@@ -88,8 +83,6 @@ Either hashbang (`/#!/path`) or normal (`/path`) style paths are supported.
 ## A Simple Page Renderer
 
 Iterate `blocks_layout.items` and render each block by type. Add `data-block-uid` so Inka knows which block the user clicked.
-
-<block type="codeExample">
 
 ### Javascript
 
@@ -136,13 +129,9 @@ Iterate `blocks_layout.items` and render each block by type. Add `data-block-uid
 </html>
 ```
 
-</block>
-
 ## Allowed Blocks and Page Regions
 
 When initialising the bridge, you can configure rules for what blocks can be added to the page and where. Pages can have multiple blocks fields for different regions (e.g., header, content, footer), each with its own allowed block types and limits. These show as separate sections in the sidebar when no block is selected:
-
-<block type="codeExample">
 
 ### Javascript
 
@@ -172,5 +161,3 @@ bridge = initBridge({
     },
 });
 ```
-
-</block>

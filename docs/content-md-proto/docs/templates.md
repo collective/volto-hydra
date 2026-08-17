@@ -97,6 +97,11 @@ blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" />
+  <block type="codeExample">
+    <region name="tabs" widget="object_list">
+      <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
+    </region>
+  </block>
 blocks-tagged: |
   <block type="slateTable">
     <region name="table.rows">
@@ -105,11 +110,6 @@ blocks-tagged: |
           <block type="cell" value="${td/slate}" />
         </region>
       </block>
-    </region>
-  </block>
-  <block type="codeExample">
-    <region name="tabs" widget="object_list">
-      <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
     </region>
   </block>
 ---
@@ -138,8 +138,6 @@ Templates are analogous to blocks themselves but are made up of blocks with spec
 
 The slot a block lives in is identified by its `slotId`. This is the field name used by `expandTemplates` / `expandTemplatesSync` and by the merge rules below — not `placeholder`.
 
-<block type="codeExample">
-
 ### Json
 
 ```json
@@ -153,8 +151,6 @@ The slot a block lives in is identified by its `slotId`. This is the field name 
   }
 }
 ```
-
-</block>
 
 ## Editing a template (central control)
 
@@ -216,8 +212,6 @@ Everything else is identical: every object\_list item still needs a `slotId` (pl
 
 The merge identifies object\_list items by their **id field**, and it varies per field — a form's `subblocks` key on `field_id`, a slider's `slides` on `@id`, a table's `rows` on `key`. A frontend has no schema, so whenever you expand a template or layout that contains an object\_list container you MUST tell the merge each field's id field via an **`idFieldMap`** (`{ blockType: { field: idField } }`). Without it the merge falls back to `@id` — and for a `field_id`-keyed field that mints a broken id and the item is dropped on the next merge.
 
-<block type="codeExample">
-
 ### Javascript
 
 ```javascript
@@ -230,15 +224,11 @@ const items = expandTemplatesSync(layout, {
 });
 ```
 
-</block>
-
 (On the admin this map is derived from the block schema automatically. When you re-enter to expand a **single** object\_list array on its own, the `idField` shorthand is enough: `expandTemplatesSync(block.slides, { templateState, templates, idField: '@id' })`.)
 
 ## allowedTemplates vs allowedLayouts
 
 Configure templates in `page.schema.properties` on the blocks field:
-
-<block type="codeExample">
 
 ### Javascript
 
@@ -256,8 +246,6 @@ initBridge({
     },
 });
 ```
-
-</block>
 
 - **`allowedTemplates`** — Templates shown in the BlockChooser's "Templates" group, inserted as blocks.
 - **`allowedLayouts`** — Templates shown in the Layout dropdown. They replace/merge the entire container content. A value of `null` allows for a no-template option. If none of those templates are already set as the layout then during editing, the first is applied automatically.
@@ -277,8 +265,6 @@ Use `expandTemplates` (async) or `expandTemplatesSync` (sync with pre-fetched te
 ## Pre-loading with loadTemplates
 
 **`loadTemplates(data, loadTemplate)`** scans page data for `templateId` references and loads them all in parallel. It follows nested references (templates referencing other templates) and has a 5s per-template timeout. It only loads templates actually in the page data — `allowedLayouts` options are loaded on demand when a forced layout is applied.
-
-<block type="codeExample">
 
 ### Javascript
 
@@ -313,8 +299,6 @@ for (const item of items) {
 }
 ```
 
-</block>
-
 Options:
 
 - **`blocks`**: Map of blockId -> block data
@@ -339,8 +323,6 @@ When a layout is applied, the rules are the same but applied across a whole bloc
 - In the top slot outside the first fixed template block
 - Otherwise it is dropped
 
-<block type="codeExample">
-
 ### Diagram
 
 ```bash
@@ -349,15 +331,11 @@ Layout:  [Fixed Header] [default] [Fixed Footer] [post_footer]
 After:   [Fixed Header] [User Block A] [User Block B] [Fixed Footer]
 ```
 
-</block>
-
 ## Forcing Layouts
 
 A **forced layout** (`allowedLayouts`) is applied **automatically across a whole blocks field** — unlike a **snippet** (`allowedTemplates`), which the *editor* inserts as a block where they choose (see the decision table above). Forcing is **your frontend's** call: you pass `allowedLayouts`, so you decide **which** layout to force and **when**.
 
 Pass a static layout to always force one (e.g. a footer):
-
-<block type="codeExample">
 
 ### Javascript
 
@@ -375,13 +353,9 @@ const items = await expandTemplates(layout, {
 });
 ```
 
-</block>
-
 ### Choosing the layout with your own rules
 
 `allowedLayouts` is just a value you compute, so apply whatever rule you like — content type, metadata, route, A/B bucket — then pass the result. Pass `undefined` (or omit it) to force nothing; pass **several** to let the editor pick from the Layout dropdown (include `null` for a "no layout" option).
-
-<block type="codeExample">
 
 ### Javascript
 
@@ -399,7 +373,5 @@ const items = await expandTemplates(layout, {
     allowedLayouts: forced ? [forced] : undefined,
 });
 ```
-
-</block>
 
 Note: during editing the admin side will load the templates so in order to apply the same rules of forcing a layout you will need to set `allowedLayouts` in `page.schema.properties` to ensure the page loads with the right template.

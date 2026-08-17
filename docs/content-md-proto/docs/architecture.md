@@ -74,6 +74,11 @@ blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" />
+  <block type="codeExample">
+    <region name="tabs" widget="object_list">
+      <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
+    </region>
+  </block>
 blocks-tagged: |
   <block type="slateTable">
     <region name="table.rows">
@@ -82,11 +87,6 @@ blocks-tagged: |
           <block type="cell" value="${td/slate}" />
         </region>
       </block>
-    </region>
-  </block>
-  <block type="codeExample">
-    <region name="tabs" widget="object_list">
-      <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
     </region>
   </block>
 ---
@@ -100,8 +100,6 @@ Instead of combining editing and rendering into one framework and codebase, thes
 ## Architecture Overview
 
 You could think of it as splitting Volto into two parts, Rendering and CMS UI/Admin UI while keeping the same UI and then making the Rendering part easily replaceable with other implementations.
-
-<block type="codeExample">
 
 ### Architecture
 
@@ -128,8 +126,6 @@ You could think of it as splitting Volto into two parts, Rendering and CMS UI/Ad
  Anon         │   Frontend   │◄──────────────────────┤    Plone    │
               └──────────────┘                       └─────────────┘
 ```
-
-</block>
 
 ## The iframe ↔ admin bridge
 

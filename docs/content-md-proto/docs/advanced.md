@@ -54,7 +54,6 @@ blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" />
-blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
@@ -76,8 +75,6 @@ Detect the admin iframe and load the bridge only when needed. `window.name` is s
 - **`hydra-view:<origin>`** — view mode (e.g., `hydra-view:http://localhost:3001`)
 
 This persists across SPA navigation within the iframe, allowing your frontend to detect it's in the admin even after client-side route changes. In view mode, render from your API immediately but still load the bridge for navigation tracking. In edit mode, wait for `onEditChange` before rendering.
-
-<block type="codeExample">
 
 ### Javascript
 
@@ -114,15 +111,11 @@ if (inAdminIframe) {
 }
 ```
 
-</block>
-
 ## Authentication
 
 As soon as the editor logs into the hydra editor, your frontend should use the same auth token to access the REST API with the same privileges and render private content.
 
 The `access_token` is passed as a URL parameter on initial load and automatically stored in `sessionStorage` by hydra.js. On SPA navigation, the URL param is gone but the token persists in `sessionStorage`. Use the `getAccessToken()` helper:
-
-<block type="codeExample">
 
 ### Javascript
 
@@ -134,11 +127,7 @@ const token = getAccessToken();
 // or sessionStorage (for SPA navigation)
 ```
 
-</block>
-
 Example using Next.js 14 and ploneClient:
-
-<block type="codeExample">
 
 ### Javascript
 
@@ -164,8 +153,6 @@ export default function Blog({ params }) {
   return <div>{data.title}</div>;
 }
 ```
-
-</block>
 
 ## Preventing Reloads
 

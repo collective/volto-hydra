@@ -97,7 +97,6 @@ blocks-assignments:
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-blocks-tagged: |
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
@@ -118,8 +117,6 @@ Add data attributes to your rendered HTML to enable progressively richer visual 
 
 Example of a fully annotated slide block:
 
-<block type="codeExample">
-
 ### Html
 
 ```html
@@ -135,13 +132,9 @@ Example of a fully annotated slide block:
 </div>
 ```
 
-</block>
-
 ## Comment Syntax
 
 If you can't modify the markup (e.g., using a 3rd party component library), use comment syntax to specify block attributes:
-
-<block type="codeExample">
 
 ### Html
 
@@ -158,8 +151,6 @@ If you can't modify the markup (e.g., using a 3rd party component library), use 
 <!-- /hydra -->
 ```
 
-</block>
-
 - Attributes without selectors apply to the root element: `block-uid=xxx`
 - Attributes with selectors target child elements: `edit-text=title(.card-title)`
 - Closing `<!-- /hydra -->` marks end of scope
@@ -171,16 +162,12 @@ Supported attributes: `block-uid`, `block-readonly`, `edit-text`, `edit-link`, `
 
 Render optional fields **data-driven**: no data, no element. Don't render an empty element just to give the editor something to click — it leaks empty markup into your published page.
 
-<block type="codeExample">
-
 ### Jsx
 
 ```jsx
 {block.heading && <h1 data-edit-text="heading">{block.heading}</h1>}
 {block.image && <img data-edit-media="image" src={block.image} />}
 ```
-
-</block>
 
 Plain truthiness is enough — you never need `.length` or a null-safe walk. Inka normalises a field the editor has cleared (widgets write `[]`, which is truthy) to absent before your renderer sees it.
 
@@ -194,16 +181,12 @@ Reveal replaces a per-block boolean only where "has data" and "should render" ar
 
 Add `data-linkable-allow` to elements that should navigate during edit mode (paging links, facet controls, etc.):
 
-<block type="codeExample">
-
 ### Html
 
 ```html
 <a href="/page?pg=2" data-linkable-allow>Next</a>
 <select data-linkable-allow @change="handleFilter">...</select>
 ```
-
-</block>
 
 ## Field Path Syntax
 
@@ -224,8 +207,6 @@ Every `data-edit-*` attribute — `data-edit-text`, `data-edit-link`, `data-edit
 
 The two compose: `../content/headline` is "the parent block, its `content.headline`". `/` descends objects only — a region (`object_list` / `blocks_layout`) or a value is the end of a path (a region's children are separate blocks with their own `data-block-uid`).
 
-<block type="codeExample">
-
 ### Html
 
 ```html
@@ -242,15 +223,11 @@ The two compose: `../content/headline` is "the parent block, its `content.headli
 <img data-edit-media="content/image" />
 ```
 
-</block>
-
 This lets fixed parts of the page (headers), parent-block fields, and fields grouped inside an object all be edited in place, with one addressing model.
 
 ## Readonly Regions
 
 Add `data-block-readonly` (or `<!-- hydra block-readonly -->` comment) to disable inline editing for all fields inside an element:
-
-<block type="codeExample">
 
 ### Html
 
@@ -263,11 +240,7 @@ Add `data-block-readonly` (or `<!-- hydra block-readonly -->` comment) to disabl
 </div>
 ```
 
-</block>
-
 Or using comment syntax:
-
-<block type="codeExample">
 
 ### Html
 
@@ -275,8 +248,6 @@ Or using comment syntax:
 <!-- hydra block-readonly -->
 <div class="listing-item" data-block-uid="item-1">...</div>
 ```
-
-</block>
 
 `data-block-readonly` is *your* call — use it when your frontend wants to lock a block for its own reasons (a teaser mirroring another page, a listing item).
 
@@ -291,8 +262,6 @@ When rendering Slate nodes to DOM, your renderer must follow these rules for `da
 
 hydra.js uses node-ids to map between Slate's data model and your DOM. When restoring cursor position after formatting changes, it walks your DOM counting Slate children.
 
-<block type="codeExample">
-
 ### Html
 
 ```html
@@ -305,8 +274,6 @@ Invalid (missing node-id on wrapper):
 This breaks cursor positioning because hydra.js can't correlate DOM structure to Slate structure.
 ```
 
-</block>
-
 ## Non-editable content inside a slate field
 
 Sometimes a renderer adds elements to slate output that are **not** part of the editable content — a decorative icon (an "opens in a new tab" glyph), a generated chip, an embedded non-editable widget. These have no `data-node-id` (they aren't Slate nodes), and they must be marked so that **both** the editor's caret and hydra's DOM→Slate reader skip them:
@@ -316,8 +283,6 @@ Sometimes a renderer adds elements to slate output that are **not** part of the 
 
 hydra's DOM→Slate reader skips any child (without a `data-node-id`) that carries **either** attribute — treating it as chrome, not content. Without this, the element's text would be read back into the Slate value on every edit / select / delete over it, corrupting the value.
 
-<block type="codeExample">
-
 ### Html
 
 ```html
@@ -325,8 +290,6 @@ An <a data-node-id="0.1">external link<span class="external-icon"
   aria-hidden="true" contenteditable="false">&#8599;</span></a>
 The icon is decoration: the caret skips it and it never enters the value.
 ```
-
-</block>
 
 Contrast this with the wrapper rule above: a wrapper that holds real content carries the inner node's `data-node-id` (and neither of these attributes), so it IS read; decorative / non-editable chrome carries these attributes and is skipped.
 
@@ -344,8 +307,6 @@ A frontend renderer can therefore always assume one top-level node per slate fie
 ## Complete Slate Rendering Example
 
 Slate data structure (value is an array but always contains a single root node):
-
-<block type="codeExample">
 
 ### Json
 
@@ -368,11 +329,7 @@ Slate data structure (value is an array but always contains a single root node):
 }
 ```
 
-</block>
-
 Renderer:
-
-<block type="codeExample">
 
 ### Javascript
 
@@ -389,11 +346,7 @@ function renderSlate(nodes) {
 }
 ```
 
-</block>
-
 Usage:
-
-<block type="codeExample">
 
 ### Html
 
@@ -402,5 +355,3 @@ Usage:
   <!-- renderSlate(block.value) output goes here -->
 </div>
 ```
-
-</block>

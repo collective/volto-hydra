@@ -131,6 +131,11 @@ blocks-assignments:
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
+  <block type="codeExample">
+    <region name="tabs" widget="object_list">
+      <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
+    </region>
+  </block>
 blocks-tagged: |
   <block type="slateTable">
     <region name="table.rows">
@@ -139,11 +144,6 @@ blocks-tagged: |
           <block type="cell" value="${td/slate}" />
         </region>
       </block>
-    </region>
-  </block>
-  <block type="codeExample">
-    <region name="tabs" widget="object_list">
-      <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
     </region>
   </block>
 ---
@@ -155,8 +155,6 @@ Define custom block types directly in your frontend configuration via the `block
 ## `initBridge()` Reference
 
 `initBridge(options)` opens the iframe bridge and registers your frontend's page and block configuration with the admin. Call it once during page setup when running inside the admin iframe.
-
-<block type="codeExample">
 
 ### Js
 
@@ -173,13 +171,9 @@ const bridge = initBridge({
 });
 ```
 
-</block>
-
 ### `page` — page-level blocks fields
 
 Defines the **blocks fields of a page** where blocks can live. `page.schema.properties` is keyed by field name; each `widget: 'blocks_layout'` entry is one blocks field. The field name is the key inside the page's `blocks_layout` dict (the default field is `items`), so they all persist inside the registered `blocks_layout` field.
-
-<block type="codeExample">
 
 ### Js
 
@@ -194,8 +188,6 @@ page: {
   },
 }
 ```
-
-</block>
 
 Per-field options:
 
@@ -217,8 +209,6 @@ Defaults and side effects:
 
 Defines or overrides individual block types. Each key is the block type name (matching what appears in `allowedBlocks` and `@type` on saved blocks).
 
-<block type="codeExample">
-
 ### Js
 
 ```js
@@ -236,8 +226,6 @@ blocks: {
   },
 }
 ```
-
-</block>
 
 Per-block options (most are passed through to Volto's block config):
 
@@ -266,8 +254,6 @@ Per-block options (most are passed through to Volto's block config):
 The `Bridge` instance, which exposes additional API methods you can call from the frontend (e.g. `getAccessToken()`, `sendBlockUpdate()`, `sendBlockAction()`). See [Advanced › Custom Sidebar UI](advanced.md#custom-sidebar-and-cms-ui) for those.
 
 ## Defining a custom block
-
-<block type="codeExample">
 
 ### Javascript
 
@@ -324,8 +310,6 @@ const bridge = initBridge({
 });
 ```
 
-</block>
-
 Child block types (like `slide` above) must be defined at the top level of `blocks`. You can also:
 
 - Set `restricted: true` to hide a block from the block chooser (only usable as child blocks)
@@ -338,8 +322,6 @@ Child block types (like `slide` above) must be defined at the top level of `bloc
 ## Schema Enhancers
 
 Schema enhancers modify block schemas dynamically:
-
-<block type="codeExample">
 
 ### Javascript
 
@@ -365,8 +347,6 @@ const bridge = initBridge({
     },
 });
 ```
-
-</block>
 
 **`fieldRules`** — add, remove, or conditionally modify field definitions. The value for each rule key can be:
 
@@ -399,8 +379,6 @@ Two extras drive **position-** and \*\*type-\*\*aware rules:
 - The virtual field **`@index`** reads a block's ordinal position within its parent `object_list` region (a `number` surface) — `{ '@index': { lt: 1 } }` means "first in my region", and `../@index` is the parent block's index. Distinct from a region's `count` (which counts children).
 - A rule whose **`set` is a block-type NAME** (a string) rather than a field definition is a **`@type` rule** — it changes the item's *type* by position, not a field. Declared as `typeRule` on a typed `object_list`; see [`typeRule` — position picks a typed item's `@type`](#typerule--position-picks-a-typed-items-type). The retype is applied by CONVERSION (a schema enhancer can't rewrite stored `@type`), which brings up the confirm described under [Drag / paste via conversion](#drag--paste-via-conversion).
 
-<block type="codeExample">
-
 ### Javascript
 
 ```javascript
@@ -419,11 +397,7 @@ schemaEnhancer: {
 }
 ```
 
-</block>
-
 For a **region** (an `object_list` field, or a single `blocks_layout` region named by its region key), the array surface is its **child block types**, and the numeric operators **count** that region's children — only its own, never a cross-region total:
-
-<block type="codeExample">
 
 ### Javascript
 
@@ -440,11 +414,7 @@ schemaEnhancer: {
 }
 ```
 
-</block>
-
 To condition on a block's **position** rather than a field value, use the virtual field **`@index`** — a block's ordinal index within its parent `object_list` region (a `number` surface). It composes with the block-step grammar, so `../@index` is the parent block's index. Unlike the region's numeric ops (which *count* children), `@index` is *where this block sits*:
-
-<block type="codeExample">
 
 ### Javascript
 
@@ -460,8 +430,6 @@ schemaEnhancer: {
     },
 }
 ```
-
-</block>
 
 A block that isn't an `object_list` item yields an unset `@index`, so comparisons are simply false (never an error). `lt: 1` is "first"; `lt: 2` is "first two", etc.
 
@@ -487,8 +455,6 @@ Each key in `fieldMappings` is either a **specific block type name**, **`@defaul
 
 Use these when blocks share fields that aren't part of the `@default` set — for example, facet types sharing `{ title, field, hidden }` or form field types sharing `{ label, description, required }`.
 
-<block type="codeExample">
-
 ### Javascript
 
 ```javascript
@@ -512,13 +478,9 @@ selectFacet:  { fieldMappings: { checkboxFacet: { title: 'title', field: 'field'
 checkboxFacet: { fieldMappings: { selectFacet: { /* ... */ }, daterangeFacet: { /* ... */ } } },
 ```
 
-</block>
-
 ### `@target` — copy from a linked content item
 
 `@target` maps a **linked** content item's attributes onto this block's own fields — the generic version of the Volto teaser's "copy from target" button. It maps *source content attributes* (`title`, `description`, `image`, …) to *this block's fields*. The item is whichever the block's **link field** points at (the `object_browser mode: 'link'` field — its stored snapshot is the source), so you don't name a URL field separately: "the url is the link in the mapping".
-
-<block type="codeExample">
 
 ### Javascript
 
@@ -537,8 +499,6 @@ button: {
 },
 ```
 
-</block>
-
 Declaring `@target` is the **only** opt-in — no per-block enhancer wiring. Each mapped field then shows a small **🔗 pull from linked** toggle in the sidebar (only when a target is selected). Every mapped field is one of two states:
 
 - **Linked** (default, toggle ticked) — the field *pulls from the linked item*. Its value is filled from the target's snapshot when the page opens for editing and re-pulled when you change the link, so it always mirrors the linked content.
@@ -547,8 +507,6 @@ Declaring `@target` is the **only** opt-in — no per-block enhancer wiring. Eac
 ### Container ⇄ value (region-crossing paths)
 
 A `fieldMappings` value is usually a sibling **field name**. It may instead be a **region-crossing path** `<region>/<type|*>/<field>`, which reaches the `<field>` of a container region's children — the one place the path grammar crosses a region boundary. This bridges a **container** block (a region of child blocks) and a **value** block (a scalar field), so a block can convert between the two shapes:
-
-<block type="codeExample">
 
 ### Javascript
 
@@ -566,8 +524,6 @@ tableCell: {                                         // the container form
 },
 ```
 
-</block>
-
 - **container → value (collapse)** — gather the region's matching children's `<field>`; slate values are **merged** into one (lossless), not truncated.
 - **value → container (expand)** — wrap the value in **one** child of `<type>` in the region.
 - `<type>` selects a child type; `*` = any child that exposes `<field>` (siblings without it — an `image` for a `value` path — are skipped). A **concrete** type (`blocks/slate/value`) makes expand unambiguous, so use it for a two-way bridge; `*` suits read-only cross-region reads (e.g. a `when` condition).
@@ -577,8 +533,6 @@ Non-region scalar fields (`key`, `width`, …) carry over unchanged. This is the
 #### `typeRule` — position picks a typed item's `@type`
 
 The bridge converts on demand; a **`@type` rule** on a typed `object_list` field decides *when*, by **position**. It is an ordinary `when`-based fieldRule (same grammar — `@index`, `../@index`, `../../<field>`, `oneOf`, `lt`, …) whose `set` is a block-**type name** instead of a field definition:
-
-<block type="codeExample">
 
 ### Javascript
 
@@ -594,8 +548,6 @@ cells: {
     ],
 },
 ```
-
-</block>
 
 The rule is evaluated in the same pass that applies field defaults (run on every edit): each typed item's target `@type` is re-resolved, and when it differs from the stored `@type` the item is **converted in place** via the bridge above. So moving a row to/from row 0 flips its cells between `tableHeaderCell` (a slate `value`) and `tableCell` (a `blocks` container), losslessly — no imperative "re-type the cells" code. Only meaningful on a **typed** object\_list (a `typeField` item has an `@type` to rewrite); it settles in one pass (the target type re-resolves to itself once the item is in place).
 
@@ -625,8 +577,6 @@ The chooser popup survives only for the genuinely ambiguous case: a single block
 
 A mapping value is either a string (simple field rename) or `{ field, type }` (rename with type conversion):
 
-<block type="codeExample">
-
 ### Json
 
 ```json
@@ -637,8 +587,6 @@ A mapping value is either a string (simple field rename) or `{ field, type }` (r
     "image": "preview_image"
 }
 ```
-
-</block>
 
 When `type` is specified, the value is converted at runtime:
 
@@ -669,8 +617,6 @@ The saved `fieldMapping` is read at render time by `expandListingBlocks` — no 
 
 When the editor pastes rich HTML into the page, Inka will eventually be able to recognise it as a custom block by matching against a CSS selector mapping. The proposed shape:
 
-<block type="codeExample">
-
 ### Javascript
 
 ```javascript
@@ -680,7 +626,5 @@ video: {
     },
 }
 ```
-
-</block>
 
 The `css:<selector>` key in `fieldMappings` matches a pasted HTML element; the value maps element attributes to block fields. Not yet implemented — open question on whether this should run via `htmlTagsToSlate` (bypassing slate conversion) or be encoded into slate so attributes/classes survive.
