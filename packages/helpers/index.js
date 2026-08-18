@@ -241,12 +241,21 @@ export function buildQuerystringSearchBody(
     metadata_fields: '_all',
   };
 
-  // Add depth if specified — Plone catalog supports a top-level depth
-  // field that limits results to N levels under each path criterion.
-  // Used by contextNavigation's listing config so a path+depth combo
-  // returns only the right tree slice.
+  // Depth belongs ON the path criterion, encoded in its VALUE as `path::depth`
+  // (`.::1`, `/docs::2`); a bare path is a recursive query. A top-level `depth`
+  // field on the request body is NOT honoured by @querystring-search — it is
+  // accepted and silently ignored, and inside the criterion as an object it
+  // errors with "index 'UID': option 'depth' is not valid".
+  //
+  // This used to set `body.depth` and so did nothing: a listing configured with
+  // depth 1 still matched the whole subtree, which put every nested Image into
+  // the /components index (`.` → 107 items, `.::1` → 33).
   if (queryConfig?.depth !== undefined) {
-    body.depth = queryConfig.depth;
+    for (const criterion of body.query) {
+      if (criterion.i !== 'path') continue;
+      if (typeof criterion.v !== 'string' || criterion.v.includes('::')) continue;
+      criterion.v = `${criterion.v}::${queryConfig.depth}`;
+    }
   }
 
   // Add limit if specified (0 or undefined means no limit)
