@@ -130,7 +130,14 @@ export async function checkEditAnnotations(
   );
   expect(imagesWithout, 'All non-decorative images should have data-edit-media').toEqual([]);
 
-  // All images must have a non-empty src and not be broken (naturalWidth > 0)
+  // All images must have a non-empty src and not be broken (naturalWidth > 0).
+  //
+  // Deliberately NOT a size judgement. A 1x1 is a perfectly valid image — a
+  // spacer, a tracking pixel, a placeholder — and renders exactly as the
+  // markup asks, so failing it here would conflate "this block renders
+  // correctly" with "this content is worth publishing". Placeholder blobs are
+  // a content problem and are detected where the content lives, in the
+  // validator's image check.
   const brokenImages = await block.locator('img').evaluateAll(
     (els: Element[]) => (els as HTMLImageElement[])
       .filter(el => {
@@ -142,6 +149,33 @@ export async function checkEditAnnotations(
       .map(el => el.getAttribute('src') || '(empty)'),
   );
   expect(brokenImages, 'All images should have valid src and load successfully').toEqual([]);
+
+  // Video/audio sources must actually exist.
+  //
+  // An <img> reports its own failure via naturalWidth, but a <video> whose src
+  // 404s just renders an empty player — nothing throws, nothing looks wrong in
+  // the DOM. Content-level link checking can't cover these either: a doc video
+  // lives in the frontend's public/ directory, so it has no @search entry and
+  // looks identical to a typo. Asking the browser to fetch it is the only check
+  // that sees the difference. Same-origin, so a plain fetch is enough.
+  const brokenMedia = await block.evaluate(async (el: Element) => {
+    const srcs = [
+      ...el.querySelectorAll('video[src], audio[src], video source[src], audio source[src]'),
+    ]
+      .map(n => n.getAttribute('src') || '')
+      .filter(s => s && !s.startsWith('data:') && !s.startsWith('blob:'));
+    const bad: string[] = [];
+    for (const src of [...new Set(srcs)]) {
+      try {
+        const resp = await fetch(src, { method: 'HEAD' });
+        if (!resp.ok) bad.push(`${src} (HTTP ${resp.status})`);
+      } catch (e) {
+        bad.push(`${src} (${(e as Error).message})`);
+      }
+    }
+    return bad;
+  });
+  expect(brokenMedia, 'All video/audio sources should exist').toEqual([]);
 
   // Any inline-text field the renderer displays must sit inside [data-edit-text]
   // so the editor can target it. Drive this off the block schema: only plain
