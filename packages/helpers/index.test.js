@@ -60,6 +60,45 @@ describe('buildQuerystringSearchBody — core body', () => {
   });
 });
 
+describe('buildQuerystringSearchBody — queryType (Standard vs Advanced)', () => {
+  test('queryType "search" → string.search (Advanced)', () => {
+    const body = buildQuerystringSearchBody({}, {}, {
+      SearchableText: 'dog park',
+      queryType: 'search',
+    });
+    expect(criterion(body, 'SearchableText')).toEqual({
+      i: 'SearchableText',
+      o: 'plone.app.querystring.operation.string.search',
+      v: 'dog park',
+    });
+  });
+
+  test('queryType "contains" → string.contains (Standard)', () => {
+    const body = buildQuerystringSearchBody({}, {}, {
+      SearchableText: 'dog',
+      queryType: 'contains',
+    });
+    expect(criterion(body, 'SearchableText').o).toBe(
+      'plone.app.querystring.operation.string.contains',
+    );
+  });
+
+  test('no queryType defaults to string.contains', () => {
+    const body = buildQuerystringSearchBody({}, {}, { SearchableText: 'dog' });
+    expect(criterion(body, 'SearchableText').o).toBe(
+      'plone.app.querystring.operation.string.contains',
+    );
+  });
+
+  test('queryType is never emitted as its own query criterion', () => {
+    const body = buildQuerystringSearchBody({}, {}, {
+      SearchableText: 'dog',
+      queryType: 'search',
+    });
+    expect(criterion(body, 'queryType')).toBeUndefined();
+  });
+});
+
 describe('buildQuerystringSearchBody — discrete (value) facets', () => {
   test('facet.<field> array → selection.any with the array', () => {
     const body = buildQuerystringSearchBody({}, {}, {

@@ -188,9 +188,15 @@ export function buildQuerystringSearchBody(
 
   // Merge extraCriteria into query
   if (extraCriteria.SearchableText) {
+    // queryType (plone6): "search" = Advanced (word/phrase) → the ZCTextIndex
+    // `string.search` operation; anything else = Standard substring
+    // (`string.contains`, the default). Only "search" switches it.
     query.push({
       i: 'SearchableText',
-      o: 'plone.app.querystring.operation.string.contains',
+      o:
+        extraCriteria.queryType === 'search'
+          ? 'plone.app.querystring.operation.string.search'
+          : 'plone.app.querystring.operation.string.contains',
       v: extraCriteria.SearchableText,
     });
   }
