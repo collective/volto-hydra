@@ -10,7 +10,7 @@
 import {
   readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, readdirSync, statSync, copyFileSync,
 } from 'fs';
-import { join, dirname, resolve, basename, extname } from 'path';
+import { join, dirname, resolve, basename, extname, relative } from 'path';
 import { fileURLToPath } from 'url';
 import YAML from 'yaml';
 import { SERVER_STATE } from '../../lib/blockmd.mjs';
@@ -25,6 +25,25 @@ const INKA = resolve(HERE, '../..');
 const SRC = resolve(INKA, 'docs/content/content/content');
 const outArg = process.argv.indexOf('--out');
 const OUT = outArg > -1 ? resolve(process.argv[outArg + 1]) : resolve(INKA, 'docs/content-md-proto');
+
+// A codeExample fence whose code IS a renderer file becomes a `{literalinclude}`
+// reference -- so the markdown points at the single source instead of copying it.
+// (Hand-written snippets that match no file stay inline.) The mount's readTree
+// resolves the reference back to the file's code, so the served content is
+// identical; `{literalinclude}` paths are regenerated on every export, so they
+// track wherever the doc tree moves.
+const EX = resolve(INKA, 'docs/examples/examples');
+const rendererByContent = new Map();
+for (const fw of ['react', 'vue', 'svelte', 'astro']) {
+  const dir = join(EX, fw);
+  if (existsSync(dir)) for (const f of readdirSync(dir)) rendererByContent.set(readFileSync(join(dir, f), 'utf8').trim(), join(dir, f));
+}
+function referenceRenderers(markdown, destDir) {
+  return markdown.replace(/```(\w+)\n([\s\S]*?)\n```/g, (m, lang, code) => {
+    const file = rendererByContent.get(code.trim());
+    return file ? `\`\`\`{literalinclude} ${relative(destDir, file)}\n:language: ${lang}\n\`\`\`` : m;
+  });
+}
 
 // Emit-capable prototypes, one text block per type. Types not here (slateTable,
 // gridBlock, the long tail) fall to tier-3 data tags automatically.
@@ -210,7 +229,7 @@ for (const d of items) {
     const asg = `blocks-assignments:\n${assignments.map((a) => `  - ${flow(a)}`).join('\n')}`;
     const fmBody = [front, asg, sectionYaml('blocks-matched', used, true), sectionYaml('blocks-tagged', used, false)]
       .filter(Boolean).join('\n');
-    writeFileSync(dest, `---\n${fmBody}\n---\n\n${markdown}\n`);
+    writeFileSync(dest, `---\n${fmBody}\n---\n\n${referenceRenderers(markdown, dirname(dest))}\n`);
     pages += 1;
     // rough coverage: count self-closing data tags (tier-3) vs the rest
     tier3 += (markdown.match(/<block type="[^"]*"[^>]*\/>/g) || []).length;

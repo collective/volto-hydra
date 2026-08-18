@@ -169,95 +169,26 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 ### React
 
-```jsx
-import { getImageUrl } from './utils.js';
-
-function ImageBlock({ block }) {
-  const src = getImageUrl(block.url);
-  const alt = block.alt || '';
-  const href = block.href?.[0]?.['@id'] || block.href;
-
-  const img = src
-    ? <img data-edit-media="url" src={src} alt={alt} />
-    : <div data-edit-media="url" style={{height:100,background:'#e5e7eb',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:4,cursor:'pointer'}}>Click to add image</div>;
-
-  return (
-    <div data-block-uid={block['@uid']}>
-      {href ? (
-        <a href={href} data-edit-link="href">{img}</a>
-      ) : (
-        <>{img}</>
-      )}
-    </div>
-  );
-}
+```{literalinclude} ../../../examples/examples/react/ImageBlock.jsx
+:language: jsx
 ```
 
 ### Vue
 
-```vue
-<template>
-  <div :data-block-uid="block['@uid']">
-    <a v-if="href" :href="href" data-edit-link="href">
-      <img data-edit-media="url" :src="imgSrc" :alt="block.alt" />
-    </a>
-    <img v-else data-edit-media="url" :src="imgSrc" :alt="block.alt" />
-  </div>
-</template>
-
-<script setup>
-import { computed } from 'vue';
-import { getImageUrl } from './utils.js';
-const props = defineProps({ block: Object });
-const href = computed(() => props.block.href?.[0]?.['@id'] || props.block.href);
-const imgSrc = computed(() => getImageUrl(props.block.url));
-</script>
+```{literalinclude} ../../../examples/examples/vue/ImageBlock.vue
+:language: vue
 ```
 
 ### Svelte
 
-```svelte
-<script>
-  import { getImageUrl } from './utils.js';
-  export let block;
-  $: href = block.href?.[0]?.['@id'] || block.href;
-  $: imgSrc = getImageUrl(block.url);
-</script>
-
-<div data-block-uid={block['@uid']}>
-  {#if href}
-    <a {href} data-edit-link="href">
-      <img data-edit-media="url" src={imgSrc} alt={block.alt} />
-    </a>
-  {:else}
-    <img data-edit-media="url" src={imgSrc} alt={block.alt} />
-  {/if}
-</div>
+```{literalinclude} ../../../examples/examples/svelte/ImageBlock.svelte
+:language: svelte
 ```
 
 ### Astro
 
-```astro
----
-/**
- * Image block. If `href` is set the image is wrapped in a link (and
- * `data-edit-link="href"` lets the link editor work); otherwise it's a
- * bare <img>. `data-edit-media="url"` is the media editor hook.
- */
-import { getImageUrl } from './utils.js';
-const { block } = Astro.props;
-const href = block.href?.[0]?.['@id'] || block.href;
-const imgSrc = getImageUrl(block.url);
----
-<div>
-  {href ? (
-    <a href={href} data-edit-link="href">
-      <img data-edit-media="url" src={imgSrc} alt={block.alt} />
-    </a>
-  ) : (
-    <img data-edit-media="url" src={imgSrc} alt={block.alt} />
-  )}
-</div>
+```{literalinclude} ../../../examples/examples/astro/ImageBlock.astro
+:language: astro
 ```
 
 </block>

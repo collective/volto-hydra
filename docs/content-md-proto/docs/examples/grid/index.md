@@ -129,92 +129,26 @@ A responsive grid that lays out child blocks in equal-width cells. The block use
 
 ### React
 
-```jsx
-function GridBlock({ block }) {
-  const blocks = block.blocks || {};
-  const items = block.blocks_layout?.items || [];
-
-  return (
-    <div data-block-uid={block['@uid']} className="grid-block">
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '1rem' }}>
-        {items.map(id => {
-          const child = { ...blocks[id], '@uid': id };
-          return (
-            <div key={id} className="grid-cell">
-              <BlockRenderer block={child} />
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+```{literalinclude} ../../../../examples/examples/react/GridBlock.jsx
+:language: jsx
 ```
 
 ### Vue
 
-```vue
-<template>
-  <div :data-block-uid="block['@uid']" class="grid-block">
-    <div :style="{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '1rem' }">
-      <div v-for="id in items" :key="id" class="grid-cell">
-        <BlockRenderer :block="{ ...block.blocks?.[id], '@uid': id }" />
-      </div>
-    </div>
-  </div>
-</template>
-
-<script setup>
-import { computed } from 'vue';
-import BlockRenderer from './BlockRenderer.vue';
-const props = defineProps({ block: Object });
-const items = computed(() => props.block.blocks_layout?.items || []);
-</script>
+```{literalinclude} ../../../../examples/examples/vue/GridBlock.vue
+:language: vue
 ```
 
 ### Svelte
 
-```svelte
-<script>
-  import BlockRenderer from './BlockRenderer.svelte';
-  export let block;
-  $: blocks = block.blocks || {};
-  $: items = block.blocks_layout?.items || [];
-</script>
-
-<div data-block-uid={block['@uid']} class="grid-block">
-  <div style="display: grid; grid-template-columns: repeat({items.length}, 1fr); gap: 1rem">
-    {#each items as id (id)}
-      <div class="grid-cell">
-        <BlockRenderer block={{ ...blocks[id], '@uid': id }} />
-      </div>
-    {/each}
-  </div>
-</div>
+```{literalinclude} ../../../../examples/examples/svelte/GridBlock.svelte
+:language: svelte
 ```
 
 ### Astro
 
-```astro
----
-/**
- * Grid container. Children are arbitrary blocks (each rendered by
- * BlockRenderer); columns count is derived from the number of items.
- */
-import BlockRenderer from './BlockRenderer.astro';
-const { block } = Astro.props;
-const subBlocks = block.blocks || {};
-const items = block.blocks_layout?.items || [];
----
-<div class="grid-block">
-  <div style={`display: grid; grid-template-columns: repeat(${items.length}, 1fr); gap: 1rem`}>
-    {items.map((id: string) => (
-      <div class="grid-cell">
-        <BlockRenderer block={{ ...subBlocks[id], '@uid': id }} />
-      </div>
-    ))}
-  </div>
-</div>
+```{literalinclude} ../../../../examples/examples/astro/GridBlock.astro
+:language: astro
 ```
 
 </block>

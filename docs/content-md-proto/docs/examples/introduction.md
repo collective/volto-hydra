@@ -139,74 +139,26 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 ### React
 
-```jsx
-function IntroductionBlock({ block }) {
-  return (
-    <div data-block-uid={block['@uid']} className="introduction-block">
-      <div className="introduction-body" data-edit-text="value">
-        {(block.value || []).map((node, i) => (
-          <SlateNode key={i} node={node} />
-        ))}
-      </div>
-    </div>
-  );
-}
+```{literalinclude} ../../../examples/examples/react/IntroductionBlock.jsx
+:language: jsx
 ```
 
 ### Vue
 
-```vue
-<template>
-  <div :data-block-uid="block['@uid']" class="introduction-block">
-    <div class="introduction-body" data-edit-text="value">
-      <SlateNode v-for="(node, i) in block.value || []" :key="i" :node="node" />
-    </div>
-  </div>
-</template>
-
-<script setup>
-import SlateNode from './SlateNode.vue';
-defineProps({ block: Object });
-</script>
+```{literalinclude} ../../../examples/examples/vue/IntroductionBlock.vue
+:language: vue
 ```
 
 ### Svelte
 
-```svelte
-<script>
-  import SlateNode from './SlateNode.svelte';
-  export let block;
-</script>
-
-<div data-block-uid={block['@uid']} class="introduction-block">
-  <div class="introduction-body" data-edit-text="value">
-    {#each block.value || [] as node, i (i)}
-      <SlateNode {node} />
-    {/each}
-  </div>
-</div>
+```{literalinclude} ../../../examples/examples/svelte/IntroductionBlock.svelte
+:language: svelte
 ```
 
 ### Astro
 
-```astro
----
-/**
- * Introduction block: a slate-style value tree rendered into a labeled
- * container. Edits attach via `data-edit-text="value"` — the bridge syncs
- * the rendered text back to the block's `value` field.
- *
- * No outer `data-block-uid` — BlockRenderer wraps every block.
- */
-import SlateNode from './SlateNode.astro';
-const { block } = Astro.props;
-const value = block?.value || [];
----
-<div class="introduction-block">
-  <div class="introduction-body" data-edit-text="value">
-    {value.map((node: any) => <SlateNode node={node} />)}
-  </div>
-</div>
+```{literalinclude} ../../../examples/examples/astro/IntroductionBlock.astro
+:language: astro
 ```
 
 </block>

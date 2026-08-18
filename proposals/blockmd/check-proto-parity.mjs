@@ -16,6 +16,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { decodePage } from '../../lib/prototype-mapping.mjs';
+import { resolveLiteralIncludes } from '../../lib/markdown-mount.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const INKA = resolve(HERE, '../..');
@@ -98,7 +99,7 @@ for (const md of walk(MD)) {
   if (!orig.blocks || !Object.keys(orig.blocks).length) { skip += 1; continue; }
 
   let decoded;
-  try { decoded = decodePage(readFileSync(md, 'utf8')); }
+  try { decoded = decodePage(resolveLiteralIncludes(readFileSync(md, 'utf8'), dirname(md))); }
   catch (e) { error += 1; problems.push(`ERROR ${md.slice(MD.length + 1)}: ${e.message.slice(0, 80)}`); continue; }
 
   const layoutOk = eq(decoded.blocks_layout, orig.blocks_layout);

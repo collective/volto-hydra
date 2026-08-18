@@ -379,67 +379,26 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidu
 
 ### React
 
-```jsx
-function ButtonBlock({ block }) {
-  const title = block.title || 'Button';
-  const href = block.href?.[0]?.['@id'] || block.href || '#';
-
-  return (
-    <div data-block-uid={block['@uid']} className="button-block">
-      <a href={href} data-edit-text="title" data-edit-link="href" className="btn">
-        {title}
-      </a>
-    </div>
-  );
-}
+```{literalinclude} ../../../examples/examples/react/ButtonBlock.jsx
+:language: jsx
 ```
 
 ### Vue
 
-```vue
-<template>
-  <div :data-block-uid="block['@uid']" class="button-block">
-    <a :href="href" data-edit-text="title" data-edit-link="href" class="btn">
-      {{ block.title || 'Button' }}
-    </a>
-  </div>
-</template>
-
-<script setup>
-import { computed } from 'vue';
-const props = defineProps({ block: Object });
-const href = computed(() => props.block.href?.[0]?.['@id'] || props.block.href || '#');
-</script>
+```{literalinclude} ../../../examples/examples/vue/ButtonBlock.vue
+:language: vue
 ```
 
 ### Svelte
 
-```svelte
-<script>
-  export let block;
-  $: href = block.href?.[0]?.['@id'] || block.href || '#';
-</script>
-
-<div data-block-uid={block['@uid']} class="button-block">
-  <a {href} data-edit-text="title" data-edit-link="href" class="btn">
-    {block.title || 'Button'}
-  </a>
-</div>
+```{literalinclude} ../../../examples/examples/svelte/ButtonBlock.svelte
+:language: svelte
 ```
 
 ### Astro
 
-```astro
----
-const { block } = Astro.props;
-const href = block.href?.[0]?.['@id'] || block.href || '#';
-const title = block.title || 'Button';
----
-<div class="button-block">
-  <a href={href} data-edit-text="title" data-edit-link="href" class="btn">
-    {title}
-  </a>
-</div>
+```{literalinclude} ../../../examples/examples/astro/ButtonBlock.astro
+:language: astro
 ```
 
 </block>

@@ -200,143 +200,26 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 ### React
 
-```jsx
-import { getImageUrl } from './utils.js';
-
-function TeaserBlock({ block }) {
-  const hrefObj = block.href?.[0] || null;
-  const useBlockData = block.overwrite || !hrefObj?.title;
-
-  const title = useBlockData ? block.title : hrefObj?.title || '';
-  const description = useBlockData ? block.description : hrefObj?.description || '';
-  // Strip API origin from brain @id so the link resolves same-origin.
-  const href = contentPath(hrefObj?.['@id'] || '');
-  const imageSrc = block.preview_image
-    ? getImageUrl(block.preview_image)
-    : (hrefObj?.hasPreviewImage ? getImageUrl({ '@id': `${href}/@@images/preview_image` }) : '');
-
-  if (!href) {
-    return (
-      <div data-block-uid={block['@uid']} className="teaser-placeholder">
-        <p>Select a target page for this teaser</p>
-      </div>
-    );
-  }
-
-  return (
-    <div data-block-uid={block['@uid']} className="teaser-block">
-      {imageSrc && <img data-edit-media="preview_image" src={imageSrc} alt="" />}
-      <h3 data-edit-text="title">{title}</h3>
-      <p data-edit-text="description">{description}</p>
-      <a href={href} data-edit-link="href">Read more</a>
-    </div>
-  );
-}
+```{literalinclude} ../../../examples/examples/react/TeaserBlock.jsx
+:language: jsx
 ```
 
 ### Vue
 
-```vue
-<template>
-  <div :data-block-uid="block['@uid']" class="teaser-block">
-    <div v-if="!href" class="teaser-placeholder">
-      <p>Select a target page for this teaser</p>
-    </div>
-    <template v-else>
-      <img v-if="imageSrc" data-edit-media="preview_image" :src="imageSrc" alt="" />
-      <h3 data-edit-text="title">{{ title }}</h3>
-      <p data-edit-text="description">{{ description }}</p>
-      <a :href="href" data-edit-link="href">Read more</a>
-    </template>
-  </div>
-</template>
-
-<script setup>
-import { computed } from 'vue';
-import { getImageUrl } from './utils.js';
-const props = defineProps({ block: Object });
-
-const hrefObj = computed(() => props.block.href?.[0] || null);
-const useBlockData = computed(() => props.block.overwrite || !hrefObj.value?.title);
-const title = computed(() => useBlockData.value ? props.block.title : hrefObj.value?.title || '');
-const description = computed(() => useBlockData.value ? props.block.description : hrefObj.value?.description || '');
-const href = computed(() => contentPath(hrefObj.value?.['@id'] || ''));
-const imageSrc = computed(() => {
-  if (props.block.preview_image) {
-    return getImageUrl(props.block.preview_image);
-  }
-  return hrefObj.value?.hasPreviewImage ? getImageUrl(`${href.value}/@@images/preview_image`) : '';
-});
-</script>
+```{literalinclude} ../../../examples/examples/vue/TeaserBlock.vue
+:language: vue
 ```
 
 ### Svelte
 
-```svelte
-<script>
-  import { getImageUrl } from './utils.js';
-  export let block;
-
-  $: hrefObj = block.href?.[0] || null;
-  $: useBlockData = block.overwrite || !hrefObj?.title;
-  $: title = useBlockData ? block.title : hrefObj?.title || '';
-  $: description = useBlockData ? block.description : hrefObj?.description || '';
-  $: href = contentPath(hrefObj?.['@id'] || '');
-  $: imageSrc = block.preview_image
-    ? getImageUrl(block.preview_image)
-    : (hrefObj?.hasPreviewImage ? getImageUrl(`${href}/@@images/preview_image`) : '');
-</script>
-
-{#if !href}
-  <div data-block-uid={block['@uid']} class="teaser-placeholder">
-    <p>Select a target page for this teaser</p>
-  </div>
-{:else}
-  <div data-block-uid={block['@uid']} class="teaser-block">
-    {#if imageSrc}
-      <img data-edit-media="preview_image" src={imageSrc} alt="" />
-    {/if}
-    <h3 data-edit-text="title">{title}</h3>
-    <p data-edit-text="description">{description}</p>
-    <a {href} data-edit-link="href">Read more</a>
-  </div>
-{/if}
+```{literalinclude} ../../../examples/examples/svelte/TeaserBlock.svelte
+:language: svelte
 ```
 
 ### Astro
 
-```astro
----
-/**
- * Teaser block. If no href is selected, render a placeholder. Otherwise,
- * fall back through block fields → referenced page fields so unedited
- * teasers still display the target page's title/description/preview image.
- * The `overwrite` flag (set when the editor edits the block fields)
- * pins to block-level values.
- */
-import { getImageUrl, contentPath } from './utils.js';
-const { block } = Astro.props;
-const hrefObj = block.href?.[0] || null;
-const useBlockData = block.overwrite || !hrefObj?.title;
-const title = useBlockData ? block.title : hrefObj?.title || '';
-const description = useBlockData ? block.description : hrefObj?.description || '';
-const href = contentPath(hrefObj?.['@id'] || '');
-const imageSrc = block.preview_image
-  ? getImageUrl(block.preview_image)
-  : (hrefObj?.hasPreviewImage ? getImageUrl(`${href}/@@images/preview_image`) : '');
----
-{!href ? (
-  <div class="teaser-placeholder">
-    <p>Select a target page for this teaser</p>
-  </div>
-) : (
-  <div class="teaser-block">
-    {imageSrc && <img data-edit-media="preview_image" src={imageSrc} alt="" />}
-    <h3 data-edit-text="title">{title}</h3>
-    <p data-edit-text="description">{description}</p>
-    <a href={href} data-edit-link="href">Read more</a>
-  </div>
-)}
+```{literalinclude} ../../../examples/examples/astro/TeaserBlock.astro
+:language: astro
 ```
 
 </block>

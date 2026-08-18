@@ -131,147 +131,26 @@ A full-width hero section with heading, subheading, image, rich text description
 
 ### React
 
-```jsx
-import { getImageUrl } from './utils.js';
-
-function HeroBlock({ block }) {
-  const subheading = (block.subheading || '').replace(/\n/g, '<br>');
-  const buttonLink = block.buttonLink?.[0]?.['@id'] || '';
-  const imageSrc = getImageUrl(block.image);
-
-  // Data-driven: render a field only when it has data. No data ⇒ no element, so
-  // view markup stays clean. Inka reveals an empty optional field for editing by
-  // seeding it, which makes these same checks true — no edit-mode branch needed.
-  return (
-    <div data-block-uid={block['@uid']} className="hero-block">
-      {imageSrc && (
-        <img data-edit-media="image" src={imageSrc} alt="Hero image" />
-      )}
-      {block.heading && <h1 data-edit-text="heading">{block.heading}</h1>}
-      {block.subheading && (
-        <p data-edit-text="subheading" dangerouslySetInnerHTML={{ __html: subheading }} />
-      )}
-      {block.description && (
-        <div className="hero-description" data-edit-text="description">
-          {block.description.map((node, i) => (
-            <SlateNode key={i} node={node} />
-          ))}
-        </div>
-      )}
-      {(block.buttonText || block.buttonLink) && (
-        <a data-edit-text="buttonText" data-edit-link="buttonLink" href={buttonLink}>
-          {block.buttonText}
-        </a>
-      )}
-    </div>
-  );
-}
+```{literalinclude} ../../../examples/examples/react/HeroBlock.jsx
+:language: jsx
 ```
 
 ### Vue
 
-```vue
-<template>
-  <!-- Data-driven: render a field only when it has data. No data ⇒ no element, so
-       view markup stays clean. Inka reveals an empty optional field for editing by
-       seeding it, which makes these same checks true — no edit-mode branch needed. -->
-  <div :data-block-uid="block['@uid']" class="hero-block">
-    <img v-if="block.image" data-edit-media="image" :src="heroImageSrc" alt="Hero image" />
-    <h1 v-if="block.heading" data-edit-text="heading">{{ block.heading }}</h1>
-    <p v-if="block.subheading" data-edit-text="subheading" v-html="subheadingHtml" />
-    <div v-if="block.description" class="hero-description" data-edit-text="description">
-      <SlateNode v-for="(node, i) in block.description" :key="i" :node="node" />
-    </div>
-    <a v-if="block.buttonText || block.buttonLink"
-       data-edit-text="buttonText" data-edit-link="buttonLink" :href="buttonLink">
-      {{ block.buttonText }}
-    </a>
-  </div>
-</template>
-
-<script setup>
-import { computed } from 'vue';
-import { getImageUrl } from './utils.js';
-const props = defineProps({ block: Object });
-const subheadingHtml = computed(() => (props.block.subheading || '').replace(/\n/g, '<br>'));
-const buttonLink = computed(() => props.block.buttonLink?.[0]?.['@id'] || '');
-const heroImageSrc = computed(() => getImageUrl(props.block.image));
-</script>
+```{literalinclude} ../../../examples/examples/vue/HeroBlock.vue
+:language: vue
 ```
 
 ### Svelte
 
-```svelte
-<script>
-  import SlateNode from './SlateNode.svelte';
-  import { getImageUrl } from './utils.js';
-  export let block;
-
-  $: subheadingHtml = (block.subheading || '').replace(/\n/g, '<br>');
-  $: buttonLink = block.buttonLink?.[0]?.['@id'] || '';
-  $: heroImageSrc = getImageUrl(block.image);
-</script>
-
-<!-- Data-driven: render a field only when it has data. No data ⇒ no element, so
-     view markup stays clean. Inka reveals an empty optional field for editing by
-     seeding it, which makes these same checks true — no edit-mode branch needed. -->
-<div data-block-uid={block['@uid']} class="hero-block">
-  {#if block.image}
-    <img data-edit-media="image" src={heroImageSrc} alt="Hero image" />
-  {/if}
-  {#if block.heading}
-    <h1 data-edit-text="heading">{block.heading}</h1>
-  {/if}
-  {#if block.subheading}
-    <p data-edit-text="subheading">{@html subheadingHtml}</p>
-  {/if}
-  {#if block.description}
-    <div class="hero-description" data-edit-text="description">
-      {#each block.description as node, i (i)}
-        <SlateNode {node} />
-      {/each}
-    </div>
-  {/if}
-  {#if block.buttonText || block.buttonLink}
-    <a data-edit-text="buttonText" data-edit-link="buttonLink" href={buttonLink}>
-      {block.buttonText}
-    </a>
-  {/if}
-</div>
+```{literalinclude} ../../../examples/examples/svelte/HeroBlock.svelte
+:language: svelte
 ```
 
 ### Astro
 
-```astro
----
-/**
- * Hero block. Heading, subheading (with simple newline→<br> support),
- * description slate tree, optional image, and a button. Each editable
- * field carries the relevant `data-edit-*` hook so the bridge can map
- * iframe edits back to the right field.
- *
- * `subheadingHtml` mirrors the svelte version's {@html} interpolation —
- * astro's `set:html` on a wrapper element fills the same role.
- */
-import SlateNode from './SlateNode.astro';
-import { getImageUrl } from './utils.js';
-const { block } = Astro.props;
-const subheadingHtml = (block.subheading || '').replace(/\n/g, '<br>');
-const buttonLink = block.buttonLink?.[0]?.['@id'] || '';
-const heroImageSrc = getImageUrl(block.image);
-const description = block.description || [];
----
-<div class="hero-block">
-  {block.image && <img data-edit-media="image" src={heroImageSrc} alt="Hero image" />}
-  <h1 data-edit-text="heading">{block.heading}</h1>
-  <p data-edit-text="subheading" set:html={subheadingHtml}></p>
-  <div class="hero-description" data-edit-text="description">
-    {description.map((node: any) => <SlateNode node={node} />)}
-  </div>
-  <a data-edit-text="buttonText" data-edit-link="buttonLink" href={buttonLink}>
-    {block.buttonText}
-  </a>
-</div>
+```{literalinclude} ../../../examples/examples/astro/HeroBlock.astro
+:language: astro
 ```
 
 </block>

@@ -216,137 +216,26 @@ A collapsible panel group. Each panel is an object\_list item with a title and a
 
 ### React
 
-```jsx
-function AccordionBlock({ block }) {
-  const panels = block.panels || [];
-
-  return (
-    <div data-block-uid={block['@uid']} className="accordion-block">
-      {panels.map(panel => {
-        const panelId = panel['@id'];
-        return <AccordionPanel key={panelId} panel={panel} panelId={panelId} />;
-      })}
-    </div>
-  );
-}
-
-function AccordionPanel({ panel, panelId }) {
-  const [open, setOpen] = useState(!panel.collapsed);
-  const contentBlocks = panel.blocks || {};
-  const contentLayout = panel.blocks_layout?.items || [];
-
-  return (
-    <div data-block-uid={panelId} className="accordion-panel">
-      <button onClick={() => setOpen(!open)} className="accordion-header">
-        <span data-edit-text="title">{panel.title}</span>
-        <span>{open ? '▲' : '▼'}</span>
-      </button>
-      {open && (
-        <div className="accordion-content">
-          {contentLayout.map(id => (
-            <BlockRenderer key={id} block={{ ...contentBlocks[id], '@uid': id }} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+```{literalinclude} ../../../examples/examples/react/AccordionBlock.jsx
+:language: jsx
 ```
 
 ### Vue
 
-```vue
-<template>
-  <div :data-block-uid="block['@uid']" class="accordion-block">
-    <div
-      v-for="panel in block.panels || []"
-      :key="panel['@id']"
-      :data-block-uid="panel['@id']"
-      class="accordion-panel"
-    >
-      <button @click="toggle(panel['@id'])" class="accordion-header">
-        <span data-edit-text="title">{{ panel.title }}</span>
-        <span>{{ openPanels[panel['@id']] ? '▲' : '▼' }}</span>
-      </button>
-      <div v-if="openPanels[panel['@id']]" class="accordion-content">
-        <BlockRenderer
-          v-for="id in panel.blocks_layout?.items || []"
-          :key="id"
-          :block="{ ...panel.blocks[id], '@uid': id }"
-        />
-      </div>
-    </div>
-  </div>
-</template>
-
-<script setup>
-import { reactive } from 'vue';
-const props = defineProps({ block: Object });
-const openPanels = reactive(Object.fromEntries((props.block.panels || []).filter(p => !p.collapsed).map(p => [p['@id'], true])));
-function toggle(id) { openPanels[id] = !openPanels[id]; }
-</script>
+```{literalinclude} ../../../examples/examples/vue/AccordionBlock.vue
+:language: vue
 ```
 
 ### Svelte
 
-```svelte
-<script>
-  import BlockRenderer from './BlockRenderer.svelte';
-  export let block;
-
-  let openPanels = Object.fromEntries((block.panels || []).filter(p => !p.collapsed).map(p => [p['@id'], true]));
-  function toggle(id) { openPanels[id] = !openPanels[id]; openPanels = openPanels; }
-</script>
-
-<div data-block-uid={block['@uid']} class="accordion-block">
-  {#each block.panels || [] as panel (panel['@id'])}
-    <div data-block-uid={panel['@id']} class="accordion-panel">
-      <button on:click={() => toggle(panel['@id'])} class="accordion-header">
-        <span data-edit-text="title">{panel.title}</span>
-        <span>{openPanels[panel['@id']] ? '▲' : '▼'}</span>
-      </button>
-      {#if openPanels[panel['@id']]}
-        <div class="accordion-content">
-          {#each panel.blocks_layout?.items || [] as id (id)}
-            <BlockRenderer block={{ ...panel.blocks[id], '@uid': id }} />
-          {/each}
-        </div>
-      {/if}
-    </div>
-  {/each}
-</div>
+```{literalinclude} ../../../examples/examples/svelte/AccordionBlock.svelte
+:language: svelte
 ```
 
 ### Astro
 
-```astro
----
-/**
- * Accordion. Server-render shows every panel open (no client interactivity
- * in the SSR example), matching what the bridge needs to see for
- * selection sync against `data-edit-text="title"`. The svelte version's
- * toggle behavior is editor-only ergonomics and isn't required by tests.
- *
- * Each panel keeps its own data-block-uid so panel selection works.
- */
-import BlockRenderer from './BlockRenderer.astro';
-const { block } = Astro.props;
-const panels = block.panels || [];
----
-<div class="accordion-block">
-  {panels.map((panel: any) => (
-    <div data-block-uid={panel['@id']} class="accordion-panel">
-      <button class="accordion-header">
-        <span data-edit-text="title">{panel.title}</span>
-      </button>
-      <div class="accordion-content">
-        {(panel.blocks_layout?.items || []).map((id: string) => (
-          <BlockRenderer block={{ ...panel.blocks?.[id], '@uid': id }} />
-        ))}
-      </div>
-    </div>
-  ))}
-</div>
+```{literalinclude} ../../../examples/examples/astro/AccordionBlock.astro
+:language: astro
 ```
 
 </block>

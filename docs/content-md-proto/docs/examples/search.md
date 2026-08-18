@@ -239,200 +239,26 @@ A search interface with faceted filtering. Contains a child listing block for re
 
 ### React
 
-```jsx
-function SearchBlock({ block, blockId }) {
-  const [query, setQuery] = useState('');
-
-  const facets = (block.facets || []).filter(f => !f.hidden);
-  const listing = block.blocks_layout?.listing || [];
-  const listingId = listing[0];
-  const listingBlock = listingId ? (block.blocks?.[listingId]) : null;
-
-  return (
-    <div data-block-uid={blockId} className="search-block">
-      {block.headline && <h2 data-edit-text="headline">{block.headline}</h2>}
-      <input
-        type="search"
-        placeholder="Search..."
-        value={query}
-        onChange={e => setQuery(e.target.value)}
-      />
-
-      {facets.length > 0 && (
-        <div className="facets">
-          <h4 data-edit-text="facetsTitle">{block.facetsTitle || 'Filter'}</h4>
-          {facets.map(facet => (
-            <FacetRenderer key={facet['@id']} facet={facet} />
-          ))}
-        </div>
-      )}
-
-      {listingBlock && (
-        <ListingBlock block={listingBlock} blockId={listingId} />
-      )}
-    </div>
-  );
-}
-
-function FacetRenderer({ facet }) {
-  switch (facet.type) {
-    case 'checkboxFacet':
-      return <fieldset data-block-uid={facet['@id']}><legend data-edit-text="title">{facet.title}</legend>{/* checkbox options */}</fieldset>;
-    case 'selectFacet':
-      return <label data-block-uid={facet['@id']}><span data-edit-text="title">{facet.title}</span><select>{/* options */}</select></label>;
-    case 'daterangeFacet':
-      return <label data-block-uid={facet['@id']}><span data-edit-text="title">{facet.title}</span><input type="date" /> – <input type="date" /></label>;
-    case 'toggleFacet':
-      return <label data-block-uid={facet['@id']}><input type="checkbox" /> <span data-edit-text="title">{facet.title}</span></label>;
-    default:
-      return null;
-  }
-}
+```{literalinclude} ../../../examples/examples/react/SearchBlock.jsx
+:language: jsx
 ```
 
 ### Vue
 
-```vue
-<template>
-  <div :data-block-uid="blockId" class="search-block">
-    <h2 v-if="block.headline" data-edit-text="headline">{{ block.headline }}</h2>
-    <input type="search" placeholder="Search..." v-model="query" />
-
-    <div v-if="visibleFacets.length" class="facets">
-      <h4 data-edit-text="facetsTitle">{{ block.facetsTitle || 'Filter' }}</h4>
-      <template v-for="facet in visibleFacets" :key="facet['@id']">
-        <fieldset v-if="facet.type === 'checkboxFacet'" :data-block-uid="facet['@id']">
-          <legend data-edit-text="title">{{ facet.title }}</legend>
-          <!-- checkbox options -->
-        </fieldset>
-        <label v-else-if="facet.type === 'selectFacet'" :data-block-uid="facet['@id']">
-          <span data-edit-text="title">{{ facet.title }}</span><select><!-- options --></select>
-        </label>
-        <label v-else-if="facet.type === 'daterangeFacet'" :data-block-uid="facet['@id']">
-          <span data-edit-text="title">{{ facet.title }}</span><input type="date" /> – <input type="date" />
-        </label>
-        <label v-else-if="facet.type === 'toggleFacet'" :data-block-uid="facet['@id']">
-          <input type="checkbox" /> <span data-edit-text="title">{{ facet.title }}</span>
-        </label>
-      </template>
-    </div>
-
-    <ListingBlock
-      v-if="listingBlock"
-      :block="listingBlock"
-      :block-id="listingId"
-    />
-  </div>
-</template>
-
-<script setup>
-import { ref, computed } from 'vue';
-const props = defineProps({ block: Object, blockId: String });
-const query = ref('');
-const visibleFacets = computed(() => (props.block.facets || []).filter(f => !f.hidden));
-const listingId = computed(() => props.block.blocks_layout?.listing?.[0]);
-const listingBlock = computed(() => listingId.value ? props.block.blocks?.[listingId.value] : null);
-</script>
+```{literalinclude} ../../../examples/examples/vue/SearchBlock.vue
+:language: vue
 ```
 
 ### Svelte
 
-```svelte
-<script>
-  import ListingBlock from './ListingBlock.svelte';
-  export let block;
-  export let blockId;
-
-  let query = '';
-
-  $: visibleFacets = (block.facets || []).filter(f => !f.hidden);
-  $: listingId = block.blocks_layout?.listing?.[0];
-  $: listingBlock = listingId ? block.blocks?.[listingId] : null;
-</script>
-
-<div data-block-uid={blockId} class="search-block">
-  {#if block.headline}<h2 data-edit-text="headline">{block.headline}</h2>{/if}
-  <input type="search" placeholder="Search..." bind:value={query} />
-
-  {#if visibleFacets.length}
-    <div class="facets">
-      <h4 data-edit-text="facetsTitle">{block.facetsTitle || 'Filter'}</h4>
-      {#each visibleFacets as facet (facet['@id'])}
-        {#if facet.type === 'checkboxFacet'}
-          <fieldset data-block-uid={facet['@id']}><legend data-edit-text="title">{facet.title}</legend><!-- checkbox options --></fieldset>
-        {:else if facet.type === 'selectFacet'}
-          <label data-block-uid={facet['@id']}><span data-edit-text="title">{facet.title}</span><select><!-- options --></select></label>
-        {:else if facet.type === 'daterangeFacet'}
-          <label data-block-uid={facet['@id']}><span data-edit-text="title">{facet.title}</span><input type="date" /> – <input type="date" /></label>
-        {:else if facet.type === 'toggleFacet'}
-          <label data-block-uid={facet['@id']}><input type="checkbox" /> <span data-edit-text="title">{facet.title}</span></label>
-        {/if}
-      {/each}
-    </div>
-  {/if}
-
-  {#if listingBlock}
-    <ListingBlock block={listingBlock} blockId={listingId} />
-  {/if}
-</div>
+```{literalinclude} ../../../examples/examples/svelte/SearchBlock.svelte
+:language: svelte
 ```
 
 ### Astro
 
-```astro
----
-/**
- * Search/facets block. The embedded listing is fetched at runtime in the
- * svelte version; here SSR shows only the static chrome (headline, facets,
- * search input, and the listing wrapper). Facets render typed inputs with
- * `data-block-uid` so per-facet selection works.
- */
-import BlockRenderer from './BlockRenderer.astro';
-const { block } = Astro.props;
-const visibleFacets = (block.facets || []).filter((f: any) => !f.hidden);
-const listingId = block.blocks_layout?.listing?.[0];
-const listingBlock = listingId ? block.blocks?.[listingId] : null;
----
-<div class="search-block">
-  {block.headline && <h2 data-edit-text="headline">{block.headline}</h2>}
-  <input type="search" placeholder="Search..." />
-
-  {visibleFacets.length > 0 && (
-    <div class="facets">
-      <h4 data-edit-text="facetsTitle">{block.facetsTitle || 'Filter'}</h4>
-      {visibleFacets.map((facet: any) => (
-        <>
-          {facet.type === 'checkboxFacet' && (
-            <fieldset data-block-uid={facet['@id']}>
-              <legend data-edit-text="title">{facet.title}</legend>
-            </fieldset>
-          )}
-          {facet.type === 'selectFacet' && (
-            <label data-block-uid={facet['@id']}>
-              <span data-edit-text="title">{facet.title}</span>
-              <select></select>
-            </label>
-          )}
-          {facet.type === 'daterangeFacet' && (
-            <label data-block-uid={facet['@id']}>
-              <span data-edit-text="title">{facet.title}</span>
-              <input type="date" /> – <input type="date" />
-            </label>
-          )}
-          {facet.type === 'toggleFacet' && (
-            <label data-block-uid={facet['@id']}>
-              <input type="checkbox" /> <span data-edit-text="title">{facet.title}</span>
-            </label>
-          )}
-        </>
-      ))}
-    </div>
-  )}
-
-  {listingBlock && (
-    <BlockRenderer block={{ ...listingBlock, '@uid': listingId }} />
-  )}
-</div>
+```{literalinclude} ../../../examples/examples/astro/SearchBlock.astro
+:language: astro
 ```
 
 </block>

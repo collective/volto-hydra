@@ -166,95 +166,26 @@ A horizontal multi-column container. The block has one slot — columns — rest
 
 ### React
 
-```jsx
-function ColumnsBlock({ block }) {
-  const items = block.blocks_layout?.columns || [];
-  const blocks = block.blocks || {};
-
-  return (
-    <div data-block-uid={block['@uid']} className="columns-block">
-      <div style={{ display: 'flex', gap: '1rem' }}>
-        {items.map(id => (
-          <ColumnBlock key={id} block={{ ...blocks[id], '@uid': id }} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ColumnBlock({ block }) {
-  const items = block.blocks_layout?.items || [];
-  const blocks = block.blocks || {};
-
-  return (
-    <div data-block-uid={block['@uid']} style={{ flex: 1 }}>
-      {block.title && <h4 data-edit-text="title">{block.title}</h4>}
-      {items.map(id => (
-        <BlockRenderer key={id} block={{ ...blocks[id], '@uid': id }} />
-      ))}
-    </div>
-  );
-}
+```{literalinclude} ../../../examples/examples/react/ColumnsBlock.jsx
+:language: jsx
 ```
 
 ### Vue
 
-```vue
-<template>
-  <div :data-block-uid="block['@uid']" class="columns-block">
-    <div style="display: flex; gap: 1rem">
-      <ColumnBlock
-        v-for="id in block.blocks_layout?.columns || []"
-        :key="id"
-        :block="{ ...block.blocks?.[id], '@uid': id }"
-      />
-    </div>
-  </div>
-</template>
-
-<script setup>
-defineProps({ block: Object });
-</script>
+```{literalinclude} ../../../examples/examples/vue/ColumnsBlock.vue
+:language: vue
 ```
 
 ### Svelte
 
-```svelte
-<script>
-  import ColumnBlock from './ColumnBlock.svelte';
-  export let block;
-</script>
-
-<div data-block-uid={block['@uid']} class="columns-block">
-  <div style="display: flex; gap: 1rem">
-    {#each block.blocks_layout?.columns || [] as id (id)}
-      <ColumnBlock block={{ ...block.blocks?.[id], '@uid': id }} />
-    {/each}
-  </div>
-</div>
+```{literalinclude} ../../../examples/examples/svelte/ColumnsBlock.svelte
+:language: svelte
 ```
 
 ### Astro
 
-```astro
----
-/**
- * Columns container. Each column is a sub-block of @type "column" rendered
- * by ColumnBlock. The columns themselves get their own data-block-uid
- * wrapper from ColumnBlock — this outer container is just layout.
- */
-import ColumnBlock from './ColumnBlock.astro';
-const { block } = Astro.props;
-const items = block.blocks_layout?.columns || [];
-const subBlocks = block.blocks || {};
----
-<div class="columns-block">
-  <div style="display: flex; gap: 1rem">
-    {items.map((id: string) => (
-      <ColumnBlock block={{ ...subBlocks[id], '@uid': id }} />
-    ))}
-  </div>
-</div>
+```{literalinclude} ../../../examples/examples/astro/ColumnsBlock.astro
+:language: astro
 ```
 
 </block>

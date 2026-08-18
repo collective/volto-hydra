@@ -175,110 +175,26 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 ### React
 
-```jsx
-function VideoBlock({ block }) {
-  const url = block.url || '';
-  const youtubeId = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([^&?/]+)/)?.[1];
-
-  return (
-    <div data-block-uid={block['@uid']} className="video-block">
-      {youtubeId ? (
-        <iframe
-          src={`https://www.youtube.com/embed/${youtubeId}`}
-          allowFullScreen
-          style={{ width: '100%', aspectRatio: '16/9', border: 'none' }}
-        />
-      ) : url ? (
-        <video src={url} controls style={{ width: '100%' }} />
-      ) : (
-        <p>No video URL set</p>
-      )}
-    </div>
-  );
-}
+```{literalinclude} ../../../examples/examples/react/VideoBlock.jsx
+:language: jsx
 ```
 
 ### Vue
 
-```vue
-<template>
-  <div :data-block-uid="block['@uid']" class="video-block">
-    <iframe
-      v-if="youtubeId"
-      :src="`https://www.youtube.com/embed/${youtubeId}`"
-      allowfullscreen
-      style="width: 100%; aspect-ratio: 16/9; border: none"
-    />
-    <video v-else-if="block.url" :src="block.url" controls style="width: 100%" />
-    <p v-else>No video URL set</p>
-  </div>
-</template>
-
-<script setup>
-import { computed } from 'vue';
-const props = defineProps({ block: Object });
-const youtubeId = computed(() => {
-  const url = props.block.url || '';
-  return url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([^&?/]+)/)?.[1];
-});
-</script>
+```{literalinclude} ../../../examples/examples/vue/VideoBlock.vue
+:language: vue
 ```
 
 ### Svelte
 
-```svelte
-<script>
-  export let block;
-  $: url = block.url || '';
-  $: youtubeId = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([^&?/]+)/)?.[1];
-</script>
-
-<div data-block-uid={block['@uid']} class="video-block">
-  {#if youtubeId}
-    <iframe
-      src="https://www.youtube.com/embed/{youtubeId}"
-      allowfullscreen
-      style="width: 100%; aspect-ratio: 16/9; border: none"
-      title="Video"
-    />
-  {:else if url}
-    <video src={url} controls style="width: 100%">
-      <track kind="captions" />
-    </video>
-  {:else}
-    <p>No video URL set</p>
-  {/if}
-</div>
+```{literalinclude} ../../../examples/examples/svelte/VideoBlock.svelte
+:language: svelte
 ```
 
 ### Astro
 
-```astro
----
-/**
- * Video block. Recognizes YouTube URLs and embeds them; falls back to a
- * native <video> for direct media URLs. Static placeholder if no URL.
- */
-const { block } = Astro.props;
-const url = block.url || '';
-const youtubeId = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([^&?/]+)/)?.[1];
----
-<div class="video-block">
-  {youtubeId && (
-    <iframe
-      src={`https://www.youtube.com/embed/${youtubeId}`}
-      allowfullscreen
-      style="width: 100%; aspect-ratio: 16/9; border: none"
-      title="Video"
-    />
-  )}
-  {!youtubeId && url && (
-    <video src={url} controls style="width: 100%">
-      <track kind="captions" />
-    </video>
-  )}
-  {!youtubeId && !url && <p>No video URL set</p>}
-</div>
+```{literalinclude} ../../../examples/examples/astro/VideoBlock.astro
+:language: astro
 ```
 
 </block>

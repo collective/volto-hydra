@@ -188,54 +188,26 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 ### React
 
-```jsx
-function SeparatorBlock({ block }) {
-  const align = block.styles?.align || 'full';
-
-  return (
-    <div data-block-uid={block['@uid']} className={`separator-block separator-${align}`}>
-      <hr />
-    </div>
-  );
-}
+```{literalinclude} ../../../examples/examples/react/SeparatorBlock.jsx
+:language: jsx
 ```
 
 ### Vue
 
-```vue
-<template>
-  <div :data-block-uid="block['@uid']" :class="'separator-block separator-' + (block.styles?.align || 'full')">
-    <hr />
-  </div>
-</template>
-
-<script setup>
-defineProps({ block: Object });
-</script>
+```{literalinclude} ../../../examples/examples/vue/SeparatorBlock.vue
+:language: vue
 ```
 
 ### Svelte
 
-```svelte
-<script>
-  export let block;
-</script>
-
-<div data-block-uid={block['@uid']} class="separator-block separator-{block.styles?.align || 'full'}">
-  <hr />
-</div>
+```{literalinclude} ../../../examples/examples/svelte/SeparatorBlock.svelte
+:language: svelte
 ```
 
 ### Astro
 
-```astro
----
-const { block } = Astro.props;
-const align = block?.styles?.align || 'full';
----
-<div class={`separator-block separator-${align}`}>
-  <hr />
-</div>
+```{literalinclude} ../../../examples/examples/astro/SeparatorBlock.astro
+:language: astro
 ```
 
 </block>

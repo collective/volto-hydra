@@ -193,58 +193,26 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 ### React
 
-```jsx
-function HeadingBlock({ block }) {
-  const Tag = block.tag || 'h2';
-  const text = block.heading || '';
-
-  return (
-    <Tag data-block-uid={block['@uid']} data-edit-text="heading">
-      {text}
-    </Tag>
-  );
-}
+```{literalinclude} ../../../examples/examples/react/HeadingBlock.jsx
+:language: jsx
 ```
 
 ### Vue
 
-```vue
-<template>
-  <component :is="block.tag || 'h2'" :data-block-uid="block['@uid']" data-edit-text="heading">
-    {{ block.heading }}
-  </component>
-</template>
-
-<script setup>
-defineProps({ block: Object });
-</script>
+```{literalinclude} ../../../examples/examples/vue/HeadingBlock.vue
+:language: vue
 ```
 
 ### Svelte
 
-```svelte
-<script>
-  export let block;
-</script>
-
-<svelte:element this={block.tag || 'h2'} data-block-uid={block['@uid']} data-edit-text="heading">
-  {block.heading}
-</svelte:element>
+```{literalinclude} ../../../examples/examples/svelte/HeadingBlock.svelte
+:language: svelte
 ```
 
 ### Astro
 
-```astro
----
-/**
- * Heading block. Tag is dynamic (h1..h6) — astro renders this via a
- * capitalized `const Tag = ...` then `<Tag>`, mirroring SlateNode's
- * dynamic-element pattern.
- */
-const { block } = Astro.props;
-const Tag = (block.tag || 'h2') as any;
----
-<Tag data-edit-text="heading">{block.heading}</Tag>
+```{literalinclude} ../../../examples/examples/astro/HeadingBlock.astro
+:language: astro
 ```
 
 </block>

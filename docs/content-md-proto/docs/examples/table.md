@@ -237,99 +237,26 @@ A table with rich text (Slate) content in each cell. Supports adding/removing ro
 
 ### React
 
-```jsx
-function TableBlock({ block }) {
-  const rows = block.table?.rows || [];
-  return (
-    <div data-block-uid={block['@uid']}>
-      <table>
-        <tbody>
-          {rows.map(row => (
-            <tr key={row.key} data-block-uid={row.key}>
-              {row.cells.map(cell => (
-                <td key={cell.key} data-block-uid={cell.key} data-edit-text="value">
-                  {(cell.value || []).map((node, i) => (
-                    <SlateNode key={i} node={node} />
-                  ))}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
+```{literalinclude} ../../../examples/examples/react/TableBlock.jsx
+:language: jsx
 ```
 
 ### Vue
 
-```vue
-<template>
-  <div :data-block-uid="block['@uid']">
-    <table>
-      <tbody>
-        <tr v-for="row in block.table?.rows || []" :key="row.key" :data-block-uid="row.key">
-          <td v-for="cell in row.cells" :key="cell.key" :data-block-uid="cell.key" data-edit-text="value">
-            <SlateNode v-for="(node, i) in cell.value || []" :key="i" :node="node" />
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</template>
-
-<script setup>
-defineProps({ block: Object });
-</script>
+```{literalinclude} ../../../examples/examples/vue/TableBlock.vue
+:language: vue
 ```
 
 ### Svelte
 
-```svelte
-<script>
-  import SlateNode from './SlateNode.svelte';
-  export let block;
-</script>
-
-<div data-block-uid={block['@uid']}>
-  <table>
-    <tbody>
-      {#each block.table?.rows || [] as row (row.key)}
-        <tr data-block-uid={row.key}>
-          {#each row.cells as cell (cell.key)}
-            <td data-block-uid={cell.key} data-edit-text="value">
-              {#each cell.value || [] as node, i (i)}
-                <SlateNode {node} />
-              {/each}
-            </td>
-          {/each}
-        </tr>
-      {/each}
-    </tbody>
-  </table>
-</div>
+```{literalinclude} ../../../examples/examples/svelte/TableBlock.svelte
+:language: svelte
 ```
 
 ### Astro
 
-```astro
----
-/**
- * Slate-table block. Each row/cell carries its own data-block-uid so the
- * bridge can target individual cells for selection sync. Cell text uses
- * the same slate-value render path as SlateBlock.
- */
-import SlateNode from './SlateNode.astro';
-const { block } = Astro.props;
-const rows = block?.table?.rows || [];
----
-<div><table><tbody>{rows.map((row: any) => (
-  <tr data-block-uid={row.key}>{(row.cells || []).map((cell: any) => (
-    <td data-block-uid={cell.key} data-edit-text="value"
-    >{(cell.value || []).map((node: any) => <SlateNode node={node} />)}</td>
-  ))}</tr>
-))}</tbody></table></div>
+```{literalinclude} ../../../examples/examples/astro/TableBlock.astro
+:language: astro
 ```
 
 </block>

@@ -161,91 +161,26 @@ blandit praesent luptatum zzril qui.
 
 ### React
 
-```jsx
-function MapsBlock({ block }) {
-  const url = block.url || '';
-
-  return (
-    <div data-block-uid={block['@uid']} className="maps-block">
-      {url ? (
-        <iframe
-          src={url}
-          title={block.title || 'Map'}
-          allowFullScreen
-          loading="lazy"
-          style={{ width: '100%', height: '450px', border: 'none' }}
-        />
-      ) : (
-        <p>No map URL set</p>
-      )}
-    </div>
-  );
-}
+```{literalinclude} ../../../examples/examples/react/MapsBlock.jsx
+:language: jsx
 ```
 
 ### Vue
 
-```vue
-<template>
-  <div :data-block-uid="block['@uid']" class="maps-block">
-    <iframe
-      v-if="block.url"
-      :src="block.url"
-      :title="block.title || 'Map'"
-      allowfullscreen
-      loading="lazy"
-      style="width: 100%; height: 450px; border: none"
-    />
-    <p v-else>No map URL set</p>
-  </div>
-</template>
-
-<script setup>
-defineProps({ block: Object });
-</script>
+```{literalinclude} ../../../examples/examples/vue/MapsBlock.vue
+:language: vue
 ```
 
 ### Svelte
 
-```svelte
-<script>
-  export let block;
-</script>
-
-<div data-block-uid={block['@uid']} class="maps-block">
-  {#if block.url}
-    <iframe
-      src={block.url}
-      title={block.title || 'Map'}
-      allowfullscreen
-      loading="lazy"
-      style="width: 100%; height: 450px; border: none"
-    />
-  {:else}
-    <p>No map URL set</p>
-  {/if}
-</div>
+```{literalinclude} ../../../examples/examples/svelte/MapsBlock.svelte
+:language: svelte
 ```
 
 ### Astro
 
-```astro
----
-const { block } = Astro.props;
----
-<div class="maps-block">
-  {block.url ? (
-    <iframe
-      src={block.url}
-      title={block.title || 'Map'}
-      allowfullscreen
-      loading="lazy"
-      style="width: 100%; height: 450px; border: none"
-    />
-  ) : (
-    <p>No map URL set</p>
-  )}
-</div>
+```{literalinclude} ../../../examples/examples/astro/MapsBlock.astro
+:language: astro
 ```
 
 </block>
