@@ -7,6 +7,7 @@ jobs:
   # ── Build Volto and upload artifact ──────────────────────────────────────
   build:
     runs-on: 'ubuntu-latest'
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -103,6 +104,12 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium firefox
       - name: Install Playwright deps only
+        # apt with no TTY blocks indefinitely on a lock or a prompt; this step sat
+        # for 3h38m on one run before it was noticed. Bound it and make apt
+        # non-interactive so a wedge fails in minutes with a clear step name.
+        timeout-minutes: 10
+        env:
+          DEBIAN_FRONTEND: noninteractive
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: pnpm exec playwright install-deps chromium firefox
       - name: Start servers
@@ -145,6 +152,7 @@ jobs:
   test-admin-mock:
     needs: build
     runs-on: 'ubuntu-latest'
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -191,6 +199,12 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium firefox
       - name: Install Playwright deps only
+        # apt with no TTY blocks indefinitely on a lock or a prompt; this step sat
+        # for 3h38m on one run before it was noticed. Bound it and make apt
+        # non-interactive so a wedge fails in minutes with a clear step name.
+        timeout-minutes: 10
+        env:
+          DEBIAN_FRONTEND: noninteractive
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: pnpm exec playwright install-deps chromium firefox
       - name: Start servers
@@ -228,6 +242,7 @@ jobs:
   # ── Nuxt bridge tests (no Volto needed) ─────────────────────────────────
   test-nuxt-bridge:
     runs-on: 'ubuntu-latest'
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -267,6 +282,12 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium firefox
       - name: Install Playwright deps only
+        # apt with no TTY blocks indefinitely on a lock or a prompt; this step sat
+        # for 3h38m on one run before it was noticed. Bound it and make apt
+        # non-interactive so a wedge fails in minutes with a clear step name.
+        timeout-minutes: 10
+        env:
+          DEBIAN_FRONTEND: noninteractive
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: pnpm exec playwright install-deps chromium firefox
       - name: Start servers
@@ -304,6 +325,7 @@ jobs:
   test-nuxt-admin:
     needs: build
     runs-on: 'ubuntu-latest'
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -352,6 +374,12 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium firefox
       - name: Install Playwright deps only
+        # apt with no TTY blocks indefinitely on a lock or a prompt; this step sat
+        # for 3h38m on one run before it was noticed. Bound it and make apt
+        # non-interactive so a wedge fails in minutes with a clear step name.
+        timeout-minutes: 10
+        env:
+          DEBIAN_FRONTEND: noninteractive
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: pnpm exec playwright install-deps chromium firefox
       - name: Start servers
@@ -390,6 +418,7 @@ jobs:
   # ── Next.js + F7 bridge tests (no Volto needed) ─────────────────────────
   test-nextjs-f7:
     runs-on: 'ubuntu-latest'
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -433,6 +462,12 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium firefox
       - name: Install Playwright deps only
+        # apt with no TTY blocks indefinitely on a lock or a prompt; this step sat
+        # for 3h38m on one run before it was noticed. Bound it and make apt
+        # non-interactive so a wedge fails in minutes with a clear step name.
+        timeout-minutes: 10
+        env:
+          DEBIAN_FRONTEND: noninteractive
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: pnpm exec playwright install-deps chromium firefox
       - name: Start servers
