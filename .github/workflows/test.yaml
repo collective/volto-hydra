@@ -7,6 +7,7 @@ jobs:
   # ── Build Volto and upload artifact ──────────────────────────────────────
   build:
     runs-on: 'ubuntu-latest'
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -101,10 +102,30 @@ jobs:
           key: ${{ runner.os }}-playwright-v2-${{ hashFiles('**/pnpm-lock.yaml') }}
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium firefox
+        run: |
+          sudo tee /etc/apt/apt.conf.d/99-hydra-acquire >/dev/null <<'APTCONF'
+          Acquire::Retries "3";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APTCONF
+          pnpm exec playwright install --with-deps chromium firefox
       - name: Install Playwright deps only
+        # This step sat for 3h38m on one run. The log shows apt-get update stalling
+        # mid-fetch of the Ubuntu package indexes — silent after
+        # "Get:5 …noble-security InRelease", no output until the run was cancelled.
+        # A stalled fetch, not a dpkg lock or a prompt. Retry and time-limit the
+        # acquire so it fails fast, and bound the step as a backstop.
+        timeout-minutes: 10
+        env:
+          DEBIAN_FRONTEND: noninteractive
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium firefox
+        run: |
+          sudo tee /etc/apt/apt.conf.d/99-hydra-acquire >/dev/null <<'APTCONF'
+          Acquire::Retries "3";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APTCONF
+          pnpm exec playwright install-deps chromium firefox
       - name: Start servers
         run: |
           node tests-playwright/fixtures/mock-api-server.cjs &
@@ -145,6 +166,7 @@ jobs:
   test-admin-mock:
     needs: build
     runs-on: 'ubuntu-latest'
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -189,10 +211,30 @@ jobs:
           key: ${{ runner.os }}-playwright-v2-${{ hashFiles('**/pnpm-lock.yaml') }}
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium firefox
+        run: |
+          sudo tee /etc/apt/apt.conf.d/99-hydra-acquire >/dev/null <<'APTCONF'
+          Acquire::Retries "3";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APTCONF
+          pnpm exec playwright install --with-deps chromium firefox
       - name: Install Playwright deps only
+        # This step sat for 3h38m on one run. The log shows apt-get update stalling
+        # mid-fetch of the Ubuntu package indexes — silent after
+        # "Get:5 …noble-security InRelease", no output until the run was cancelled.
+        # A stalled fetch, not a dpkg lock or a prompt. Retry and time-limit the
+        # acquire so it fails fast, and bound the step as a backstop.
+        timeout-minutes: 10
+        env:
+          DEBIAN_FRONTEND: noninteractive
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium firefox
+        run: |
+          sudo tee /etc/apt/apt.conf.d/99-hydra-acquire >/dev/null <<'APTCONF'
+          Acquire::Retries "3";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APTCONF
+          pnpm exec playwright install-deps chromium firefox
       - name: Start servers
         run: |
           node tests-playwright/fixtures/mock-api-server.cjs &
@@ -228,6 +270,7 @@ jobs:
   # ── Nuxt bridge tests (no Volto needed) ─────────────────────────────────
   test-nuxt-bridge:
     runs-on: 'ubuntu-latest'
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -265,10 +308,30 @@ jobs:
           key: ${{ runner.os }}-playwright-v2-${{ hashFiles('**/pnpm-lock.yaml') }}
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium firefox
+        run: |
+          sudo tee /etc/apt/apt.conf.d/99-hydra-acquire >/dev/null <<'APTCONF'
+          Acquire::Retries "3";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APTCONF
+          pnpm exec playwright install --with-deps chromium firefox
       - name: Install Playwright deps only
+        # This step sat for 3h38m on one run. The log shows apt-get update stalling
+        # mid-fetch of the Ubuntu package indexes — silent after
+        # "Get:5 …noble-security InRelease", no output until the run was cancelled.
+        # A stalled fetch, not a dpkg lock or a prompt. Retry and time-limit the
+        # acquire so it fails fast, and bound the step as a backstop.
+        timeout-minutes: 10
+        env:
+          DEBIAN_FRONTEND: noninteractive
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium firefox
+        run: |
+          sudo tee /etc/apt/apt.conf.d/99-hydra-acquire >/dev/null <<'APTCONF'
+          Acquire::Retries "3";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APTCONF
+          pnpm exec playwright install-deps chromium firefox
       - name: Start servers
         run: |
           node tests-playwright/fixtures/mock-api-server.cjs &
@@ -304,6 +367,7 @@ jobs:
   test-nuxt-admin:
     needs: build
     runs-on: 'ubuntu-latest'
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -350,10 +414,30 @@ jobs:
           key: ${{ runner.os }}-playwright-v2-${{ hashFiles('**/pnpm-lock.yaml') }}
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium firefox
+        run: |
+          sudo tee /etc/apt/apt.conf.d/99-hydra-acquire >/dev/null <<'APTCONF'
+          Acquire::Retries "3";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APTCONF
+          pnpm exec playwright install --with-deps chromium firefox
       - name: Install Playwright deps only
+        # This step sat for 3h38m on one run. The log shows apt-get update stalling
+        # mid-fetch of the Ubuntu package indexes — silent after
+        # "Get:5 …noble-security InRelease", no output until the run was cancelled.
+        # A stalled fetch, not a dpkg lock or a prompt. Retry and time-limit the
+        # acquire so it fails fast, and bound the step as a backstop.
+        timeout-minutes: 10
+        env:
+          DEBIAN_FRONTEND: noninteractive
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium firefox
+        run: |
+          sudo tee /etc/apt/apt.conf.d/99-hydra-acquire >/dev/null <<'APTCONF'
+          Acquire::Retries "3";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APTCONF
+          pnpm exec playwright install-deps chromium firefox
       - name: Start servers
         run: |
           node tests-playwright/fixtures/mock-api-server.cjs &
@@ -390,6 +474,7 @@ jobs:
   # ── Next.js + F7 bridge tests (no Volto needed) ─────────────────────────
   test-nextjs-f7:
     runs-on: 'ubuntu-latest'
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -431,10 +516,30 @@ jobs:
           key: ${{ runner.os }}-playwright-v2-${{ hashFiles('**/pnpm-lock.yaml') }}
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium firefox
+        run: |
+          sudo tee /etc/apt/apt.conf.d/99-hydra-acquire >/dev/null <<'APTCONF'
+          Acquire::Retries "3";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APTCONF
+          pnpm exec playwright install --with-deps chromium firefox
       - name: Install Playwright deps only
+        # This step sat for 3h38m on one run. The log shows apt-get update stalling
+        # mid-fetch of the Ubuntu package indexes — silent after
+        # "Get:5 …noble-security InRelease", no output until the run was cancelled.
+        # A stalled fetch, not a dpkg lock or a prompt. Retry and time-limit the
+        # acquire so it fails fast, and bound the step as a backstop.
+        timeout-minutes: 10
+        env:
+          DEBIAN_FRONTEND: noninteractive
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium firefox
+        run: |
+          sudo tee /etc/apt/apt.conf.d/99-hydra-acquire >/dev/null <<'APTCONF'
+          Acquire::Retries "3";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APTCONF
+          pnpm exec playwright install-deps chromium firefox
       - name: Start servers
         run: |
           node tests-playwright/fixtures/mock-api-server.cjs &

@@ -179,8 +179,13 @@
             return criteria;
         }
 
-        // API origin — the mock Plone API always runs on port 8888
-        window._apiOrigin = 'http://localhost:8888';
+        // window._apiOrigin is injected by vite from HYDRA_MOCK_API_PORT (see
+        // vite.config.js). Never hardcode it here: the mock API moves whenever
+        // the ports are overridden, and a stale constant silently fetches
+        // whatever else happens to be on that port.
+        if (!window._apiOrigin) {
+            throw new Error('window._apiOrigin was not injected — check vite.config.js');
+        }
 
         // Make search criteria available globally for form handlers
         window._searchCriteria = {};
