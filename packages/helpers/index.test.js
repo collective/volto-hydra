@@ -228,3 +228,86 @@ describe('buildQuerystringSearchBody — date-facet edge cases', () => {
     expect(criteria(body, 'created.after')).toHaveLength(0);
   });
 });
+
+describe('buildQuerystringSearchBody — depth', () => {
+  // Plone encodes path-criterion depth in the criterion VALUE as `path::depth`
+  // (`.::1`, `/docs::2`). A bare path is a recursive query. The top-level `depth`
+  // field on the request body is NOT honoured by @querystring-search — the mock
+  // API says so explicitly (verified against demo.plone.org) and the live backend
+  // agrees: `.` returns 107 items under /components, `.::1` returns 33.
+  //
+  // Sending the ignored top-level field is what put every nested Image into the
+  // /components index.
+  test('depth is encoded onto the path criterion, not sent as a top-level field', () => {
+    const body = buildQuerystringSearchBody(
+      {
+        depth: 1,
+        query: [
+          {
+            i: 'path',
+            o: 'plone.app.querystring.operation.string.relativePath',
+            v: '.',
+          },
+        ],
+      },
+      {},
+      {},
+    );
+    expect(criterion(body, 'path').v).toBe('.::1');
+    expect(body.depth).toBeUndefined();
+  });
+
+  test('an absolute path criterion gets the same encoding', () => {
+    const body = buildQuerystringSearchBody(
+      {
+        depth: 2,
+        query: [
+          {
+            i: 'path',
+            o: 'plone.app.querystring.operation.string.absolutePath',
+            v: '/docs',
+          },
+        ],
+      },
+      {},
+      {},
+    );
+    expect(criterion(body, 'path').v).toBe('/docs::2');
+  });
+
+  test('a depth already in the value is left alone', () => {
+    const body = buildQuerystringSearchBody(
+      {
+        depth: 5,
+        query: [
+          {
+            i: 'path',
+            o: 'plone.app.querystring.operation.string.relativePath',
+            v: '.::1',
+          },
+        ],
+      },
+      {},
+      {},
+    );
+    expect(criterion(body, 'path').v).toBe('.::1');
+  });
+
+  test('no depth leaves the path criterion recursive', () => {
+    const body = buildQuerystringSearchBody(
+      {
+        query: [
+          {
+            i: 'path',
+            o: 'plone.app.querystring.operation.string.relativePath',
+            v: '.',
+          },
+        ],
+      },
+      {},
+      {},
+    );
+    expect(criterion(body, 'path').v).toBe('.');
+    expect(body.depth).toBeUndefined();
+  });
+});
