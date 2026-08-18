@@ -32,6 +32,7 @@ blocks-assignments:
   - { id: ref-columns-rendering-jsx-a52cb0 }
   - { id: ref-columns-rendering-vue-526eec }
   - { id: ref-columns-rendering-svelte-9b4eec }
+  - { id: ref-columns-rendering-astro-481d9d }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
@@ -229,6 +230,29 @@ defineProps({ block: Object });
     {#each block.blocks_layout?.columns || [] as id (id)}
       <ColumnBlock block={{ ...block.blocks?.[id], '@uid': id }} />
     {/each}
+  </div>
+</div>
+```
+
+### Astro
+
+```astro
+---
+/**
+ * Columns container. Each column is a sub-block of @type "column" rendered
+ * by ColumnBlock. The columns themselves get their own data-block-uid
+ * wrapper from ColumnBlock — this outer container is just layout.
+ */
+import ColumnBlock from './ColumnBlock.astro';
+const { block } = Astro.props;
+const items = block.blocks_layout?.columns || [];
+const subBlocks = block.blocks || {};
+---
+<div class="columns-block">
+  <div style="display: flex; gap: 1rem">
+    {items.map((id: string) => (
+      <ColumnBlock block={{ ...subBlocks[id], '@uid': id }} />
+    ))}
   </div>
 </div>
 ```

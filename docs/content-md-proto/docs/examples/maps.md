@@ -51,6 +51,7 @@ blocks-assignments:
   - { id: ref-maps-rendering-jsx-7fbc14 }
   - { id: ref-maps-rendering-vue-85ab6d }
   - { id: ref-maps-rendering-svelte-4d9083 }
+  - { id: ref-maps-rendering-astro-6e7b3c }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
@@ -223,6 +224,27 @@ defineProps({ block: Object });
   {:else}
     <p>No map URL set</p>
   {/if}
+</div>
+```
+
+### Astro
+
+```astro
+---
+const { block } = Astro.props;
+---
+<div class="maps-block">
+  {block.url ? (
+    <iframe
+      src={block.url}
+      title={block.title || 'Map'}
+      allowfullscreen
+      loading="lazy"
+      style="width: 100%; height: 450px; border: none"
+    />
+  ) : (
+    <p>No map URL set</p>
+  )}
 </div>
 ```
 

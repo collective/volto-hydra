@@ -33,6 +33,7 @@ blocks-assignments:
   - { id: ref-slider-rendering-jsx-87bcad }
   - { id: ref-slider-rendering-vue-6e69c4 }
   - { id: ref-slider-rendering-svelte-586973 }
+  - { id: ref-slider-rendering-astro-a4ec65 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
@@ -301,6 +302,52 @@ const slides = computed(() => expandTemplatesSync(props.block.slides || [], { id
     {#each slides as _, i}
       <button on:click={() => current = i} class:active={i === current} />
     {/each}
+  </div>
+</div>
+```
+
+### Astro
+
+```astro
+---
+/**
+ * Slider/carousel. Server-render shows the first slide visible and the
+ * rest hidden, mirroring the svelte version's initial state. There's no
+ * client interactivity in the SSR example — tests only verify per-slide
+ * DOM hooks render.
+ *
+ * Each slide keeps its own data-block-uid so the bridge can target slides
+ * individually.
+ */
+import { getImageUrl } from './utils.js';
+import { expandTemplatesSync } from '$helpers';
+// astro renders ONLY via the edit render API (SSR has no window.name), so default to edit mode —
+// also covers a slider nested in a container, whose BlockRenderer doesn't thread editMode down.
+const { block, editMode = true } = Astro.props;
+// Expand the slides object_list (idField @id). Edit mode makes this a pass-through that sets each
+// slide's @uid (a view render would need pre-loaded templates instead).
+const slides = expandTemplatesSync(block.slides || [], { idField: '@id', editMode });
+---
+<div class="slider-block">
+  {slides.map((slide: any, i: number) => (
+    <div
+      data-block-uid={slide['@id']}
+      class="slide"
+      style={`display: ${i === 0 ? 'block' : 'none'}`}
+    >
+      {slide.preview_image && (
+        <img data-edit-media="preview_image" src={getImageUrl(slide.preview_image)} alt="" />
+      )}
+      <span data-edit-text="head_title">{slide.head_title}</span>
+      <h2 data-edit-text="title">{slide.title}</h2>
+      <p data-edit-text="description">{slide.description}</p>
+      <button data-edit-text="buttonText">{slide.buttonText}</button>
+    </div>
+  ))}
+  <div class="slider-dots">
+    {slides.map((_: any, i: number) => (
+      <button class={i === 0 ? 'active' : ''} />
+    ))}
   </div>
 </div>
 ```

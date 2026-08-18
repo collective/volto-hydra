@@ -46,6 +46,7 @@ blocks-assignments:
   - { id: ref-table-rendering-jsx-ee1611 }
   - { id: ref-table-rendering-vue-570ccb }
   - { id: ref-table-rendering-svelte-de27fc }
+  - { id: ref-table-rendering-astro-a34e40 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
@@ -308,6 +309,27 @@ defineProps({ block: Object });
     </tbody>
   </table>
 </div>
+```
+
+### Astro
+
+```astro
+---
+/**
+ * Slate-table block. Each row/cell carries its own data-block-uid so the
+ * bridge can target individual cells for selection sync. Cell text uses
+ * the same slate-value render path as SlateBlock.
+ */
+import SlateNode from './SlateNode.astro';
+const { block } = Astro.props;
+const rows = block?.table?.rows || [];
+---
+<div><table><tbody>{rows.map((row: any) => (
+  <tr data-block-uid={row.key}>{(row.cells || []).map((cell: any) => (
+    <td data-block-uid={cell.key} data-edit-text="value"
+    >{(cell.value || []).map((node: any) => <SlateNode node={node} />)}</td>
+  ))}</tr>
+))}</tbody></table></div>
 ```
 
 </block>

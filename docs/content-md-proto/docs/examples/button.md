@@ -67,6 +67,7 @@ blocks-assignments:
   - { id: ref-button-rendering-jsx-ab4e0b }
   - { id: ref-button-rendering-vue-e704dd }
   - { id: ref-button-rendering-svelte-a8e495 }
+  - { id: ref-button-rendering-astro-1ee456 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
@@ -422,6 +423,21 @@ const href = computed(() => props.block.href?.[0]?.['@id'] || props.block.href |
 <div data-block-uid={block['@uid']} class="button-block">
   <a {href} data-edit-text="title" data-edit-link="href" class="btn">
     {block.title || 'Button'}
+  </a>
+</div>
+```
+
+### Astro
+
+```astro
+---
+const { block } = Astro.props;
+const href = block.href?.[0]?.['@id'] || block.href || '#';
+const title = block.title || 'Button';
+---
+<div class="button-block">
+  <a href={href} data-edit-text="title" data-edit-link="href" class="btn">
+    {title}
   </a>
 </div>
 ```

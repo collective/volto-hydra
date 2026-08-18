@@ -52,6 +52,7 @@ blocks-assignments:
   - { id: ref-video-rendering-jsx-b3c5ea }
   - { id: ref-video-rendering-vue-160de2 }
   - { id: ref-video-rendering-svelte-b4e8ba }
+  - { id: ref-video-rendering-astro-e0899a }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
@@ -247,6 +248,36 @@ const youtubeId = computed(() => {
   {:else}
     <p>No video URL set</p>
   {/if}
+</div>
+```
+
+### Astro
+
+```astro
+---
+/**
+ * Video block. Recognizes YouTube URLs and embeds them; falls back to a
+ * native <video> for direct media URLs. Static placeholder if no URL.
+ */
+const { block } = Astro.props;
+const url = block.url || '';
+const youtubeId = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([^&?/]+)/)?.[1];
+---
+<div class="video-block">
+  {youtubeId && (
+    <iframe
+      src={`https://www.youtube.com/embed/${youtubeId}`}
+      allowfullscreen
+      style="width: 100%; aspect-ratio: 16/9; border: none"
+      title="Video"
+    />
+  )}
+  {!youtubeId && url && (
+    <video src={url} controls style="width: 100%">
+      <track kind="captions" />
+    </video>
+  )}
+  {!youtubeId && !url && <p>No video URL set</p>}
 </div>
 ```
 

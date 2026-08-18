@@ -58,6 +58,7 @@ blocks-assignments:
   - { id: ref-toc-rendering-jsx-ee2124 }
   - { id: ref-toc-rendering-vue-12aef2 }
   - { id: ref-toc-rendering-svelte-397c7f }
+  - { id: ref-toc-rendering-astro-7a8692 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
@@ -327,6 +328,56 @@ const entries = computed(() => {
   {:else}
     <p>Table of Contents</p>
   {/if}
+</nav>
+```
+
+### Astro
+
+```astro
+---
+/**
+ * Table of Contents block. Walks the page's top-level blocks and emits a
+ * list of headings + slate blocks whose first node is an h1..h6. The TOC
+ * receives `content` (the whole page formData) as a second prop so it can
+ * see the rest of the document.
+ *
+ * Note: this only scans top-level blocks (same as the svelte version) —
+ * nested headings inside container blocks aren't surfaced.
+ */
+const { block, content } = Astro.props;
+
+function buildEntries(formData: any) {
+  const result: { id: string; level: number; text: string }[] = [];
+  if (!formData?.blocks || !formData?.blocks_layout?.items) return result;
+  for (const id of formData.blocks_layout.items) {
+    const b = formData.blocks[id];
+    if (!b) continue;
+    if (b['@type'] === 'heading' && b.heading) {
+      result.push({ id, level: parseInt((b.tag || 'h2').slice(1)), text: b.heading });
+    } else if (b['@type'] === 'slate' && b.value?.[0]?.type?.match(/^h[1-6]$/)) {
+      const level = parseInt(b.value[0].type.slice(1));
+      const text =
+        b.plaintext || b.value[0].children?.map((c: any) => c.text).join('') || '';
+      if (text.trim()) result.push({ id, level, text });
+    }
+  }
+  return result;
+}
+
+const entries = buildEntries(content);
+---
+<nav class="toc-block">
+  {entries.length > 0 ? (
+    <ul>
+      {entries.map((e) => (
+        <li style={`margin-left: ${(e.level - 2) * 1.5}em`}>
+          <a href={`#${e.id}`}>{e.text}</a>
+        </li>
+      ))}
+    </ul>
+  ) : (
+    <p>Table of Contents</p>
+  )}
 </nav>
 ```
 

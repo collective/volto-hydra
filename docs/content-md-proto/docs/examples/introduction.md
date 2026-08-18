@@ -48,6 +48,7 @@ blocks-assignments:
   - { id: ref-introduction-rendering-jsx-599242 }
   - { id: ref-introduction-rendering-vue-53106b }
   - { id: ref-introduction-rendering-svelte-9e2b59 }
+  - { id: ref-introduction-rendering-astro-6e9a3b }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
@@ -182,6 +183,28 @@ defineProps({ block: Object });
     {#each block.value || [] as node, i (i)}
       <SlateNode {node} />
     {/each}
+  </div>
+</div>
+```
+
+### Astro
+
+```astro
+---
+/**
+ * Introduction block: a slate-style value tree rendered into a labeled
+ * container. Edits attach via `data-edit-text="value"` — the bridge syncs
+ * the rendered text back to the block's `value` field.
+ *
+ * No outer `data-block-uid` — BlockRenderer wraps every block.
+ */
+import SlateNode from './SlateNode.astro';
+const { block } = Astro.props;
+const value = block?.value || [];
+---
+<div class="introduction-block">
+  <div class="introduction-body" data-edit-text="value">
+    {value.map((node: any) => <SlateNode node={node} />)}
   </div>
 </div>
 ```

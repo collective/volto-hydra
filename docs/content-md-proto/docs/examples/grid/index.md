@@ -44,6 +44,7 @@ blocks-assignments:
   - { id: ref-grid-rendering-jsx-f30d80 }
   - { id: ref-grid-rendering-vue-1d61ab }
   - { id: ref-grid-rendering-svelte-8158ec }
+  - { id: ref-grid-rendering-astro-f8f4db }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
@@ -188,6 +189,30 @@ const items = computed(() => props.block.blocks_layout?.items || []);
         <BlockRenderer block={{ ...blocks[id], '@uid': id }} />
       </div>
     {/each}
+  </div>
+</div>
+```
+
+### Astro
+
+```astro
+---
+/**
+ * Grid container. Children are arbitrary blocks (each rendered by
+ * BlockRenderer); columns count is derived from the number of items.
+ */
+import BlockRenderer from './BlockRenderer.astro';
+const { block } = Astro.props;
+const subBlocks = block.blocks || {};
+const items = block.blocks_layout?.items || [];
+---
+<div class="grid-block">
+  <div style={`display: grid; grid-template-columns: repeat(${items.length}, 1fr); gap: 1rem`}>
+    {items.map((id: string) => (
+      <div class="grid-cell">
+        <BlockRenderer block={{ ...subBlocks[id], '@uid': id }} />
+      </div>
+    ))}
   </div>
 </div>
 ```

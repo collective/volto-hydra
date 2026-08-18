@@ -36,6 +36,7 @@ blocks-assignments:
   - { id: ref-contextNavigation-rendering-jsx-25968a }
   - { id: ref-contextNavigation-rendering-vue-af752b }
   - { id: ref-contextNavigation-rendering-svelte-a27836 }
+  - { id: ref-contextNavigation-rendering-astro-7718b9 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
@@ -292,6 +293,38 @@ defineProps({ block: Object, blocks: Object });
         <NavItem block={{ ...blocks[id], '@uid': id }} />
       </li>
     {/each}
+  </ul>
+</nav>
+```
+
+### Astro
+
+```astro
+---
+/**
+ * Context navigation block: a vertical nav list whose rows are either
+ * hand-added `navItem` blocks or a `listing` block that auto-populates
+ * from a query. Mirrors test-svelte's ContextNavigationBlock minus the
+ * outer `data-block-uid` (BlockRenderer wraps every block in that).
+ *
+ * `blocks` is the sibling map of inner blocks indexed by id — each entry
+ * is the child block, and we splice the id back in as `@uid` so the
+ * NavItem renderer can produce a stable selector.
+ */
+import NavItem from './NavItem.astro';
+const { block, blocks = {} } = Astro.props;
+const items = block?.blocks_layout?.items || [];
+---
+<nav
+  aria-label={block.ariaLabel || 'Section navigation'}
+  class="context-navigation"
+>
+  <ul role="list" class="context-navigation-list">
+    {items.map((id: string) => (
+      <li>
+        <NavItem block={{ ...blocks[id], '@uid': id }} />
+      </li>
+    ))}
   </ul>
 </nav>
 ```

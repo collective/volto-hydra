@@ -55,6 +55,7 @@ blocks-assignments:
   - { id: ref-separator-rendering-jsx-470901 }
   - { id: ref-separator-rendering-vue-4281a1 }
   - { id: ref-separator-rendering-svelte-8c1d19 }
+  - { id: ref-separator-rendering-astro-84f1fd }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
@@ -221,6 +222,18 @@ defineProps({ block: Object });
 </script>
 
 <div data-block-uid={block['@uid']} class="separator-block separator-{block.styles?.align || 'full'}">
+  <hr />
+</div>
+```
+
+### Astro
+
+```astro
+---
+const { block } = Astro.props;
+const align = block?.styles?.align || 'full';
+---
+<div class={`separator-block separator-${align}`}>
   <hr />
 </div>
 ```

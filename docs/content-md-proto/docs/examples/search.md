@@ -44,6 +44,7 @@ blocks-assignments:
   - { id: ref-search-rendering-jsx-dd082e }
   - { id: ref-search-rendering-vue-3c1873 }
   - { id: ref-search-rendering-svelte-7ba7ad }
+  - { id: ref-search-rendering-astro-014919 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
@@ -373,6 +374,64 @@ const listingBlock = computed(() => listingId.value ? props.block.blocks?.[listi
   {#if listingBlock}
     <ListingBlock block={listingBlock} blockId={listingId} />
   {/if}
+</div>
+```
+
+### Astro
+
+```astro
+---
+/**
+ * Search/facets block. The embedded listing is fetched at runtime in the
+ * svelte version; here SSR shows only the static chrome (headline, facets,
+ * search input, and the listing wrapper). Facets render typed inputs with
+ * `data-block-uid` so per-facet selection works.
+ */
+import BlockRenderer from './BlockRenderer.astro';
+const { block } = Astro.props;
+const visibleFacets = (block.facets || []).filter((f: any) => !f.hidden);
+const listingId = block.blocks_layout?.listing?.[0];
+const listingBlock = listingId ? block.blocks?.[listingId] : null;
+---
+<div class="search-block">
+  {block.headline && <h2 data-edit-text="headline">{block.headline}</h2>}
+  <input type="search" placeholder="Search..." />
+
+  {visibleFacets.length > 0 && (
+    <div class="facets">
+      <h4 data-edit-text="facetsTitle">{block.facetsTitle || 'Filter'}</h4>
+      {visibleFacets.map((facet: any) => (
+        <>
+          {facet.type === 'checkboxFacet' && (
+            <fieldset data-block-uid={facet['@id']}>
+              <legend data-edit-text="title">{facet.title}</legend>
+            </fieldset>
+          )}
+          {facet.type === 'selectFacet' && (
+            <label data-block-uid={facet['@id']}>
+              <span data-edit-text="title">{facet.title}</span>
+              <select></select>
+            </label>
+          )}
+          {facet.type === 'daterangeFacet' && (
+            <label data-block-uid={facet['@id']}>
+              <span data-edit-text="title">{facet.title}</span>
+              <input type="date" /> – <input type="date" />
+            </label>
+          )}
+          {facet.type === 'toggleFacet' && (
+            <label data-block-uid={facet['@id']}>
+              <input type="checkbox" /> <span data-edit-text="title">{facet.title}</span>
+            </label>
+          )}
+        </>
+      ))}
+    </div>
+  )}
+
+  {listingBlock && (
+    <BlockRenderer block={{ ...listingBlock, '@uid': listingId }} />
+  )}
 </div>
 ```
 

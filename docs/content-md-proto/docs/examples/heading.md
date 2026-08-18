@@ -48,6 +48,7 @@ blocks-assignments:
   - { id: ref-heading-rendering-jsx-eb01a3 }
   - { id: ref-heading-rendering-vue-754dc2 }
   - { id: ref-heading-rendering-svelte-f5f71c }
+  - { id: ref-heading-rendering-astro-a73687 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
@@ -229,6 +230,21 @@ defineProps({ block: Object });
 <svelte:element this={block.tag || 'h2'} data-block-uid={block['@uid']} data-edit-text="heading">
   {block.heading}
 </svelte:element>
+```
+
+### Astro
+
+```astro
+---
+/**
+ * Heading block. Tag is dynamic (h1..h6) — astro renders this via a
+ * capitalized `const Tag = ...` then `<Tag>`, mirroring SlateNode's
+ * dynamic-element pattern.
+ */
+const { block } = Astro.props;
+const Tag = (block.tag || 'h2') as any;
+---
+<Tag data-edit-text="heading">{block.heading}</Tag>
 ```
 
 </block>
