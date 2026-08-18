@@ -59,6 +59,7 @@ blocks-assignments:
   - { id: ref-text-rendering-jsx-076433 }
   - { id: ref-text-rendering-vue-54b4b7 }
   - { id: ref-text-rendering-svelte-2aa474 }
+  - { id: ref-slate-rendering-astro-6ff068 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
@@ -239,6 +240,63 @@ defineProps({ node: Object });
 {:else}
   <svelte:element this={node.type} data-node-id={node.nodeId}>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</svelte:element>
 {/if}
+```
+
+### Astro
+
+```astro
+<!-- SlateBlock.astro -->
+---
+/**
+ * Slate block: a rich-text editor's value tree. Renders the value array
+ * recursively via SlateNode. The `data-edit-text="value"` attribute is
+ * the hook the bridge's selection sync uses to pair this DOM element
+ * with the block's `value` field for inline editing.
+ *
+ * Note: this component does NOT set `data-block-uid` — the wrapper in
+ * BlockRenderer.astro handles that. Mirrors test-svelte's SlateBlock
+ * minus the outer wrapper (which is BlockRenderer's job here).
+ */
+import SlateNode from './SlateNode.astro';
+const { block } = Astro.props;
+const value = block?.value || [];
+---
+<div data-edit-text="value"
+>{value.map((node: any) => <SlateNode node={node} />)}</div>
+
+<!-- SlateNode.astro -->
+---
+/**
+ * Recursive slate node renderer.
+ *
+ * Self-recursion: Astro supports a component importing itself, which is
+ * how children of a non-link element render. Svelte uses <svelte:self/>
+ * for the same purpose — different syntax, same result.
+ *
+ * Three cases match the bridge's slate transform output:
+ *   - text leaf: just its text content
+ *   - link: <a href="..." data-node-id="...">
+ *   - any other element: <Tag data-node-id="...">  (h1/p/em/strong/...)
+ *
+ * `data-node-id` is what the bridge's selection sync uses to map
+ * iframe DOM nodes back to slate node paths during editing — it MUST
+ * end up on the rendered tag.
+ */
+import Self from './SlateNode.astro';
+const { node } = Astro.props;
+const Tag = node?.type;
+---
+{node?.text !== undefined ? (
+  node.text
+) : node?.type === 'link' ? (
+  <a href={node.data?.url} data-node-id={node.nodeId}>
+    {(node.children || []).map((c: any) => <Self node={c} />)}
+  </a>
+) : (
+  <Tag data-node-id={node.nodeId}>
+    {(node.children || []).map((c: any) => <Self node={c} />)}
+  </Tag>
+)}
 ```
 
 </block>
