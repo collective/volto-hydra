@@ -232,6 +232,34 @@ function variationOf(blockData) {
 }
 
 /**
+ * Can an author edit this instance? Only such an instance is a valid subject
+ * for the sanity checks, which click a field and require it to become editable.
+ *
+ * Ranking candidates purely by content richness picked whatever happened to be
+ * most populated, and for globalAlert that was `alert0` in
+ * /templates/site-announcement — a template DEFINITION, whose blocks are the
+ * locked originals every page inherits. Clicking one and asking "why is this
+ * not editable" answers a question nobody asked: it is locked by design.
+ *
+ * Two kinds are excluded:
+ *   - anything on a /templates/* page (the definitions themselves)
+ *   - any block flagged readOnly/fixed (a locked member of a template instance
+ *     stamped onto an ordinary page)
+ *
+ * Everything else — a doc page's examples, its narrative, a dev fixture — is a
+ * fair subject. WHICH of them is picked stays the richness choice below; this
+ * only rules out the ones that cannot be edited at all.
+ *
+ * @param {string} pagePath - Path of the page the instance was found on
+ * @param {Object} blockData - The block's stored data
+ * @returns {boolean}
+ */
+function isEditableInstance(pagePath, blockData) {
+  if (pagePath.startsWith('/templates/')) return false;
+  return blockData?.readOnly !== true && blockData?.fixed !== true;
+}
+
+/**
  * Score an example block by content richness, so when multiple pages
  * contain the same (blockType, variation) we keep the most interesting
  * example for testing. Heuristic:
@@ -1107,6 +1135,12 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         // (lowest score → catches degenerate cases like null slate values
         // that fall through to "Not implemented" rendering). Same render
         // test fires for each kind.
+        //
+        // Locked instances are still walked above for shape/slate/containment
+        // validation, but are never the subject of the render + editing checks
+        // (see isEditableInstance).
+        if (!isEditableInstance(pagePath, blockData)) continue;
+
         for (const kind of ['rich', 'simple']) {
           const key = `${blockType}:${variation}:${kind}`;
           const existing = seen.get(key);
@@ -1297,7 +1331,14 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
       if (!frontendKeySet.has(parentType)) continue;
       for (const subType of allowedBlocks) required.add(subType);
     }
-    const discoveredTypes = new Set(result.map((r) => r.blockType));
+    // Only entries that carry block data are real render cases. Issue entries
+    // (shape, slate, undeclared field, containment) name a blockType too, and
+    // counting those as coverage let a type with an unrelated failure hide the
+    // fact that it has no example at all — `form` and `search` both have
+    // schema-gap failures, and were silently exempted from needing one.
+    const discoveredTypes = new Set(
+      result.filter((r) => r.blockData !== undefined).map((r) => r.blockType),
+    );
     for (const blockType of required) {
       if (discoveredTypes.has(blockType)) continue;
       // A dynamic listing/grid item type has no stored authored instance, but a

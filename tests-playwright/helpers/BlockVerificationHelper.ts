@@ -17,12 +17,20 @@ export interface SubBlock {
 }
 
 /**
- * Click each [data-edit-text] element in the block and verify no
- * "Missing data-node-id attributes" warning appears in the iframe.
+ * Click the block's first visible [data-edit-text] element and verify that an
+ * author can actually edit it:
  *
- * This catches blocks that put data-edit-text on Slate-rendered content
- * but don't add data-node-id attributes on the individual nodes — the bridge
- * cannot sync the cursor position and shows a developer warning overlay.
+ *  - no "Missing data-node-id attributes" warning (a block that puts
+ *    data-edit-text on Slate-rendered content without data-node-id on the
+ *    individual nodes — the bridge can't sync the cursor and warns), and
+ *  - the click really starts editing: the field becomes contenteditable and
+ *    takes the caret.
+ *
+ * The second half is the one with teeth. Annotation checks only prove the
+ * attribute is present; a component whose own JS reveals or rebuilds its DOM
+ * (accordion titles, tab labels) can be annotated perfectly and still be
+ * impossible to type into — which is exactly how such a bug survived while
+ * every other check was green.
  */
 export async function checkDataEditTextClicks(
   page: Page,
@@ -50,6 +58,38 @@ export async function checkDataEditTextClicks(
     if (await warning.isVisible()) {
       await iframe.locator('#hydra-warning-close').click();
     }
+
+    const fieldName = await el.getAttribute('data-edit-text');
+    // contenteditable is written explicitly as "true"/"false" by the bridge. A
+    // missing attribute and contenteditable="" both read as "" through
+    // Playwright, so only "true" proves the field was promoted.
+    await expect(
+      el,
+      `Clicking [data-edit-text="${fieldName}"] should make it editable`,
+    ).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
+
+    // Editable is not enough — the caret has to land in it, or the author's
+    // first keystroke goes to the body and is buffered instead of typed.
+    await expect
+      .poll(
+        async () =>
+          el.evaluate((node) => {
+            const doc = node.ownerDocument;
+            // The editable host itself must hold focus. A <button> inside it
+            // taking focus (a design system rewriting a heading into a button)
+            // reads as "focus is in the field" to a contains() check but leaves
+            // the author with nothing to type into.
+            if (doc.activeElement !== node) return `activeElement=${doc.activeElement?.tagName}`;
+            const sel = doc.getSelection();
+            if (!sel || sel.rangeCount === 0) return 'no selection';
+            return node.contains(sel.getRangeAt(0).startContainer) ? 'caret in field' : 'caret elsewhere';
+          }),
+        {
+          timeout: 5000,
+          message: `Clicking [data-edit-text="${fieldName}"] should put the caret in it`,
+        },
+      )
+      .toBe('caret in field');
 
     await page.keyboard.press('Escape');
     break; // One click per block is sufficient

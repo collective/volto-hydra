@@ -110,11 +110,14 @@ test.describe('Block sanity (auto-discovered)', () => {
     // A frontend-registered type with no content example — fails as its own
     // test (nothing to render) rather than blocking the suite.
     if (block.noExample) {
-      test(`${block.blockType} block has a content example to render`, () => {
+      test(`${block.blockType} block has an editable content example to render`, () => {
         throw new Error(
-          `Block @type "${block.blockType}" is registered in the frontend but no content ` +
+          `Block @type "${block.blockType}" is registered in the frontend but no EDITABLE content ` +
             `example exists to run its render test. Add a fixture (a page with a populated ` +
-            `instance), or mark the type restricted if it only belongs inside a parent container.`,
+            `instance), or mark the type restricted if it only belongs inside a parent container.\n\n` +
+            `Locked instances don't count: a /templates/* definition, or a block flagged ` +
+            `readOnly/fixed, cannot be edited by an author, so the editing checks would be ` +
+            `asserting the opposite of what that block is for.`,
         );
       });
       continue;
@@ -198,8 +201,11 @@ test.describe('Block sanity (auto-discovered)', () => {
         // Sub-block iteration uses the bridge's blockPathMap (canonical,
         // schema-resolved) rather than a shape heuristic on blockData.
         checkSubBlocks: true,
-        // Skip data-edit-text clicks for discovered content — we just want rendering + annotation checks
-        checkEditTextClicks: false,
+        // Click the block's first editable field and require that it actually
+        // becomes editable. Annotation presence alone is not the contract an
+        // author experiences: a component whose own JS reveals or rebuilds its
+        // DOM can carry every annotation and still be impossible to type into.
+        checkEditTextClicks: true,
       });
 
       // Accessibility pass (axe-core) over the WHOLE rendered fixture page —
