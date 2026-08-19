@@ -881,8 +881,34 @@ export class Bridge {
     if (blockElement.getAttribute('data-edit-text') === fieldName) {
       return blockElement;
     }
-    // Check descendants
-    return blockElement.querySelector(`[data-edit-text="${fieldName}"]`);
+    // Search EVERY element of the block, not just the one we were handed. A
+    // multi-element block (one uid rendered as several sibling elements — a
+    // grid image's figure + caption, an accordion panel's title + content)
+    // keeps its fields spread across them, and resolving inside the first
+    // element alone silently found nothing when the field lived in another.
+    const uid = blockElement.getAttribute('data-block-uid');
+    const scopes = uid ? [...this.getAllBlockElements(uid)] : [blockElement];
+    if (!scopes.length) scopes.push(blockElement);
+    const matches = scopes.flatMap((scope) => {
+      if (scope.getAttribute('data-edit-text') === fieldName) return [scope];
+      return [...scope.querySelectorAll(`[data-edit-text="${fieldName}"]`)];
+    });
+    if (matches.length <= 1) return matches[0] || null;
+
+    // The SAME field can be rendered more than once — responsive chrome does
+    // this routinely: the side nav prints its title in both a mobile toggle and
+    // a desktop header, and only one is visible at a given width. Taking the
+    // first in DOM order picked the hidden twin, whose getBoundingClientRect()
+    // is all zeros, so the click coordinates resolved to the top-left of the
+    // document and the caret landed in whatever block happens to be there.
+    //
+    // Prefer the element the author actually clicked; failing that, the visible
+    // one; only then fall back to document order.
+    const clicked = this.lastClickPosition?.target;
+    const clickedMatch =
+      clicked && [...matches].find((el) => el === clicked || el.contains(clicked));
+    if (clickedMatch) return clickedMatch;
+    return [...matches].find((el) => !this.isElementHidden(el)) || matches[0];
   }
 
   /**
@@ -4370,6 +4396,13 @@ export class Bridge {
           return;
         }
         const selector = selectorElement.getAttribute('data-block-selector');
+        // A reveal trigger can also BE the block's editable heading: accordion
+        // panel titles and <details>/<summary> disclosures carry
+        // data-block-selector and data-edit-text on the same element (or the
+        // heading nested inside the trigger). Revealing must not cost the author
+        // inline editing, so record the clicked field BEFORE navigating — the
+        // selectBlock that follows the reveal is what promotes it.
+        this.noteEditableFromSelectorClick(event, selector);
         this.handleBlockSelector(selector, selectorElement);
         return;
       }
@@ -4468,23 +4501,7 @@ export class Bridge {
           event.preventDefault();
         }
 
-        if (editableField) {
-          const rect = editableField.getBoundingClientRect();
-          this.lastClickPosition = {
-            relativeX: event.clientX - rect.left,
-            relativeY: event.clientY - rect.top,
-            editableField: editableField.getAttribute('data-edit-text'),
-            target: event.target, // For field detection
-            linkableField: clickedLinkableField?.getAttribute('data-edit-link') || null,
-            mediaField: clickedMediaField?.getAttribute('data-edit-media') || null,
-          };
-        } else {
-          this.lastClickPosition = {
-            target: event.target,
-            linkableField: clickedLinkableField?.getAttribute('data-edit-link') || null,
-            mediaField: clickedMediaField?.getAttribute('data-edit-media') || null,
-          };
-        }
+        this.recordClickPosition(event, editableField, !!isInsideReadonly);
         // Cancel any pending initial-selection from waitForStable —
         // user click takes priority over automatic block restoration
         if (this._pendingInitialSelectTimer) {
@@ -6435,7 +6452,24 @@ export class Bridge {
     // BUT: still check if cursor is on invalid whitespace (e.g., on DIV container
     // instead of inside P element) and correct if needed
     // NOTE: Use requestAnimationFrame to run after browser's default click positioning completes
-    if (options.wasAlreadyEditable && isAlreadyFocused) {
+    //
+    // "Focused" only implies "the browser placed a caret" for an ordinary
+    // element. When the editable field is ITSELF focusable — a card whose title
+    // is its cover <a>, a nav link, a button — clicking it gives the element
+    // focus and NO caret, so trusting the browser here left the author focused
+    // on a field with nothing to type into. Require a caret actually inside the
+    // field before deferring to the browser; otherwise fall through and place
+    // one ourselves from the click coordinates.
+    const activeSelection = window.getSelection();
+    const caretInField =
+      activeSelection?.rangeCount > 0 &&
+      fieldElement.contains(activeSelection.getRangeAt(0).startContainer);
+    // Only a click ON THIS FIELD earns the fall-through. Activations that come
+    // from anywhere else — the admin driving selection, a re-render, a
+    // programmatic select — must keep deferring to the browser, or we yank
+    // focus into the iframe mid-edit and clobber what the admin is doing.
+    const clickedThisField = this.lastClickPosition?.editableField === fieldName;
+    if (options.wasAlreadyEditable && isAlreadyFocused && (caretInField || !clickedThisField)) {
       requestAnimationFrame(() => {
         const selection = window.getSelection();
         const anchorNode = selection?.anchorNode;
@@ -8030,9 +8064,16 @@ export class Bridge {
           // Verify the field belongs to THIS block, not a nested block
           // Container blocks (like columns) contain nested blocks with their own editable fields
           // If we find a field that belongs to a nested block, don't focus it
+          //
+          // Compared by UID, not element identity: a multi-element block spreads
+          // one uid across sibling elements, so its own field routinely sits in
+          // an element other than the one selectBlock is holding. Identity
+          // comparison rejected those as "belongs to a nested block".
           if (contentEditableField) {
-            const fieldBlockElement = contentEditableField.closest('[data-block-uid]');
-            if (fieldBlockElement !== currentBlockElement) {
+            const fieldBlockUid = contentEditableField
+              .closest('[data-block-uid]')
+              ?.getAttribute('data-block-uid');
+            if (fieldBlockUid !== currentBlockElement.getAttribute('data-block-uid')) {
               log('selectBlock: editable field belongs to nested block, skipping focus');
               contentEditableField = null;
             }
@@ -8080,6 +8121,102 @@ export class Bridge {
   }
 
   /**
+   * Remember where a click landed, for cursor positioning once the field is
+   * editable. Coordinates are relative to the FIELD, not the viewport: focus(),
+   * scrolling, or a reveal can move the field before activateEditableField
+   * turns them back into a caret position (caretRangeFromPoint) against its
+   * rect as it is by then. Absolute coordinates would land wherever the field
+   * used to be — usually collapsing the caret to the start of the text.
+   *
+   * @param {MouseEvent} event - The click event
+   * @param {HTMLElement|null} editableField - The text field the click resolved
+   *   to, or null when the click wasn't on one (the target is still recorded,
+   *   for field detection).
+   * @param {boolean} isInsideReadonly - Inside a readonly block (listing items
+   *   and friends) linkable/media fields come from query results, not editable
+   *   content, so they are ignored.
+   */
+  recordClickPosition(event, editableField, isInsideReadonly = false) {
+    const rect = editableField?.getBoundingClientRect();
+    const fieldAttr = (attr) =>
+      (isInsideReadonly ? null : event.target.closest(`[${attr}]`)?.getAttribute(attr)) || null;
+    this.lastClickPosition = {
+      ...(editableField && {
+        relativeX: event.clientX - rect.left,
+        relativeY: event.clientY - rect.top,
+        editableField: editableField.getAttribute('data-edit-text'),
+      }),
+      target: event.target, // For field detection
+      linkableField: fieldAttr('data-edit-link'),
+      mediaField: fieldAttr('data-edit-media'),
+    };
+  }
+
+  /**
+   * A data-block-selector click that landed on one of the SELECTED block's own
+   * editable fields must still start inline editing.
+   *
+   * The plain-click path further down blockClickHandler decides text vs block
+   * mode from "did this click land on a field this block owns". The selector
+   * branch returns before reaching it, so a trigger that doubles as a heading —
+   * an accordion panel title, a <summary> — only ever became editable when text
+   * mode happened to leak in from a previously selected block. From block mode
+   * (Escape, or selecting a container first) clicking the heading revealed the
+   * block and left it uneditable.
+   *
+   * Recording the field + click point here is enough: the selectBlock that runs
+   * once the target is visible reads focusedFieldName / lastClickPosition and
+   * promotes the field itself, so the reveal and the caret can't race.
+   *
+   * Deliberately NO preventDefault: the element's default action IS the reveal
+   * (a <summary> toggling its <details>). The plain-click path prevents it for
+   * exactly the opposite reason — there, the default action would compete with
+   * editing rather than enable it.
+   *
+   * @param {MouseEvent} event - The click event
+   * @param {string} selector - The data-block-selector value
+   */
+  noteEditableFromSelectorClick(event, selector) {
+    // '+1'/'-1' navigate to a SIBLING, so a field under the trigger belongs to
+    // a different block than the one about to be selected — nothing to promote.
+    if (selector === '+1' || selector === '-1') return;
+
+    const field = event.target.closest('[data-edit-text]');
+    if (!field) return;
+
+    // Only when the reveal selects the very block that owns the field. A
+    // carousel dot labelled with its slide's text points elsewhere; promoting
+    // that field would put the caret in a block that is about to scroll away.
+    const ownerUid = field.closest('[data-block-uid]')?.getAttribute('data-block-uid');
+    if (ownerUid !== selector.trim().split(/\s+/)[0]) return;
+
+    // Readonly blocks (listing items and friends) render query results, not
+    // editable content — same exclusion the plain-click path applies.
+    if (event.target.closest('[data-block-readonly]') || this.isBlockReadonly(ownerUid)) return;
+
+    // Touch: the first tap on a not-yet-selected block selects it without a
+    // caret, so iOS word-select and long-press multi-select have a clean
+    // canvas; the second tap enters text mode. Mirrors the plain-click path.
+    const coarsePointer =
+      typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    if (coarsePointer && ownerUid !== this.selectedBlockUid) {
+      this.editMode = 'block';
+      return;
+    }
+
+    this.recordClickPosition(event, field);
+    // editMode FIRST: focusedFieldName is an accessor that drops any value
+    // assigned while the mode is still 'block' (block mode has no focused
+    // field). Assigning the other way round silently loses the field name, and
+    // selectBlock then falls back to the block's FIRST editable field — right by
+    // luck for a single-field block, wrong for every multi-field one.
+    this.editMode = 'text';
+    this.focusedFieldName = field.getAttribute('data-edit-text');
+    log('noteEditableFromSelectorClick: will edit', this.focusedFieldName, 'of', ownerUid, 'after reveal');
+    return true;
+  }
+
+  /**
    * Handle data-block-selector click to navigate between sibling blocks.
    * Used for carousel prev/next buttons, tab selectors, etc.
    *
@@ -8089,7 +8226,34 @@ export class Bridge {
   handleBlockSelector(selector, triggerElement) {
     log('handleBlockSelector:', selector, 'trigger:', triggerElement.className);
 
-    // Find the container block
+    // Direct UID selector. The value is either a single uid (e.g. a
+    // carousel dot → that slide) or a space-separated word-list whose
+    // FIRST uid is the block to select — accordion panel headers carry
+    // `[panelUid, ...childUids]` (panel first), the rest of the list is
+    // only there for tryMakeBlockVisible's `~=` reveal match. Take the
+    // first token either way.
+    //
+    // Handled BEFORE any container/sibling lookup: a named uid says exactly
+    // which block to select, so what surrounds the trigger is irrelevant. The
+    // sibling scan below is only meaningful for the relative '+1'/'-1' form,
+    // and requiring it here silently dropped every trigger that IS its own
+    // block — an accordion panel title or tab label carrying the panel's uid,
+    // whose content is a same-uid SIBLING rather than a descendant, has no
+    // nested blocks to find. Those clicks reached "no child blocks found" and
+    // returned, so the panel was never selected and its title never editable.
+    if (selector !== '+1' && selector !== '-1') {
+      const targetUid = selector.trim().split(/\s+/)[0];
+      log('handleBlockSelector: direct selector targetUid =', targetUid);
+      // Hide outline during transition (same as +1/-1 path)
+      this._blockSelectorNavigating = true;
+      this.stopTransitionTracking();
+      window.parent.postMessage({ type: 'HIDE_BLOCK_UI' }, this.adminOrigin);
+      this.waitForBlockVisibleAndSelect(targetUid);
+      return;
+    }
+
+    // Relative navigation ('+1'/'-1') moves between the SIBLINGS around the
+    // trigger, so from here on the container and its child blocks are required.
     const containerBlock = triggerElement.closest('[data-block-uid]');
     if (!containerBlock) {
       log('handleBlockSelector: no container found');
@@ -8108,23 +8272,6 @@ export class Bridge {
 
     if (childBlocks.length === 0) {
       log('handleBlockSelector: no child blocks found');
-      return;
-    }
-
-    // Direct UID selector. The value is either a single uid (e.g. a
-    // carousel dot → that slide) or a space-separated word-list whose
-    // FIRST uid is the block to select — accordion panel headers carry
-    // `[panelUid, ...childUids]` (panel first), the rest of the list is
-    // only there for tryMakeBlockVisible's `~=` reveal match. Take the
-    // first token either way.
-    if (selector !== '+1' && selector !== '-1') {
-      const targetUid = selector.trim().split(/\s+/)[0];
-      log('handleBlockSelector: direct selector targetUid =', targetUid);
-      // Hide outline during transition (same as +1/-1 path)
-      this._blockSelectorNavigating = true;
-      this.stopTransitionTracking();
-      window.parent.postMessage({ type: 'HIDE_BLOCK_UI' }, this.adminOrigin);
-      this.waitForBlockVisibleAndSelect(targetUid);
       return;
     }
 
