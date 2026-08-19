@@ -168,7 +168,16 @@
     const mockBlocksConfig = {
       _page: {
         schema: () => ({
-          properties: { items: { widget: 'blocks_layout' } },
+          // `title` / `description` are the PAGE's own metadata, annotated by the
+          // title/description blocks as `data-edit-text="/title"` and
+          // `"/description"`. They have to be declared here for the same reason a
+          // block's fields do: getFieldType resolves a `/`-scoped name against the
+          // page schema, and an undeclared field is never made contenteditable.
+          properties: {
+            items: { widget: 'blocks_layout' },
+            title: { title: 'Title', type: 'string' },
+            description: { title: 'Description', type: 'string' },
+          },
         }),
       },
       slate: { id: 'slate', blockSchema: { properties: { value: { widget: 'slate' } } } },

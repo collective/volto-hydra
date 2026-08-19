@@ -469,8 +469,31 @@ export const sharedBlocksConfig = {
     // so they were excluded from the page-level allowed set (getPageAllowedBlocks
     // only includes registered blocks with an id). Minimal registration makes them
     // valid page blocks; the frontend still owns their rendering.
-    search: { id: 'search', title: 'Search', group: 'common', blockSchema: { properties: {} } },
-    heading: { id: 'heading', title: 'Heading', group: 'common', blockSchema: { properties: {} } },
+    // Both DO declare their inline-editable fields: the bridge refuses to promote
+    // a field its schema doesn't declare as text (getFieldType returns undefined,
+    // so restoreContentEditableOnFields skips it). An undeclared field renders a
+    // data-edit-text annotation that can never be edited — which is what the
+    // renderer has been emitting for these two since they were registered.
+    search: {
+        id: 'search',
+        title: 'Search',
+        group: 'common',
+        blockSchema: {
+            properties: {
+                headline: { title: 'Headline', type: 'string' },
+                title: { title: 'Title', type: 'string' },
+                facetsTitle: { title: 'Facets title', type: 'string' },
+            },
+        },
+    },
+    heading: {
+        id: 'heading',
+        title: 'Heading',
+        group: 'common',
+        blockSchema: {
+            properties: { heading: { title: 'Heading', type: 'string' } },
+        },
+    },
     // slateTable has inline-editable cells, so it MUST declare its nested
     // structure — table (object) → rows (object_list) → cells (object_list) →
     // value (slate). A frontend's registered schema OVERRIDES the admin's
@@ -782,6 +805,15 @@ export const sharedBlocksConfig = {
         title: 'Teaser',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>',
         group: 'common',
+        // renderTeaserBlock annotates title + description, so they have to be
+        // declared: the bridge won't promote a field whose schema doesn't say
+        // it is text (see `heading` / `search`).
+        blockSchema: {
+            properties: {
+                title: { title: 'Title', type: 'string' },
+                description: { title: 'Description', type: 'string' },
+            },
+        },
     },
     // Image block: parents declare claims via inheritSchemaFrom.parentControlled.image.
     image: {
