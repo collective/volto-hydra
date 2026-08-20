@@ -482,7 +482,7 @@ export default defineConfig({
     }] : []),
     ...(needsF7 ? [{
       name: 'Framework7 Frontend (Test)',
-      command: `cp ../../packages/hydra-js/hydra.js ./src/js/hydra.js && npx vite --port ${PORTS.f7} --strictPort --config vite.config.test.js`,
+      command: `cp ../../packages/hydra-js/hydra.js ./src/js/hydra.js && npx vite --port ${PORTS.f7} --strictPort --config vite.config.test.mjs`,
       url: URLS.f7,
       timeout: 120 * 1000,
       reuseExistingServer: true,
