@@ -342,6 +342,13 @@ export async function checkEditAnnotations(
               // at all means "not rendered right now", which we cannot judge,
               // and the field stays required.
               if (!host) return true;
+              // `data-block-readonly` is the frontend saying this content is not
+              // authored here — a teaser mirroring its target, a listing showing
+              // query results, a site header whose text comes from site
+              // settings. The click check already skips those subtrees; without
+              // the same rule here the two contradict each other, demanding an
+              // annotation that the other check would then fail on.
+              if (host.closest('[data-block-readonly]')) return true;
               const rendered = host.getClientRects().length > 0;
               const box = host.getBoundingClientRect();
               if (rendered && box.width < 2 && box.height < 2) return true;
