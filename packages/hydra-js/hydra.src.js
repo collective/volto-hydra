@@ -6552,7 +6552,33 @@ export class Bridge {
     if (hasNonCollapsedSelection) {
       log('activateEditableField: skipping cursor positioning - non-collapsed selection exists');
     } else {
-      const range = this.caretRangeFromPoint(clientX, clientY);
+      let range = this.caretRangeFromPoint(clientX, clientY);
+      // The point is only a hint. The stored click is relative to the FIELD, so
+      // that a scroll can't invalidate it — but converting it back gives a
+      // viewport point, and by then the page may have moved something else
+      // under it: a sticky header, or simply different content at that spot.
+      // caretRangeFromPoint answers for whatever is there, so an unchecked
+      // result drops the author's caret into another element entirely (a page
+      // heading, in the case that surfaced this). If the range isn't inside the
+      // field, fall back to the field's own text.
+      if (range && !fieldElement.contains(range.startContainer)) {
+        log('activateEditableField: point resolved outside the field, using its own text instead');
+        const walker = document.createTreeWalker(fieldElement, NodeFilter.SHOW_TEXT);
+        const textNode = walker.nextNode();
+        if (textNode) {
+          range = document.createRange();
+          range.setStart(textNode, 0);
+          range.collapse(true);
+        } else {
+          range = null;
+          const fallback = document.createRange();
+          fallback.selectNodeContents(fieldElement);
+          fallback.collapse(true);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(fallback);
+        }
+      }
       if (range) {
         log('activateEditableField: caretRangeFromPoint result:', {
           startContainer: range.startContainer.nodeName,
