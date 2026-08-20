@@ -482,7 +482,12 @@ export default defineConfig({
     }] : []),
     ...(needsF7 ? [{
       name: 'Framework7 Frontend (Test)',
-      command: `cp ../../packages/hydra-js/hydra.js ./src/js/hydra.js && npx vite --port ${PORTS.f7} --strictPort --config vite.config.test.mjs`,
+      // No hydra.js copy: the app imports `@hydra-js/hydra.js`, which both vite
+      // configs alias to packages/hydra-js/hydra.src.js — vite compiles the
+      // SOURCE per request, so the example always runs the current bridge. The
+      // copy wrote a gitignored file nothing reads, and reading it as the served
+      // bridge sent me chasing a "stale build" that never existed.
+      command: `npx vite --port ${PORTS.f7} --strictPort --config vite.config.test.mjs`,
       url: URLS.f7,
       timeout: 120 * 1000,
       reuseExistingServer: true,
