@@ -6577,6 +6577,73 @@ export class Bridge {
 
     // Clear lastClickPosition - we've used it
     this.lastClickPosition = null;
+
+    // A frontend may re-render this field out from under us — Vue patching the
+    // node it owns, React remounting a subtree, any framework reconciling after
+    // its own state change. The replacement is re-promoted (contenteditable is
+    // restored on the new node), but focus and the caret belong to the node that
+    // was thrown away, so the author is left typing into nothing: activeElement
+    // falls back to BODY, and the next selection lands on the block's FIRST
+    // field instead of the one they clicked.
+    this.watchForEditableReplacement(fieldElement, fieldName, blockUid);
+  }
+
+  /**
+   * Re-focus a field whose element is replaced by the frontend's own re-render.
+   *
+   * Watches the field's parent for its removal, and if a new element for the
+   * SAME field appears in the same block, restores focus and the caret offset to
+   * it. Gives up as soon as anything else takes focus — a re-render the author
+   * has already moved on from must not yank them back.
+   */
+  watchForEditableReplacement(fieldElement, fieldName, blockUid) {
+    this._editableReplacementObserver?.disconnect();
+    const root = fieldElement.parentElement;
+    if (!root || !fieldName) return;
+
+    const caretOffset = (() => {
+      const sel = window.getSelection();
+      if (!sel?.rangeCount) return 0;
+      const range = sel.getRangeAt(0);
+      return fieldElement.contains(range.startContainer) ? range.startOffset : 0;
+    })();
+
+    const observer = new MutationObserver(() => {
+      if (fieldElement.isConnected) return;
+      // Only OUR field's disappearance, and only while nothing else is focused.
+      const active = document.activeElement;
+      if (active && active !== document.body && active.hasAttribute?.('data-edit-text')) {
+        observer.disconnect();
+        return;
+      }
+      const block = blockUid ? this.queryBlockElement(blockUid) : root.closest('[data-block-uid]');
+      const replacement = block?.querySelector(`[data-edit-text="${fieldName}"]`);
+      if (!replacement) return;
+      observer.disconnect();
+      this._editableReplacementObserver = null;
+      log('watchForEditableReplacement: field was re-rendered, restoring focus', fieldName);
+      replacement.setAttribute('contenteditable', 'true');
+      replacement.focus({ preventScroll: true });
+      const textNode = replacement.firstChild;
+      if (textNode?.nodeType === Node.TEXT_NODE) {
+        const range = document.createRange();
+        range.setStart(textNode, Math.min(caretOffset, textNode.length));
+        range.collapse(true);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    });
+    observer.observe(root, { childList: true, subtree: true });
+    this._editableReplacementObserver = observer;
+    // Stop watching once the re-render window has passed, so a long-lived
+    // observer can't fire on an unrelated change minutes later.
+    setTimeout(() => {
+      if (this._editableReplacementObserver === observer) {
+        observer.disconnect();
+        this._editableReplacementObserver = null;
+      }
+    }, 2000);
   }
 
   /**
