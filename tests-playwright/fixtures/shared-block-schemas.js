@@ -536,7 +536,25 @@ export const sharedBlocksConfig = {
             },
         },
     },
-    maps: { id: 'maps', title: 'Map', group: 'common', blockSchema: { properties: {} } },
+    // Declared, not empty: the bridge promotes a field only if the block's
+    // schema has it, so an empty schema makes every annotation on these blocks
+    // dead — `data-edit-text="title"` on a map never becomes editable, however
+    // correctly the frontend marked it up. Fields are the ones the fixtures
+    // actually store.
+    maps: {
+        id: 'maps',
+        title: 'Map',
+        group: 'common',
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'url', 'align'] }],
+            properties: {
+                title: { title: 'Title', type: 'string' },
+                url: { title: 'Map URL', widget: 'url' },
+                align: { title: 'Alignment', type: 'string', factory: 'Choice' },
+            },
+            required: [],
+        },
+    },
     video: { id: 'video', title: 'Video', group: 'common', blockSchema: { properties: {} } },
     // Code example block: tabbed code display with syntax highlighting
     codeExample: {
