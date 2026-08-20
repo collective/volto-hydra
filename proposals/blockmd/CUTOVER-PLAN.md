@@ -42,10 +42,20 @@ readable enough to hand/AI-author.
    ~10-line extension mapping `<block>`/`<fields>` → passthrough so the inert
    tags disappear from the DOM.
    - check: `sphinx-build` of the full docs tree is clean.
-2. **Stabilize block uids.** Replace sync's positional counter (`p-7`, `ul-6`)
-   with heading/slug-derived ids, so hand-edits don't renumber. Must precede the
-   freeze.
-   - check: editing prose in a page changes only that block's markdown, no id churn.
+2. **Block uids: derive, don't store; object UIDs: keep stable.** A block uid
+   (`p-7`, `ul-6`) is a runtime/internal identity — *not* an identity or match
+   key for either deploy path (see step 5), and tests key on block **type**, not
+   uid. So stop emitting block uids: the loader derives them deterministically at
+   read time (path + type + heading-slug, else position-within-parent). What
+   *does* need to be stable is the **content-object UID** (page/folder/blob) — the
+   incremental sync uses it for move detection and `resolveuid` links point at it
+   — so those stay authored/stable in frontmatter / `subitem-assignments` (largely
+   already true; the site tree uses semantic slugs). This **inverts** the old
+   "stabilize block uids" step and folds into the freeze (step 3): until we stop
+   matching legacy JSON, parity still needs the old uids, so the drop lands *with*
+   the freeze, not before it.
+   - check: an unrelated prose edit produces no block-uid diff (there are none in
+     source) and leaves object UIDs unchanged.
 3. **Freeze markdown as source.** The format files become canonical; stop
    generating them from JSON. One committed markdown tree per side.
    - check: no script writes the markdown tree from JSON anymore.
@@ -53,10 +63,28 @@ readable enough to hand/AI-author.
    format files directly (superseding `sync.mjs`). Route the mock API mounts and
    the docs `/docs` mount through it.
    - check: mock API serves both trees from the markdown; `sync.mjs` deleted.
-5. **Deploy from the loader.** Replace `build-distribution-content.mjs`: the
-   loader emits the distribution (`__metadata__.json`: `_data_files_`,
-   `_blob_files_`, `ordering`, `local_roles`) from the two markdown trees.
-   - check: built distribution imports and matches today's served JSON.
+5. **Deploy from the loader — two emitters over one content model.** The loader
+   yields a canonical content model (objects: path / `@type` / blocks /
+   `blocks_layout`; blobs; order; derived metadata). Deploy is a **pluggable
+   emitter** over that model, *not* baked into the loader — so both of pretagov's
+   existing deploy paths are consumers of the same output:
+   - **Distribution build** — replaces `build-distribution-content.mjs`; emits
+     `__metadata__.json` (`_data_files_`, `_blob_files_`, `ordering`,
+     `local_roles`). Creates a fresh site (content resets on deploy via
+     `plone.distribution`), so nothing to match — block uids are freely derived.
+     - check: built distribution imports and matches today's served JSON.
+   - **Incremental sync** (`scripts/classify_content_delta.py`) — compares three
+     path-keyed `data.json` trees (BASE = last deploy, DISK = HEAD, LIVE = live
+     export). Change is a **per-page content hash** (`content_key`, canonical JSON
+     minus `VOLATILE`); identity is **path**; object **UID** drives move
+     detection. Block uids are not a key here — so to stop derived-uid churn from
+     registering as false "changed" (and false clobbers of live editor edits),
+     **normalize block uids out of `content_key`** (alongside the existing
+     `VOLATILE` stripping) and in `convert-export-to-local.py`'s LIVE
+     normalization.
+     - task: extend the classifier's normalization to strip block uids.
+     - check: an unrelated prose edit classifies **NOOP** for that page (no false
+       UPDATE / clobber warning).
 6. **Bring marketing to sanity-clean.** Run the normalizer + discovery/sanity on
    `inka-site/content` (14 multi-node slates + any shape issues), so the deployed
    content — not just docs — is covered.
@@ -118,7 +146,11 @@ referenced by `{literalinclude}` instead of copied.)
 
 ## Risks
 
-- **uid stability** (step 2) gates the freeze — do it first.
+- **Object-UID stability** (page/folder/blob — *not* block uids) is what the
+  incremental sync's move detection and `resolveuid` links depend on; keep those
+  authored/stable. Block uids are loader-derived and normalized out of change
+  detection, so they no longer gate anything — the old "stabilize block uids"
+  risk is retired.
 - **Deploy metadata** (step 5) must generate `__metadata__.json` exactly; the
   agreement check (built distribution == served JSON) is the guard.
 - **Marketing coverage** (step 6) — deploy currently ships unchecked site content.

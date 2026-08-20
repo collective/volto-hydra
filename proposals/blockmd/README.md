@@ -1,236 +1,186 @@
 # blockmd — two-way markdown ⇄ block documents
 
-Reference implementation of the format in `../mcp-content-authoring.md`.
-Measured against **all** real content — 74 pages, 1546 blocks, 30 block types.
+The readable format that is the single source of truth for Plone block content:
+the **loader** turns it into the block JSON the mock API serves (and deploy
+builds from), and **Sphinx** renders the same files as docs. Engine:
+`../../lib/prototype-mapping.mjs`; exporter: `export-proto.mjs`; loader:
+`../../lib/markdown-mount.mjs`.
 
 ```
-node convert.mjs           # write out/**.md and report round-trip fidelity
-node convert.mjs --check   # report only
-./dump_schema.sh           # refresh schemas.json from shared-block-schemas.js
+node export-proto.mjs              # JSON tree -> docs/content-md-proto/**.md
+node check-proto-parity.mjs        # decode every page, diff vs the original JSON
 ```
 
-| | |
-|---|---|
-| page metadata | **74 / 74 — 100%** |
-| block order | **74 / 74 — 100%** |
-| blocks (semantic) | **1494 / 1494 — 100%** |
+Round-trip is verified by decoding each written file back and diffing the blocks
+against the source JSON (`check-proto-parity`), currently **61 / 0**. The
+comparison is *semantic* — it ignores the derived `plaintext`, empty text
+leaves, empty `styles`, and (once uids are loader-minted) block uids — because
+byte-equality is the wrong bar for inconsistently-normalised stored slate.
 
-The round-trip writes each file to disk and parses **that file back**, not the
-in-memory string — comparing a string against itself only proves the functions
-compose.
-
-Semantic = ignoring empty text leaves and the derived `plaintext`; see
-`../blockmd-prototype/FINDINGS.md` for why byte-equality is the wrong bar
-(stored slate is inconsistently normalised).
-
-## Design
-
-Two layers, each doing what it is good at.
-
-**1. Frame layer** — a line-anchored scanner for `:::type{attrs}` … `:::`.
-This grammar is ours, always block-level, always at line start, so a scanner is
-exact and needs no dependency. `::::name` opens a named region: either a
-`blocks_layout` region or an `object_list` field.
-
-**2. Prose layer** — `remark` (mdast) ⇄ slate. Markdown parsing is where
-hand-rolling goes wrong; the earlier python prototype's regexes lost inline
-code, split one list into three, and mangled nested emphasis. Delegated to
-`remark-parse` / `remark-stringify` / `remark-gfm`, all already in the tree.
-
-`remark-directive` is deliberately *not* used. Directives here are emitted by
-us and always line-anchored, so the scanner is exact, and it avoids adding a
-dependency to a repo that pins carefully.
-
-## The format
+## The document
 
 ```markdown
 ---
+"@type": Document
+UID: aboutinka0000000000000000000001
 title: About
 description: Why Inka exists…
 review_state: published
-UID: aboutinka0000000000000000000001
-blocks:                      # the blockMap: ordered uid -> type
-  - intro: slate
-  - status-grid: gridBlock
+blocks-matched: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
+  <block type="title" _="${h1}" />
+  <block type="separator" _="${hr}" />
+blocks-tagged: |
+  <block type="accordion">
+    <region name="panels" widget="object_list">
+      <block type="panel" title="${h2/text}" />
+    </region>
+  </block>
 ---
 
 Plain prose is a slate block. No wrapper.
 
-## So are headings
+## Headings are slate too
 
-:::gridBlock{uid="status-grid" headline="Status"}
-:::slate{uid="card-1"}
-**Built** — the editor, the bridge, the Plone adapter.
-:::
-:::
+<block type="accordion">
 
-:::codeExample{uid="ex-1"}
-::::tabs
-:::tab{uid="tab-nuxt" label="Nuxt.js" language="vue"}
-```field:code vue
-<template>…</template>
-```
-:::
-::::
-:::
+## First panel
+
+Body of the first panel.
+
+</block>
 ```
 
-**Rules**
+The body is **content**; the two frontmatter sections are the **mapping** that
+makes it decodable without a schema, so the mock API can serve markdown
+directly.
 
-| JSON | markdown |
-|---|---|
-| `blocks_layout` order | document order — needs no syntax |
-| block uid | `{uid="…"}`, or the frontmatter `blocks:` map for bare prose |
-| `slate` (65% of blocks) | plain markdown |
-| scalar field, single line, ≤200 chars | `{key="value"}` attr |
-| multi-line string | ` ```field:name lang ` fenced block |
-| object/array field | ` ```fields ` JSON escape hatch |
-| slate with no markdown form | ` ```field-json:value ` — emitter-verified |
-| field with a native spelling | `$ref` into the body (see below) |
-| nested `blocks` | nested `:::`, `::::region` for named regions |
-| `object_list` field | `::::field` containing `:::item` — **needs the schema** |
-| `plaintext` | derived, never authored |
+## Prototypes: matched vs tagged
 
-Multi-line strings get a fence long enough to contain any backtick run inside
-them, so a code sample containing ``` still round-trips.
+A prototype maps a markdown shape to a block type. There are two sections, and
+**section membership is the flag** — no `explicit` attribute:
 
-## Fields that are markdown
+- **`blocks-matched`** — matched *implicitly* from bare markdown. Source order is
+  a **CSS cascade**: the most *specific* prototype wins (specificity = count of
+  non-`*` type slots; a multi-node run is a compound and sums), ties broken by
+  source order, **later wins**. This is why `slate` is declared before `title`,
+  so an `h1` ties on specificity and `title` (declared later) takes it.
+- **`blocks-tagged`** — matched *only* via an explicit `<block type=…>` tag. For
+  shapes too ambiguous to match from bare markdown (a variable-remainder
+  container like `accordion`).
 
-A heading block IS a heading; an image block IS an image. Writing them as
-attributes or fenced JSON is the format failing at its one job:
+A fixed-shape repeating container (e.g. `codeExample` = `(### h3, fenced code)+`)
+can be matched **bare** from `blocks-matched` with no wrapper — the pattern break
+is the boundary (greedy / maximal-munch).
 
-```markdown
-:::heading{uid="a0e70eab…" alignment="left" heading=$text tag="h${level}"}
-## Button Block
-:::
+### References
 
-:::image{uid="img-14" align="center" size="l" url=$src alt=$alt}
-![Frontend switcher panel — Viewport section…](/docs/images/frontend-switcher)
-:::
-```
-
-**The document carries its own mapping**, so a reader needs no schema. That is
-what lets the mock API serve markdown directly.
-
-An attribute value is a JSON scalar *or* a reference — two spaces that cannot
-overlap, because `$src` is not a valid JSON token:
+An attribute value is a JSON scalar *or* a `${…}` reference — they can't overlap
+because `${` is not a JSON token:
 
 | form | meaning |
 |---|---|
-| `title="…"` | string literal, always — `title="$5.00"` needs no escape |
-| `n=3` `ok=true` `x=null` | that JSON value |
-| `url=$src` | reference: the construct's part, type preserved |
-| `tag="h${level}"` | interpolation: composes a string, so nothing hardcodes the `h` |
-| anything else bare | **error** — it used to become a string, silently |
+| `title="${1/text}"` | construct 1's `text` part — whole value, type preserved |
+| `tag="h${1/level}"` | interpolation: composes a string (`"h2"`) |
+| `value="${p,h*,ul/slate}"` | a node **set** — any of these node kinds → slate |
+| `_="${hr}"` | match-only: consumes a node, captures nothing (separator) |
 
-`$part` searches the body's constructs in order; `$N.part` indexes one. The
-part vocabulary belongs to markdown, not to any block type — which is what
-keeps this generic:
+Interpolation isn't invertible, so only the **emitter** runs it backwards and
+checks the result reproduces the stored value (verify-on-emit); a value the
+construct can't carry keeps a literal attribute instead of being silently
+rewritten.
 
-| construct | parts |
+## Tags
+
+| tag | meaning |
 |---|---|
-| `## text` | `text`, `level` |
-| `![alt](src)` | `src`, `alt` |
-| `[label](target)` | `text`, `href` |
-| paragraph | `text` |
+| bare prose / heading / list | a `blocks-matched` block (usually `slate`) — no wrapper |
+| `<block type="X" …>` … `</block>` | an explicit block, or one carrying field overrides / a region |
+| `<block type="X" … />` | tier-3 escape hatch: a raw block from its attributes (`data='{…}'` carries object fields) |
+| `<region name="X" widget="blocks_layout\|object_list">` | an explicit region inside a container |
+| `<fields … />` / `<fields …> … </fields>` | attach field values — see below |
+| ` ```{literalinclude} path ` | reference a renderer file; the loader inlines its code, Sphinx renders it (one source, three consumers) |
 
-Interpolation is not invertible in general (`"${a}${b}"` = `"h2"` has several
-solutions), so only the *emitter* runs it backwards, and it checks the result
-reproduces the stored value. The parser only runs forward. A value the
-construct cannot carry — one heading's text ends in a space — keeps its literal
-attribute instead of being quietly rewritten.
+## `<fields>` — attach field values to a scope
 
-A `Template` is a kind decided where it appears, never inferred from a string's
-contents: source code in a fenced field is full of JS template literals, and
-treating those as interpolation rewrote 11 codeExample blocks.
+One tag, one rule: **`<fields>` sets field values on the blocks in its scope.**
+The scope is chosen by form:
 
-`markdown-roles.json` says which fields have a native spelling. It belongs in
-the block schema beside `widget`; it is separate while the shape settles. No
-block type is named anywhere in `blockmd.mjs`.
+- **self-closing** `<fields align="left" />` — sets the fields on the **block it
+  sits in** (the escape hatch for fields a block's clean markdown can't carry,
+  e.g. `styles`, `data='{…}'`).
+- **enclosing** `<fields slotId="rendering"> … blocks … </fields>` — sets the
+  fields on **every block it wraps**, as *defaults*: a wrapped block's own field
+  wins, and nested wrappers merge (outer fills whatever inner left unset).
 
-## Why the schema is needed
+The enclosing form is how repeated fields are **hoisted**. The exporter factors
+fields shared across a run of blocks into nested wrappers automatically — fields
+shared by *all* blocks become an outer wrapper, contiguous runs sharing a field
+become inner wrappers — so this:
 
-`object_list` and `object_browser` are indistinguishable in storage — both are
-`[{"@id": …}]`:
-
+```markdown
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-x" slotId="schema"> … </block>
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-x" slotId="rendering"> … </block>
+<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-x" slotId="rendering"> … </block>
 ```
-object_list      slider.slides  accordion.panels  codeExample.tabs  form.subblocks
-object_browser   button.href    hero.buttonLink   navItem.href      highlight.cta_link
+
+becomes:
+
+```markdown
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-x">
+
+<block type="codeExample" slotId="schema"> … </block>
+
+<fields slotId="rendering">
+
+<block type="codeExample"> … </block>
+<block type="codeExample"> … </block>
+
+</fields>
+
+</fields>
 ```
 
-`accordion.panels[0]` is a child block; `button.href[0]` is a link to a page.
-No shape heuristic survives real content. Without the schema you still get a
-lossless round-trip (those fields use the escape hatch) — what you lose is an
-agent being able to author `:::accordion` with `:::panel` children.
+Hoisting is verify-on-emit'd: the exporter only emits a wrapper when the whole
+page still decodes back to the same blocks, else it keeps the flat form.
 
-`shared-block-schemas.js` is incomplete: `teaser.href`, `search.facets` and
-`socialLinks.links` are absent, so they fall back to the hatch.
+## Block uids
+
+Block uids are a per-load internal identity — not a match key for tests (which
+key on `@type` + page-UID) or for either deploy path (the distribution creates a
+fresh site; the incremental sync matches pages by path and normalises block uids
+out of its change hash). So the loader **mints** them on read
+(`keyBlocks` with no `blocks-assignments`); only **content-object UIDs**
+(page/folder/blob) must stay authored/stable.
+
+## Why a schema-free document still needs the prototypes
+
+`object_list` and `object_browser` are the same storage shape (`[{"@id": …}]`) —
+`accordion.panels[0]` is a child block, `button.href[0]` is a link. No heuristic
+tells them apart on real content, so the prototype (the `<region widget=…>`
+declaration) carries that distinction in the document itself.
 
 ## Not all valid slate is expressible in markdown
 
-Slate is the larger language. An editor can legally produce two adjacent `em`
-nodes with no gap, a text leaf containing a bare `*`, an emphasis boundary
-falling mid-word — structures with no markdown spelling, or whose only spelling
-reads back as something else. `docs/architecture` `ol-26` is a real example:
-
-```json
-{"text": ", and in *"},
-{"type": "em", "children": [{"text": "template edit mode only when…"}]},
-{"text": "outside"},
-{"type": "em", "children": [{"text": " the template"}]}
-```
-
-That is well-formed slate. It is not writable in markdown.
-
-The format does not try to enumerate these cases — that list is unbounded and
-any omission is silent data loss. Instead **the emitter checks its own work**:
-
-```js
-slateRoundTrips(value)   // slateToMd -> mdToSlate -> compare
-```
-
-Prose that survives is written as markdown. Prose that doesn't falls back to
-` ```field-json:value `, carrying the slate verbatim. Losslessness is therefore
-a property of the design, not a number we measured and hope holds on the next
-document.
-
-**15 of 1546 blocks (1%) take the fallback** — 14 empty paragraphs (nothing
-cannot be read back as a block) and `ol-26`. The other 99% stay readable
-markdown.
-
-An earlier version of this note blamed `ol-26` on `*` being ambiguous between
-emphasis and strong. That was wrong: remark disambiguates correctly using
-character references (`*inside*outsid&#x65;*&#x20;the template*` reparses
-exactly). The real reason is simply that this slate has no markdown form.
-
-Separately, that slate does not match its source — `docs/architecture.md:83`
-has well-formed nested emphasis, so `sync.mjs` flattened it on the way in.
-Worth fixing at source, but *independent* of the format: the format's job is to
-carry whatever slate it is handed, however it got there.
+Slate is the larger language: two adjacent `em` nodes with no gap, an emphasis
+boundary mid-word — structures with no markdown spelling. The format does not
+enumerate these (the list is unbounded; any omission is silent data loss).
+Instead the **emitter checks its own work** — `slateToMd → mdToSlate → compare`;
+prose that survives is written as markdown, prose that doesn't falls back to a
+`data='{…}'` blob carrying the slate verbatim. Losslessness is a property of the
+design, not a measured number.
 
 ## Content normalised to get here
 
-`normalise-content.mjs` fixed genuine editing debris — these were data quirks,
-not format limits, and each is worth fixing at source regardless of markdown:
+`normalise-content.mjs` fixed genuine editing debris (worth fixing at source
+regardless): `{"type":"a"}` link nodes where others use `"link"`, empty inline
+`<em>`/`<strong>` nodes that serialise to stray asterisks, a trailing newline
+inside a text leaf. These are data quirks, not format limits.
 
-- **2 `{"type":"a"}` link nodes** where the other 110 use `"link"`.
-- **2 empty inline nodes** — an `<em>` or `<strong>` containing no text, which
-  renders nothing and serialises to stray asterisks.
-- **1 trailing newline** inside a text leaf at the end of a paragraph. Markdown
-  cannot express it and it renders as nothing.
+## Living format — not yet finalised
 
-One content edit: `docs/index.md` said `Open <https://hydra.pretagov.com>`,
-which remark-gfm reads back as an autolink. It is now a proper markdown link,
-which it should have been anyway. Note remark-stringify *does* escape the angle
-bracket correctly (`\<https\://…`) — gfm's autolink-literal extension matches
-the URL regardless, so escaping is not a fix.
-
-## What this does not do yet
-
-- **Write-back into the CMS.** Reading is solved; the MCP's edit loop needs
-  id-addressed operations (`edit_blocks`), not whole-page replacement.
-- **A mock-API mount.** `scanContentDir` would need a markdown variant. The
-  conversion is ready; the wiring is not.
-- **Replace `sync.mjs` at deploy.** Production imports a Plone distribution, so
-  a markdown→JSON pass still runs. The win is the dev loop and the end of
-  generated JSON in git.
+- **uid drop** — `keyBlocks` mints uids when `blocks-assignments` is absent; the
+  exporter still emits the map until markdown is frozen as source (parity needs
+  the old uids until we stop matching legacy JSON). See `CUTOVER-PLAN.md`.
+- **one tree, two emitters** — the loader yields a content model; the
+  distribution build and the incremental sync are two consumers of it.
