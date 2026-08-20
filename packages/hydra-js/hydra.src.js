@@ -6618,7 +6618,11 @@ export class Bridge {
       if (active && active !== document.body && active.hasAttribute?.('data-edit-text')) return;
       this.restoreFocusToReplacement(blockUid, root, fieldName, caretOffset);
     });
-    observer.observe(root, { childList: true, subtree: true });
+    // Observe the DOCUMENT, not the field's parent: a framework re-rendering a
+    // block replaces the parent as readily as the child, and an observer bound
+    // to a node that is itself detached never fires again. The window is short
+    // (below), so watching wide costs nothing.
+    observer.observe(document.body, { childList: true, subtree: true });
     this._editableReplacementObserver = observer;
 
     const stopWatching = () => {
