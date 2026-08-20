@@ -854,10 +854,7 @@ export const sharedBlocksConfig = {
                     title: 'Title',
                     type: 'string',
                 },
-                description: {
-                    title: 'Description',
-                    type: 'textarea',
-                },
+                description: { title: 'Description', type: 'string', widget: 'textarea' },
                 subblocks: {
                     title: 'Fields',
                     widget: 'object_list',

@@ -354,6 +354,12 @@
                                      || editParam === 'true'
                                      || editParam === 'false';
                 const isEditMode = isHydraEdit || editParam === 'true';
+                // Exposed for renderer.js: a field with no value still has to
+                // render its annotated element in EDIT mode, or the bridge's
+                // applyPlaceholders has nothing to mark data-empty and the
+                // author cannot see or click an empty field. View mode keeps
+                // "no data ⇒ no element" (issue #296).
+                window._isEditMode = isEditMode;
                 tfLog('Mode detection:', {
                     url: window.location.href,
                     windowName: window.name,

@@ -438,7 +438,17 @@ if (typeof document !== 'undefined') {
 }
 
 function renderSlateBlock(block) {
-    const value = block.value || [];
+    // An EMPTY slate block (no `value` at all — the state a just-added block is
+    // in) still has to render one node, or there is nothing carrying
+    // data-node-id for the bridge to sync a cursor to: clicking it raises
+    // "Selection sync failed - missing data-node-id" and the author cannot
+    // type. A real frontend gets this from the schema default
+    // ([{type:'p',children:[{text:''}]}]); this fixture has no defaults layer,
+    // so it seeds the same empty paragraph here, nodeId '0' like the first node
+    // of any slate value.
+    const value = (block.value && block.value.length)
+        ? block.value
+        : [{ type: 'p', nodeId: '0', children: [{ text: '' }] }];
     let html = '';
     value.forEach((node) => {
         // nodeId is required for edit mode (hydra.js adds it), but optional for view mode
@@ -739,9 +749,17 @@ function renderHeroBlockClean(block) {
     // Render subheading as textarea (preserve newlines)
     const subheadingHtml = subheading.replace(/\n/g, '<br>');
 
-    // Render description - still needs node IDs for slate editing
+    // Render description - still needs node IDs for slate editing.
+    // An EMPTY description renders one empty node in EDIT mode: the editor
+    // reveals empty fields via applyPlaceholders (data-empty + the CSS "Click
+    // to edit"), which needs an annotated element to mark. Without it the field
+    // is uneditable everywhere it appears. View mode keeps "no data ⇒ no
+    // element" (issue #296).
+    const descriptionNodes = description.length
+        ? description
+        : (window._isEditMode ? [{ type: 'p', nodeId: '0', children: [{ text: '' }] }] : []);
     let descriptionHtml = '';
-    description.forEach((node) => {
+    descriptionNodes.forEach((node) => {
         const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
         const text = renderChildren(node.children);
         switch (node.type) {
@@ -758,13 +776,18 @@ function renderHeroBlockClean(block) {
     });
 
     // Image - uses class instead of data-edit-media. Data-driven (issue #296):
-    // no image ⇒ no element, so the comment selector simply matches nothing.
+    // no image ⇒ no element in VIEW mode, so the comment selector matches
+    // nothing. In EDIT mode an empty image still renders a placeholder element,
+    // or `edit-media=image(.hero-image)` has nothing to attach to and the field
+    // is unsettable — the author would have no way to add the first image.
     const imageHtml = imageSrc
         ? `<img class="hero-image" src="${imageSrc}" alt="Hero image" style="max-width: 100%; height: auto; margin-bottom: 10px;" />`
+        : window._isEditMode
+        ? `<div class="hero-image" style="height: 100px; background: #ddd; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; border-radius: 4px; cursor: pointer;">Click to add image</div>`
         : '';
 
     // One element, two fields (buttonText + buttonLink) — see renderHeroBlock.
-    const buttonHtml = (block.buttonText || block.buttonLink)
+    const buttonHtml = (block.buttonText || block.buttonLink || window._isEditMode)
         ? `<a class="hero-button" href="${buttonLink}" style="display: inline-block; padding: 10px 20px; background: #007eb1; color: white; text-decoration: none; border-radius: 4px; cursor: pointer;">${buttonText}</a>`
         : '';
 
