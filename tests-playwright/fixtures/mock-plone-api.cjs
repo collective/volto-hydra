@@ -15,6 +15,19 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 8888;
 
+// Every absolute URL this server emits is built from the port it is ACTUALLY
+// listening on. `PORT` is overridable (playwright passes HYDRA_MOCK_API_PORT,
+// see tests-playwright/ports.ts) so a parent project embedding this checkout
+// can move the server off 8888 — and a URL still naming 8888 then points at a
+// dead port, or at whatever unrelated server got there first.
+const API_ORIGIN = `http://localhost:${PORT}`;
+
+// Content fixtures on disk are written against the canonical origin: `@id`s,
+// image `url`s and hrefs all say localhost:8888. That is a storage convention,
+// not a claim about where the server runs, so it is normalised on the way out
+// (see rewriteFixtureOrigin). Covered by tests-playwright/api/fixture-origin.spec.ts.
+const FIXTURE_ORIGIN = 'http://localhost:8888';
+
 /**
  * Parse CONTENT_MOUNTS env variable for multiple content directories
  * Format: "mountPath:dirPath,mountPath2:dirPath2"
@@ -167,6 +180,15 @@ function generateAuthToken(username = 'admin') {
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' })); // Increase limit for image uploads
+
+// Normalise the fixtures' baked origin to ours on the way out. Every JSON
+// response goes through res.json, so this is the one place a URL can leave the
+// server — no endpoint has to remember to call the rewrite itself.
+app.use((req, res, next) => {
+  const sendJson = res.json.bind(res);
+  res.json = (body) => sendJson(rewriteFixtureOrigin(body));
+  next();
+});
 
 // Virtual Host Monster path rewriting middleware
 // Volto's proxy adds VHM paths like: /VirtualHostBase/http/localhost:8888/++api++/VirtualHostRoot/@login
@@ -788,6 +810,32 @@ function resolveUidUrls(obj, parentKey = null) {
 }
 
 /**
+ * Rewrite the fixtures' canonical origin to the one we are serving from.
+ *
+ * Plone builds absolute URLs from the incoming request, so stored content
+ * never dictates the origin. Our fixtures are static files that had to pick
+ * one, and picked 8888; this is the equivalent normalisation. Only the origin
+ * is touched — paths, and any other host, are left alone.
+ */
+function rewriteFixtureOrigin(obj) {
+  if (API_ORIGIN === FIXTURE_ORIGIN) return obj;
+  if (typeof obj === 'string') {
+    return obj.startsWith(FIXTURE_ORIGIN)
+      ? API_ORIGIN + obj.slice(FIXTURE_ORIGIN.length)
+      : obj;
+  }
+  if (Array.isArray(obj)) return obj.map(rewriteFixtureOrigin);
+  if (obj && typeof obj === 'object') {
+    const result = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = rewriteFixtureOrigin(value);
+    }
+    return result;
+  }
+  return obj;
+}
+
+/**
  * Add image_scales to catalog brain references embedded in block data.
  * Real Plone includes image_scales in catalog brains; our content export doesn't.
  * Walks the data and for any object with image_field but no image_scales,
@@ -1239,7 +1287,7 @@ app.post('/@login-renew', (req, res) => {
   res.json({
     token: generateAuthToken('admin'),
     user: {
-      '@id': 'http://localhost:8888/@users/admin',
+      '@id': `${API_ORIGIN}/@users/admin`,
       id: 'admin',
       fullname: 'Admin User',
       email: 'admin@example.com',
@@ -1265,7 +1313,7 @@ app.post('/@login', (req, res) => {
     const response = {
       token,
       user: {
-        '@id': `http://localhost:8888/@users/${login}`,
+        '@id': `${API_ORIGIN}/@users/${login}`,
         id: login,
         fullname: 'Admin User',
         email: 'admin@example.com',
@@ -1350,7 +1398,7 @@ app.post('/*', (req, res, next) => {
 
     // Create the image content
     const imageContent = {
-      '@id': `http://localhost:8888${imagePath}`,
+      '@id': `${API_ORIGIN}${imagePath}`,
       '@type': 'Image',
       'UID': `uid-${imageId}`,
       'id': imageId,
@@ -1358,18 +1406,18 @@ app.post('/*', (req, res, next) => {
       'description': body.description || '',
       'image': {
         'content-type': body.image?.['content-type'] || 'image/png',
-        'download': `http://localhost:8888${imagePath}/@@images/image`,
+        'download': `${API_ORIGIN}${imagePath}/@@images/image`,
         'filename': body.image?.filename || 'image.png',
         'height': height,
         'width': width,
         'scales': {
           'preview': {
-            'download': `http://localhost:8888${imagePath}/@@images/image/preview`,
+            'download': `${API_ORIGIN}${imagePath}/@@images/image/preview`,
             'height': 400,
             'width': 400,
           },
           'large': {
-            'download': `http://localhost:8888${imagePath}/@@images/image/large`,
+            'download': `${API_ORIGIN}${imagePath}/@@images/image/large`,
             'height': 800,
             'width': 800,
           },
@@ -1418,7 +1466,7 @@ app.post('/*', (req, res, next) => {
         .replace(/^-+|-+$/g, '');
     const filePath = `${parentPath === '/' ? '' : parentPath}/${fileId}`.replace(/\/+/g, '/');
     const fileContent = {
-      '@id': `http://localhost:8888${filePath}`,
+      '@id': `${API_ORIGIN}${filePath}`,
       '@type': 'File',
       'UID': `uid-${fileId}`,
       'id': fileId,
@@ -1426,7 +1474,7 @@ app.post('/*', (req, res, next) => {
       'description': body.description || '',
       'file': {
         'content-type': body.file?.['content-type'] || 'application/octet-stream',
-        'download': `http://localhost:8888${filePath}/@@download/file`,
+        'download': `${API_ORIGIN}${filePath}/@@download/file`,
         'filename': body.file?.filename || rawName,
         'size': body.file?.data?.length || 0,
       },
@@ -1552,7 +1600,7 @@ function collectSubjectValues() {
  */
 app.get('*/@querystring', (req, res) => {
   res.json({
-    '@id': 'http://localhost:8888/@querystring',
+    '@id': `${API_ORIGIN}/@querystring`,
     'indexes': {
       'portal_type': {
         'title': 'Type',
@@ -1838,7 +1886,7 @@ app.get('*/@querystring', (req, res) => {
  */
 app.get('/@site', (req, res) => {
   res.json({
-    '@id': 'http://localhost:8888',
+    '@id': API_ORIGIN,
     'plone.site_title': 'Plone Site',
     'plone.site_logo': null,
     // Volto 19 reads `plone.default_language` from this response as the
@@ -1867,7 +1915,7 @@ app.get(/.*\/@workflow$/, (req, res) => {
 app.get('/@users/:userid', (req, res) => {
   const { userid } = req.params;
   res.json({
-    '@id': `http://localhost:8888/@users/${userid}`,
+    '@id': `${API_ORIGIN}/@users/${userid}`,
     id: userid,
     fullname: 'Admin User',
     email: 'admin@example.com',
@@ -2466,8 +2514,8 @@ app.get('*/@search', (req, res) => {
   }
 
   const searchUrl = searchPath === '' || searchPath === '/'
-    ? 'http://localhost:8888/@search'
-    : `http://localhost:8888${searchPath}/@search`;
+    ? `${API_ORIGIN}/@search`
+    : `${API_ORIGIN}${searchPath}/@search`;
 
   res.json({
     '@id': searchUrl,
@@ -2545,7 +2593,7 @@ app.get('*/@contents', (req, res) => {
   }
 
   res.json({
-    '@id': `http://localhost:8888${contentPath}/@contents`,
+    '@id': `${API_ORIGIN}${contentPath}/@contents`,
     'items': items,
     'items_total': items.length,
   });
