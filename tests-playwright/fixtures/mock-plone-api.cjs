@@ -738,12 +738,21 @@ function buildWorkflowComponent(cleanPath, baseUrl) {
 
 function buildNavrootComponent(cleanPath, baseUrl) {
   const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
+  // The navigation root is the SITE ROOT object, so serialise its real title and
+  // description — Plone does, and a frontend is entitled to read the site's name
+  // out of the response it already has rather than fetching the root itself.
+  // This used to answer `title: 'Site'` regardless, which is a lie a consumer
+  // can only discover by comparing against a real backend: our own frontend had
+  // grown a second request for the site root with a comment explaining that
+  // navroot "would work against Plone and quietly differ under test".
+  const root = loadRawContentFromDisk('/') || {};
   return {
     '@id': `${fullUrl}/@navroot`,
     navroot: {
       '@id': baseUrl,
-      '@type': 'Plone Site',
-      title: 'Site',
+      '@type': root['@type'] || 'Plone Site',
+      title: root.title || 'Site',
+      ...(root.description ? { description: root.description } : {}),
     },
   };
 }
