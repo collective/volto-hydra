@@ -6610,17 +6610,38 @@ export class Bridge {
 
     const observer = new MutationObserver(() => {
       if (fieldElement.isConnected) return;
-      // Only OUR field's disappearance, and only while nothing else is focused.
+      observer.disconnect();
+      this._editableReplacementObserver = null;
+      // Restore immediately: a framework that re-renders once often does it
+      // twice, and a deferred restore aims at a node that is already gone.
       const active = document.activeElement;
-      if (active && active !== document.body && active.hasAttribute?.('data-edit-text')) {
-        observer.disconnect();
-        return;
-      }
+      if (active && active !== document.body && active.hasAttribute?.('data-edit-text')) return;
+      this.restoreFocusToReplacement(blockUid, root, fieldName, caretOffset);
+    });
+    observer.observe(root, { childList: true, subtree: true });
+    this._editableReplacementObserver = observer;
+
+    const stopWatching = () => {
+      if (this._editableReplacementObserver !== observer) return;
+      observer.disconnect();
+      this._editableReplacementObserver = null;
+      document.removeEventListener('keydown', stopWatching, true);
+    };
+    // The window is the reconciliation that follows the CLICK — a frontend
+    // re-rendering the node it owns, immediately. Once the author starts
+    // typing, every later re-render is a consequence of editing (Backspace
+    // joining two blocks, Enter splitting one), and the bridge places those
+    // carets itself; restoring an offset captured at click time would drop the
+    // next keystroke at the wrong end of the joined text.
+    document.addEventListener('keydown', stopWatching, true);
+    setTimeout(stopWatching, 500);
+  }
+
+  /** Put focus and the caret back on the re-rendered element for a field. */
+  restoreFocusToReplacement(blockUid, root, fieldName, caretOffset) {
       const block = blockUid ? this.queryBlockElement(blockUid) : root.closest('[data-block-uid]');
       const replacement = block?.querySelector(`[data-edit-text="${fieldName}"]`);
       if (!replacement) return;
-      observer.disconnect();
-      this._editableReplacementObserver = null;
       log('watchForEditableReplacement: field was re-rendered, restoring focus', fieldName);
       replacement.setAttribute('contenteditable', 'true');
       replacement.focus({ preventScroll: true });
@@ -6633,17 +6654,6 @@ export class Bridge {
         sel.removeAllRanges();
         sel.addRange(range);
       }
-    });
-    observer.observe(root, { childList: true, subtree: true });
-    this._editableReplacementObserver = observer;
-    // Stop watching once the re-render window has passed, so a long-lived
-    // observer can't fire on an unrelated change minutes later.
-    setTimeout(() => {
-      if (this._editableReplacementObserver === observer) {
-        observer.disconnect();
-        this._editableReplacementObserver = null;
-      }
-    }, 2000);
   }
 
   /**
