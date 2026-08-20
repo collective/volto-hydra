@@ -58,7 +58,9 @@ A multi-field form with configurable field types, validation, and email submissi
 
 <block type="slate" data-json='{"styles":{},"value":[{"children":[{"text":""}],"type":"p"}]}' />
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form" slotId="schema">
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form">
+
+<block type="codeExample" slotId="schema">
 
 ### Schema
 
@@ -545,7 +547,7 @@ A multi-field form with configurable field types, validation, and email submissi
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form" slotId="json-data">
+<block type="codeExample" slotId="json-data">
 
 ### JSON Block Data
 
@@ -599,7 +601,7 @@ A multi-field form with configurable field types, validation, and email submissi
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-form" slotId="rendering">
+<block type="codeExample" slotId="rendering">
 
 ### React
 
@@ -626,3 +628,5 @@ A multi-field form with configurable field types, validation, and email submissi
 ```
 
 </block>
+
+</fields>

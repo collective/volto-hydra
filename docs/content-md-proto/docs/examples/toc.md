@@ -100,6 +100,8 @@ Renders a table of contents generated from heading blocks on the current page. I
 
 </block>
 
+<fields data-json='{"styles":{}}'>
+
 ## Text Heading H2&#x20;
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
@@ -128,6 +130,8 @@ Text can be **bold** or *italic*.
 
 [Link external](https://www.google.com/)
 
+</fields>
+
 <block type="separator">
 
 ---
@@ -136,7 +140,9 @@ Text can be **bold** or *italic*.
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc" slotId="schema">
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc">
+
+<block type="codeExample" slotId="schema">
 
 ### Schema
 
@@ -194,7 +200,7 @@ Text can be **bold** or *italic*.
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc" slotId="json-data">
+<block type="codeExample" slotId="json-data">
 
 ### JSON Block Data
 
@@ -213,7 +219,7 @@ Text can be **bold** or *italic*.
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc" slotId="rendering">
+<block type="codeExample" slotId="rendering">
 
 ### React
 
@@ -240,3 +246,5 @@ Text can be **bold** or *italic*.
 ```
 
 </block>
+
+</fields>

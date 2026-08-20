@@ -48,7 +48,9 @@ blocks-matched: |
 
 A carousel/slider that cycles through slides. Slides are stored as an object\_list — each slide has a title, description, image, and optional button.
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-slider" slotId="schema">
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-slider">
+
+<block type="codeExample" slotId="schema">
 
 ### Schema
 
@@ -138,7 +140,7 @@ A carousel/slider that cycles through slides. Slides are stored as an object\_li
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-slider" slotId="json-data">
+<block type="codeExample" slotId="json-data">
 
 ### JSON Block Data
 
@@ -180,7 +182,7 @@ A carousel/slider that cycles through slides. Slides are stored as an object\_li
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-slider" slotId="rendering">
+<block type="codeExample" slotId="rendering">
 
 ### React
 
@@ -207,3 +209,5 @@ A carousel/slider that cycles through slides. Slides are stored as an object\_li
 ```
 
 </block>
+
+</fields>

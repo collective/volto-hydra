@@ -33,11 +33,15 @@ blocks-matched: |
   </block>
 ---
 
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def">
+
+<fields data-json='{"fixed":true,"readOnly":true}'>
+
 <block type="separator">
 
 ---
 
-<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="sep" data-json='{"fixed":true,"readOnly":true,"styles":{"align":"full"}}' />
+<fields slotId="sep" data-json='{"styles":{"align":"full"}}' />
 
 </block>
 
@@ -45,7 +49,7 @@ blocks-matched: |
 
 ## Developer Reference
 
-<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="examples-heading" data-json='{"fixed":true,"readOnly":true}' />
+<fields slotId="examples-heading" />
 
 </block>
 
@@ -53,7 +57,7 @@ blocks-matched: |
 
 ### Schema
 
-<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="schema-heading" data-json='{"fixed":true,"readOnly":true}' />
+<fields slotId="schema-heading" />
 
 </block>
 
@@ -61,11 +65,13 @@ blocks-matched: |
 
 Pass this object inside the `blocks` option when calling `initBridge()` to register this block type with the admin UI. See [Custom Blocks](/docs/live-preview) for the full setup guide.
 
-<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="schema-desc" data-json='{"fixed":true,"readOnly":true}' />
+<fields slotId="schema-desc" />
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="schema">
+</fields>
+
+<block type="codeExample" slotId="schema">
 
 ### Schema
 
@@ -75,11 +81,13 @@ Pass this object inside the `blocks` option when calling `initBridge()` to regis
 
 </block>
 
+<fields data-json='{"fixed":true,"readOnly":true}'>
+
 <block type="slate">
 
 ### JSON Block Data
 
-<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-heading" data-json='{"fixed":true,"readOnly":true}' />
+<fields slotId="json-heading" />
 
 </block>
 
@@ -87,11 +95,13 @@ Pass this object inside the `blocks` option when calling `initBridge()` to regis
 
 Example JSON as stored in the Plone content API. This is the data structure your component will receive in the `block` prop.
 
-<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-desc" data-json='{"fixed":true,"readOnly":true}' />
+<fields slotId="json-desc" />
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="json-data">
+</fields>
+
+<block type="codeExample" slotId="json-data">
 
 ### JSON Block Data
 
@@ -101,11 +111,13 @@ Example JSON as stored in the Plone content API. This is the data structure your
 
 </block>
 
+<fields data-json='{"fixed":true,"readOnly":true}'>
+
 <block type="slate">
 
 ### Rendering
 
-<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering-heading" data-json='{"fixed":true,"readOnly":true}' />
+<fields slotId="rendering-heading" />
 
 </block>
 
@@ -113,11 +125,13 @@ Example JSON as stored in the Plone content API. This is the data structure your
 
 How this block renders in your frontend. Add its handling to your renderer, or — for list-style blocks — register a fetcher and reuse your list rendering.
 
-<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering-desc" data-json='{"fixed":true,"readOnly":true}' />
+<fields slotId="rendering-desc" />
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-block-ref-def" slotId="rendering">
+</fields>
+
+<block type="codeExample" slotId="rendering">
 
 ### React
 
@@ -138,3 +152,5 @@ How this block renders in your frontend. Add its handling to your renderer, or �
 ```
 
 </block>
+
+</fields>

@@ -65,15 +65,25 @@ Displays a list of content items from a query. The listing block fetches items f
 
 <block type="image" url="/docs/images/listing-edit" alt="The listing example block being edited in Volto Hydra" align="center" size="l" />
 
-<block type="listing" block="24280e07-e962-4414-8ee5-cdaf58ca5f35" headline="Listing: Default" headlineTag="h2" variation="default" data-json='{"query":[],"querystring":{"b_size":"4","limit":"10","query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Document"]},{"i":"Subject","o":"plone.app.querystring.operation.selection.none","v":["main folder"]}],"sort_on":"getId","sort_order":"ascending"},"styles":{"backgroundColor":"transparent"}}' />
+<fields headlineTag="h2">
 
-<block type="listing" block="24280e07-e962-4414-8ee5-cdaf58ca5f35" headline="Listing: Summary" headlineTag="h2" variation="summary" data-json='{"query":[],"querystring":{"limit":"5","query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Document"]},{"i":"Subject","o":"plone.app.querystring.operation.selection.none","v":["main folder"]}],"sort_on":"getId","sort_order":"ascending"},"styles":{"backgroundColor":"grey"}}' />
+<fields block="24280e07-e962-4414-8ee5-cdaf58ca5f35" data-json='{"query":[]}'>
 
-<block type="gridBlock" headline="Listing: Grid (Teaser)" headlineTag="h2" data-json='{"blocks":[{"@type":"listing","querystring":{"limit":"6","query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Document"]},{"i":"Subject","o":"plone.app.querystring.operation.selection.none","v":["main folder"]}],"sort_on":"getId","sort_order":"ascending"},"variation":"teaser"}],"styles":{"backgroundColor":"transparent"}}' />
+<block type="listing" headline="Listing: Default" variation="default" data-json='{"querystring":{"b_size":"4","limit":"10","query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Document"]},{"i":"Subject","o":"plone.app.querystring.operation.selection.none","v":["main folder"]}],"sort_on":"getId","sort_order":"ascending"},"styles":{"backgroundColor":"transparent"}}' />
 
-<block type="slider" headline="Listing: Image Slider" headlineTag="h2" data-json='{"autoplayDelay":4000,"autoplayEnabled":false,"autoplayJump":false,"slides":[{"@id":"slider-listing-1","@type":"listing","fieldMapping":{"@id":"href","title":"alt","image":"url"},"querystring":{"query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Image"]}],"sort_order":"ascending"},"variation":"image"}],"styles":{}}' />
+<block type="listing" headline="Listing: Summary" variation="summary" data-json='{"querystring":{"limit":"5","query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Document"]},{"i":"Subject","o":"plone.app.querystring.operation.selection.none","v":["main folder"]}],"sort_on":"getId","sort_order":"ascending"},"styles":{"backgroundColor":"grey"}}' />
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="schema">
+</fields>
+
+<block type="gridBlock" headline="Listing: Grid (Teaser)" data-json='{"blocks":[{"@type":"listing","querystring":{"limit":"6","query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Document"]},{"i":"Subject","o":"plone.app.querystring.operation.selection.none","v":["main folder"]}],"sort_on":"getId","sort_order":"ascending"},"variation":"teaser"}],"styles":{"backgroundColor":"transparent"}}' />
+
+<block type="slider" headline="Listing: Image Slider" data-json='{"autoplayDelay":4000,"autoplayEnabled":false,"autoplayJump":false,"slides":[{"@id":"slider-listing-1","@type":"listing","fieldMapping":{"@id":"href","title":"alt","image":"url"},"querystring":{"query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Image"]}],"sort_order":"ascending"},"variation":"image"}],"styles":{}}' />
+
+</fields>
+
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing">
+
+<block type="codeExample" slotId="schema">
 
 ### Schema
 
@@ -153,7 +163,7 @@ Displays a list of content items from a query. The listing block fetches items f
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="json-data">
+<block type="codeExample" slotId="json-data">
 
 ### JSON Block Data
 
@@ -188,7 +198,7 @@ Displays a list of content items from a query. The listing block fetches items f
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-listing" slotId="rendering">
+<block type="codeExample" slotId="rendering">
 
 ### React
 
@@ -215,3 +225,5 @@ Displays a list of content items from a query. The listing block fetches items f
 ```
 
 </block>
+
+</fields>

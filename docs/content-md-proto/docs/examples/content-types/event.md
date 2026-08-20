@@ -48,14 +48,22 @@ blocks-matched: |
   <block type="title" _="${h1}" />
 ---
 
+<fields templateId="/templates/event-view" templateInstanceId="tpl-ev-def">
+
+<fields data-json='{"fixed":true}'>
+
 <block type="title">
 
 # 
 
-<fields templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="title" data-json='{"fixed":true,"readOnly":true}' />
+<fields slotId="title" data-json='{"readOnly":true}' />
 
 </block>
 
-<block type="eventMetadata" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="event-metadata" data-json='{"fixed":true}' />
+<block type="eventMetadata" slotId="event-metadata" />
 
-<block type="slate" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="content" data-json='{"styles":{},"value":[{"children":[{"text":""}],"type":"p"}]}' />
+</fields>
+
+<block type="slate" slotId="content" data-json='{"styles":{},"value":[{"children":[{"text":""}],"type":"p"}]}' />
+
+</fields>

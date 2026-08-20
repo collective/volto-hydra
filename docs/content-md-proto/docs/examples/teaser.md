@@ -67,67 +67,37 @@ A content preview card that links to another page. Selecting a target page via t
 
 <block type="image" url="/docs/images/teaser-edit" alt="The teaser example block being edited in Volto Hydra" align="center" size="l" />
 
-<block type="teaser">
+<fields title="Headline H2" data-json='{"href":[{"@id":"/docs/examples/content-types/page","@type":"Document","Description":"The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.","Title":"Page","getRemoteUrl":null,"hasPreviewImage":true,"head_title":null,"image_field":"preview_image","title":"Page"}]}'>
 
-## [Headline H2](/docs/examples/content-types/page)
+<fields head_title="Head title">
 
-Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum.
+<block type="teaser" data-json='{"description":"Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum.","styles":{"align":"center"}}' />
 
-<fields head_title="Head title" data-json='{"styles":{"align":"center"}}' />
+<fields data-json='{"description":"Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea."}'>
 
-</block>
+<block type="teaser" data-json='{"styles":{"align":"left"}}' />
 
-<block type="teaser">
+<block type="teaser" data-json='{"styles":{"align":"right"}}' />
 
-## [Headline H2](/docs/examples/content-types/page)
+</fields>
 
-Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea.
+</fields>
 
-<fields head_title="Head title" data-json='{"styles":{"align":"left"}}' />
+<block type="teaser" data-json='{"description":"Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum.","styles":{"align":"center","backgroundColor":"grey"}}' />
 
-</block>
+<fields data-json='{"description":"Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea."}'>
 
-<block type="teaser">
+<block type="teaser" data-json='{"styles":{"align":"left","backgroundColor":"grey"}}' />
 
-## [Headline H2](/docs/examples/content-types/page)
+<block type="teaser" data-json='{"styles":{"align":"right","backgroundColor":"grey"}}' />
 
-Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea.
+</fields>
 
-<fields head_title="Head title" data-json='{"styles":{"align":"right"}}' />
+</fields>
 
-</block>
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser">
 
-<block type="teaser">
-
-## [Headline H2](/docs/examples/content-types/page)
-
-Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum.
-
-<fields data-json='{"styles":{"align":"center","backgroundColor":"grey"}}' />
-
-</block>
-
-<block type="teaser">
-
-## [Headline H2](/docs/examples/content-types/page)
-
-Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea.
-
-<fields data-json='{"styles":{"align":"left","backgroundColor":"grey"}}' />
-
-</block>
-
-<block type="teaser">
-
-## [Headline H2](/docs/examples/content-types/page)
-
-Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea.
-
-<fields data-json='{"styles":{"align":"right","backgroundColor":"grey"}}' />
-
-</block>
-
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="schema">
+<block type="codeExample" slotId="schema">
 
 ### Schema
 
@@ -172,7 +142,7 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="json-data">
+<block type="codeExample" slotId="json-data">
 
 ### JSON Block Data
 
@@ -196,7 +166,7 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser" slotId="rendering">
+<block type="codeExample" slotId="rendering">
 
 ### React
 
@@ -223,3 +193,5 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 ```
 
 </block>
+
+</fields>

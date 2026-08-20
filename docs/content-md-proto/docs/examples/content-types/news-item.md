@@ -76,304 +76,168 @@ blocks-matched: |
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
 ---
 
-<block type="dateField" dateField="effective" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="date" data-json='{"showTime":false,"fixed":true,"readOnly":true}' />
+<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def">
+
+<fields data-json='{"fixed":true,"readOnly":true}'>
+
+<block type="dateField" dateField="effective" slotId="date" data-json='{"showTime":false}' />
 
 <block type="title">
 
 # 
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="title" data-json='{"fixed":true,"readOnly":true}' />
+<fields slotId="title" />
 
 </block>
 
-<block type="image" align="wide" image_field="image" size="l" title="Inhaltstyp: Image-1" url="/docs/examples/content-types/image-dark" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"credit":{},"description":"Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren."}' />
+</fields>
+
+<fields slotId="content">
+
+<block type="image" align="wide" image_field="image" size="l" title="Inhaltstyp: Image-1" url="/docs/examples/content-types/image-dark" data-json='{"credit":{},"description":"Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren."}' />
 
 <block type="separator">
 
 ---
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"styles":{"align":"full"}}' />
+<fields data-json='{"styles":{"align":"full"}}' />
 
 </block>
 
-<block type="introduction" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"value":[{"children":[{"text":"Highlight Title H2 "}],"type":"h2"}]}' />
+<block type="introduction" data-json='{"value":[{"children":[{"text":"Highlight Title H2 "}],"type":"h2"}]}' />
+
+</fields>
+
+</fields>
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat.&#x20;
 
+<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content">
+
 <block type="separator">
 
 ---
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"styles":{"align":"full"}}' />
+<fields data-json='{"styles":{"align":"full"}}' />
 
 </block>
-
-<block type="slate">
 
 ## Headline H2&#x20;
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" />
-
-</block>
-
-<block type="slate">
-
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
-
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" />
-
-</block>
-
-<block type="slate">
 
 ### Headline H3&#x20;
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" />
-
-</block>
-
-<block type="slate">
-
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"styles":{}}' />
-
-</block>
-
-<block type="slate">
-
 ### Lists
-
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" />
-
-</block>
-
-<block type="slate">
 
 1. Ordered List Bullett Point One
 2. Ordered List Bullett Point Two
 3. Ordered List Bullett Point Three
 4. Ordered List Bullett Point Four
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" />
-
-</block>
-
-<block type="slate">
-
 - Unordered List Bullett Point One
 - Unordered List Bullett Point Two
 - Unordered List Bullett Point Three
 - Unordered List Bullett Point Four
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" />
-
-</block>
-
-<block type="slate">
-
 ### Inline Styles
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" />
-
-</block>
-
-<block type="slate">
+<fields data-json='{"styles":{}}'>
 
 Text can be **bold** or *Italic*.
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"styles":{}}' />
-
-</block>
-
-<block type="slate">
-
 [Link internal ](/docs/examples/button)
-
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"styles":{}}' />
-
-</block>
-
-<block type="slate">
 
 [Link external](https://www.google.com)
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"styles":{}}' />
-
-</block>
+</fields>
 
 <block type="separator">
 
 ---
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"styles":{"align":"full"}}' />
+<fields data-json='{"styles":{"align":"full"}}' />
 
 </block>
 
-<block type="introduction" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"value":[{"children":[{"text":"Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. "}],"type":"p"}]}' />
+<block type="introduction" data-json='{"value":[{"children":[{"text":"Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. "}],"type":"p"}]}' />
 
 <block type="separator">
 
 ---
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"styles":{"align":"full"}}' />
+<fields data-json='{"styles":{"align":"full"}}' />
 
 </block>
 
-<block type="image" align="center" image_field="image" size="l" title="Image - Light" url="/docs/examples/content-types/image-light" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"credit":{},"description":"Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren."}' />
+<block type="image" align="center" image_field="image" size="l" title="Image - Light" url="/docs/examples/content-types/image-light" data-json='{"credit":{},"description":"Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren."}' />
 
 <block type="separator">
 
 ---
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"styles":{"align":"left"}}' />
+<fields data-json='{"styles":{"align":"left"}}' />
 
 </block>
-
-<block type="slate">
 
 ### Headline H3&#x20;
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" />
-
-</block>
-
-<block type="image" align="right" image_field="image" size="l" title="Image - Light" url="/docs/examples/content-types/image-light" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"credit":{},"description":"Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren."}' />
-
-<block type="slate">
+<block type="image" align="right" image_field="image" size="l" title="Image - Light" url="/docs/examples/content-types/image-light" data-json='{"credit":{},"description":"Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren."}' />
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem iusto odio dignissim qui blandit praesent luptatum zzril delenit auguevel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit luptatum zzril delenit auguevel eum iriure dolor in hendrerit in vulputate velit esse&#x20;
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" />
-
-</block>
-
-<block type="image" align="left" image_field="image" size="l" title="Image - Light" url="/docs/examples/content-types/image-light" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"credit":{},"description":"Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren."}' />
-
-<block type="slate">
+<block type="image" align="left" image_field="image" size="l" title="Image - Light" url="/docs/examples/content-types/image-light" data-json='{"credit":{},"description":"Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren."}' />
 
 ### Headline H3&#x20;
-
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" />
-
-</block>
-
-<block type="slate">
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem iusto odio dignissim qui blandit praesent luptatum zzril delenit auguevel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit&#x20;
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"styles":{}}' />
-
-</block>
-
-<block type="slate">
-
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
-
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" />
-
-</block>
 
 <block type="separator">
 
 ---
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"styles":{"align":"left"}}' />
+<fields data-json='{"styles":{"align":"left"}}' />
 
 </block>
 
-<block type="image" align="left" image_field="image" size="m" title="Image - Light" url="/docs/examples/content-types/image-light" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"credit":{},"description":"Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren.","styles":{"size:noprefix":"medium"}}' />
-
-<block type="slate">
+<block type="image" align="left" image_field="image" size="m" title="Image - Light" url="/docs/examples/content-types/image-light" data-json='{"credit":{},"description":"Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren.","styles":{"size:noprefix":"medium"}}' />
 
 ### Headline H3&#x20;
-
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" />
-
-</block>
-
-<block type="slate">
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem iusto odio dignissim qui blandit praesent luptatum zzril delenit auguevel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum&#x20;
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" />
-
-</block>
-
-<block type="image" align="right" image_field="image" size="m" title="Image - Light" url="/docs/examples/content-types/image-light" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"credit":{},"description":"Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren.","styles":{"size:noprefix":"medium"}}' />
-
-<block type="slate">
+<block type="image" align="right" image_field="image" size="m" title="Image - Light" url="/docs/examples/content-types/image-light" data-json='{"credit":{},"description":"Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren.","styles":{"size:noprefix":"medium"}}' />
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem iusto odio dignissim qui blandit praesent luptatum zzril delenit auguevel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu luptatum zzril delenit auguevel eum iriure&#x20;
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" />
-
-</block>
-
-<block type="slate">
-
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
-
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" />
-
-</block>
 
 <block type="separator">
 
 ---
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"styles":{"align":"left"}}' />
+<fields data-json='{"styles":{"align":"left"}}' />
 
 </block>
 
-<block type="image" align="left" image_field="image" size="s" title="Image - Light" url="/docs/examples/content-types/image-light" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"credit":{},"description":"Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren.","styles":{"size:noprefix":"small"}}' />
-
-<block type="slate">
+<block type="image" align="left" image_field="image" size="s" title="Image - Light" url="/docs/examples/content-types/image-light" data-json='{"credit":{},"description":"Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren.","styles":{"size:noprefix":"small"}}' />
 
 ### Headline H3&#x20;
-
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" />
-
-</block>
-
-<block type="slate">
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem iusto odio dignissim qui blandit praesent ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo  luptatum zzril delenit auguevel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu luptatum zzril delenit auguevel eum iriure dolor in hendrerit in&#x20;
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" />
-
-</block>
-
-<block type="slate">
-
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue&#x20;
-
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" />
-
-</block>
-
-<block type="slate">
 
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" />
-
-</block>
-
-<block type="image" align="right" image_field="image" size="s" title="Image - Light" url="/docs/examples/content-types/image-light" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"credit":{},"description":"Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren.","styles":{"size:noprefix":"small"}}' />
-
-<block type="slate">
+<block type="image" align="right" image_field="image" size="s" title="Image - Light" url="/docs/examples/content-types/image-light" data-json='{"credit":{},"description":"Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren.","styles":{"size:noprefix":"small"}}' />
 
 ### Headline H3&#x20;
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" />
-
-</block>
-
-<block type="slate">
-
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem iusto odio dignissim qui blandit praesent ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo  luptatum zzril delenit auguevel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu luptatum zzril delenit auguevel eum iriure dolor in hendrerit in. Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem iusto odio dignissim qui blandit praesent ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo  luptatum zzril delenit auguevel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu luptatum zzril delenit auguevel eum iriure dolor in hendrerit in.
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"styles":{}}' />
-
-</block>
+</fields>

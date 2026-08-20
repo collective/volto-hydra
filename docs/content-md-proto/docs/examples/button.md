@@ -145,15 +145,19 @@ A call-to-action button with an editable label and link.
 
 </block>
 
+<fields data-json='{"styles":{}}'>
+
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
 
 <block type="button">
 
 [Button](/)
 
-<fields inneralign="left" data-json='{"styles":{}}' />
+<fields inneralign="left" />
 
 </block>
+
+</fields>
 
 <block type="separator">
 
@@ -163,15 +167,19 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidu
 
 </block>
 
+<fields data-json='{"styles":{}}'>
+
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
 
 <block type="button">
 
 [Button](/)
 
-<fields inneralign="center" data-json='{"styles":{}}' />
+<fields inneralign="center" />
 
 </block>
+
+</fields>
 
 <block type="separator">
 
@@ -181,15 +189,19 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 </block>
 
+<fields data-json='{"styles":{}}'>
+
 Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
 
 <block type="button">
 
 [Button](/)
 
-<fields inneralign="right" data-json='{"styles":{}}' />
+<fields inneralign="right" />
 
 </block>
+
+</fields>
 
 <block type="heading" alignment="left" heading="Button Block" tag="h2" data-json='{"styles":{"backgroundColor":"grey"}}' />
 
@@ -313,7 +325,9 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidu
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-button" slotId="schema">
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-button">
+
+<block type="codeExample" slotId="schema">
 
 ### Schema
 
@@ -357,7 +371,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidu
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-button" slotId="json-data">
+<block type="codeExample" slotId="json-data">
 
 ### JSON Block Data
 
@@ -375,7 +389,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidu
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-button" slotId="rendering">
+<block type="codeExample" slotId="rendering">
 
 ### React
 
@@ -402,3 +416,5 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidu
 ```
 
 </block>
+
+</fields>

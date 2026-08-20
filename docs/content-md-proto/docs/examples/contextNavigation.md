@@ -51,7 +51,9 @@ blocks-matched: |
 
 A vertical navigation list for grouped pages — a left sidebar on desktop and a collapsible disclosure at the top on mobile. Each row is a navItem (hand-added link) and/or a listing (auto-populated from a path query). The active link is detected from the current URL and gets aria-current="page" plus a .current class. Named after Plone's @contextnavigation endpoint, which serves the same purpose.
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-contextNavigation" slotId="schema">
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-contextNavigation">
+
+<block type="codeExample" slotId="schema">
 
 ### Schema
 
@@ -104,7 +106,7 @@ A vertical navigation list for grouped pages — a left sidebar on desktop and a
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-contextNavigation" slotId="json-data">
+<block type="codeExample" slotId="json-data">
 
 ### JSON Block Data
 
@@ -196,7 +198,7 @@ A vertical navigation list for grouped pages — a left sidebar on desktop and a
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-contextNavigation" slotId="rendering">
+<block type="codeExample" slotId="rendering">
 
 ### React
 
@@ -223,3 +225,5 @@ A vertical navigation list for grouped pages — a left sidebar on desktop and a
 ```
 
 </block>
+
+</fields>

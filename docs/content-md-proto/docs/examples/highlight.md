@@ -67,17 +67,23 @@ A prominent content section with a background image, overlay, title, rich text b
 
 <block type="image" url="/docs/images/highlight-edit" alt="The highlight example block being edited in Volto Hydra" align="center" size="l" />
 
-<block type="highlight" title="Highlight-Block" cta_title="Button" image="/docs/examples/content-types/image/@@images/image" data-json='{"styles":{"descriptionColor":"highlight-custom-color-1"},"description":[{"children":[{"text":"Lorem ipsum dolor sit amet, "},{"children":[{"text":"consetetur sadipscing"}],"data":{"url":"/docs/examples/button"},"type":"link"},{"text":" elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt."}],"type":"p"}],"cta_link":[{"@id":"/docs/examples/content-types/page"}]}' />
+<fields title="Highlight-Block" cta_title="Button" image="/docs/examples/content-types/image/@@images/image" data-json='{"description":[{"children":[{"text":"Lorem ipsum dolor sit amet, "},{"children":[{"text":"consetetur sadipscing"}],"data":{"url":"/docs/examples/button"},"type":"link"},{"text":" elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt."}],"type":"p"}],"cta_link":[{"@id":"/docs/examples/content-types/page"}]}'>
 
-<block type="highlight" title="Highlight-Block" cta_title="Button" image="/docs/examples/content-types/image/@@images/image" data-json='{"styles":{"descriptionColor":"highlight-custom-color-2"},"description":[{"children":[{"text":"Lorem ipsum dolor sit amet, "},{"children":[{"text":"consetetur sadipscing"}],"data":{"url":"/docs/examples/button"},"type":"link"},{"text":" elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt."}],"type":"p"}],"cta_link":[{"@id":"/docs/examples/content-types/page"}]}' />
+<block type="highlight" data-json='{"styles":{"descriptionColor":"highlight-custom-color-1"}}' />
 
-<block type="highlight" title="Highlight-Block" cta_title="Button" image="/docs/examples/content-types/image/@@images/image" data-json='{"styles":{"descriptionColor":"highlight-custom-color-3"},"description":[{"children":[{"text":"Lorem ipsum dolor sit amet, "},{"children":[{"text":"consetetur sadipscing"}],"data":{"url":"/docs/examples/button"},"type":"link"},{"text":" elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt."}],"type":"p"}],"cta_link":[{"@id":"/docs/examples/content-types/page"}]}' />
+<block type="highlight" data-json='{"styles":{"descriptionColor":"highlight-custom-color-2"}}' />
 
-<block type="highlight" title="Highlight-Block" cta_title="Button" image="/docs/examples/content-types/image/@@images/image" data-json='{"styles":{"descriptionColor":"highlight-custom-color-4"},"description":[{"children":[{"text":"Lorem ipsum dolor sit amet, "},{"children":[{"text":"consetetur sadipscing"}],"data":{"url":"/docs/examples/button"},"type":"link"},{"text":" elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt."}],"type":"p"}],"cta_link":[{"@id":"/docs/examples/content-types/page"}]}' />
+<block type="highlight" data-json='{"styles":{"descriptionColor":"highlight-custom-color-3"}}' />
 
-<block type="highlight" title="Highlight-Block" cta_title="Button" image="/docs/examples/content-types/image/@@images/image" data-json='{"styles":{"descriptionColor":"highlight-custom-color-5"},"description":[{"children":[{"text":"Lorem ipsum dolor sit amet, "},{"children":[{"text":"consetetur sadipscing"}],"data":{"url":"/docs/examples/button"},"type":"link"},{"text":" elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt."}],"type":"p"}],"cta_link":[{"@id":"/docs/examples/content-types/page"}]}' />
+<block type="highlight" data-json='{"styles":{"descriptionColor":"highlight-custom-color-4"}}' />
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-highlight" slotId="schema">
+<block type="highlight" data-json='{"styles":{"descriptionColor":"highlight-custom-color-5"}}' />
+
+</fields>
+
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-highlight">
+
+<block type="codeExample" slotId="schema">
 
 ### Schema
 
@@ -113,7 +119,7 @@ A prominent content section with a background image, overlay, title, rich text b
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-highlight" slotId="json-data">
+<block type="codeExample" slotId="json-data">
 
 ### JSON Block Data
 
@@ -143,7 +149,7 @@ A prominent content section with a background image, overlay, title, rich text b
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-highlight" slotId="rendering">
+<block type="codeExample" slotId="rendering">
 
 ### React
 
@@ -170,3 +176,5 @@ A prominent content section with a background image, overlay, title, rich text b
 ```
 
 </block>
+
+</fields>

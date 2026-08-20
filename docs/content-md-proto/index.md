@@ -77,6 +77,8 @@ blobs:
     exclude_from_nav: false
 ---
 
+<fields data-json='{"styles":{}}'>
+
 <block type="slate">
 
 # Design-system-first page building
@@ -84,6 +86,8 @@ blobs:
 </block>
 
 Strike the right balance for your site. Make it easy for editors to create engagement — while staying compliant.
+
+</fields>
 
 <block type="slate">
 
@@ -93,9 +97,13 @@ Strike the right balance for your site. Make it easy for editors to create engag
 
 </block>
 
+<fields data-json='{"styles":{}}'>
+
 ## Why Inka
 
 Compliance or engagement is a false choice. You decide where the dial sits for each site.
+
+</fields>
 
 <block type="image" align="center" size="l" url="/images/quadrant/@@download/image/quadrant.svg" />
 
@@ -400,7 +408,9 @@ export const POST = async ({ request }) => {
 }
 ```
 
-<block type="slider" data-json='{"autoplayDelay":4000,"autoplayEnabled":false,"autoplayJump":false,"slides":[{"@id":"b09f39ea-36c3-4f09-9a18-30aef3565a22","buttonText":"See all Content Types","description":"You can log in and experience currently working features (Volto like but on any frontend)","flagAlign":"left","head_title":"Welcome to Inka","href":[{"@id":"/docs/examples/content-types","@type":"Document","Description":"This section has a sample of content types available in this site.","Title":"Content Types","hasPreviewImage":null,"head_title":null,"image_field":"image","title":"Content Types"}],"preview_image":[{"@id":"/images/penguin1.jpg","@type":"Image","CreationDate":"2024-03-07T12:29:54+01:00","Creator":"admin","Date":"2024-03-07T12:30:08+01:00","Description":"","EffectiveDate":"None","ExpirationDate":"None","ModificationDate":"2024-03-07T12:30:08+01:00","Subject":[],"Title":"testimage","Type":"Bild","UID":"9abc1a813bcf46388e565b277bd8c6bf","author_name":null,"cmf_uid":null,"commentators":[],"created":"2024-03-07T11:29:54+00:00","description":"","effective":"1969-12-30T23:00:00+00:00","end":null,"exclude_from_nav":false,"expires":"2499-12-30T23:00:00+00:00","getIcon":true,"getId":"testimage.jpg","getObjSize":"2.0 MB","getPath":"/Plone/testimage.jpg","getRemoteUrl":null,"getURL":"http://localhost:3000/testimage.jpg","hasPreviewImage":null,"head_title":null,"id":"testimage.jpg","image_field":"image","in_response_to":null,"is_folderish":false,"last_comment_date":null,"listCreators":["admin"],"location":null,"mime_type":"image/jpeg","modified":"2024-03-07T11:30:08+00:00","nav_title":null,"portal_type":"Image","review_state":null,"start":null,"sync_uid":null,"title":"testimage","total_comments":0,"type_title":"Bild"}],"title":"You can use this site to test Inka"},{"@id":"ef8ceecc-7c1d-4e0a-9b67-a56e7d03f6e3","buttonText":"See all blocks","description":"Frontend freedom makes it easy to create beautiful and fast experiences","flagAlign":"right","head_title":"Welcome to Inka&#39;s many frontends","hideButton":false,"href":[{"@id":"/docs/examples","@type":"Document","Description":"","Title":"Blocks","hasPreviewImage":null,"head_title":null,"image_field":"","title":"Blocks"}],"preview_image":[{"@id":"/images/penguin2.jpg","@type":"Image","CreationDate":"2024-03-08T13:05:46+01:00","Creator":"admin","Date":"2024-03-08T13:05:46+01:00","Description":"","EffectiveDate":"None","ExpirationDate":"None","ModificationDate":"2024-03-08T13:05:46+01:00","Subject":[],"Title":"penguin2.jpg","Type":"Bild","UID":"05bace45294c45d5ab93de883e7ce702","author_name":null,"cmf_uid":null,"commentators":[],"created":"2024-03-08T12:05:46+00:00","description":"","effective":"1969-12-30T23:00:00+00:00","end":null,"exclude_from_nav":false,"expires":"2499-12-30T23:00:00+00:00","getIcon":true,"getId":"penguin2.jpg","getObjSize":"2.8 MB","getPath":"/Plone/images/penguin2.jpg","getRemoteUrl":null,"getURL":"http://localhost:3000/images/penguin2.jpg","hasPreviewImage":null,"head_title":null,"id":"penguin2.jpg","image_field":"image","in_response_to":null,"is_folderish":false,"last_comment_date":null,"listCreators":["admin"],"location":null,"mime_type":"image/jpeg","modified":"2024-03-08T12:05:46+00:00","nav_title":null,"portal_type":"Image","review_state":null,"start":null,"sync_uid":null,"title":"penguin2.jpg","total_comments":0,"type_title":"Bild"}],"title":"You are enjoying one of many possible frontends"}],"styles":{}}' />
+<fields data-json='{"styles":{}}'>
+
+<block type="slider" data-json='{"autoplayDelay":4000,"autoplayEnabled":false,"autoplayJump":false,"slides":[{"@id":"b09f39ea-36c3-4f09-9a18-30aef3565a22","buttonText":"See all Content Types","description":"You can log in and experience currently working features (Volto like but on any frontend)","flagAlign":"left","head_title":"Welcome to Inka","href":[{"@id":"/docs/examples/content-types","@type":"Document","Description":"This section has a sample of content types available in this site.","Title":"Content Types","hasPreviewImage":null,"head_title":null,"image_field":"image","title":"Content Types"}],"preview_image":[{"@id":"/images/penguin1.jpg","@type":"Image","CreationDate":"2024-03-07T12:29:54+01:00","Creator":"admin","Date":"2024-03-07T12:30:08+01:00","Description":"","EffectiveDate":"None","ExpirationDate":"None","ModificationDate":"2024-03-07T12:30:08+01:00","Subject":[],"Title":"testimage","Type":"Bild","UID":"9abc1a813bcf46388e565b277bd8c6bf","author_name":null,"cmf_uid":null,"commentators":[],"created":"2024-03-07T11:29:54+00:00","description":"","effective":"1969-12-30T23:00:00+00:00","end":null,"exclude_from_nav":false,"expires":"2499-12-30T23:00:00+00:00","getIcon":true,"getId":"testimage.jpg","getObjSize":"2.0 MB","getPath":"/Plone/testimage.jpg","getRemoteUrl":null,"getURL":"http://localhost:3000/testimage.jpg","hasPreviewImage":null,"head_title":null,"id":"testimage.jpg","image_field":"image","in_response_to":null,"is_folderish":false,"last_comment_date":null,"listCreators":["admin"],"location":null,"mime_type":"image/jpeg","modified":"2024-03-07T11:30:08+00:00","nav_title":null,"portal_type":"Image","review_state":null,"start":null,"sync_uid":null,"title":"testimage","total_comments":0,"type_title":"Bild"}],"title":"You can use this site to test Inka"},{"@id":"ef8ceecc-7c1d-4e0a-9b67-a56e7d03f6e3","buttonText":"See all blocks","description":"Frontend freedom makes it easy to create beautiful and fast experiences","flagAlign":"right","head_title":"Welcome to Inka&#39;s many frontends","hideButton":false,"href":[{"@id":"/docs/examples","@type":"Document","Description":"","Title":"Blocks","hasPreviewImage":null,"head_title":null,"image_field":"","title":"Blocks"}],"preview_image":[{"@id":"/images/penguin2.jpg","@type":"Image","CreationDate":"2024-03-08T13:05:46+01:00","Creator":"admin","Date":"2024-03-08T13:05:46+01:00","Description":"","EffectiveDate":"None","ExpirationDate":"None","ModificationDate":"2024-03-08T13:05:46+01:00","Subject":[],"Title":"penguin2.jpg","Type":"Bild","UID":"05bace45294c45d5ab93de883e7ce702","author_name":null,"cmf_uid":null,"commentators":[],"created":"2024-03-08T12:05:46+00:00","description":"","effective":"1969-12-30T23:00:00+00:00","end":null,"exclude_from_nav":false,"expires":"2499-12-30T23:00:00+00:00","getIcon":true,"getId":"penguin2.jpg","getObjSize":"2.8 MB","getPath":"/Plone/images/penguin2.jpg","getRemoteUrl":null,"getURL":"http://localhost:3000/images/penguin2.jpg","hasPreviewImage":null,"head_title":null,"id":"penguin2.jpg","image_field":"image","in_response_to":null,"is_folderish":false,"last_comment_date":null,"listCreators":["admin"],"location":null,"mime_type":"image/jpeg","modified":"2024-03-08T12:05:46+00:00","nav_title":null,"portal_type":"Image","review_state":null,"start":null,"sync_uid":null,"title":"penguin2.jpg","total_comments":0,"type_title":"Bild"}],"title":"You are enjoying one of many possible frontends"}]}' />
 
 <block type="gridBlock">
 
@@ -412,6 +422,8 @@ This site uses some recommended **add-ons**: Some blocks that are suitable to be
 
 </block>
 
+</fields>
+
 <block type="separator">
 
 ---
@@ -420,12 +432,16 @@ This site uses some recommended **add-ons**: Some blocks that are suitable to be
 
 </block>
 
+<fields data-json='{"styles":{}}'>
+
 ## View this site in other frameworks
 
 - [NUXT.js Example](https://hydra-nuxt-flowbrite.netlify.app/)
 - [Framework7 Example (mobile app)](https://hydra-vue-f7.netlify.app/)
 - [Next.js Example](https://hydra-blogsite-nextjs.vercel.app)
 - [Edit either of these frontends: hydra.pretagov.com](https://hydra.pretagov.com)
+
+</fields>
 
 ## Find out more about Inka
 

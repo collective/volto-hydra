@@ -53,7 +53,9 @@ Renders the current page's related items relation field (default relatedItems). 
 
 <block type="relatedItemsListing" relationField="relatedItems" variation="summary" />
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="schema">
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing">
+
+<block type="codeExample" slotId="schema">
 
 ### Schema
 
@@ -101,7 +103,7 @@ Renders the current page's related items relation field (default relatedItems). 
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="json-data">
+<block type="codeExample" slotId="json-data">
 
 ### JSON Block Data
 
@@ -115,15 +117,9 @@ Renders the current page's related items relation field (default relatedItems). 
 
 </block>
 
-<block type="slate">
+<fields slotId="rendering">
 
 This block has no bespoke renderer. Add its fetcher to your fetchItems map (keyed by @type) and expandListingBlocks expands it in any region you render — the same seam that powers [listings](/docs/listings) and other collection blocks. See [Custom Blocks](/docs/custom-blocks) to define the block type. Only the fetcher below is block-specific.
-
-<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="rendering" />
-
-</block>
-
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="rendering">
 
 ### Fetcher
 
@@ -138,9 +134,7 @@ export function relatedItemsFetcher({ apiUrl, contextPath }) {
 }
 ```
 
-</block>
-
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing" slotId="rendering">
+<block type="codeExample">
 
 ### Render
 
@@ -159,3 +153,7 @@ items.forEach((item) => renderBlock(item)); // your normal per-block renderer
 ```
 
 </block>
+
+</fields>
+
+</fields>

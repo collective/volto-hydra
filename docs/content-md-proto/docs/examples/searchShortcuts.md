@@ -53,7 +53,9 @@ Renders a set of values as links into a faceted search — a "tag cloud" of shor
 
 <block type="searchShortcuts" index="Subject" searchUrl="/search" variation="default" />
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-searchShortcuts" slotId="schema">
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-searchShortcuts">
+
+<block type="codeExample" slotId="schema">
 
 ### Schema
 
@@ -115,7 +117,7 @@ Renders a set of values as links into a faceted search — a "tag cloud" of shor
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-searchShortcuts" slotId="json-data">
+<block type="codeExample" slotId="json-data">
 
 ### JSON Block Data
 
@@ -131,15 +133,9 @@ Renders a set of values as links into a faceted search — a "tag cloud" of shor
 
 </block>
 
-<block type="slate">
+<fields slotId="rendering">
 
 This block has no bespoke renderer. Add its fetcher to your fetchItems map (keyed by @type) and expandListingBlocks expands it in any region you render — the same seam that powers [listings](/docs/listings) and other collection blocks. See [Custom Blocks](/docs/custom-blocks) to define the block type. Only the fetcher below is block-specific.
-
-<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-searchShortcuts" slotId="rendering" />
-
-</block>
-
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-searchShortcuts" slotId="rendering">
 
 ### Fetcher
 
@@ -168,9 +164,7 @@ export function searchShortcutsFetcher({ apiUrl, contextPath }) {
 }
 ```
 
-</block>
-
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-searchShortcuts" slotId="rendering">
+<block type="codeExample">
 
 ### Render
 
@@ -189,3 +183,7 @@ items.forEach((item) => renderBlock(item)); // your normal per-block renderer
 ```
 
 </block>
+
+</fields>
+
+</fields>

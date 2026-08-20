@@ -38,24 +38,32 @@ blocks-matched: |
   <block type="title" _="${h1}" />
 ---
 
-<block type="dateField" dateField="effective" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="date" data-json='{"showTime":false,"fixed":true,"readOnly":true}' />
+<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def">
+
+<fields data-json='{"fixed":true,"readOnly":true}'>
+
+<block type="dateField" dateField="effective" slotId="date" data-json='{"showTime":false}' />
 
 <block type="title">
 
 # 
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="title" data-json='{"fixed":true,"readOnly":true}' />
+<fields slotId="title" />
 
 </block>
 
-<block type="introduction" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"value":[{"children":[{"text":"Cinnamon skinny medium panna americano spice affogato froth frappuccino that."}],"type":"p"}]}' />
+</fields>
 
-<block type="leadimage" align="center" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="lead-image" data-json='{"fixed":true}' />
+<block type="introduction" slotId="content" data-json='{"value":[{"children":[{"text":"Cinnamon skinny medium panna americano spice affogato froth frappuccino that."}],"type":"p"}]}' />
+
+<block type="leadimage" align="center" slotId="lead-image" data-json='{"fixed":true}' />
 
 <block type="slate">
 
 Ristretto so chicory skinny ristretto au decaffeinated sugar that spoon shop crema ut pot lungo. Flavour that milk brewed flavour whipped kopi black and robusta. Bar sugar americano eu froth variety brewed acerbic steamed. Aroma est milk doppio frappuccino half cream filter french froth luwak. Acerbic plunger au barista flavour in froth trade.
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"styles":{}}' />
+<fields slotId="content" data-json='{"styles":{}}' />
 
 </block>
+
+</fields>

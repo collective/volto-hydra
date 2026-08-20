@@ -16,16 +16,24 @@ blocks-matched: |
   <block type="title" _="${h1}" />
 ---
 
-<block type="dateField" dateField="effective" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="date" data-json='{"showTime":false,"fixed":true}' />
+<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def">
+
+<fields data-json='{"fixed":true}'>
+
+<block type="dateField" dateField="effective" slotId="date" data-json='{"showTime":false}' />
 
 <block type="title">
 
 # 
 
-<fields templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="title" data-json='{"fixed":true}' />
+<fields slotId="title" />
 
 </block>
 
-<block type="leadimage" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="lead-image" data-json='{"fixed":true}' />
+<block type="leadimage" slotId="lead-image" />
 
-<block type="slate" templateId="/templates/newsitem-view" templateInstanceId="tpl-ni-def" slotId="content" data-json='{"value":[{"type":"p","children":[{"text":""}]}]}' />
+</fields>
+
+<block type="slate" slotId="content" data-json='{"value":[{"type":"p","children":[{"text":""}]}]}' />
+
+</fields>

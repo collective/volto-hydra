@@ -72,6 +72,10 @@ blobs:
 
 # 
 
-<block type="listing" headlineTag="h2" variation="default" data-json='{"styles":{}}' />
+<fields data-json='{"styles":{}}'>
 
-<block type="slate" data-json='{"styles":{},"value":[{"children":[{"text":""}],"type":"p"}]}' />
+<block type="listing" headlineTag="h2" variation="default" />
+
+<block type="slate" data-json='{"value":[{"children":[{"text":""}],"type":"p"}]}' />
+
+</fields>

@@ -76,7 +76,9 @@ blocks-tagged: |
 
 # 
 
-<block type="heading" alignment="left" heading="Heading (H2, 33/42px)" tag="h2" data-json='{"styles":{}}' />
+<fields data-json='{"styles":{}}'>
+
+<block type="heading" alignment="left" heading="Heading (H2, 33/42px)" tag="h2" />
 
 <block type="gridBlock">
 
@@ -95,6 +97,8 @@ blocks-tagged: |
 ## Text Heading H2 (H2, 30/36px)
 
 Paragraph (p, 18px/24px)
+
+</fields>
 
 - unordered list
 - unordered list
@@ -120,7 +124,9 @@ Paragraph text (p, 24/33px) -> Lorem ipsum dolor sit amet, consetetur sadipscing
 
 <block type="image" align="center" image_field="image" size="l" title="Caption Title (14/18px). Image" url="/docs/examples/content-types/image-dark" data-json='{"allow_image_download":false,"credit":{},"description":"Caption Description (14/18px). The Image content type can be used to upload an image in various formats (JPG, GIF, PNG, SVG). The uploaded image should always have a high resolution so that it can be used flexibly, for example as a banner image. Plone automatically delivers the images in the best scaling, so there is no need to scale images down manually."}' />
 
-<block type="button" inneralign="left" title="Button text (button, 18/24px)" data-json='{"styles":{}}' />
+<fields data-json='{"styles":{}}'>
+
+<block type="button" inneralign="left" title="Button text (button, 18/24px)" />
 
 <block type="gridBlock">
 
@@ -136,7 +142,7 @@ Paragraph text (p, 24/33px) -> Lorem ipsum dolor sit amet, consetetur sadipscing
 
 </block>
 
-<block type="toc" variation="default" data-json='{"levels":["h2","h3"],"styles":{}}' />
+<block type="toc" variation="default" data-json='{"levels":["h2","h3"]}' />
 
 <block type="slateTable" table.celled table.fixed>
 
@@ -145,5 +151,7 @@ Paragraph text (p, 24/33px) -> Lorem ipsum dolor sit amet, consetetur sadipscing
 | Table cell (td p, 18/24px) | Table cell (td p, 18/24px) |
 
 </block>
+
+</fields>
 
 <block type="slate" data-json='{"value":[{"children":[{"text":""}],"type":"p"}]}' />

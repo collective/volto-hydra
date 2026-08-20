@@ -47,7 +47,9 @@ blocks-matched: |
 
 A horizontal multi-column container. The block has one slot — columns — restricted to column children, capped at four. Each column is itself a container holding any of its allowed inner block types (slate, image, …).
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-columns" slotId="schema">
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-columns">
+
+<block type="codeExample" slotId="schema">
 
 ### Schema
 
@@ -93,7 +95,7 @@ A horizontal multi-column container. The block has one slot — columns — rest
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-columns" slotId="json-data">
+<block type="codeExample" slotId="json-data">
 
 ### JSON Block Data
 
@@ -162,7 +164,7 @@ A horizontal multi-column container. The block has one slot — columns — rest
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-columns" slotId="rendering">
+<block type="codeExample" slotId="rendering">
 
 ### React
 
@@ -189,3 +191,5 @@ A horizontal multi-column container. The block has one slot — columns — rest
 ```
 
 </block>
+
+</fields>

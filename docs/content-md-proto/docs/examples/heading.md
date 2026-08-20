@@ -125,7 +125,9 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="schema">
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading">
+
+<block type="codeExample" slotId="schema">
 
 ### Schema
 
@@ -175,7 +177,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="json-data">
+<block type="codeExample" slotId="json-data">
 
 ### JSON Block Data
 
@@ -189,7 +191,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading" slotId="rendering">
+<block type="codeExample" slotId="rendering">
 
 ### React
 
@@ -216,3 +218,5 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 ```
 
 </block>
+
+</fields>

@@ -47,26 +47,32 @@ blocks-matched: |
   <block type="title" _="${h1}" />
 ---
 
+<fields templateId="/templates/event-view" templateInstanceId="tpl-ev-def">
+
 <block type="title">
 
 # 
 
-<fields templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="title" data-json='{"fixed":true,"readOnly":true}' />
+<fields slotId="title" data-json='{"fixed":true,"readOnly":true}' />
 
 </block>
 
-<block type="introduction" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="content" data-json='{"value":[{"children":[{"text":"Wings fair wings doppio sit irish americano galão eu variety affogato."}],"type":"p"}]}' />
+<fields slotId="content">
 
-<block type="slate" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="content" data-json='{"styles":{},"value":[{"children":[{"text":""}],"type":"p"}]}' />
+<block type="introduction" data-json='{"value":[{"children":[{"text":"Wings fair wings doppio sit irish americano galão eu variety affogato."}],"type":"p"}]}' />
 
-<block type="slate">
+<fields data-json='{"styles":{}}'>
+
+<block type="slate" data-json='{"value":[{"children":[{"text":""}],"type":"p"}]}' />
 
 Percolator and extraction press luwak press aroma foam eu panna spoon espresso iced sit americano. Saucer beans kopi froth to au lait dark panna café iced cup instant au lait. Id origin decaffeinated aromatic in rich sit mocha caramelization café doppio spoon. Strong steamed crema mountain ristretto coffee sweet black aromatic white beans shop. Id pumpkin extraction robusta est white extra organic panna as turkish.
 
-<fields templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="content" data-json='{"styles":{}}' />
+</fields>
 
-</block>
+</fields>
 
-<block type="eventMetadata" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="event-metadata" data-json='{"fixed":true,"required":true}' />
+<block type="eventMetadata" slotId="event-metadata" data-json='{"fixed":true,"required":true}' />
 
-<block type="slate" templateId="/templates/event-view" templateInstanceId="tpl-ev-def" slotId="content" />
+<block type="slate" slotId="content" />
+
+</fields>

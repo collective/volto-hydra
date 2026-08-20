@@ -68,7 +68,9 @@ A responsive grid that lays out child blocks in equal-width cells. The block use
 
 <block type="slate" data-json='{"value":[{"children":[{"text":""}],"type":"p"}]}' />
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="schema">
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid">
+
+<block type="codeExample" slotId="schema">
 
 ### Schema
 
@@ -91,7 +93,7 @@ A responsive grid that lays out child blocks in equal-width cells. The block use
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="json-data">
+<block type="codeExample" slotId="json-data">
 
 ### JSON Block Data
 
@@ -125,7 +127,7 @@ A responsive grid that lays out child blocks in equal-width cells. The block use
 
 </block>
 
-<block type="codeExample" templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid" slotId="rendering">
+<block type="codeExample" slotId="rendering">
 
 ### React
 
@@ -152,3 +154,5 @@ A responsive grid that lays out child blocks in equal-width cells. The block use
 ```
 
 </block>
+
+</fields>
