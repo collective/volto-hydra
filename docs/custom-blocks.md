@@ -162,6 +162,48 @@ Child block types (like `slide` above) must be defined at the top level of `bloc
 
 **A `widget: 'slate'` field holds one top-level node.** A slate field — like `description` on the `slide` above — stores a single paragraph, heading, or list, not a document of several. Pasting or typing multiple paragraphs into it flattens them back into one node; only the built-in `slate` *block* splits multi-node content into separate blocks. Design slate fields for single-node content, and use a `blocks_layout`/`object_list` of `slate` blocks when you need several. See [Visual Editing › One top-level node per slate field](visual-editing.md#one-top-level-node-per-slate-field).
 
+## Inline-editable fields: annotation and schema must agree
+
+A field is inline-editable only when BOTH halves are in place. They are easy to
+get out of step, because each half looks fine on its own.
+
+**1. Your markup renders something to click**, annotated with the field name:
+
+```html
+<h3 data-edit-text="title">Sydney Opera House</h3>
+```
+
+An *empty* field still has to render its element in edit mode — the editor
+reveals empty fields by marking them `data-empty` and drawing a "Click to edit"
+placeholder, and it can only mark an element that exists. A field that renders
+nothing when empty can never be filled in on the canvas. (In view mode, render
+nothing — the annotations are edit-mode only.)
+
+Text with no box on screen is not inline-editable at all: a `.sr-only` element
+is clipped to 1×1, so there is nothing to put a cursor in. Leave it unannotated
+and let the sidebar edit it.
+
+**2. Your schema declares that field as text.** The bridge will not make a field
+editable unless its schema says it is one:
+
+```javascript
+properties: {
+    title:       { title: 'Title', type: 'string' },
+    description: { title: 'Description', type: 'string', widget: 'textarea' },
+    body:        { title: 'Body', widget: 'slate' },
+}
+```
+
+`type` is the DATA type (`string`, `array`, `object`, `boolean`) and `widget` is
+the editor. Do not put a widget name in `type` — `{ type: 'textarea' }` is not a
+textarea field, and the bridge will silently refuse to make it editable, with no
+error and no clue in the DOM. Either declare both (`type: 'string', widget:
+'textarea'`) or the widget alone.
+
+`block-sanity` checks both halves: every schema text field visible on screen has
+to be annotated, and every annotated field has to become editable and take the
+caret when clicked.
+
 ## Schema Enhancers
 
 Schema enhancers modify block schemas dynamically:
