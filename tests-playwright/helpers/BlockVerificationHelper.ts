@@ -71,6 +71,24 @@ export async function checkDataEditTextClicks(
     const readonly = await el.evaluate((node) => !!node.closest('[data-block-readonly]'));
     if (readonly) continue;
 
+    // A field inside a collapsed tab / accordion panel has no box, so clicking
+    // it would just time out. That is not "uneditable" — it is content the
+    // author reveals first, and the frontend already says how: the container
+    // advertises the uids it can reveal on `data-block-selector` (the tab's nav
+    // link, the accordion header), which is the same handle the bridge clicks
+    // when the admin selects a hidden block. Use it here rather than teaching
+    // this helper about any particular component's markup.
+    await revealBlock(iframe, blockUid);
+
+    // Scroll the field to the MIDDLE of the viewport before clicking. Playwright
+    // scrolls to the nearest edge, which on any site with a sticky header puts
+    // the field underneath it — the click then lands on the header and the
+    // failure reads as "something intercepts pointer events", which looks like a
+    // markup bug and is not one.
+    await el.evaluate((node) =>
+      node.scrollIntoView({ block: 'center', inline: 'nearest' }),
+    );
+
     await el.click();
     await page.waitForTimeout(300);
 
@@ -124,6 +142,32 @@ export async function checkDataEditTextClicks(
     // shape of the fixture gaps this check just found (form's label/placeholder
     // sit behind title/description).
   }
+}
+
+/**
+ * Reveal a block that is rendered but not visible — inside a collapsed tab
+ * panel, accordion or carousel slide.
+ *
+ * `data-block-selector` is a word-list of the uids an element reveals when
+ * clicked, published by the frontend (see tabs / accordion). It is the contract
+ * the bridge itself uses for reveal-on-select, so honouring it here keeps this
+ * helper free of component-specific knowledge — a new container opts in by
+ * publishing the attribute, with no change to the harness.
+ *
+ * A block that is already visible, or whose container publishes nothing, is
+ * left exactly as it was.
+ */
+export async function revealBlock(iframe: FrameLocator, blockUid: string): Promise<void> {
+  const block = iframe.locator(`[data-block-uid="${blockUid}"]`).first();
+  const rendered = await block
+    .evaluate((node) => node.getClientRects().length > 0)
+    .catch(() => false);
+  if (rendered) return;
+
+  const opener = iframe.locator(`[data-block-selector~="${blockUid}"]`).first();
+  if ((await opener.count()) === 0) return;
+  await opener.click();
+  await expect(block).toBeVisible({ timeout: 5000 });
 }
 
 /**
