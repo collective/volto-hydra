@@ -11,6 +11,11 @@
  * Env vars:
  *   DISCOVER_BLOCKS_API  - Plone API URL for discovery and content fetching
  *   MOCK_PARENT_URL      - URL of mock-parent.html (defaults to test-frontend port)
+ *   CONTAINMENT_EXEMPT_SLOTS
+ *                        - comma-separated template slot ids where a block may
+ *                          sit outside its container's allowedBlocks on purpose
+ *                          (e.g. a docs site's component showcase slot). See
+ *                          readContainmentRules in helpers/discover-blocks.cjs.
  *
  * Works against any Plone API — mock or remote.
  */

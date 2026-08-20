@@ -907,6 +907,49 @@ async function loadOfflineBlockSyncApi(blocksConfig) {
     api.resolveEffectiveBlockSchema(blockId, formData, pathMap, enhanced, intl);
 }
 
+// Structural types: hydra's own plumbing, never a project's placement choice.
+const CONTAINMENT_EXEMPT_TYPES = new Set(['empty', 'column', 'title', 'description']);
+
+/**
+ * Rules the CONSUMING PROJECT passes in, saying where a block placed outside
+ * its container's allowedBlocks is deliberate rather than a mistake.
+ *
+ * `CONTAINMENT_EXEMPT_SLOTS` — comma-separated template slot ids. The case this
+ * exists for: a documentation site shows every component on its own doc page,
+ * inside a showcase slot of a page template. Chrome like `header`, or a layout
+ * like `contentLayout`, is in no ordinary region's allowedBlocks and must stay
+ * that way — otherwise the block chooser offers site chrome on every page — yet
+ * the doc page still has to show one. Only the project that authored the
+ * template knows which slot means "an example lives here", so hydra takes it as
+ * configuration instead of guessing.
+ */
+function readContainmentRules(env = process.env) {
+  return {
+    slots: (env.CONTAINMENT_EXEMPT_SLOTS || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  };
+}
+
+/**
+ * Is this block's placement exempt from the containment check?
+ *
+ * Exempt when: it is structural, template-placed or position-fixed; its
+ * container declares no allowed set, or declares one that includes the type;
+ * or it sits in a slot the project nominated (see readContainmentRules).
+ */
+function isContainmentExempt(entry, blockData, rules = { slots: [] }) {
+  if (entry.isTemplateInstance || entry.isFixed) return true;
+  if (CONTAINMENT_EXEMPT_TYPES.has(entry.blockType)) return true;
+  if (!Array.isArray(entry.allowedSiblingTypes) || entry.allowedSiblingTypes.length === 0) {
+    return true;
+  }
+  if (entry.allowedSiblingTypes.includes(entry.blockType)) return true;
+  const slotId = blockData && blockData.slotId;
+  return !!slotId && (rules.slots || []).includes(slotId);
+}
+
 async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, frontendKeys = []) {
   // Use hydra's canonical buildBlockPathMap to walk content — it knows
   // the schema-defined container fields (blocks_layout, object_list,
@@ -936,7 +979,7 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   // chevron / drag walks it OUT to the nearest ancestor that accepts the type,
   // so it "escapes"). Surface each as a failing test, like the issues below.
   const allowedBlocksViolations = []; // {blockType, allowed, parentType, pagePath, blockId}
-  const CONTAINMENT_EXEMPT = new Set(['empty', 'column', 'title', 'description']);
+  const containmentRules = readContainmentRules();
   // Track block @types seen in content that aren't in blocksConfig — the
   // frontend's Block.vue falls through to a "Not implemented" placeholder
   // for these. Collect all occurrences so the report shows every page
@@ -1032,16 +1075,10 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         const schema = resolvedSchema || (blockType ? blocksConfig[blockType]?.blockSchema : null);
 
         // Containment check (see allowedBlocksViolations above): flag a block
-        // placed in a container that doesn't allow its @type. Skip template-
-        // placed / content-type-fixed blocks and exempt structural types.
+        // placed in a container that doesn't allow its @type.
         if (
           entry.blockType &&
-          !entry.isTemplateInstance &&
-          !entry.isFixed &&
-          !CONTAINMENT_EXEMPT.has(entry.blockType) &&
-          Array.isArray(entry.allowedSiblingTypes) &&
-          entry.allowedSiblingTypes.length > 0 &&
-          !entry.allowedSiblingTypes.includes(entry.blockType)
+          !isContainmentExempt(entry, blockData, containmentRules)
         ) {
           allowedBlocksViolations.push({
             blockType: entry.blockType,
@@ -1367,4 +1404,11 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   return result;
 }
 
-module.exports = { discoverBlocks, extractBlocks, buildObjectListFieldsMap, buildEmptyRegionCases };
+module.exports = {
+  discoverBlocks,
+  extractBlocks,
+  buildObjectListFieldsMap,
+  buildEmptyRegionCases,
+  isContainmentExempt,
+  readContainmentRules,
+};
