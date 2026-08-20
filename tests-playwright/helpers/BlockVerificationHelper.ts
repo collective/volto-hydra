@@ -17,8 +17,8 @@ export interface SubBlock {
 }
 
 /**
- * Click the block's first visible [data-edit-text] element and verify that an
- * author can actually edit it:
+ * Click EVERY visible [data-edit-text] field the block owns and verify that an
+ * author can actually edit each one:
  *
  *  - no "Missing data-node-id attributes" warning (a block that puts
  *    data-edit-text on Slate-rendered content without data-node-id on the
@@ -31,12 +31,19 @@ export interface SubBlock {
  * (accordion titles, tab labels) can be annotated perfectly and still be
  * impossible to type into — which is exactly how such a bug survived while
  * every other check was green.
+ *
+ * Every field, because a block can declare its first and leave the rest
+ * annotated-but-undeclared; the bridge won't promote an undeclared field
+ * (getFieldType → undefined), so those annotations promise an editor that
+ * never opens. Fields belonging to NESTED blocks are skipped — they are that
+ * block's contract, checked when it is the subject.
  */
 export async function checkDataEditTextClicks(
   page: Page,
   iframe: FrameLocator,
   block: Locator,
 ): Promise<void> {
+  const blockUid = await block.getAttribute('data-block-uid');
   const editTextEls = block.locator('[data-edit-text]');
   const count = await editTextEls.count();
   if (count === 0) return;
@@ -44,6 +51,25 @@ export async function checkDataEditTextClicks(
   for (let i = 0; i < count; i++) {
     const el = editTextEls.nth(i);
     if (!await el.isVisible()) continue;
+    // Only the fields this block OWNS. A container renders its children's
+    // fields too, and those are the child block's contract, checked when the
+    // child is the subject.
+    const owned = await el.evaluate(
+      (node, uid) => node.closest('[data-block-uid]')?.getAttribute('data-block-uid') === uid,
+      blockUid,
+    );
+    if (!owned) continue;
+
+    // `data-block-readonly` is the FRONTEND declaring "this content is not
+    // authored here" — a teaser mirroring the page it links to, a listing
+    // rendering query results. The bridge honours it by promoting nothing, so
+    // asserting editability would test a promise no one made.
+    //
+    // It has to be the attribute, not the uid: a listing's expanded results
+    // deliberately carry the LISTING's uid, so ownership cannot tell borrowed
+    // content from authored content — only this attribute can.
+    const readonly = await el.evaluate((node) => !!node.closest('[data-block-readonly]'));
+    if (readonly) continue;
 
     await el.click();
     await page.waitForTimeout(300);
@@ -92,7 +118,11 @@ export async function checkDataEditTextClicks(
       .toBe('caret in field');
 
     await page.keyboard.press('Escape');
-    break; // One click per block is sufficient
+    // EVERY field, not just the first. Stopping at one meant a block's second
+    // and later fields were never exercised — a block could declare its first
+    // field and leave the rest annotated-but-undeclared, which is exactly the
+    // shape of the fixture gaps this check just found (form's label/placeholder
+    // sit behind title/description).
   }
 }
 
@@ -251,14 +281,37 @@ export async function checkEditAnnotations(
           let node: Node | null;
           while ((node = walker.nextNode())) {
             if (node.textContent?.includes(v)) {
-              return !!(node.parentElement?.closest('[data-edit-text]'));
+              const host = node.parentElement;
+              // Only text with a real box on screen has to be annotated. An
+              // `.sr-only` field is clipped to 1×1 so a screen reader still
+              // announces it while nothing is there to click — requiring
+              // `data-edit-text` on it would demand an inline editor that can
+              // never open, and the click check (which requires every annotated
+              // field to be editable) would then contradict this one. Such a
+              // field is authored from the sidebar instead.
+              //
+              // RENDERED-BUT-CLIPPED, not merely "no box". A collapsed
+              // accordion panel (`hidden="until-found"`) and an inactive tab
+              // (`panel.hidden = true`) are display:none, so they report zero
+              // rects too — and their fields MUST stay in scope, since that is
+              // exactly the content whose editing breaks. So: no client rects
+              // at all means "not rendered right now", which we cannot judge,
+              // and the field stays required.
+              if (!host) return true;
+              const rendered = host.getClientRects().length > 0;
+              const box = host.getBoundingClientRect();
+              if (rendered && box.width < 2 && box.height < 2) return true;
+              return !!host.closest('[data-edit-text]');
             }
           }
           return true; // text not found in DOM — skip
         },
         value,
       );
-      expect(hasEditText, `"${value}" (${field}) should be inside [data-edit-text]`).toBe(true);
+      expect(
+        hasEditText,
+        `"${value}" (${field}) is visible on screen, so it should be inside [data-edit-text] — a visible schema text field has to be inline-editable`,
+      ).toBe(true);
     }
   }
 }
