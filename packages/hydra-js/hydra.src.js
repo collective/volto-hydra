@@ -4391,9 +4391,24 @@ export class Bridge {
       // Skip if tryMakeBlockVisible is currently navigating (to avoid interference)
       const selectorElement = event.target.closest('[data-block-selector]');
       if (selectorElement) {
-        if (this._navigatingToBlock) {
+        // tryMakeBlockVisible reveals a hidden block by SYNTHESISING a click on
+        // its selector (`clickedSelector.click()`); that must not re-enter this
+        // handler. But a genuine user click arriving mid-navigation was being
+        // dropped by the same guard — click an accordion header or a <summary>
+        // while the editor is still scrolling to the initially selected block
+        // and nothing happens at all, silently.
+        //
+        // `isTrusted` is exactly this distinction: false for a programmatic
+        // .click(), true for real user input. So the bridge ignores only its
+        // own click; a user's click wins and cancels the navigation it
+        // interrupted.
+        if (this._navigatingToBlock && !event.isTrusted) {
           log('blockClickHandler: skipping handleBlockSelector, tryMakeBlockVisible in progress');
           return;
+        }
+        if (this._navigatingToBlock) {
+          log('blockClickHandler: user click overrides in-progress navigation to', this._navigatingToBlock);
+          this._navigatingToBlock = null;
         }
         const selector = selectorElement.getAttribute('data-block-selector');
         // A reveal trigger can also BE the block's editable heading: accordion
