@@ -123,9 +123,15 @@
   <script type="module">
     import { buildBlockPathMap } from '/build-block-path-map.js';
 
-    // Configure iframe frontend from ?frontend= URL param (default: mock frontend on 8888)
+    // Configure iframe frontend from ?frontend= URL param. The default is the
+    // origin THIS page is served from — vite injects it (see vite.config.js), and
+    // it is also just window.location.origin, since the mock parent and the test
+    // frontend are the same server. It used to be a literal localhost:8889, so a
+    // run on an overridden port (HYDRA_TEST_FRONTEND_PORT) framed a dead server
+    // unless the caller remembered ?frontend=.
     const params = new URLSearchParams(window.location.search);
-    const frontendOrigin = params.get('frontend') || 'http://localhost:8889';
+    const frontendOrigin =
+      params.get('frontend') || window._frontendOrigin || window.location.origin;
     const contentName = params.get('content'); // e.g., 'examples' loads /examples.json
     const apiPath = params.get('api_path'); // e.g., '/block/toc-block' loads from API
     const adminOrigin = window.location.origin;
