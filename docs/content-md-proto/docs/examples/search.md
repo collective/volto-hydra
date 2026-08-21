@@ -57,7 +57,7 @@ blocks-matched: |
   </block>
 ---
 
-# 
+# Search
 
 A search interface with faceted filtering. Contains a child listing block for results and typed facets (checkbox, select, date range, toggle) for filtering.
 

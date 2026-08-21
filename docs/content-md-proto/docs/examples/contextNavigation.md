@@ -47,7 +47,7 @@ blocks-matched: |
   </block>
 ---
 
-# 
+# Context Navigation Block
 
 A vertical navigation list for grouped pages — a left sidebar on desktop and a collapsible disclosure at the top on mobile. Each row is a navItem (hand-added link) and/or a listing (auto-populated from a path query). The active link is detected from the current URL and gets aria-current="page" plus a .current class. Named after Plone's @contextnavigation endpoint, which serves the same purpose.
 

@@ -62,7 +62,7 @@ blocks-matched: |
   </block>
 ---
 
-# 
+# Introduction
 
 Displays the page's title and description as a styled header. The introduction block has no content of its own — it reads title and description from the page metadata.
 

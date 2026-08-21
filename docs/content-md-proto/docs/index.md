@@ -52,7 +52,7 @@ order:
   - images
 ---
 
-# 
+# Docs
 
 A design-system-first page-builder toolkit. Strike the right balance for your site — make it easy for editors to create engagement while staying compliant.
 

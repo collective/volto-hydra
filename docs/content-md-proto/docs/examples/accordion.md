@@ -127,7 +127,7 @@ blocks-tagged: |
   </block>
 ---
 
-# 
+# Accordion
 
 A collapsible panel group. Each panel is an object\_list item with a title and a content area that holds child blocks.
 

@@ -60,7 +60,7 @@ order:
   - text
 ---
 
-# 
+# Grid
 
 A responsive grid that lays out child blocks in equal-width cells. The block uses Volto's standard shared-blocks shape — blocks is the dict of children, blocks\_layout.items is their order — and constrains the allowed types via allowedBlocks.
 

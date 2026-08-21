@@ -44,7 +44,7 @@ blocks-matched: |
   </block>
 ---
 
-# 
+# Slider Block
 
 A carousel/slider that cycles through slides. Slides are stored as an object\_list — each slide has a title, description, image, and optional button.
 

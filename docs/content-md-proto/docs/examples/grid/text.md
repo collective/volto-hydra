@@ -64,7 +64,7 @@ blocks-tagged: |
   </block>
 ---
 
-# 
+# Grid-Text block
 
 <block type="gridBlock">
 

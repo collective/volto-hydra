@@ -114,7 +114,7 @@ blocks-tagged: |
   </block>
 ---
 
-# 
+# Templates & Layouts
 
 Templates allow editors to centrally control content and reuse content. They allow a developer to not have to hard code layout decisions and instead use rules to apply user layouts in template content stored separately from the page, or give the user a choice on which layout they want.
 

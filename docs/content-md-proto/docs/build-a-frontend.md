@@ -105,7 +105,7 @@ blocks-matched: |
   </block>
 ---
 
-# 
+# Build a frontend
 
 The actual code you write will depend on the framework you choose. You can look at these examples to help you:
 

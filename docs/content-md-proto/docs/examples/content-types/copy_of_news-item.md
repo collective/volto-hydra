@@ -46,7 +46,7 @@ blocks-matched: |
 
 <block type="title">
 
-# 
+# Another News Item
 
 <fields slotId="title" />
 

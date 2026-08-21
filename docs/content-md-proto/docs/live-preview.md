@@ -51,7 +51,7 @@ blocks-matched: |
   </block>
 ---
 
-# 
+# Live Preview
 
 To make your site editable with Inka you load hydra.js in your frontend and call `initBridge()`. This sets up a two-way communication channel that handles authentication, page navigation, and live content updates.
 

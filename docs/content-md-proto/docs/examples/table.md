@@ -69,7 +69,7 @@ blocks-tagged: |
   </block>
 ---
 
-# 
+# Table
 
 A table with rich text (Slate) content in each cell. Supports adding/removing rows and columns via toolbar actions.
 

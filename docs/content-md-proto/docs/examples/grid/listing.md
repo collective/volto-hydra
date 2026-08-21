@@ -44,7 +44,7 @@ blocks-tagged: |
   </block>
 ---
 
-# 
+# Grid-Listing
 
 <block type="gridBlock">
 

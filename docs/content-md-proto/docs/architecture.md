@@ -91,7 +91,7 @@ blocks-tagged: |
   </block>
 ---
 
-# 
+# How Inka Works
 
 Instead of combining editing and rendering into one framework and codebase, these are separated and during editing a two way communication channel is opened across an iframe so that the editing UI is no longer part of the frontend code. Instead a small JS file called hydra.js is included in your frontend during editing that handles the iframe bridge communication to Inka which is running in the same browser window.
 

@@ -82,7 +82,7 @@ blocks-tagged: |
   </block>
 ---
 
-# 
+# Server-rendered frontends
 
 Inka works with any frontend, including ones that have no client-side reactivity at all — pure server-rendered frameworks like **Astro**, **PHP**, **Django**, **Rails**, **Laravel**, **Symfony**, **Go html/template**. The bridge ships a built-in pattern for these: one config option on `initBridge` and one small endpoint on your server.
 

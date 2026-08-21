@@ -242,7 +242,12 @@ for (const d of items) {
     const asg = `blocks-assignments:\n${assignments.map((a) => `  - ${flow(a)}`).join('\n')}`;
     const fmBody = [front, asg, sectionYaml('blocks-matched', used, true), sectionYaml('blocks-tagged', used, false)]
       .filter(Boolean).join('\n');
-    writeFileSync(dest, `---\n${fmBody}\n---\n\n${referenceRenderers(markdown, dirname(dest))}\n`);
+    // Fill the title block's otherwise-empty `# ` with the page title for
+    // readability. This is emit-only: the title block is match-only, so decode
+    // ignores the heading text and reads `title` from frontmatter (kept) -- the
+    // h1 is a readable duplicate, not a second source.
+    const body = d.title ? markdown.replace(/^# *$/m, () => `# ${d.title}`) : markdown;
+    writeFileSync(dest, `---\n${fmBody}\n---\n\n${referenceRenderers(body, dirname(dest))}\n`);
     pages += 1;
     // rough coverage: count self-closing data tags (tier-3) vs the rest
     tier3 += (markdown.match(/<block type="[^"]*"[^>]*\/>/g) || []).length;

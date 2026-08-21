@@ -64,7 +64,7 @@ blocks-tagged: |
   </block>
 ---
 
-# 
+# Grid-Teaser block
 
 <block type="gridBlock">
 

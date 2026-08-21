@@ -72,7 +72,7 @@ blocks-matched: |
   </block>
 ---
 
-# 
+# Table of Contents
 
 Renders a table of contents generated from heading blocks on the current page. It scans sibling blocks for headings and builds a navigation list.
 

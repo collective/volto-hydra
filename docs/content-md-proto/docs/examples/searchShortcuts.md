@@ -45,7 +45,7 @@ blocks-matched: |
   </block>
 ---
 
-# 
+# Search Shortcuts Block
 
 Renders a set of values as links into a faceted search — a "tag cloud" of shortcuts. Each value links to a search page with ?facet.\<index>=\<value> pre-set, which a Search block reads from the URL.
 

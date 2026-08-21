@@ -148,7 +148,7 @@ blocks-tagged: |
   </block>
 ---
 
-# 
+# Custom Blocks
 
 Define custom block types directly in your frontend configuration via the `blocks` option in `initBridge`. No Volto plugin deployment required. Each block type needs an `id`, `title`, and a `blockSchema` with its field properties.
 

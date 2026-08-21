@@ -66,7 +66,7 @@ blocks-matched: |
   </block>
 ---
 
-# 
+# Video
 
 Embeds a video from a URL. Detects YouTube links and renders an iframe embed; otherwise falls back to an HTML5 \<video> element.
 

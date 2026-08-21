@@ -73,7 +73,7 @@ blocks-matched: |
   </block>
 ---
 
-# 
+# Text
 
 Rich text block powered by the Slate editor. Supports paragraphs, headings, lists, blockquotes, and inline formatting (bold, italic, strikethrough, underline, code, links).
 

@@ -139,7 +139,7 @@ blocks-tagged: |
   </block>
 ---
 
-# 
+# Container Blocks
 
 A block — or the page itself — is divided into **regions**, and each region holds an ordered list of blocks. Sliders have a slides region, grids have columns, accordions have panels; a page has its main `items` region (and optionally a header, footer, …).
 

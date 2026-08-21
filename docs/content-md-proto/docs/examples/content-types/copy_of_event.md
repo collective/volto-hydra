@@ -51,7 +51,7 @@ blocks-matched: |
 
 <block type="title">
 
-# 
+# Another Event
 
 <fields slotId="title" data-json='{"fixed":true,"readOnly":true}' />
 

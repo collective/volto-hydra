@@ -67,7 +67,7 @@ blocks-tagged: |
   </block>
 ---
 
-# 
+# Heading
 
 A standalone heading block that renders as h1–h6 based on a configurable tag field. Unlike headings inside a slate block, this is a dedicated block type with its own heading text field.
 

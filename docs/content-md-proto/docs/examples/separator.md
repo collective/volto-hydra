@@ -69,7 +69,7 @@ blocks-matched: |
   </block>
 ---
 
-# 
+# Separator
 
 A horizontal rule used to visually divide sections of content. Supports an alignment style property.
 

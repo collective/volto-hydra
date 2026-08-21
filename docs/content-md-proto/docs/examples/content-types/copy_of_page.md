@@ -35,7 +35,7 @@ blocks-matched: |
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
 ---
 
-# 
+# Another Page
 
 <block type="description" />
 

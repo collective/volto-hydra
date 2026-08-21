@@ -81,7 +81,7 @@ blocks-tagged: |
   </block>
 ---
 
-# 
+# Selecting blocks
 
 The editor has two modes when a block is selected: **text mode** (you're editing inside the block) and **block mode** (the whole block is selected as a unit).
 

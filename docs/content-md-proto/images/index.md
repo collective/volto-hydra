@@ -62,7 +62,7 @@ blobs:
     description: CMS landscape quadrant showing Visual Editing vs Frontend Freedom
 ---
 
-# 
+# Images
 
 <block type="gridBlock">
 

@@ -61,7 +61,7 @@ blocks-matched: |
   </block>
 ---
 
-# 
+# Highlight
 
 A prominent content section with a background image, overlay, title, rich text body, and an optional call-to-action link. Used for feature callouts and banners.
 

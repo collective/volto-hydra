@@ -65,7 +65,7 @@ blocks-matched: |
   </block>
 ---
 
-# 
+# Maps
 
 Embeds a map from a URL (Google Maps, OpenStreetMap, etc.) using an iframe. The url field should contain the embed URL, and title provides an accessible label.
 

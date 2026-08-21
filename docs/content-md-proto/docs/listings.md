@@ -108,7 +108,7 @@ blocks-tagged: |
   </block>
 ---
 
-# 
+# Listings & Dynamic Blocks
 
 A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block, repeating each block once per result entry. This means a listing can be moved between containers and reuse normal blocks for what it repeats.
 

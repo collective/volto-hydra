@@ -73,7 +73,7 @@ blocks-tagged: |
   </block>
 ---
 
-# 
+# Adding and moving blocks
 
 The block chooser, slash menu, and drag handles are part of Inka and look the same everywhere. What you can pick from those choosers — the list of block types — comes from your site's design system. One site might offer "Lead paragraph", "Pull quote", "Stat highlight"; another might just have "Text" and "Image". Mechanic is identical.
 

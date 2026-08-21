@@ -61,7 +61,7 @@ blocks-matched: |
   </block>
 ---
 
-# 
+# Advanced
 
 Advanced topics for optimising your Inka integration: lazy loading the bridge, authentication, and preventing reloads.
 

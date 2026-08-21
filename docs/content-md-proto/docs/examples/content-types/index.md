@@ -70,7 +70,7 @@ blobs:
     exclude_from_nav: false
 ---
 
-# 
+# Content Types
 
 <block type="listing" headlineTag="h2" variation="default" />
 

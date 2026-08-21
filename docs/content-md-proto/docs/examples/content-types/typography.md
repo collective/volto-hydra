@@ -74,7 +74,7 @@ blocks-tagged: |
   </block>
 ---
 
-# 
+# Typography - Page Title (H1, 48/56px)
 
 <block type="heading" alignment="left" heading="Heading (H2, 33/42px)" tag="h2" />
 

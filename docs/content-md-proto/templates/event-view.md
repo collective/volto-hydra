@@ -21,7 +21,7 @@ blocks-matched: |
 
 <block type="title">
 
-# 
+# Event View
 
 <fields slotId="title" />
 

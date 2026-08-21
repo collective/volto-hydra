@@ -61,7 +61,7 @@ blocks-tagged: |
   <block type="teaser" title="${h/text}" href="${h/link}" description="${p/text}" />
 ---
 
-# 
+# Teaser
 
 A content preview card that links to another page. Selecting a target page via the object browser auto-fills the title, description, and preview image from that page. Editors can toggle "overwrite" to customize these values.
 

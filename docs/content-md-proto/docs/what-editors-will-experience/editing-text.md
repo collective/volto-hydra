@@ -67,7 +67,7 @@ blocks-tagged: |
   </block>
 ---
 
-# 
+# Editing text
 
 Click into any text in the preview that's marked inline-editable and start typing. There are two kinds of text fields: **simple text** (like a title) and **slate** (rich text — the body of a paragraph block, descriptions, etc.).
 

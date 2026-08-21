@@ -104,7 +104,7 @@ blocks-matched: |
   </block>
 ---
 
-# 
+# Visual Editing
 
 ## HTML Annotations for Visual Editing
 

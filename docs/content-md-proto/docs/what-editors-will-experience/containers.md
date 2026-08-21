@@ -60,7 +60,7 @@ blocks-matched: |
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
 ---
 
-# 
+# Containers
 
 A **container block** holds other blocks inside it — sliders, columns, accordions, grids, generic sections. The blocks inside are called its **children**. Containers can be nested (a column inside a row inside a section).
 

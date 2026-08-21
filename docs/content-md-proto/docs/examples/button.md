@@ -83,7 +83,7 @@ blocks-tagged: |
   <block type="button" title="${p/text}" href="${p/link}" />
 ---
 
-# 
+# Button
 
 A call-to-action button with an editable label and link.
 

@@ -95,7 +95,7 @@ order:
   - templates-and-layouts
 ---
 
-# 
+# Editor Guide
 
 This guide is for **content editors** using an Inka-powered site. It covers how to use the editor — how to select things, edit text, add and move blocks, work with containers and templates — without assuming you know how the site was built.
 

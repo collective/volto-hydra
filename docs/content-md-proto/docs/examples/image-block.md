@@ -72,7 +72,7 @@ blocks-matched: |
   </block>
 ---
 
-# 
+# Image
 
 Displays an image with optional alt text and link. Supports the image picker widget for selecting images from the Plone content tree or uploading new ones.
 

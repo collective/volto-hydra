@@ -24,7 +24,7 @@ blocks-matched: |
 
 <block type="title">
 
-# 
+# News Item View
 
 <fields slotId="title" />
 
