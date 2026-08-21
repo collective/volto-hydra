@@ -750,16 +750,12 @@ function renderHeroBlockClean(block) {
     const subheadingHtml = subheading.replace(/\n/g, '<br>');
 
     // Render description - still needs node IDs for slate editing.
-    // An EMPTY description renders one empty node in EDIT mode: the editor
-    // reveals empty fields via applyPlaceholders (data-empty + the CSS "Click
-    // to edit"), which needs an annotated element to mark. Without it the field
-    // is uneditable everywhere it appears. View mode keeps "no data ⇒ no
-    // element" (issue #296).
-    const descriptionNodes = description.length
-        ? description
-        : (window._isEditMode ? [{ type: 'p', nodeId: '0', children: [{ text: '' }] }] : []);
+    // Data-driven, in edit mode too (issue #296): no data ⇒ no element. Reveal
+    // is the bridge's job — TOGGLE_OPTIONAL_FIELDS seeds a sentinel value so
+    // this very `description.length` rule fires — and it only works while the
+    // renderer keeps telling the truth about what the block holds.
     let descriptionHtml = '';
-    descriptionNodes.forEach((node) => {
+    description.forEach((node) => {
         const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
         const text = renderChildren(node.children);
         switch (node.type) {
@@ -788,7 +784,7 @@ function renderHeroBlockClean(block) {
         : '';
 
     // One element, two fields (buttonText + buttonLink) — see renderHeroBlock.
-    const buttonHtml = (block.buttonText || block.buttonLink || window._isEditMode)
+    const buttonHtml = (block.buttonText || block.buttonLink)
         ? `<a class="hero-button" href="${buttonLink}" style="display: inline-block; padding: 10px 20px; background: #007eb1; color: white; text-decoration: none; border-radius: 4px; cursor: pointer;">${buttonText}</a>`
         : '';
 
