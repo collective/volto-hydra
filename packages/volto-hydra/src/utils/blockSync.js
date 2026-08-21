@@ -2204,6 +2204,10 @@ function evaluateOperators(surface, operators) {
     notRegex,
   } = operators;
 
+  // Presence (isSet/isNotSet) goes through `isPresent`, which treats an empty
+  // array as unset — the array widgets (multiselect, object_browser) leave `[]`
+  // behind when the last entry is removed rather than dropping the key, so a
+  // field the author has just cleared must not still read as answered.
   if (isSet !== undefined && (isSet ? !isPresent(surface) : isPresent(surface)))
     return false;
   if (
