@@ -29,6 +29,7 @@ import { URLS } from '../ports';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { requireEnvironment } from '../helpers/preconditions';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 interface DiscoveredBlock {
   blockType: string;
@@ -81,12 +82,17 @@ discoveredBlocks = discoveredBlocks.filter(
 const SANITY_PROJECTS = new Set(['mock', 'nuxt', 'nextjs']);
 
 base.beforeEach(async ({}, testInfo) => {
-  if (discoveredBlocks.length === 0) {
-    testInfo.skip(true, 'No .discovered-blocks.json found — run with DISCOVER_BLOCKS_API=<url>');
-  }
+  // Scope BEFORE environment: a project this spec doesn't cover is a decision,
+  // and no CI change would make it run — so it skips even on CI. Discovery
+  // missing is the opposite, hence requireEnvironment below.
   if (!SANITY_PROJECTS.has(testInfo.project.name)) {
     testInfo.skip(true, `block-sanity only runs on mock/nuxt/nextjs (skipping ${testInfo.project.name})`);
   }
+  requireEnvironment(
+    testInfo,
+    discoveredBlocks.length > 0,
+    'no .discovered-blocks.json — discovery needs DISCOVER_BLOCKS_API=<mock api url> in this job',
+  );
 });
 
 const test = base.extend<{ helper: AdminUIHelper }>({

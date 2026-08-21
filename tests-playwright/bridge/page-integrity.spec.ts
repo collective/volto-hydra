@@ -16,6 +16,7 @@ import { getFrontendUrl } from './fixtures';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { requireEnvironment } from '../helpers/preconditions';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -32,15 +33,21 @@ if (fs.existsSync(discoveredPath)) {
 
 test.describe('Page integrity (auto-discovered)', () => {
   test.beforeEach(async ({}, testInfo) => {
-    if (uniquePages.length === 0) {
-      testInfo.skip(true, 'No .discovered-blocks.json found — run with DISCOVER_BLOCKS_API=<url>');
-    }
+    requireEnvironment(
+      testInfo,
+      uniquePages.length > 0,
+      'no .discovered-blocks.json — discovery needs DISCOVER_BLOCKS_API=<mock api url> in this job',
+    );
   });
 
   for (const pagePath of uniquePages) {
     test(`${pagePath}`, async ({ page }, testInfo) => {
       const frontendUrl = process.env.FRONTEND_URL || getFrontendUrl(testInfo.project.name);
-      testInfo.skip(!frontendUrl, `No frontend URL configured for project ${testInfo.project.name}`);
+      requireEnvironment(
+        testInfo,
+        !!frontendUrl,
+        `no frontend URL for project ${testInfo.project.name} (set FRONTEND_URL or add the project to ports.ts)`,
+      );
 
       await page.goto(`${frontendUrl}${pagePath}`, { timeout: 20000 });
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
