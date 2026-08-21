@@ -1,5 +1,5 @@
 {
-  "@id": "http://localhost:8888/news",
+  "@id": "/_test_data/news",
   "@type": "Document",
   "UID": "news-folder-uid-0001",
   "id": "news",
@@ -7,11 +7,6 @@
   "description": "Folder holding linkable news items.",
   "effective": "2024-11-01T00:00:00+00:00",
   "review_state": "published",
-  "parent": {
-    "@id": "http://localhost:8888",
-    "@type": "Plone Site",
-    "title": "Site"
-  },
   "blocks": {
     "title-block": {
       "@type": "title"

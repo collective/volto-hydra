@@ -1,5 +1,5 @@
 {
-  "@id": "http://localhost:8888/target-page",
+  "@id": "/_test_data/target-page",
   "@type": "Document",
   "UID": "target-page-uid-0001",
   "id": "target-page",
@@ -7,11 +7,6 @@
   "description": "The page other fixtures link to.",
   "effective": "2024-11-01T00:00:00+00:00",
   "review_state": "published",
-  "parent": {
-    "@id": "http://localhost:8888",
-    "@type": "Plone Site",
-    "title": "Site"
-  },
   "blocks": {
     "title-block": {
       "@type": "title"

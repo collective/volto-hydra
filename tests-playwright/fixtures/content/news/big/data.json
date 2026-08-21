@@ -1,5 +1,5 @@
 {
-  "@id": "http://localhost:8888/news/big",
+  "@id": "/_test_data/news/big",
   "@type": "Document",
   "UID": "news-big-uid-0001",
   "id": "big",
@@ -7,11 +7,6 @@
   "description": "A news item fixtures link to by href.",
   "effective": "2024-11-01T00:00:00+00:00",
   "review_state": "published",
-  "parent": {
-    "@id": "http://localhost:8888/news",
-    "@type": "Document",
-    "title": "News"
-  },
   "blocks": {
     "title-block": {
       "@type": "title"
