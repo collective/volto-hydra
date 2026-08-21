@@ -776,14 +776,15 @@ function renderHeroBlockClean(block) {
     });
 
     // Image - uses class instead of data-edit-media. Data-driven (issue #296):
-    // no image ⇒ no element in VIEW mode, so the comment selector matches
-    // nothing. In EDIT mode an empty image still renders a placeholder element,
-    // or `edit-media=image(.hero-image)` has nothing to attach to and the field
-    // is unsettable — the author would have no way to add the first image.
+    // no image ⇒ no element, so the comment selector matches nothing.
+    //
+    // NOT a placeholder in edit mode. An empty field is easier to set with
+    // something to click, but "can clear image using X button overlay" asserts
+    // that clearing an image leaves NO annotated element behind — and a
+    // placeholder IS the leftover it looks for. Revealing an empty media field
+    // is the toolbar's job (issue #296), not the renderer's.
     const imageHtml = imageSrc
         ? `<img class="hero-image" src="${imageSrc}" alt="Hero image" style="max-width: 100%; height: auto; margin-bottom: 10px;" />`
-        : window._isEditMode
-        ? `<div class="hero-image" style="height: 100px; background: #ddd; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; border-radius: 4px; cursor: pointer;">Click to add image</div>`
         : '';
 
     // One element, two fields (buttonText + buttonLink) — see renderHeroBlock.
