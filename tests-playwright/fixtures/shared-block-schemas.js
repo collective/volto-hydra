@@ -823,12 +823,44 @@ export const sharedBlocksConfig = {
         title: 'Teaser',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>',
         group: 'common',
-        // NO blockSchema here, deliberately. The teaser's real schema comes from
-        // the admin, and a fixture blockSchema WINS over it — so declaring a
-        // partial one here hid fields the admin knows about and broke the
-        // starter UI for an empty href (it stopped appearing at all). Blocks
-        // below declare a schema only where the fixture already had an empty
-        // one to fill in.
+        // Mirrors Volto's own teaser schema (core Teaser/schema.js), because a
+        // fixture blockSchema WINS over the admin's. A PARTIAL copy is what
+        // broke the starter UI: declaring title/description without `overwrite`
+        // — the "customize" checkbox those fields hang off — left the bridge
+        // with a teaser whose link and toggle did not exist.
+        blockSchema: {
+            fieldsets: [
+                { id: 'default', title: 'Default', fields: ['href', 'overwrite', 'title', 'head_title', 'description', 'preview_image'] },
+            ],
+            properties: {
+                href: { title: 'Target', widget: 'object_browser', mode: 'link', allowExternals: true },
+                overwrite: { title: 'Customize teaser content', type: 'boolean', default: false },
+                title: { title: 'Title' },
+                head_title: { title: 'Kicker' },
+                description: { title: 'Description', widget: 'textarea' },
+                preview_image: { title: 'Image override', widget: 'object_browser', mode: 'image', allowExternals: true },
+            },
+            required: ['href'],
+        },
+        // The teaser's RULE, not a snapshot of one side of it. A teaser MIRRORS
+        // its target by default — title/description/image belong to the page it
+        // points at and are not this block's to edit — until "Customize teaser
+        // content" is ticked, when they become its own.
+        //
+        // Volto expresses that as a schema FUNCTION of the data, which cannot
+        // reach a frontend: the block config crosses postMessage, so functions
+        // don't survive. fieldRules is the declarative form of the same rule and
+        // travels intact, so the admin and the mock parent resolve the teaser
+        // identically — instead of one of them believing the title is always
+        // editable and the other that it has no fields at all.
+        schemaEnhancer: {
+            fieldRules: {
+                title: { when: { overwrite: true }, else: false },
+                head_title: { when: { overwrite: true }, else: false },
+                description: { when: { overwrite: true }, else: false },
+                preview_image: { when: { overwrite: true }, else: false },
+            },
+        },
     },
     // Image block: parents declare claims via inheritSchemaFrom.parentControlled.image.
     image: {

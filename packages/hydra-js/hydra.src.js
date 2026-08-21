@@ -7787,6 +7787,28 @@ export class Bridge {
   }
 
   /**
+   * Mark a SELECT_BLOCK as pending because its element hasn't rendered yet, and
+   * return the predicate its deferred completion must consult. Any selection
+   * that lands in the meantime — the author clicking another block, a newer
+   * SELECT_BLOCK — clears the mark in selectBlock(), so the late completion
+   * abandons instead of yanking the selection back.
+   *
+   * @param {string} uid - Block uid being waited for
+   * @returns {() => boolean} True if this pending selection is still wanted
+   */
+  awaitPendingSelect(uid) {
+    this._pendingSelectUid = uid;
+    return () => {
+      if (this._pendingSelectUid !== uid) {
+        log('Deferred SELECT_BLOCK abandoned, selection moved on:', uid);
+        return false;
+      }
+      this._pendingSelectUid = null;
+      return true;
+    };
+  }
+
+  /**
    * Selects a block and communicates the selection to the adminUI.
    *
    * @param {HTMLElement|string} blockElementOrUid - The block element or block UID to select.
@@ -7818,6 +7840,14 @@ export class Bridge {
     const caller = new Error().stack?.split('\n')[2]?.trim() || 'unknown';
     log('selectBlock called for:', blockUid, 'from:', caller, 'elements:', blockElements.length);
     if (blockElements.length === 0) return;
+
+    // Any selection that actually lands supersedes a SELECT_BLOCK still waiting
+    // for its element to render (see awaitPendingSelect). Without this the late
+    // arrival steals the block the author has since clicked.
+    if (this._pendingSelectUid && this._pendingSelectUid !== blockUid) {
+      log('selectBlock: superseding pending SELECT_BLOCK for', this._pendingSelectUid);
+      this._pendingSelectUid = null;
+    }
 
     // Primary element for operations that need a single element
     const blockElement = blockElements[0];
@@ -9988,8 +10018,9 @@ export class Bridge {
           if (alreadySelected || this._blockSelectorNavigating) {
             // Navigation already in progress (carousel click or handleBlockSelector) -
             // just wait for the animation to complete, don't try to navigate again
+            const stillWanted = this.awaitPendingSelect(uid);
             waitForVisible().then((visible) => {
-              if (visible) {
+              if (visible && stillWanted()) {
                 this.selectBlock(blockElement);
               }
             });
@@ -9999,8 +10030,9 @@ export class Bridge {
           // Block not yet selected and no navigation in progress - try to navigate to it
           const madeVisible = this.tryMakeBlockVisible(uid);
           if (madeVisible) {
+            const stillWanted = this.awaitPendingSelect(uid);
             waitForVisible().then((visible) => {
-              if (visible) {
+              if (visible && stillWanted()) {
                 this.selectBlock(blockElement);
               }
             });
@@ -10068,11 +10100,13 @@ export class Bridge {
           // with a safety timeout to bail out so we don't leak handlers
           // when a SELECT_BLOCK references a nonexistent uid.
           log('Block element not found for SELECT_BLOCK, observing for it:', uid);
+          const stillWanted = this.awaitPendingSelect(uid);
           const observer = new MutationObserver(() => {
             const el = document.querySelector(`[data-block-uid="${uid}"]`);
             if (el) {
               observer.disconnect();
               clearTimeout(safetyTimer);
+              if (!stillWanted()) return;
               log('Block element appeared via observer, selecting:', uid);
               this.selectBlock(el);
             }
