@@ -6611,7 +6611,11 @@ export class Bridge {
     // was thrown away, so the author is left typing into nothing: activeElement
     // falls back to BODY, and the next selection lands on the block's FIRST
     // field instead of the one they clicked.
-    this.watchForEditableReplacement(fieldElement, fieldName, blockUid);
+    // Not from the replay itself: a frontend that re-renders on every
+    // activation would otherwise chase its own tail.
+    if (caller !== 'reRender') {
+      this.watchForEditableReplacement(fieldElement, fieldName, blockUid);
+    }
   }
 
   /**
@@ -6627,12 +6631,11 @@ export class Bridge {
     const root = fieldElement.parentElement;
     if (!root || !fieldName) return;
 
-    const caretOffset = (() => {
-      const sel = window.getSelection();
-      if (!sel?.rangeCount) return 0;
-      const range = sel.getRangeAt(0);
-      return fieldElement.contains(range.startContainer) ? range.startOffset : 0;
-    })();
+    // Keep the click position as activateEditableField stores it, so the replay
+    // below can hand it back and take the same caret path a click takes.
+    const clickPosition = this.lastClickPosition
+      ? { ...this.lastClickPosition, editableField: fieldName }
+      : null;
 
     const observer = new MutationObserver(() => {
       if (fieldElement.isConnected) return;
@@ -6642,7 +6645,7 @@ export class Bridge {
       // twice, and a deferred restore aims at a node that is already gone.
       const active = document.activeElement;
       if (active && active !== document.body && active.hasAttribute?.('data-edit-text')) return;
-      this.restoreFocusToReplacement(blockUid, root, fieldName, caretOffset);
+      this.restoreFocusToReplacement(blockUid, root, fieldName, clickPosition);
     });
     // Observe the DOCUMENT, not the field's parent: a framework re-rendering a
     // block replaces the parent as readily as the child, and an observer bound
@@ -6668,30 +6671,36 @@ export class Bridge {
   }
 
   /** Put focus and the caret back on the re-rendered element for a field. */
-  restoreFocusToReplacement(blockUid, root, fieldName, caretOffset) {
-      const block = blockUid ? this.queryBlockElement(blockUid) : root.closest('[data-block-uid]');
-      const replacement = block?.querySelector(`[data-edit-text="${fieldName}"]`);
-      if (!replacement) return;
-      // Restore FOCUS, never editability. Whether a field may be edited is the
-      // bridge's and the frontend's decision, and a re-render is often how that
-      // decision changes — unticking a teaser's "customize" makes its title
-      // mirror the linked page again, and forcing contenteditable back on here
-      // undid exactly that.
-      if (replacement.getAttribute('contenteditable') !== 'true') {
-        log('watchForEditableReplacement: replacement is not editable, leaving it alone', fieldName);
-        return;
-      }
-      log('watchForEditableReplacement: field was re-rendered, restoring focus', fieldName);
-      replacement.focus({ preventScroll: true });
-      const textNode = replacement.firstChild;
-      if (textNode?.nodeType === Node.TEXT_NODE) {
-        const range = document.createRange();
-        range.setStart(textNode, Math.min(caretOffset, textNode.length));
-        range.collapse(true);
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-      }
+  /**
+   * Re-run the activation against the element that replaced the field.
+   *
+   * Deliberately NOT its own focus/caret code: it hands the click position back
+   * and calls activateEditableField, so the replacement goes through the same
+   * gate a click goes through — the same caret-from-point logic, the same
+   * clamp when that point lands outside the field, the same whitespace
+   * correction. A second implementation here would be a second set of rules to
+   * keep in step.
+   */
+  restoreFocusToReplacement(blockUid, root, fieldName, clickPosition) {
+    const block = blockUid ? this.queryBlockElement(blockUid) : root.closest('[data-block-uid]');
+    const replacement = block?.querySelector(`[data-edit-text="${fieldName}"]`);
+    if (!replacement) return;
+    // Editability stays the bridge's and the frontend's decision. A re-render is
+    // often how that decision CHANGES — unticking a teaser's "customize" makes
+    // its title mirror the linked page again — so a replacement that came back
+    // read-only is left alone.
+    if (replacement.getAttribute('contenteditable') !== 'true') {
+      log('watchForEditableReplacement: replacement is not editable, leaving it alone', fieldName);
+      return;
+    }
+    log('watchForEditableReplacement: field was re-rendered, replaying activation', fieldName);
+    if (clickPosition) this.lastClickPosition = clickPosition;
+    this.activateEditableField(replacement, fieldName, blockUid, 'reRender', {
+      skipContentEditable: true,
+      skipObservers: true,
+      preventScroll: true,
+      wasAlreadyEditable: true,
+    });
   }
 
   /**
