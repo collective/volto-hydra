@@ -866,6 +866,56 @@ export const sharedBlocksConfig = {
     image: {
         id: 'image',
         title: 'Image',
+        // Mirrors Volto's ImageSchema (core Image/schema.jsx), with two
+        // deliberate differences.
+        //
+        // 1. `url` is declared. Volto leaves it out of `properties` because the
+        //    upload widget writes it, not a sidebar field — but hydra reads the
+        //    schema to learn that `url` is a MEDIA field, which is what makes
+        //    data-edit-media="url" an editable target rather than an unknown
+        //    attribute. Undeclared, the image is uneditable on the canvas.
+        //
+        // 2. `url` is REQUIRED. An image block exists to hold an image, so it
+        //    renders one either way — a grey placeholder until the author picks
+        //    a real one, giving them something to click. Marking it required is
+        //    what tells reveal to leave it alone: reveal is for OPTIONAL fields
+        //    that are absent until asked for (a hero's image), and offering to
+        //    "reveal" a field whose element is already on screen is nonsense.
+        //
+        // Volto states the rest as a schema FUNCTION of formData (alt/align/size
+        // and the link fieldset appear only once a url exists). A function can't
+        // cross postMessage to a frontend, so the same rule is expressed as
+        // fieldRules, which travels as data.
+        blockSchema: {
+            fieldsets: [
+                { id: 'default', title: 'Default', fields: ['url', 'alt', 'align', 'size'] },
+                { id: 'link_settings', title: 'Link settings', fields: ['href', 'openLinkInNewTab'] },
+            ],
+            properties: {
+                url: { title: 'Image', widget: 'image' },
+                alt: { title: 'Alt text' },
+                align: { title: 'Alignment', widget: 'align', default: 'center' },
+                size: { title: 'Size', widget: 'image_size', default: 'l' },
+                href: {
+                    title: 'Link to',
+                    widget: 'object_browser',
+                    mode: 'link',
+                    selectedItemAttrs: ['Title', 'Description', 'hasPreviewImage'],
+                    allowExternals: true,
+                },
+                openLinkInNewTab: { title: 'Open in a new tab', type: 'boolean' },
+            },
+            required: ['url'],
+        },
+        schemaEnhancer: {
+            fieldRules: {
+                alt: { when: { url: { isSet: true } }, else: false },
+                align: { when: { url: { isSet: true } }, else: false },
+                size: { when: { url: { isSet: true } }, else: false },
+                href: { when: { url: { isSet: true } }, else: false },
+                openLinkInNewTab: { when: { url: { isSet: true } }, else: false },
+            },
+        },
         fieldMappings: {
             '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },
         },

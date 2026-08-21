@@ -469,7 +469,14 @@ export default defineConfig({
     // Example frontends — opt-in only
     ...(needsNextjs ? [{
       name: 'Next.js Frontend (Test)',
-      command: 'pnpm run dev:test',
+      // Wait for the mock API before starting. Playwright brings every
+      // webServer up at once, and the mock API only listens after it has
+      // scanned all content (~40s) — so Next would boot first, its very first
+      // SSR fetch would be refused, and the whole run failed with "#previewIframe
+      // never appeared" on every test. It reads like the app is broken; it is a
+      // start-order race. CI doesn't hit this path (NO_WEBSERVER=true; the
+      // workflow starts and waits for servers itself).
+      command: `until curl -sf ${URLS.mockApi}/health > /dev/null 2>&1; do sleep 1; done; pnpm run dev:test`,
       url: URLS.nextjs,
       timeout: 120 * 1000,
       reuseExistingServer: true,

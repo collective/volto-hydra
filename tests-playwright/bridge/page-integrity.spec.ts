@@ -43,11 +43,12 @@ test.describe('Page integrity (auto-discovered)', () => {
   for (const pagePath of uniquePages) {
     test(`${pagePath}`, async ({ page }, testInfo) => {
       const frontendUrl = process.env.FRONTEND_URL || getFrontendUrl(testInfo.project.name);
-      requireEnvironment(
-        testInfo,
-        !!frontendUrl,
-        `no frontend URL for project ${testInfo.project.name} (set FRONTEND_URL or add the project to ports.ts)`,
-      );
+      // SCOPE, not environment: this check crawls a standalone frontend site,
+      // and projects absent from the URL map have none to crawl — `mock` is
+      // driven through mock-parent, and the `-firefox` variants re-run another
+      // project's site in a second browser. Nothing is broken, so it skips even
+      // on CI (unlike the discovery guard above).
+      testInfo.skip(!frontendUrl, `no standalone frontend site for project ${testInfo.project.name}`);
 
       await page.goto(`${frontendUrl}${pagePath}`, { timeout: 20000 });
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
