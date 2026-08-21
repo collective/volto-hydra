@@ -6455,6 +6455,10 @@ export class Bridge {
       log(`activateEditableField: focused field`);
     }
 
+    // A frontend may replace this very element on its next render; watch for it
+    // so the caret can be put back (see observeFocusedFieldReplacement).
+    this.observeFocusedFieldReplacement(fieldElement);
+
     // Make sure data-empty reflects current text content. data-empty no
     // longer flips based on focus — the placeholder ::before is held
     // invisible by :focus::before { visibility: hidden } and its
@@ -6604,103 +6608,6 @@ export class Bridge {
     // Clear lastClickPosition - we've used it
     this.lastClickPosition = null;
 
-    // A frontend may re-render this field out from under us — Vue patching the
-    // node it owns, React remounting a subtree, any framework reconciling after
-    // its own state change. The replacement is re-promoted (contenteditable is
-    // restored on the new node), but focus and the caret belong to the node that
-    // was thrown away, so the author is left typing into nothing: activeElement
-    // falls back to BODY, and the next selection lands on the block's FIRST
-    // field instead of the one they clicked.
-    // Not from the replay itself: a frontend that re-renders on every
-    // activation would otherwise chase its own tail.
-    if (caller !== 'reRender') {
-      this.watchForEditableReplacement(fieldElement, fieldName, blockUid);
-    }
-  }
-
-  /**
-   * Re-focus a field whose element is replaced by the frontend's own re-render.
-   *
-   * Watches the field's parent for its removal, and if a new element for the
-   * SAME field appears in the same block, restores focus and the caret offset to
-   * it. Gives up as soon as anything else takes focus — a re-render the author
-   * has already moved on from must not yank them back.
-   */
-  watchForEditableReplacement(fieldElement, fieldName, blockUid) {
-    this._editableReplacementObserver?.disconnect();
-    const root = fieldElement.parentElement;
-    if (!root || !fieldName) return;
-
-    // Keep the click position as activateEditableField stores it, so the replay
-    // below can hand it back and take the same caret path a click takes.
-    const clickPosition = this.lastClickPosition
-      ? { ...this.lastClickPosition, editableField: fieldName }
-      : null;
-
-    const observer = new MutationObserver(() => {
-      if (fieldElement.isConnected) return;
-      observer.disconnect();
-      this._editableReplacementObserver = null;
-      // Restore immediately: a framework that re-renders once often does it
-      // twice, and a deferred restore aims at a node that is already gone.
-      const active = document.activeElement;
-      if (active && active !== document.body && active.hasAttribute?.('data-edit-text')) return;
-      this.restoreFocusToReplacement(blockUid, root, fieldName, clickPosition);
-    });
-    // Observe the DOCUMENT, not the field's parent: a framework re-rendering a
-    // block replaces the parent as readily as the child, and an observer bound
-    // to a node that is itself detached never fires again. The window is short
-    // (below), so watching wide costs nothing.
-    observer.observe(document.body, { childList: true, subtree: true });
-    this._editableReplacementObserver = observer;
-
-    const stopWatching = () => {
-      if (this._editableReplacementObserver !== observer) return;
-      observer.disconnect();
-      this._editableReplacementObserver = null;
-      document.removeEventListener('keydown', stopWatching, true);
-    };
-    // The window is the reconciliation that follows the CLICK — a frontend
-    // re-rendering the node it owns, immediately. Once the author starts
-    // typing, every later re-render is a consequence of editing (Backspace
-    // joining two blocks, Enter splitting one), and the bridge places those
-    // carets itself; restoring an offset captured at click time would drop the
-    // next keystroke at the wrong end of the joined text.
-    document.addEventListener('keydown', stopWatching, true);
-    setTimeout(stopWatching, 500);
-  }
-
-  /** Put focus and the caret back on the re-rendered element for a field. */
-  /**
-   * Re-run the activation against the element that replaced the field.
-   *
-   * Deliberately NOT its own focus/caret code: it hands the click position back
-   * and calls activateEditableField, so the replacement goes through the same
-   * gate a click goes through — the same caret-from-point logic, the same
-   * clamp when that point lands outside the field, the same whitespace
-   * correction. A second implementation here would be a second set of rules to
-   * keep in step.
-   */
-  restoreFocusToReplacement(blockUid, root, fieldName, clickPosition) {
-    const block = blockUid ? this.queryBlockElement(blockUid) : root.closest('[data-block-uid]');
-    const replacement = block?.querySelector(`[data-edit-text="${fieldName}"]`);
-    if (!replacement) return;
-    // Editability stays the bridge's and the frontend's decision. A re-render is
-    // often how that decision CHANGES — unticking a teaser's "customize" makes
-    // its title mirror the linked page again — so a replacement that came back
-    // read-only is left alone.
-    if (replacement.getAttribute('contenteditable') !== 'true') {
-      log('watchForEditableReplacement: replacement is not editable, leaving it alone', fieldName);
-      return;
-    }
-    log('watchForEditableReplacement: field was re-rendered, replaying activation', fieldName);
-    if (clickPosition) this.lastClickPosition = clickPosition;
-    this.activateEditableField(replacement, fieldName, blockUid, 'reRender', {
-      skipContentEditable: true,
-      skipObservers: true,
-      preventScroll: true,
-      wasAlreadyEditable: true,
-    });
   }
 
   /**
@@ -7702,6 +7609,105 @@ export class Bridge {
    *
    * @param {HTMLElement} blockElement - The currently selected block element.
    */
+  /**
+   * Watch the field the author is editing for being replaced.
+   *
+   * observeBlockDomChanges watches the BLOCK — it asks whether elements
+   * carrying the block's uid were added, and a framework that re-renders only
+   * the field inside an unchanged block never trips it. That is the case in the
+   * Framework7 example, and it is the one that costs the caret.
+   *
+   * The restore itself is the bridge's existing one: savedClickPosition, looked
+   * up by field NAME so a replaced element is found, re-derived against the new
+   * element. No timer — the trigger is the mutation, and the position is
+   * consumed once and cleared by the existing paths when the sidebar edits or
+   * the selection moves.
+   */
+  observeFocusedFieldReplacement(fieldElement) {
+    this._focusedFieldObserver?.disconnect();
+    if (!fieldElement) return;
+    const observer = new MutationObserver(() => {
+      if (fieldElement.isConnected) return;
+      observer.disconnect();
+      this._focusedFieldObserver = null;
+      const block = this.queryBlockElement(this.selectedBlockUid);
+      if (block) this.restoreFocusIfFieldLost(block);
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    this._focusedFieldObserver = observer;
+  }
+
+  /**
+   * Restore the caret ONLY if this re-render actually cost us the field.
+   *
+   * A frontend re-renders a block several times over one interaction, and most
+   * of those leave focus intact. Restoring on every one of them looks harmless
+   * but is not: the saved click position is consumed on first use, so an early
+   * benign re-render spends it, and the later re-render that DOES detach the
+   * field has nothing left to restore from — which is exactly how this failed.
+   */
+  restoreFocusIfFieldLost(blockElement) {
+    if (!this.savedClickPosition || this.editMode !== 'text' || !this.focusedFieldName) return;
+    const field = this.getEditableFieldByName(blockElement, this.focusedFieldName);
+    if (!field || document.activeElement === field) return;
+    log('observeBlockDomChanges: re-render lost the focused field, restoring', this.focusedFieldName);
+    this.restoreFocusFromSavedClick(blockElement);
+  }
+
+  /**
+   * Put the caret back where the click put it, after the block's DOM was
+   * replaced by a re-render.
+   *
+   * Looked up by field NAME, not by element: a re-render replaces the node, so
+   * the element the click landed on no longer exists. The position is stored
+   * relative to the field (savedClickPosition), so it survives the element
+   * moving, and is re-derived against whatever element now carries the field.
+   *
+   * Called from two places, and it matters that both are re-renders rather than
+   * timers: after FORM_DATA from the admin, and — see observeBlockDomChanges —
+   * when the FRONTEND re-renders the selected block for its own reasons, which
+   * is what Vue does in the Framework7 example on almost every activation.
+   */
+  restoreFocusFromSavedClick(blockElement, { skipFocus = false, fieldType = null } = {}) {
+    const hasSavedClickPosition = !!this.savedClickPosition;
+    if (!this.focusedFieldName || (skipFocus && !hasSavedClickPosition)) return;
+
+    const focusedField = this.getEditableFieldByName(blockElement, this.focusedFieldName);
+    const type = fieldType ?? this.getFieldType(this.selectedBlockUid, this.focusedFieldName);
+    if (!focusedField || !this.fieldTypeIsTextEditable(type)) return;
+
+    if (!skipFocus || hasSavedClickPosition) {
+      focusedField.focus();
+    }
+    if (!this.savedClickPosition) return;
+
+    const selection = window.getSelection();
+    // An existing non-collapsed selection is the author's; don't overwrite it.
+    if (selection && (!selection.rangeCount || selection.isCollapsed)) {
+      const currentRect = focusedField.getBoundingClientRect();
+      const clientX = currentRect.left + this.savedClickPosition.relativeX;
+      const clientY = currentRect.top + this.savedClickPosition.relativeY;
+      let range = this.caretRangeFromPoint(clientX, clientY);
+      // The point can land outside the field once the page has moved under it;
+      // fall back to the field's own text rather than caret somewhere else.
+      if (range && !focusedField.contains(range.startContainer)) {
+        const walker = document.createTreeWalker(focusedField, NodeFilter.SHOW_TEXT);
+        const textNode = walker.nextNode();
+        range = null;
+        if (textNode) {
+          range = document.createRange();
+          range.setStart(textNode, 0);
+          range.collapse(true);
+        }
+      }
+      if (range) {
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    }
+    this.savedClickPosition = null;
+  }
+
   updateBlockUIAfterFormData(blockElement, skipFocus = false) {
     // Restore contenteditable on fields after renderer updates
     // The renderer may have replaced DOM elements, removing contenteditable attributes
@@ -7718,40 +7724,7 @@ export class Bridge {
     // EXCEPTION: If we have savedClickPosition, restore cursor because the re-render
     // may have destroyed the DOM element where cursor was positioned.
     // Note: savedClickPosition is cleared in FORM_DATA handler when content changes (sidebar edit)
-    const hasSavedClickPosition = !!this.savedClickPosition;
-    if (this.focusedFieldName && (!skipFocus || hasSavedClickPosition)) {
-      const focusedField = this.getEditableFieldByName(blockElement, this.focusedFieldName);
-
-      if (focusedField && this.fieldTypeIsTextEditable(fieldType)) {
-        // Focus the field (only if not skipFocus, unless we need to restore click position)
-        if (!skipFocus || hasSavedClickPosition) {
-          focusedField.focus();
-        }
-
-        // Position cursor at click location if we saved it
-        if (this.savedClickPosition) {
-          const selection = window.getSelection();
-          if (selection) {
-            // Only restore click position if there's no existing non-collapsed selection
-            if (!selection.rangeCount || selection.isCollapsed) {
-              // Convert relative position to screen coordinates using current element position
-              const currentRect = focusedField.getBoundingClientRect();
-              const clientX = currentRect.left + this.savedClickPosition.relativeX;
-              const clientY = currentRect.top + this.savedClickPosition.relativeY;
-
-              // Position cursor at the click location using caretRangeFromPoint
-              const range = this.caretRangeFromPoint(clientX, clientY);
-              if (range) {
-                selection.removeAllRanges();
-                selection.addRange(range);
-              }
-            }
-          }
-          // Clear saved click position after using it
-          this.savedClickPosition = null;
-        }
-      }
-    }
+    this.restoreFocusFromSavedClick(blockElement, { skipFocus, fieldType });
 
     // Scroll to block if not visible - BUT skip if we just finished dragging this block.
     // After drag-drop, the async renderer may not have completed yet and we'd be
@@ -8959,6 +8932,12 @@ export class Bridge {
         );
 
       if (elementsMatch) {
+        // The block's own elements survived — but a framework re-renders as
+        // little as it can, and replacing just the FIELD is enough to lose the
+        // caret: the node the author was typing in is detached, focus falls back
+        // to BODY, and the next selection picks the block's first field instead
+        // of theirs. Restore from the same saved click position.
+        this.restoreFocusIfFieldLost(currentElements[0]);
         log('observeBlockDomChanges: elements still match, no action needed');
         return;
       }
@@ -8970,6 +8949,16 @@ export class Bridge {
         'new:',
         currentElements.length,
       );
+
+      // The selected block's elements were REPLACED. Whatever the author was
+      // editing is now a detached node, so focus and the caret are gone —
+      // activeElement falls back to BODY and the next selection lands on the
+      // block's first field instead of theirs. This is the same loss FORM_DATA
+      // already restores from; the only difference is that the frontend
+      // re-rendered for its own reasons (Vue patching a block in the Framework7
+      // example) rather than because the admin sent data. Same saved position,
+      // same restore.
+      this.restoreFocusIfFieldLost(currentElements[0]);
 
       // Elements have changed - re-attach ResizeObserver
       if (this.blockResizeObserver) {
