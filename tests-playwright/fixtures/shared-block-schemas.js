@@ -823,15 +823,12 @@ export const sharedBlocksConfig = {
         title: 'Teaser',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>',
         group: 'common',
-        // renderTeaserBlock annotates title + description, so they have to be
-        // declared: the bridge won't promote a field whose schema doesn't say
-        // it is text (see `heading` / `search`).
-        blockSchema: {
-            properties: {
-                title: { title: 'Title', type: 'string' },
-                description: { title: 'Description', type: 'string' },
-            },
-        },
+        // NO blockSchema here, deliberately. The teaser's real schema comes from
+        // the admin, and a fixture blockSchema WINS over it — so declaring a
+        // partial one here hid fields the admin knows about and broke the
+        // starter UI for an empty href (it stopped appearing at all). Blocks
+        // below declare a schema only where the fixture already had an empty
+        // one to fill in.
     },
     // Image block: parents declare claims via inheritSchemaFrom.parentControlled.image.
     image: {

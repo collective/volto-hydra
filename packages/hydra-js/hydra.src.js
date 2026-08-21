@@ -6672,8 +6672,16 @@ export class Bridge {
       const block = blockUid ? this.queryBlockElement(blockUid) : root.closest('[data-block-uid]');
       const replacement = block?.querySelector(`[data-edit-text="${fieldName}"]`);
       if (!replacement) return;
+      // Restore FOCUS, never editability. Whether a field may be edited is the
+      // bridge's and the frontend's decision, and a re-render is often how that
+      // decision changes — unticking a teaser's "customize" makes its title
+      // mirror the linked page again, and forcing contenteditable back on here
+      // undid exactly that.
+      if (replacement.getAttribute('contenteditable') !== 'true') {
+        log('watchForEditableReplacement: replacement is not editable, leaving it alone', fieldName);
+        return;
+      }
       log('watchForEditableReplacement: field was re-rendered, restoring focus', fieldName);
-      replacement.setAttribute('contenteditable', 'true');
       replacement.focus({ preventScroll: true });
       const textNode = replacement.firstChild;
       if (textNode?.nodeType === Node.TEXT_NODE) {
