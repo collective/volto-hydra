@@ -29,7 +29,8 @@ This is a **built-in** block (registered as `slateTable`).
                       "schema": {
                         "properties": {
                           "value": {
-                            "widget": "slate"
+                            "widget": "slate",
+                            "type": "array"
                           }
                         }
                       }

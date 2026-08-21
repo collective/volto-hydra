@@ -438,7 +438,17 @@ if (typeof document !== 'undefined') {
 }
 
 function renderSlateBlock(block) {
-    const value = block.value || [];
+    // An EMPTY slate block (no `value` at all — the state a just-added block is
+    // in) still has to render one node, or there is nothing carrying
+    // data-node-id for the bridge to sync a cursor to: clicking it raises
+    // "Selection sync failed - missing data-node-id" and the author cannot
+    // type. A real frontend gets this from the schema default
+    // ([{type:'p',children:[{text:''}]}]); this fixture has no defaults layer,
+    // so it seeds the same empty paragraph here, nodeId '0' like the first node
+    // of any slate value.
+    const value = (block.value && block.value.length)
+        ? block.value
+        : [{ type: 'p', nodeId: '0', children: [{ text: '' }] }];
     let html = '';
     value.forEach((node) => {
         // nodeId is required for edit mode (hydra.js adds it), but optional for view mode
@@ -739,7 +749,11 @@ function renderHeroBlockClean(block) {
     // Render subheading as textarea (preserve newlines)
     const subheadingHtml = subheading.replace(/\n/g, '<br>');
 
-    // Render description - still needs node IDs for slate editing
+    // Render description - still needs node IDs for slate editing.
+    // Data-driven, in edit mode too (issue #296): no data ⇒ no element. Reveal
+    // is the bridge's job — TOGGLE_OPTIONAL_FIELDS seeds a sentinel value so
+    // this very `description.length` rule fires — and it only works while the
+    // renderer keeps telling the truth about what the block holds.
     let descriptionHtml = '';
     description.forEach((node) => {
         const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
@@ -758,7 +772,13 @@ function renderHeroBlockClean(block) {
     });
 
     // Image - uses class instead of data-edit-media. Data-driven (issue #296):
-    // no image ⇒ no element, so the comment selector simply matches nothing.
+    // no image ⇒ no element, so the comment selector matches nothing.
+    //
+    // NOT a placeholder in edit mode. An empty field is easier to set with
+    // something to click, but "can clear image using X button overlay" asserts
+    // that clearing an image leaves NO annotated element behind — and a
+    // placeholder IS the leftover it looks for. Revealing an empty media field
+    // is the toolbar's job (issue #296), not the renderer's.
     const imageHtml = imageSrc
         ? `<img class="hero-image" src="${imageSrc}" alt="Hero image" style="max-width: 100%; height: auto; margin-bottom: 10px;" />`
         : '';

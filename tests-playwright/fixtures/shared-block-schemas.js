@@ -469,8 +469,31 @@ export const sharedBlocksConfig = {
     // so they were excluded from the page-level allowed set (getPageAllowedBlocks
     // only includes registered blocks with an id). Minimal registration makes them
     // valid page blocks; the frontend still owns their rendering.
-    search: { id: 'search', title: 'Search', group: 'common', blockSchema: { properties: {} } },
-    heading: { id: 'heading', title: 'Heading', group: 'common', blockSchema: { properties: {} } },
+    // Both DO declare their inline-editable fields: the bridge refuses to promote
+    // a field its schema doesn't declare as text (getFieldType returns undefined,
+    // so restoreContentEditableOnFields skips it). An undeclared field renders a
+    // data-edit-text annotation that can never be edited — which is what the
+    // renderer has been emitting for these two since they were registered.
+    search: {
+        id: 'search',
+        title: 'Search',
+        group: 'common',
+        blockSchema: {
+            properties: {
+                headline: { title: 'Headline', type: 'string' },
+                title: { title: 'Title', type: 'string' },
+                facetsTitle: { title: 'Facets title', type: 'string' },
+            },
+        },
+    },
+    heading: {
+        id: 'heading',
+        title: 'Heading',
+        group: 'common',
+        blockSchema: {
+            properties: { heading: { title: 'Heading', type: 'string' } },
+        },
+    },
     // slateTable has inline-editable cells, so it MUST declare its nested
     // structure — table (object) → rows (object_list) → cells (object_list) →
     // value (slate). A frontend's registered schema OVERRIDES the admin's
@@ -513,7 +536,25 @@ export const sharedBlocksConfig = {
             },
         },
     },
-    maps: { id: 'maps', title: 'Map', group: 'common', blockSchema: { properties: {} } },
+    // Declared, not empty: the bridge promotes a field only if the block's
+    // schema has it, so an empty schema makes every annotation on these blocks
+    // dead — `data-edit-text="title"` on a map never becomes editable, however
+    // correctly the frontend marked it up. Fields are the ones the fixtures
+    // actually store.
+    maps: {
+        id: 'maps',
+        title: 'Map',
+        group: 'common',
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'url', 'align'] }],
+            properties: {
+                title: { title: 'Title', type: 'string' },
+                url: { title: 'Map URL', widget: 'url' },
+                align: { title: 'Alignment', type: 'string', factory: 'Choice' },
+            },
+            required: [],
+        },
+    },
     video: { id: 'video', title: 'Video', group: 'common', blockSchema: { properties: {} } },
     // Code example block: tabbed code display with syntax highlighting
     codeExample: {
@@ -782,11 +823,99 @@ export const sharedBlocksConfig = {
         title: 'Teaser',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>',
         group: 'common',
+        // Mirrors Volto's own teaser schema (core Teaser/schema.js), because a
+        // fixture blockSchema WINS over the admin's. A PARTIAL copy is what
+        // broke the starter UI: declaring title/description without `overwrite`
+        // — the "customize" checkbox those fields hang off — left the bridge
+        // with a teaser whose link and toggle did not exist.
+        blockSchema: {
+            fieldsets: [
+                { id: 'default', title: 'Default', fields: ['href', 'overwrite', 'title', 'head_title', 'description', 'preview_image'] },
+            ],
+            properties: {
+                href: { title: 'Target', widget: 'object_browser', mode: 'link', allowExternals: true },
+                overwrite: { title: 'Customize teaser content', type: 'boolean', default: false },
+                title: { title: 'Title' },
+                head_title: { title: 'Kicker' },
+                description: { title: 'Description', widget: 'textarea' },
+                preview_image: { title: 'Image override', widget: 'object_browser', mode: 'image', allowExternals: true },
+            },
+            required: ['href'],
+        },
+        // The teaser's RULE, not a snapshot of one side of it. A teaser MIRRORS
+        // its target by default — title/description/image belong to the page it
+        // points at and are not this block's to edit — until "Customize teaser
+        // content" is ticked, when they become its own.
+        //
+        // Volto expresses that as a schema FUNCTION of the data, which cannot
+        // reach a frontend: the block config crosses postMessage, so functions
+        // don't survive. fieldRules is the declarative form of the same rule and
+        // travels intact, so the admin and the mock parent resolve the teaser
+        // identically — instead of one of them believing the title is always
+        // editable and the other that it has no fields at all.
+        schemaEnhancer: {
+            fieldRules: {
+                title: { when: { overwrite: true }, else: false },
+                head_title: { when: { overwrite: true }, else: false },
+                description: { when: { overwrite: true }, else: false },
+                preview_image: { when: { overwrite: true }, else: false },
+            },
+        },
     },
     // Image block: parents declare claims via inheritSchemaFrom.parentControlled.image.
     image: {
         id: 'image',
         title: 'Image',
+        // Mirrors Volto's ImageSchema (core Image/schema.jsx), with two
+        // deliberate differences.
+        //
+        // 1. `url` is declared. Volto leaves it out of `properties` because the
+        //    upload widget writes it, not a sidebar field — but hydra reads the
+        //    schema to learn that `url` is a MEDIA field, which is what makes
+        //    data-edit-media="url" an editable target rather than an unknown
+        //    attribute. Undeclared, the image is uneditable on the canvas.
+        //
+        // 2. `url` is REQUIRED. An image block exists to hold an image, so it
+        //    renders one either way — a grey placeholder until the author picks
+        //    a real one, giving them something to click. Marking it required is
+        //    what tells reveal to leave it alone: reveal is for OPTIONAL fields
+        //    that are absent until asked for (a hero's image), and offering to
+        //    "reveal" a field whose element is already on screen is nonsense.
+        //
+        // Volto states the rest as a schema FUNCTION of formData (alt/align/size
+        // and the link fieldset appear only once a url exists). A function can't
+        // cross postMessage to a frontend, so the same rule is expressed as
+        // fieldRules, which travels as data.
+        blockSchema: {
+            fieldsets: [
+                { id: 'default', title: 'Default', fields: ['url', 'alt', 'align', 'size'] },
+                { id: 'link_settings', title: 'Link settings', fields: ['href', 'openLinkInNewTab'] },
+            ],
+            properties: {
+                url: { title: 'Image', widget: 'image' },
+                alt: { title: 'Alt text' },
+                align: { title: 'Alignment', widget: 'align', default: 'center' },
+                size: { title: 'Size', widget: 'image_size', default: 'l' },
+                href: {
+                    title: 'Link to',
+                    widget: 'object_browser',
+                    mode: 'link',
+                    selectedItemAttrs: ['Title', 'Description', 'hasPreviewImage'],
+                    allowExternals: true,
+                },
+                openLinkInNewTab: { title: 'Open in a new tab', type: 'boolean' },
+            },
+            required: ['url'],
+        },
+        schemaEnhancer: {
+            fieldRules: {
+                alt: { when: { url: { isSet: true } }, else: false },
+                align: { when: { url: { isSet: true } }, else: false },
+                size: { when: { url: { isSet: true } }, else: false },
+                href: { when: { url: { isSet: true } }, else: false },
+                openLinkInNewTab: { when: { url: { isSet: true } }, else: false },
+            },
+        },
         fieldMappings: {
             '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },
         },
@@ -822,10 +951,7 @@ export const sharedBlocksConfig = {
                     title: 'Title',
                     type: 'string',
                 },
-                description: {
-                    title: 'Description',
-                    type: 'textarea',
-                },
+                description: { title: 'Description', type: 'string', widget: 'textarea' },
                 subblocks: {
                     title: 'Fields',
                     widget: 'object_list',

@@ -11,6 +11,11 @@
  * Env vars:
  *   DISCOVER_BLOCKS_API  - Plone API URL for discovery and content fetching
  *   MOCK_PARENT_URL      - URL of mock-parent.html (defaults to test-frontend port)
+ *   CONTAINMENT_EXEMPT_SLOTS
+ *                        - comma-separated template slot ids where a block may
+ *                          sit outside its container's allowedBlocks on purpose
+ *                          (e.g. a docs site's component showcase slot). See
+ *                          readContainmentRules in helpers/discover-blocks.cjs.
  *
  * Works against any Plone API — mock or remote.
  */
@@ -24,6 +29,7 @@ import { URLS } from '../ports';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { requireEnvironment } from '../helpers/preconditions';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 interface DiscoveredBlock {
   blockType: string;
@@ -76,12 +82,17 @@ discoveredBlocks = discoveredBlocks.filter(
 const SANITY_PROJECTS = new Set(['mock', 'nuxt', 'nextjs']);
 
 base.beforeEach(async ({}, testInfo) => {
-  if (discoveredBlocks.length === 0) {
-    testInfo.skip(true, 'No .discovered-blocks.json found — run with DISCOVER_BLOCKS_API=<url>');
-  }
+  // Scope BEFORE environment: a project this spec doesn't cover is a decision,
+  // and no CI change would make it run — so it skips even on CI. Discovery
+  // missing is the opposite, hence requireEnvironment below.
   if (!SANITY_PROJECTS.has(testInfo.project.name)) {
     testInfo.skip(true, `block-sanity only runs on mock/nuxt/nextjs (skipping ${testInfo.project.name})`);
   }
+  requireEnvironment(
+    testInfo,
+    discoveredBlocks.length > 0,
+    'no .discovered-blocks.json — discovery needs DISCOVER_BLOCKS_API=<mock api url> in this job',
+  );
 });
 
 const test = base.extend<{ helper: AdminUIHelper }>({
@@ -110,11 +121,14 @@ test.describe('Block sanity (auto-discovered)', () => {
     // A frontend-registered type with no content example — fails as its own
     // test (nothing to render) rather than blocking the suite.
     if (block.noExample) {
-      test(`${block.blockType} block has a content example to render`, () => {
+      test(`${block.blockType} block has an editable content example to render`, () => {
         throw new Error(
-          `Block @type "${block.blockType}" is registered in the frontend but no content ` +
+          `Block @type "${block.blockType}" is registered in the frontend but no EDITABLE content ` +
             `example exists to run its render test. Add a fixture (a page with a populated ` +
-            `instance), or mark the type restricted if it only belongs inside a parent container.`,
+            `instance), or mark the type restricted if it only belongs inside a parent container.\n\n` +
+            `Locked instances don't count: a /templates/* definition, or a block flagged ` +
+            `readOnly/fixed, cannot be edited by an author, so the editing checks would be ` +
+            `asserting the opposite of what that block is for.`,
         );
       });
       continue;
@@ -198,8 +212,11 @@ test.describe('Block sanity (auto-discovered)', () => {
         // Sub-block iteration uses the bridge's blockPathMap (canonical,
         // schema-resolved) rather than a shape heuristic on blockData.
         checkSubBlocks: true,
-        // Skip data-edit-text clicks for discovered content — we just want rendering + annotation checks
-        checkEditTextClicks: false,
+        // Click the block's first editable field and require that it actually
+        // becomes editable. Annotation presence alone is not the contract an
+        // author experiences: a component whose own JS reveals or rebuilds its
+        // DOM can carry every annotation and still be impossible to type into.
+        checkEditTextClicks: true,
       });
 
       // Accessibility pass (axe-core) over the WHOLE rendered fixture page —

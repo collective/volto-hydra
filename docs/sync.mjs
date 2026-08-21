@@ -1478,6 +1478,57 @@ function parseConceptsMd(mdContent) {
   return { blocks, items };
 }
 
+/**
+ * Turn a markdown-relative link into the path the SITE serves.
+ *
+ * The markdown is the source of truth and its links are markdown links —
+ * `[Templates](templates.md#slots)` — which is exactly right for Sphinx, where
+ * pages are files. The Plone content built from it is served at
+ * `/docs/templates`, so those hrefs have to be resolved on the way through:
+ * left alone they render as `/docs/templates.md`, which is a dead link on every
+ * generated page (the page integrity crawl found six of them).
+ *
+ * Anchors survive (`#slots`), a folder's `index.md`/`README.md` collapses to the
+ * folder, and anything that isn't a relative .md link — http(s), mailto, a bare
+ * `#anchor`, an already-absolute path — is returned untouched.
+ *
+ * @param {string} url - the href as written in the markdown
+ * @param {string} folder - content folder of the page being generated, e.g. "docs/architecture"
+ * @returns {string} the site path, anchor included
+ */
+function resolveMarkdownLink(url, folder) {
+  if (!url || /^(https?:|mailto:|#|\/)/.test(url)) return url;
+  const [target, ...anchorParts] = url.split('#');
+  if (!target.endsWith('.md')) return url;
+  const anchor = anchorParts.length ? `#${anchorParts.join('#')}` : '';
+  let base = target.slice(0, -'.md'.length);
+  if (/\/(index|README)$/.test(base)) base = base.replace(/\/(index|README)$/, '');
+  // A page generated from `foo.md` sits in the folder holding that file, so its
+  // markdown siblings resolve against the PARENT of its own content folder.
+  const parent = folder.includes('/') ? folder.slice(0, folder.lastIndexOf('/')) : '';
+  const segments = [];
+  for (const part of `${parent}/${base}`.split('/')) {
+    if (!part || part === '.') continue;
+    if (part === '..') segments.pop();
+    else segments.push(part);
+  }
+  return `/${segments.join('/')}${anchor}`;
+}
+
+/** Rewrite every markdown link in a page's blocks to the path the site serves. */
+function resolveMarkdownLinksInBlocks(blocks, folder) {
+  const walk = (node) => {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (!node || typeof node !== 'object') return;
+    if (node.type === 'link' && node.data && typeof node.data.url === 'string') {
+      node.data.url = resolveMarkdownLink(node.data.url, folder);
+    }
+    for (const value of Object.values(node)) walk(value);
+  };
+  walk(blocks);
+  return blocks;
+}
+
 const docsMdFiles = Object.keys(CONCEPTS_MD_TO_FOLDER);
 
 for (const mdFile of docsMdFiles) {
@@ -1492,6 +1543,10 @@ for (const mdFile of docsMdFiles) {
   }
   const mdContent = readFileSync(mdPath, 'utf-8');
   const { blocks: newBlocks, items: newItems } = parseConceptsMd(mdContent);
+  // Markdown links point at .md files; the site serves paths (see
+  // resolveMarkdownLink). Resolve here, where the page's folder is known.
+  // `folder` is relative to DOCS_CONTENT_DIR, which the site serves at /docs.
+  resolveMarkdownLinksInBlocks(newBlocks, `docs/${folder}`);
 
   // Build the shell every run — title, description, parent metadata, and
   // is_folderish are derived from CONCEPTS_MD_TO_FOLDER + the markdown's H1
@@ -1573,6 +1628,10 @@ for (const mdFile of docsMdFiles) {
   if (existsSync(indexMdPath) && existsSync(indexJsonPath)) {
     const indexMd = readFileSync(indexMdPath, 'utf-8');
     const { blocks: parsedBlocks, items: parsedItems } = parseConceptsMd(indexMd);
+    // The landing page lives at /docs, so its markdown links resolve there too
+    // (this page is generated here rather than in the loop above, and was the
+    // one place still emitting .md hrefs).
+    resolveMarkdownLinksInBlocks(parsedBlocks, 'docs/index');
     const originalRootJson = readFileSync(indexJsonPath, 'utf-8');
     const rootData = JSON.parse(originalRootJson);
 

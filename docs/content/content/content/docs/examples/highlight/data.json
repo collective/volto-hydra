@@ -207,7 +207,7 @@
           "@id": "ref-highlight-schema-javascript-80590c",
           "label": "Schema",
           "language": "javascript",
-          "code": "{\n  \"highlight\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"title\": {\n          \"title\": \"Title\"\n        },\n        \"description\": {\n          \"title\": \"Description\",\n          \"widget\": \"slate\"\n        },\n        \"image\": {\n          \"title\": \"Background Image\",\n          \"widget\": \"image\"\n        },\n        \"cta_title\": {\n          \"title\": \"CTA Text\"\n        },\n        \"cta_link\": {\n          \"title\": \"CTA Link\",\n          \"widget\": \"object_browser\",\n          \"mode\": \"link\"\n        }\n      }\n    }\n  }\n}"
+          "code": "{\n  \"highlight\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"title\": {\n          \"title\": \"Title\"\n        },\n        \"description\": {\n          \"title\": \"Description\",\n          \"widget\": \"slate\",\n          \"type\": \"array\"\n        },\n        \"image\": {\n          \"title\": \"Background Image\",\n          \"widget\": \"image\"\n        },\n        \"cta_title\": {\n          \"title\": \"CTA Text\"\n        },\n        \"cta_link\": {\n          \"title\": \"CTA Link\",\n          \"widget\": \"object_browser\",\n          \"mode\": \"link\"\n        }\n      }\n    }\n  }\n}"
         }
       ]
     },

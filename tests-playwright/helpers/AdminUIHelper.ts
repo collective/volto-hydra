@@ -2845,6 +2845,40 @@ export class AdminUIHelper {
    * @param fieldName - Optional field name to target (e.g., 'value', 'title'). If not provided, uses first editable field.
    * @returns The editor element, ready for text input
    */
+  /**
+   * The uid of a block you located by CONTENT or POSITION.
+   *
+   * Every block-level helper here takes a `blockId`, so a spec that wants "the
+   * card I just added" or "the empty block in this grid" has to produce one —
+   * and 105 places currently do it by hand, reading the attribute inline. That
+   * couples specs to a value which is generated, changes, and means nothing to
+   * the person reading the test. Locate the block the way a reader would and
+   * resolve the uid here, in the one place that has to know the attribute
+   * exists.
+   *
+   *   const empty = iframe.locator('.nsw-card:has([data-edit-text][data-empty])').first();
+   *   await helper.enterEditMode(await helper.getBlockUid(empty), 'title');
+   *
+   * Resolves from the element itself or the nearest ancestor carrying the
+   * attribute, because a component may put `data-block-uid` on a wrapper rather
+   * than on the element that matched the content selector.
+   */
+  async getBlockUid(target: Locator): Promise<string> {
+    await target.waitFor({ state: 'attached', timeout: 10000 });
+    const uid = await target.evaluate((el) => {
+      const owner = (el as Element).closest('[data-block-uid]');
+      return owner?.getAttribute('data-block-uid') || '';
+    });
+    if (!uid) {
+      throw new Error(
+        'getBlockUid: the located element carries no data-block-uid and neither ' +
+          'does any ancestor. A block that was just added may not be registered ' +
+          'with the bridge yet — wait for it to render before resolving.',
+      );
+    }
+    return uid;
+  }
+
   async enterEditMode(blockId: string, fieldName?: string): Promise<any> {
     const iframe = this.getIframe();
 

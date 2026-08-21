@@ -276,7 +276,7 @@ function checkIntegrity(contentDir) {
   const warnings = [];
   const stats = {
     items: 0,
-    imagesOk: 0, imagesBroken: 0,
+    imagesOk: 0, imagesBroken: 0, imagesPlaceholder: 0,
     resolveuidOk: 0, resolveuidBroken: 0,
     linksOk: 0, linksBroken: 0,
     layoutOk: 0, layoutBroken: 0,
@@ -346,6 +346,43 @@ function checkIntegrity(contentDir) {
     }
   }
 
+  /**
+ * Pixel dimensions from an image file's header — no decoding, no dependencies.
+ * Returns null for a format we don't parse (SVG has no intrinsic size anyway).
+ */
+function imageDimensions(file) {
+  let buf;
+  try {
+    const fd = fs.openSync(file, 'r');
+    buf = Buffer.alloc(64);
+    fs.readSync(fd, buf, 0, 64, 0);
+    fs.closeSync(fd);
+  } catch {
+    return null;
+  }
+  if (buf.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
+    return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+  }
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) {
+    return { width: buf.readUInt16LE(6), height: buf.readUInt16LE(8) };
+  }
+  if (buf[0] === 0xff && buf[1] === 0xd8) {
+    // JPEG dimensions live in a SOF segment, which needs the whole file.
+    let all;
+    try { all = fs.readFileSync(file); } catch { return null; }
+    let i = 2;
+    while (i < all.length - 9) {
+      if (all[i] !== 0xff) { i += 1; continue; }
+      const marker = all[i + 1];
+      if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+        return { height: all.readUInt16BE(i + 5), width: all.readUInt16BE(i + 7) };
+      }
+      i += 2 + all.readUInt16BE(i + 2);
+    }
+  }
+  return null;
+}
+
   // Pass 2b: Image content items have blob files
   for (const { rel, data } of items) {
     if (data['@type'] !== 'Image') continue;
@@ -356,8 +393,22 @@ function checkIntegrity(contentDir) {
       errors.push(`  ${rel}: image has remote URL (not blob_path): ${download.slice(0, 60)}`);
       stats.imagesBroken += 1;
     } else if (blobPath) {
-      if (fs.existsSync(path.join(contentDir, blobPath))) {
-        stats.imagesOk += 1;
+      const blobFile = path.join(contentDir, blobPath);
+      if (fs.existsSync(blobFile)) {
+        // "The file is there" is not the same as "there is a picture there". A
+        // 1x1 stub passes every existence check and every rendered check — it
+        // loads, so naturalWidth is 1, not 0 — and shows as an empty box on the
+        // page. This is the only layer that can tell the difference, because it
+        // is the only one that reads the bytes.
+        const dim = imageDimensions(blobFile);
+        if (dim && dim.width <= 1 && dim.height <= 1) {
+          warnings.push(
+            `  ${rel}: image is a ${dim.width}x${dim.height} placeholder, not a real image: ${blobPath}`,
+          );
+          stats.imagesPlaceholder += 1;
+        } else {
+          stats.imagesOk += 1;
+        }
       } else {
         errors.push(`  ${rel}: blob file missing: ${blobPath}`);
         stats.imagesBroken += 1;
@@ -522,7 +573,12 @@ function formatReport(title, result) {
     lines.push(`Content export OK: ${result.stats.dataFiles} data files, ${result.stats.blobFiles} blob files`);
   } else {
     lines.push(`Content: ${result.stats.items} items`);
-    lines.push(`Images:  ${result.stats.imagesOk} ok, ${result.stats.imagesBroken} broken`);
+    lines.push(
+      `Images:  ${result.stats.imagesOk} ok, ${result.stats.imagesBroken} broken` +
+        (result.stats.imagesPlaceholder
+          ? `, ${result.stats.imagesPlaceholder} placeholder`
+          : ''),
+    );
     lines.push(`UIDs:    ${result.stats.resolveuidOk} resolved, ${result.stats.resolveuidBroken} broken`);
     lines.push(`Links:   ${result.stats.linksOk} ok, ${result.stats.linksBroken} broken`);
     lines.push(`Layout:  ${result.stats.layoutOk} ok, ${result.stats.layoutBroken} dangling`);

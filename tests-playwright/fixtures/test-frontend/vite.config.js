@@ -24,6 +24,10 @@ const envPort = (name, fallback) => {
 };
 const TEST_FRONTEND_PORT = envPort('HYDRA_TEST_FRONTEND_PORT', 8889);
 const MOCK_API_ORIGIN = `http://localhost:${envPort('HYDRA_MOCK_API_PORT', 8888)}`;
+// Same reasoning for the frontend: mock-parent.html defaulted its iframe to a
+// literal localhost:8889, so any run on an overridden port framed a dead server
+// unless the caller remembered to pass ?frontend=.
+const TEST_FRONTEND_ORIGIN = `http://localhost:${TEST_FRONTEND_PORT}`;
 
 export default defineConfig({
   root: __dirname,
@@ -41,7 +45,9 @@ export default defineConfig({
           {
             tag: 'script',
             injectTo: 'head-prepend',
-            children: `window._apiOrigin = ${JSON.stringify(MOCK_API_ORIGIN)};`,
+            children:
+              `window._apiOrigin = ${JSON.stringify(MOCK_API_ORIGIN)};` +
+              `window._frontendOrigin = ${JSON.stringify(TEST_FRONTEND_ORIGIN)};`,
           },
         ];
       },

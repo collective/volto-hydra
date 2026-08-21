@@ -545,16 +545,25 @@ jobs:
           node tests-playwright/fixtures/mock-api-server.cjs &
           npx vite --config tests-playwright/fixtures/test-frontend/vite.config.js &
           cd examples/hydra-nextjs && pnpm run start:test &
-          cd examples/hydra-vue-f7 && VITE_API_BASE_URL=http://localhost:8888 npx vite --port 3008 --strictPort --config vite.config.test.js &
+          cd examples/hydra-vue-f7 && VITE_API_BASE_URL=http://localhost:8888 npx vite --port 3008 --strictPort --config vite.config.test.mjs &
           sleep 3
       - name: Wait for servers
         run: |
+          # Fail here if a server never came up. The old loop just ran out of
+          # attempts and carried on, so a dead frontend reached the tests as 140
+          # identical 30s timeouts ("no [data-block-uid] visible") and burned the
+          # job's whole 45min budget — the symptom looked like 140 bugs.
           for port in 8888 8889 3007 3008; do
             echo "Waiting for port $port..."
+            ready=""
             for i in {1..30}; do
-              curl -s http://localhost:$port > /dev/null && break
+              if curl -s http://localhost:$port > /dev/null; then ready=1; break; fi
               sleep 2
             done
+            if [ -z "$ready" ]; then
+              echo "::error::No server on port $port after 60s — check the Start servers step"
+              exit 1
+            fi
           done
           echo "All servers ready"
       - name: Run tests
@@ -563,6 +572,11 @@ jobs:
           CI: true
           NO_WEBSERVER: true
           SKIP_VOLTO_CHECK: true
+          # Without this, discovery never runs here, so block-sanity and
+          # page-integrity found no .discovered-blocks.json and skipped — the
+          # nextjs project is inside block-sanity's own scope, so it had simply
+          # stopped being checked while the job reported green.
+          DISCOVER_BLOCKS_API: http://localhost:8888
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v4

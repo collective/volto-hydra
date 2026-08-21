@@ -16,7 +16,8 @@ This is a **custom** block — register it via `initBridge`.
         },
         "description": {
           "title": "Description",
-          "widget": "slate"
+          "widget": "slate",
+          "type": "array"
         },
         "image": {
           "title": "Background Image",

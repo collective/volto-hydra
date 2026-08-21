@@ -6,6 +6,7 @@ import SlateBlock, { SlateInline } from "@/components/SlateBlock";
 import CodeExampleBlock from "@/components/CodeExampleBlock/CodeExampleBlock";
 import { expandTemplatesSync, expandListingBlocks, ploneFetchItems, staticBlocks, contentPath } from "#utils/helpers";
 import SwiperSlider from "@/components/SwiperSlider";
+import { pageFromPath } from "#utils/paging";
 
 // Template context for nested block expansion
 const TemplateContext = createContext({ templates: {}, templateState: {} });
@@ -335,11 +336,7 @@ function ListingBlock({ id, block, data, apiUrl, contextPath }) {
   // Read initial page from URL on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const path = window.location.pathname;
-      const match = path.match(new RegExp(`@pg_${id}_(\\d+)`));
-      if (match) {
-        setCurrentPage(parseInt(match[1], 10));
-      }
+      setCurrentPage(pageFromPath(window.location.pathname, id));
     }
   }, [id]);
 
@@ -409,6 +406,11 @@ function AccordionBlock({ id, block, data, apiUrl, contextPath }) {
       {panels.map((panel, i) => {
         const children = expand(panel.blocks_layout?.items || [], panel.blocks || {});
         const isOpen = !!openPanels[panel["@uid"]];
+        // What the toggle button can reveal: the panel itself and every block
+        // inside it, since the editor can select any of them from the document
+        // tree while the panel is closed. The bridge clicks this handle to open
+        // the panel before measuring the selected block.
+        const revealTargets = [panel["@uid"], ...(panel.blocks_layout?.items || [])].join(" ");
         return (
           <div key={panel["@uid"] || i} data-block-uid={panel["@uid"]} style={{ border: "1px solid #e5e7eb" }}>
             <h2>
@@ -416,6 +418,7 @@ function AccordionBlock({ id, block, data, apiUrl, contextPath }) {
                 type="button"
                 onClick={() => toggle(panel["@uid"])}
                 aria-expanded={isOpen ? "true" : "false"}
+                data-block-selector={revealTargets}
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "space-between",
                   width: "100%", padding: "1.25rem", fontWeight: 500, cursor: "pointer",
@@ -430,13 +433,18 @@ function AccordionBlock({ id, block, data, apiUrl, contextPath }) {
                 </svg>
               </button>
             </h2>
-            {isOpen && (
-              <div style={{ padding: "1.25rem", borderTop: "1px solid #e5e7eb" }}>
-                {children.map((item) => (
-                  <Block key={item["@uid"]} block={item} id={item["@uid"]} data={data} apiUrl={apiUrl} contextPath={contextPath} />
-                ))}
-              </div>
-            )}
+            {/* A closed panel HIDES its content, it does not unmount it. The
+                blocks inside are real blocks the editor can select from the
+                document tree, and a selected block that isn't in the DOM has no
+                rect, no toolbar and nothing to reveal — so the bridge can never
+                bring it into view. display:none is what hydra expects here. */}
+            <div
+              style={{ padding: "1.25rem", borderTop: "1px solid #e5e7eb", display: isOpen ? "block" : "none" }}
+            >
+              {children.map((item) => (
+                <Block key={item["@uid"]} block={item} id={item["@uid"]} data={data} apiUrl={apiUrl} contextPath={contextPath} />
+              ))}
+            </div>
           </div>
         );
       })}
@@ -940,6 +948,15 @@ function SearchBlock({ id, block, data, apiUrl, contextPath }) {
   );
 }
 
+/**
+ * Stand-in for an image block that has no image yet: a transparent-grey SVG with
+ * real intrinsic dimensions, so it lays out like the image it will become and
+ * gives the author something to click. Kept at module scope — a data URI rebuilt
+ * per render would change identity and churn the DOM.
+ */
+const IMAGE_BLOCK_PLACEHOLDER =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect width='400' height='300' fill='%23e5e7eb'/%3E%3C/svg%3E";
+
 // ─── Block Component ─────────────────────────────────────────────────────────
 
 function Block({ block, id, data, apiUrl, contextPath }) {
@@ -990,7 +1007,13 @@ function Block({ block, id, data, apiUrl, contextPath }) {
     // ── Image ──
     case "image": {
       const imgProps = imageProps(block, apiUrl);
-      const src = imgProps.url || "";
+      // An image block with no image still renders one — a grey placeholder at
+      // the shape a real image would take. This block exists to hold an image,
+      // so the author has to be able to click it to set one, and a block that
+      // renders nothing has no box to click and no toolbar to reveal from.
+      // That is NOT the always-render hack #296 forbids: that rule is about
+      // OPTIONAL fields (a hero's image), which stay absent until revealed.
+      const src = imgProps.url || IMAGE_BLOCK_PLACEHOLDER;
       const href = getUrl(block.href, apiUrl);
       return (
         <div
@@ -1179,6 +1202,49 @@ function Block({ block, id, data, apiUrl, contextPath }) {
       );
     }
 
+    // ── Section — a plain container: a wrapper and the blocks it holds ──
+    case "section": {
+      const sectionChildren = expand(block.blocks_layout?.items || [], block.blocks || {});
+      return (
+        <section data-block-uid={id} data-block-container="{}" className="section-block">
+          {sectionChildren.map((item) => (
+            <Block key={item["@uid"]} block={item} id={item["@uid"]} data={data} apiUrl={apiUrl} contextPath={contextPath} />
+          ))}
+        </section>
+      );
+    }
+
+    // ── Context navigation — its entries are child blocks: `navItem`s written by
+    // hand, or a `listing` that generates them from a query. Both are rendered
+    // as blocks, so each keeps its own data-block-uid and stays selectable.
+    case "contextNavigation": {
+      const navChildren = expand(block.blocks_layout?.items || [], block.blocks || {});
+      return (
+        <nav
+          data-block-uid={id}
+          data-block-container="{}"
+          className="context-navigation-block"
+          aria-label={block.ariaLabel || "Section navigation"}
+        >
+          {navChildren.map((item) => (
+            <Block key={item["@uid"]} block={item} id={item["@uid"]} data={data} apiUrl={apiUrl} contextPath={contextPath} />
+          ))}
+        </nav>
+      );
+    }
+
+    // ── Nav item — one entry of a contextNavigation ──
+    case "navItem": {
+      const navHref = getUrl(block.href, apiUrl);
+      return (
+        <div data-block-uid={id} className="nav-item-block">
+          <a href={navHref || "#"} data-edit-link="href" data-edit-text="label">
+            {block.label || ""}
+          </a>
+        </div>
+      );
+    }
+
     // ── Accordion ──
     case "accordion":
       return <AccordionBlock id={id} block={block} data={data} apiUrl={apiUrl} contextPath={contextPath} />;
@@ -1275,8 +1341,13 @@ function Block({ block, id, data, apiUrl, contextPath }) {
           className="highlight-block"
           style={{ position: "relative", overflow: "hidden", borderRadius: "8px" }}
         >
+          {/* data-edit-media on BOTH branches: the backdrop element exists either
+              way (it is the block's background), so annotating it costs no extra
+              markup and is the only way this image is editable at all — as a CSS
+              background it has no <img> for the editor to aim at. */}
           {highlightImgProps.url ? (
             <div
+              data-edit-media="image"
               style={{
                 position: "absolute", inset: 0,
                 backgroundImage: `url(${highlightImgProps.url})`,
@@ -1284,7 +1355,7 @@ function Block({ block, id, data, apiUrl, contextPath }) {
               }}
             />
           ) : (
-            <div style={{ position: "absolute", inset: 0, backgroundColor: block.color || "#f0f0f0" }} />
+            <div data-edit-media="image" style={{ position: "absolute", inset: 0, backgroundColor: block.color || "#f0f0f0" }} />
           )}
           <div style={{ position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.5)" }} />
           <div style={{ position: "relative", padding: "4rem 1rem", textAlign: "center", color: "#fff" }}>

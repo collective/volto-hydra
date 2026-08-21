@@ -426,7 +426,7 @@ export default defineConfig({
       url: URLS.reactDoc,
       timeout: 30 * 1000,
       reuseExistingServer: true,
-      cwd: path.join(process.cwd(), 'docs/blocks/test-react'),
+      cwd: path.join(process.cwd(), 'docs/examples/test-react'),
       stdout: 'pipe' as const,
       stderr: 'pipe' as const,
     }] : []),
@@ -437,7 +437,7 @@ export default defineConfig({
       url: URLS.svelteDoc,
       timeout: 30 * 1000,
       reuseExistingServer: true,
-      cwd: path.join(process.cwd(), 'docs/blocks/test-svelte'),
+      cwd: path.join(process.cwd(), 'docs/examples/test-svelte'),
       stdout: 'pipe' as const,
       stderr: 'pipe' as const,
     }] : []),
@@ -448,7 +448,7 @@ export default defineConfig({
       url: URLS.vueDoc,
       timeout: 30 * 1000,
       reuseExistingServer: true,
-      cwd: path.join(process.cwd(), 'docs/blocks/test-vue'),
+      cwd: path.join(process.cwd(), 'docs/examples/test-vue'),
       stdout: 'pipe' as const,
       stderr: 'pipe' as const,
     }] : []),
@@ -469,7 +469,14 @@ export default defineConfig({
     // Example frontends — opt-in only
     ...(needsNextjs ? [{
       name: 'Next.js Frontend (Test)',
-      command: 'pnpm run dev:test',
+      // Wait for the mock API before starting. Playwright brings every
+      // webServer up at once, and the mock API only listens after it has
+      // scanned all content (~40s) — so Next would boot first, its very first
+      // SSR fetch would be refused, and the whole run failed with "#previewIframe
+      // never appeared" on every test. It reads like the app is broken; it is a
+      // start-order race. CI doesn't hit this path (NO_WEBSERVER=true; the
+      // workflow starts and waits for servers itself).
+      command: `until curl -sf ${URLS.mockApi}/health > /dev/null 2>&1; do sleep 1; done; pnpm run dev:test`,
       url: URLS.nextjs,
       timeout: 120 * 1000,
       reuseExistingServer: true,
@@ -482,7 +489,12 @@ export default defineConfig({
     }] : []),
     ...(needsF7 ? [{
       name: 'Framework7 Frontend (Test)',
-      command: `cp ../../packages/hydra-js/hydra.js ./src/js/hydra.js && npx vite --port ${PORTS.f7} --strictPort --config vite.config.test.js`,
+      // No hydra.js copy: the app imports `@hydra-js/hydra.js`, which both vite
+      // configs alias to packages/hydra-js/hydra.src.js — vite compiles the
+      // SOURCE per request, so the example always runs the current bridge. The
+      // copy wrote a gitignored file nothing reads, and reading it as the served
+      // bridge sent me chasing a "stale build" that never existed.
+      command: `npx vite --port ${PORTS.f7} --strictPort --config vite.config.test.mjs`,
       url: URLS.f7,
       timeout: 120 * 1000,
       reuseExistingServer: true,
