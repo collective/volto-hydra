@@ -85,6 +85,22 @@ because `${` is not a JSON token:
 | `value="${p,h*,ul/slate}"` | a node **set** — any of these node kinds → slate |
 | `_="${hr}"` | match-only: consumes a node, captures nothing (separator) |
 
+The **node kinds** a ref can target: `p`, `h1`–`h6` / `h` (relative) / `h*` (any),
+`img`, `a`, `ul`, `ol`, `li`, `blockquote`, `pre` (code fence), `hr`, `table`, and
+`strong` / `em` (a lone-bold / lone-italic paragraph). A trailing `?`
+(`${strong?/text}`) makes the slot **optional**. The **parts** a ref can read:
+
+| part | from | yields |
+|---|---|---|
+| `text` | any | the node's text |
+| `slate` | any | the node as a slate value (rich prose) |
+| `src` / `alt` | `img` | the image url / alt |
+| `title` | `img` / `a` | the title-string `![a](u "title")` / `[t](u "title")` |
+| `link` | `a` / `img` | the object-browser widget `[{'@id': url}]` |
+| `lang` / `text` | `pre` | the fence language / code |
+| `meta` | `pre` | the fence info-string after the lang |
+| `level` | `h1`–`h6` | the heading depth (for `tag="h${1/level}"`) |
+
 Interpolation isn't invertible, so only the **emitter** runs it backwards and
 checks the result reproduces the stored value (verify-on-emit); a value the
 construct can't carry keeps a literal attribute instead of being silently
