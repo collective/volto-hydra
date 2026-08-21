@@ -52,7 +52,10 @@ const PROTO_TEXT = {
   // h1) are declared AFTER it so they win the CSS cascade tie.
   slate: '<block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />',
   title: '<block type="title" _="${h1}" />',
-  separator: '<block type="separator" _="${hr}" />',
+  // `align: full` is the default separator style (34 of 56); declaring it here
+  // makes those emit as a bare `---` and be restored on decode, while left/center
+  // /background variants keep their explicit `<fields>`.
+  separator: '<block type="separator" _="${hr}" styles={"align":"full"} />',
   button: '<block type="button" title="${p/text}" href="${p/link}" />',
   // href is @id-only (the heading's link); the teaser's rendered title/
   // description/hasPreviewImage are RESOLVED from the target by the mount, not
@@ -92,6 +95,16 @@ const PROTO_TEXT = {
     '<block type="accordion" right_arrows=true>',
     '  <region name="panels" widget="object_list">',
     '    <block type="panel" title="${h/text}" />',
+    '  </region>',
+    '</block>',
+  ].join('\n'),
+  // A slide is a teaser-shaped card: heading (title) + paragraph (description) +
+  // image (preview_image, object-browser @id) + a button link (buttonText/href);
+  // head_title/flagAlign the card can't carry spill into a per-slide <fields>.
+  slider: [
+    '<block type="slider">',
+    '  <region name="slides" widget="object_list">',
+    '    <block type="slide" title="${h/text}" head_title="${strong?/text}" description="${p/text}" buttonText="${p[2]/text}" href="${p[2]/link}" preview_image="${img/link}" />',
     '  </region>',
     '</block>',
   ].join('\n'),

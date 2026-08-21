@@ -37,7 +37,7 @@ let linksCollapsed = 0;
 const LINK_KEYS = new Set(['@id', '@type', 'title', 'Title', 'description', 'Description',
   'hasPreviewImage', 'getRemoteUrl', 'head_title', 'image_field', 'image_scales', 'review_state']);
 const isLinkSummary = (o) => o && typeof o === 'object' && !Array.isArray(o)
-  && '@id' in o && Object.keys(o).every((k) => LINK_KEYS.has(k));
+  && '@id' in o && ('@type' in o || Object.keys(o).every((k) => LINK_KEYS.has(k)));
 
 /** Adjacent bare-text leaves are one leaf in Slate (merged on normalise). */
 function mergeTextLeaves(items) {
