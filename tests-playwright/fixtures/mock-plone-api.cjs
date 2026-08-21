@@ -2873,6 +2873,18 @@ app.get('*/@@download/*', (req, res) => {
   const contentPath = pathMatch ? pathMatch[1] : '';
   const fieldName = pathMatch ? pathMatch[2] : 'image';
 
+  // A markdown mount keeps the blob as an ordinary file beside its markdown, so
+  // serve it directly — same as the @@images handler. Image blocks store their
+  // src as `@@download/image/<file>`, so this path must resolve it too, not only
+  // the distribution `<dir>/image/<file>` layout handled below.
+  if (markdownBlobs.has(contentPath)) {
+    const file = markdownBlobs.get(contentPath);
+    res.set('Content-Type', MARKDOWN_BLOB_MIME[path.extname(file).toLowerCase()]
+      || 'application/octet-stream');
+    res.sendFile(file);
+    return;
+  }
+
   const dirInfo = contentDirMap[contentPath];
   const imageDir = dirInfo ? path.join(dirInfo.dirPath, fieldName) : null;
 
