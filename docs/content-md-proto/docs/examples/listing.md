@@ -32,6 +32,7 @@ blocks-assignments:
   - { uid: 2a597dde-dd2b-4c66-816c-09e243a188f5 }
   - { uid: grid-listing-1 }
   - { uid: c2eaacd0-4e96-4344-a0ac-26ed644fc503 }
+  - { id: slider-listing-1 }
   - { uid: ref-listing-schema }
   - { id: ref-listing-schema-javascript-bd0476 }
   - { uid: ref-listing-json-data }
@@ -57,6 +58,11 @@ blocks-tagged: |
       <block type="teaser" title="${h/text}" description="${p/text}" />
     </region>
   </block>
+  <block type="slider">
+    <region name="slides" widget="object_list">
+      <block type="slide" title="${h/text}" head_title="${strong?/text}" description="${p/text}" buttonText="${p[2]/text}" href="${p[2]/link}" preview_image="${img/link}" />
+    </region>
+  </block>
 ---
 
 # 
@@ -77,7 +83,7 @@ Displays a list of content items from a query. The listing block fetches items f
 
 <block type="gridBlock" headline="Listing: Grid (Teaser)" data-json='{"blocks":[{"@type":"listing","querystring":{"limit":"6","query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Document"]},{"i":"Subject","o":"plone.app.querystring.operation.selection.none","v":["main folder"]}],"sort_on":"getId","sort_order":"ascending"},"variation":"teaser"}],"styles":{"backgroundColor":"transparent"}}' />
 
-<block type="slider" headline="Listing: Image Slider" data-json='{"autoplayDelay":4000,"autoplayEnabled":false,"autoplayJump":false,"slides":[{"@id":"slider-listing-1","@type":"listing","fieldMapping":{"@id":"href","title":"alt","image":"url"},"querystring":{"query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Image"]}],"sort_order":"ascending"},"variation":"image"}],"styles":{}}' />
+<block type="slider" headline="Listing: Image Slider" data-json='{"autoplayDelay":4000,"autoplayEnabled":false,"autoplayJump":false,"slides":[{"@type":"listing","fieldMapping":{"@id":"href","title":"alt","image":"url"},"querystring":{"query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Image"]}],"sort_order":"ascending"},"variation":"image"}]}' />
 
 </fields>
 

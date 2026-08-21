@@ -48,8 +48,8 @@ blocks-tagged: |
 
 <block type="gridBlock">
 
-<block type="listing" headlineTag="h2" variation="default" data-json='{"querystring":{"limit":"7","query":[{"i":"path","o":"plone.app.querystring.operation.string.absolutePath","v":"/docs/examples/grid"}],"sort_order":"ascending"},"styles":{}}' />
+<block type="listing" headlineTag="h2" variation="default" data-json='{"querystring":{"limit":"7","query":[{"i":"path","o":"plone.app.querystring.operation.string.absolutePath","v":"/docs/examples/grid"}],"sort_order":"ascending"}}' />
 
-<block type="listing" headlineTag="h2" variation="default" data-json='{"querystring":{"limit":"7","query":[{"i":"path","o":"plone.app.querystring.operation.string.absolutePath","v":"/docs/examples/grid"}],"sort_on":"getId","sort_order":"descending","sort_order_boolean":true},"styles":{}}' />
+<block type="listing" headlineTag="h2" variation="default" data-json='{"querystring":{"limit":"7","query":[{"i":"path","o":"plone.app.querystring.operation.string.absolutePath","v":"/docs/examples/grid"}],"sort_on":"getId","sort_order":"descending","sort_order_boolean":true}}' />
 
 </block>

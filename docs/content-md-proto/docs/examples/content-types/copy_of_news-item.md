@@ -62,7 +62,7 @@ blocks-matched: |
 
 Ristretto so chicory skinny ristretto au decaffeinated sugar that spoon shop crema ut pot lungo. Flavour that milk brewed flavour whipped kopi black and robusta. Bar sugar americano eu froth variety brewed acerbic steamed. Aroma est milk doppio frappuccino half cream filter french froth luwak. Acerbic plunger au barista flavour in froth trade.
 
-<fields slotId="content" data-json='{"styles":{}}' />
+<fields slotId="content" />
 
 </block>
 

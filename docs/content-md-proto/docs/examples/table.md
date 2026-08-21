@@ -75,8 +75,6 @@ A table with rich text (Slate) content in each cell. Supports adding/removing ro
 
 <block type="image" url="/docs/images/table-edit" alt="The table example block being edited in Volto Hydra" align="center" size="l" />
 
-<fields data-json='{"styles":{}}'>
-
 <block type="heading" alignment="left" heading="Basic Table" tag="h2" />
 
 <block type="slateTable" table.celled table.fixed>
@@ -102,8 +100,6 @@ A table with rich text (Slate) content in each cell. Supports adding/removing ro
 | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) |
 
 </block>
-
-</fields>
 
 <fields data-json='{"styles":{"backgroundColor":"grey"}}'>
 

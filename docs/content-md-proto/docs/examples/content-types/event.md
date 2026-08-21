@@ -64,6 +64,6 @@ blocks-matched: |
 
 </fields>
 
-<block type="slate" slotId="content" data-json='{"styles":{},"value":[{"children":[{"text":""}],"type":"p"}]}' />
+<block type="slate" slotId="content" data-json='{"value":[{"children":[{"text":""}],"type":"p"}]}' />
 
 </fields>

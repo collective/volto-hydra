@@ -62,7 +62,7 @@ blocks-assignments:
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="separator" _="${hr}" />
+  <block type="separator" _="${hr}" styles={"align":"full"} />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="codeExample">
@@ -80,27 +80,13 @@ Renders a table of contents generated from heading blocks on the current page. I
 
 <block type="toc" title="Inhaltsverzeichnis" variation="default" />
 
-<block type="separator">
-
 ---
-
-<fields data-json='{"styles":{"align":"full"}}' />
-
-</block>
 
 <block type="image" align="wide" copyright_and_sources="Copyright: unsplash.com" description="Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt." size="l" title="Title Image" url="/docs/examples/content-types/image-dark" data-json='{"styles":{"size:noprefix":"large"}}' />
 
 <block type="introduction" data-json='{"value":[{"children":[{"text":"Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. "}],"type":"p"}]}' />
 
-<block type="separator">
-
 ---
-
-<fields data-json='{"styles":{"align":"full"}}' />
-
-</block>
-
-<fields data-json='{"styles":{}}'>
 
 ## Text Heading H2&#x20;
 
@@ -129,8 +115,6 @@ Text can be **bold** or *italic*.
 [Link internal](/docs/examples/heading)
 
 [Link external](https://www.google.com/)
-
-</fields>
 
 <block type="separator">
 

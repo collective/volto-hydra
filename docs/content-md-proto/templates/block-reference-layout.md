@@ -25,7 +25,7 @@ blocks-assignments:
   - { id: tpl-rendering-svelte-000000 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
-  <block type="separator" _="${hr}" />
+  <block type="separator" _="${hr}" styles={"align":"full"} />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
@@ -41,7 +41,7 @@ blocks-matched: |
 
 ---
 
-<fields slotId="sep" data-json='{"styles":{"align":"full"}}' />
+<fields slotId="sep" />
 
 </block>
 

@@ -52,7 +52,7 @@ blocks-assignments:
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="separator" _="${hr}" />
+  <block type="separator" _="${hr}" styles={"align":"full"} />
   <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
   <block type="codeExample">
@@ -68,25 +68,13 @@ Displays the page's title and description as a styled header. The introduction b
 
 <block type="image" url="/docs/images/introduction-edit" alt="The introduction example block being edited in Volto Hydra" align="center" size="l" />
 
-<block type="separator">
-
 ---
-
-<fields data-json='{"styles":{"align":"full"}}' />
-
-</block>
 
 <block type="introduction" data-json='{"value":[{"children":[{"text":"Highlight Title H2 "}],"type":"h2"}]}' />
 
 Lorem ipsum vitae elit libero, a pharetra augue. Nulla vitae elit libero, a pharetra augue. Duis mollis, est non commodo luctus, nisi erat porttitor ligula, eget lacinia odio sem nec elit. Donec ullamcorper nulla non metus auctor fringilla. Vivamus sagittis lacus vel augue laoreet rutrum faucibus dolor auctor. Vestibulum id ligula porta felis euismod semper.
 
-<block type="separator">
-
 ---
-
-<fields data-json='{"styles":{"align":"full"}}' />
-
-</block>
 
 ## Headline H2
 

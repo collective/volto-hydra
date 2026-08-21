@@ -78,4 +78,4 @@ blobs:
 
 </block>
 
-<block type="slate" data-json='{"styles":{},"value":[{"children":[{"text":""}],"type":"p"}]}' />
+<block type="slate" data-json='{"value":[{"children":[{"text":""}],"type":"p"}]}' />

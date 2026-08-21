@@ -81,4 +81,4 @@ The default preset is a Nuxt.js frontend deployed as an [SSG](https://hydra-nuxt
 
 To run Inka locally against your own frontend, see the **Run Locally** section of the [project README](https://github.com/collective/volto-hydra#run-locally).
 
-<block type="listing" headlineTag="h2" variation="summary" data-json='{"styles":{},"fieldMapping":{"@id":"href","title":"title","description":"description","image":"image"}}' />
+<block type="listing" headlineTag="h2" variation="summary" data-json='{"fieldMapping":{"@id":"href","title":"title","description":"description","image":"image"}}' />
