@@ -531,11 +531,69 @@ export class Bridge {
         continue;
       }
 
+      // Which block this comment belongs to. Both declaration styles are legal and
+      // in use: the mock frontend names the uid in the comment, while the Nuxt
+      // example omits it because the central <Block> wrapper already carries
+      // data-block-uid. Needed only to judge the selector warning below.
+      const blockUid =
+        parsed.attrs['block-uid']?.[0]?.value ??
+        nextElement.closest('[data-block-uid]')?.getAttribute('data-block-uid');
+
       // Apply attributes to the element
-      this.applyHydraAttributes(nextElement, parsed.attrs);
+      this.applyHydraAttributes(nextElement, parsed.attrs, this.getRenderedBlockData(blockUid));
     }
 
     log('materializeHydraComments: completed');
+  }
+
+  /**
+   * The block's data AS RENDERED — i.e. after _projectForRender, so a revealed
+   * field carries its sentinel here even though state has it empty.
+   *
+   * @param {string} blockUid
+   * @returns {Object|undefined}
+   */
+  getRenderedBlockData(blockUid) {
+    if (!blockUid || !this._lastRenderedData) return undefined;
+    const pathInfo = this.blockPathMap?.[blockUid];
+    if (!pathInfo?.path) return undefined;
+    let current = this._lastRenderedData;
+    for (const key of pathInfo.path) {
+      if (!current || typeof current !== 'object') return undefined;
+      current = current[key];
+    }
+    return current;
+  }
+
+  /**
+   * Is a comment selector matching nothing the CORRECT outcome?
+   *
+   * Yes exactly when the field it names has no data: "no data ⇒ no element" is the
+   * contract (issue #296), so a data-driven renderer is right to emit nothing and
+   * shouting about it would train devs to ignore the console. Everything else stays
+   * an error — a field WITH content and no element is a renderer bug, and that
+   * includes a revealed sentinel, where it means the reveal silently did nothing.
+   *
+   * Only edit-* attributes name a field. block-uid, block-add, linkable-* and the
+   * rest are structural, so a missing target is always wrong.
+   */
+  isFieldAbsentFromRender(name, fieldName, renderedBlock) {
+    if (name !== 'edit-text' && name !== 'edit-link' && name !== 'edit-media') {
+      return false;
+    }
+    // A leading slash means a PAGE field (/title, /description), which lives on the
+    // form root rather than the block.
+    const source = fieldName.startsWith('/')
+      ? this._lastRenderedData
+      : renderedBlock;
+    if (!source) return false;
+    const value = source[fieldName.replace(/^\//, '')];
+    return (
+      value === undefined ||
+      value === null ||
+      value === '' ||
+      (Array.isArray(value) && value.length === 0)
+    );
   }
 
   /**
@@ -543,8 +601,10 @@ export class Bridge {
    *
    * @param {HTMLElement} element - The root element
    * @param {Object} attrs - Parsed attributes { name: [{ value, selector }, ...] }
+   * @param {Object} [renderedBlock] - The block data the renderer was handed, used
+   *   to judge whether a selector matching nothing is correct or a bug.
    */
-  applyHydraAttributes(element, attrs) {
+  applyHydraAttributes(element, attrs, renderedBlock) {
     const attrMap = {
       'block-uid': 'data-block-uid',
       'block-readonly': 'data-block-readonly',
@@ -555,6 +615,14 @@ export class Bridge {
       'block-selector': 'data-block-selector',
       'block-container': 'data-block-container',
       'linkable-id': 'data-linkable-id',
+      // Leveled heading anchors — the suffix carries the heading level so the
+      // harvested anchor list has a hierarchy (see linkableAnchors.js).
+      'linkable-h1': 'data-linkable-h1',
+      'linkable-h2': 'data-linkable-h2',
+      'linkable-h3': 'data-linkable-h3',
+      'linkable-h4': 'data-linkable-h4',
+      'linkable-h5': 'data-linkable-h5',
+      'linkable-h6': 'data-linkable-h6',
     };
 
     for (const [name, entries] of Object.entries(attrs)) {
@@ -568,7 +636,7 @@ export class Bridge {
           ? element.querySelectorAll(selector)
           : [element];
 
-        if (selector && targets.length === 0) {
+        if (selector && targets.length === 0 && !this.isFieldAbsentFromRender(name, value, renderedBlock)) {
           console.error(`[hydra] Comment selector "${selector}" for ${name}=${value} matched no elements in`, element.tagName, element.className);
         }
 
@@ -1193,6 +1261,12 @@ export class Bridge {
       }
     };
     if (!this._edgeHandles) return;
+    // While an edge-handle drag is in progress the container's absorb/expel
+    // capability cannot change — only which children the cursor has crossed.
+    // Re-probing here (triggered by autoscroll's scroll events) is pure churn
+    // and would yank the invisible handle out from under the active drag, so
+    // freeze: keep the capability flags computed at mousedown.
+    if (this._edgeDragActive) return;
     const uid = this.selectedBlockUid;
     if (!uid || uid === PAGE_BLOCK_UID) { hide(); return; }
     const info = this.blockPathMap?.[uid];
@@ -1381,7 +1455,9 @@ export class Bridge {
     let candidates;
     let accepts;
     if (mode === 'absorb') {
-      accepts = (t) => !childAllowed || (t && childAllowed.includes(t));
+      // Same drop-acceptance the DnD scan uses (native OR conversion via conversionMap),
+      // NOT a bare allowed-types `.includes` — keep edge-drag and drag consistent (DRY).
+      accepts = (t) => acceptableAt(t, childAllowed, false, this.conversionMap);
       candidates = new Set();
       for (const [uid, info] of Object.entries(this.blockPathMap)) {
         if (!uid || uid === containerUid) continue;
@@ -1397,7 +1473,7 @@ export class Bridge {
         if (outwardOfEdge && inwardOfCursor) candidates.add(uid);
       }
     } else {
-      accepts = (t) => !parentAllowed || (t && parentAllowed.includes(t));
+      accepts = (t) => acceptableAt(t, parentAllowed, false, this.conversionMap);
       candidates = new Set();
       for (const [uid, info] of Object.entries(this.blockPathMap)) {
         if (!uid || uid === containerUid) continue;
@@ -1585,6 +1661,10 @@ export class Bridge {
       e.preventDefault();
       e.stopPropagation();
       dragging = true;
+      // Capability (canAbsorb/canExpel) was computed when the container was
+      // selected and is fixed for the duration of this drag; freeze
+      // _positionEdgeHandles so autoscroll's scroll events don't re-probe.
+      this._edgeDragActive = true;
       lastX = e.clientX;
       lastY = e.clientY;
       autoScroller = this._createAutoScroller();
@@ -1616,6 +1696,7 @@ export class Bridge {
     document.addEventListener('mouseup', () => {
       if (!dragging) return;
       dragging = false;
+      this._edgeDragActive = false;
       autoScroller?.stop();
       autoScroller = null;
 
@@ -3284,6 +3365,11 @@ export class Bridge {
       editableFields,
       linkableFields,
       mediaFields,
+      // Reveal (#296): which optional fields COULD be revealed, and whether they
+      // currently are. Rides BLOCK_SELECTED exactly like mediaFields, so the
+      // quanta toolbar can show/hide the toggle with no extra round-trip.
+      revealableFields: this.revealableFields(blockUid),
+      revealed: !!this._revealedBlocks?.has(blockUid),
       focusedFieldName,
       focusedFieldRect,
       focusedLinkableField,
@@ -4115,6 +4201,10 @@ export class Bridge {
             log('Clearing processing state due to SLATE_ERROR');
             this.setBlockProcessing(blockId, false);
           }
+        } else if (event.data.type === 'TOGGLE_OPTIONAL_FIELDS') {
+          // Editor pressed the reveal toggle on the quanta toolbar.
+          log('Received TOGGLE_OPTIONAL_FIELDS:', event.data.blockUid);
+          this.toggleOptionalFields(event.data.blockUid);
         } else if (event.data.type === 'FOCUS_FIELD') {
           // Restore focus to a specific field (e.g., after LinkEditor closes)
           const { blockId, fieldName } = event.data;
@@ -6918,23 +7008,40 @@ export class Bridge {
 
   /**
    * Harvest linkable anchors from the live DOM and, when the full map changed
-   * since the last send, push it to the admin so it can persist
-   * block._linkableAnchors. Guarded by a JSON snapshot so a FORM_DATA echo →
+   * since the last send, push it to the admin so it can merge
+   * block._linkableAnchors into the canonical formData (see the LINKABLE_ANCHORS
+   * handler in View.jsx). Guarded by a JSON snapshot so a FORM_DATA echo →
    * re-render never loops.
    */
-  _maybeSendLinkableAnchors() {
+  /**
+   * Harvest deep-link anchors from the live DOM, dropping any block hydra
+   * considers read-only. Read-only for TEMPLATE content is hydra's call, not the
+   * frontend's — the merge stamps block.readOnly, so isBlockReadonly knows it
+   * from the data on every frontend (a real frontend needn't mark
+   * data-block-readonly for template blocks). That content is owned by the
+   * template (which carries its own anchors), so it must not be harvested onto
+   * the instance. collectLinkableAnchors still honours a frontend's OWN
+   * data-block-readonly (its escape hatch to lock a block for its own reasons);
+   * this adds the template-aware determination. Shared by the inline fold-in and
+   * the structural-settle send.
+   */
+  _harvestLinkableAnchors() {
     const anchors = collectLinkableAnchors(document);
-    // Read-only for TEMPLATE content is hydra's call, not the frontend's — the
-    // merge stamps block.readOnly, so isBlockReadonly knows it from the data on
-    // every frontend (a real frontend needn't mark data-block-readonly for
-    // template blocks). Drop anchors on any block hydra considers read-only:
-    // that content is owned by the template (which carries its own anchors), so
-    // it must not be harvested onto the instance. collectLinkableAnchors still
-    // honours a frontend's OWN data-block-readonly (its escape hatch to lock a
-    // block for its own reasons); this adds the template-aware determination.
     for (const uid of Object.keys(anchors)) {
       if (this.isBlockReadonly(uid)) delete anchors[uid];
     }
+    return anchors;
+  }
+
+  /**
+   * STRUCTURAL path: after a settled render (add/remove/reorder heading blocks —
+   * no inline edit fired), push the anchors so the admin can fold them into
+   * formData. Inline edits do NOT come through here — they carry their anchors on
+   * the INLINE_EDIT_DATA message itself (see flushPendingTextUpdates), which is
+   * why this only sends when the map changed since the last send of EITHER path.
+   */
+  _maybeSendLinkableAnchors() {
+    const anchors = this._harvestLinkableAnchors();
     const json = JSON.stringify(anchors);
     // Treat an unset baseline as "{}" so a page with no anchors never sends a
     // spurious empty map on its first flush — that dispatch would re-render the
@@ -9058,6 +9165,32 @@ export class Bridge {
       // re-runs even while the cursor is held stationary at an edge.
       const scroller = this._createAutoScroller();
 
+      // Droppability is FIXED for the whole drag: the dragged block types are
+      // set at drag start and each container's allowedSiblingTypes is stable
+      // while dragging (the pathmap doesn't mutate mid-drag). So resolve "can
+      // the dragged blocks drop beside block X" ONCE per container and memoize —
+      // only the nearest-edge GEOMETRY in onMouseMove needs the cursor. This
+      // avoids re-running the acceptance walk on every mousemove/scroll tick,
+      // which is exactly when the drag needs to stay responsive.
+      const draggedBlockUids = allElements.map(el => el.getAttribute('data-block-uid'));
+      const draggedBlockTypes = draggedBlockUids.map(uid => this.getBlockType(uid)).filter(Boolean);
+      const isMultiDrag = draggedBlockTypes.length > 1;
+      const uidOf = (el) => el && el.getAttribute('data-block-uid');
+      const _dropAcceptById = new Map();
+      // Can the dragged blocks drop as a sibling of `el` (into el's parent)?
+      // Allowed natively, or reachable via the conversionMap (single: any option;
+      // multi: exactly one — auto-only). Mirrors the walk-up's acceptance test.
+      const isDroppableBeside = (el) => {
+        const id = uidOf(el);
+        if (!id) return false;
+        if (_dropAcceptById.has(id)) return _dropAcceptById.get(id);
+        const ok = draggedBlockTypes.every((t) =>
+          acceptableAt(t, this.blockPathMap?.[id]?.allowedSiblingTypes, isMultiDrag, this.conversionMap),
+        );
+        _dropAcceptById.set(id, ok);
+        return ok;
+      };
+
       // Handle mouse movement
       const onMouseMove = (e) => {
         scroller.onMouseMove(e);
@@ -9076,40 +9209,125 @@ export class Bridge {
 
         // Exclude the dragged block(s) and ghost from being drop targets
         // For multi-element blocks (listings, template instances), exclude all elements
-        const draggedBlockUids = allElements.map(el => el.getAttribute('data-block-uid'));
         const isSelfOrGhost = closestBlock &&
           (closestBlock === draggedBlock || allElements.includes(closestBlock) ||
            draggedBlockUids.includes(closestBlock.getAttribute('data-block-uid')));
         if (isSelfOrGhost) closestBlock = null;
 
-        // Handle overshoot - find nearest block when cursor isn't over any block
-        if (!closestBlock) {
-          const allBlocks = Array.from(document.querySelectorAll('[data-block-uid]'))
-            .filter(el => el !== draggedBlock && !draggedBlockUids.includes(el.getAttribute('data-block-uid')));
+        // draggedBlockTypes / isMultiDrag / uidOf / isDroppableBeside are
+        // computed ONCE at drag start (above) — droppability can't change
+        // mid-drag, only which edge is nearest the cursor.
 
-          // Find nearest block by vertical distance to cursor
-          let nearest = { el: null, dist: Infinity, above: false };
-          for (const el of allBlocks) {
+        // NEAREST DROPPABLE EDGE — the single resolution for "the cursor isn't on a
+        // droppable leaf": either over NOTHING (the old overshoot) or over a
+        // CONTAINER's own chrome (its padding / the gap between children, where
+        // elementFromPoint resolves to the container, not a child). Both used to be
+        // handled separately and wrongly: over-nothing picked the nearest block
+        // without checking it accepts the drop, and on-a-container the walk-up saw
+        // only the container's OUTER sibling level and dropped the blocks BESIDE it
+        // (for a convert-drop, skipping the conversion — because these blocks are
+        // usually allowed at the outer level too, the walk-up stopped there and never
+        // descended). Instead, scan every candidate block, measure its nearest edge to
+        // the cursor, and take the nearest edge the dragged blocks can actually drop at
+        // (native, or via the conversionMap). "Drop at the nearest place it can go":
+        // deep inside a container a child edge wins (drop in); at its outer border a
+        // sibling edge wins (drop beside); a leaf the cursor is on picks that leaf's own
+        // nearest edge. This ONE scan is the sole resolver — it replaces BOTH the old
+        // up-only walk-up and the over-nothing overshoot, and it ALWAYS runs, so
+        // resolution is uniform for every cursor position (it effectively walks both up
+        // and down and takes the nearest droppable edge). Enable HYDRA_DEBUG to trace.
+        {
+          const candidates = Array.from(document.querySelectorAll('[data-block-uid]'))
+            .filter(el => el !== draggedBlock && !draggedBlockUids.includes(uidOf(el)));
+          // For each candidate, measure BOTH insert edges along the axis its siblings
+          // are laid out on — a horizontal row (columns / data-block-add="right") uses
+          // the left/right edges + clientX, a vertical stack uses top/bottom + clientY
+          // (the same axis the drop indicator is drawn on downstream, getAddDirection) —
+          // and take the nearer: the leading edge inserts BEFORE (insertAt 0), the
+          // trailing edge inserts AFTER (insertAt 1). Measuring both edges per block
+          // (rather than only the add edge) keeps a dense set of candidates so the
+          // nearest inside edge reliably wins near a container boundary.
+          let bestEdge = null;
+          // Accumulate a compact per-candidate trace and emit it as ONE log line per
+          // move (below), not one line PER candidate: with HYDRA_DEBUG on in tests the
+          // scan runs every mousemove, and a log() per candidate floods the CDP console
+          // channel enough to starve mouse.move/boundingBox (60s timeouts). Batching to
+          // a single message per move keeps the "why each candidate didn't match" trace
+          // the design calls for at ~1/30th the message volume.
+          const edgeTrace = (debugEnabled || window.HYDRA_DEBUG) ? [] : null;
+          for (const el of candidates) {
             const rect = el.getBoundingClientRect();
-            const aboveDist = rect.top - e.clientY; // positive if cursor above block
-            const belowDist = e.clientY - rect.bottom; // positive if cursor below block
-            if (aboveDist > 0 && aboveDist < nearest.dist) {
-              nearest = { el, dist: aboveDist, above: true };
-            } else if (belowDist > 0 && belowDist < nearest.dist) {
-              nearest = { el, dist: belowDist, above: false };
+            const horizontal = this.getAddDirection(el) === 'right';
+            // True 2D distance from the cursor to each insert-edge LINE SEGMENT, not
+            // just the perpendicular axis — otherwise blocks that share the insertion
+            // axis but sit at a different offset on the other axis (e.g. children of
+            // DIFFERENT columns at the same Y) are indistinguishable and the wrong one
+            // can win. The edge is a segment along the block's span on the OTHER axis;
+            // `over` is how far the cursor is outside that span (0 when within it, so a
+            // vertical stack the cursor is over reduces to the plain perpendicular dy).
+            let dStart, dEnd;
+            if (horizontal) {
+              // vertical insert edges (left/right); segment spans rect.top..rect.bottom
+              const over = e.clientY < rect.top ? rect.top - e.clientY
+                : e.clientY > rect.bottom ? e.clientY - rect.bottom : 0;
+              dStart = Math.hypot(e.clientX - rect.left, over);
+              dEnd = Math.hypot(e.clientX - rect.right, over);
+            } else {
+              // horizontal insert edges (top/bottom); segment spans rect.left..rect.right
+              const over = e.clientX < rect.left ? rect.left - e.clientX
+                : e.clientX > rect.right ? e.clientX - rect.right : 0;
+              dStart = Math.hypot(over, e.clientY - rect.top);
+              dEnd = Math.hypot(over, e.clientY - rect.bottom);
+            }
+            const at = dStart <= dEnd ? 0 : 1; // 0 = before (top/left), 1 = after (bottom/right)
+            const dist = Math.min(dStart, dEnd);
+            const droppable = isDroppableBeside(el);
+            // Nesting depth (block ancestors). A container's insert edge ~coincides with
+            // its last/first child's edge, so at an exact-or-near distance tie a pure
+            // `dist <` picks whichever comes FIRST in DOM order — the ANCESTOR container —
+            // and a reorder meant to stay inside the container ejects the block to the
+            // outer level. Depth breaks that tie toward the INNER (deeper) edge so the
+            // block reorders within the container the cursor is over. (object-blocks:213:
+            // ob-1 and child-2 both at d6 → without this, ob-1 wins and child-1 ejects.)
+            let depth = 0;
+            for (let p = el.parentElement; p; p = p.parentElement) {
+              if (p.hasAttribute && p.hasAttribute('data-block-uid')) depth++;
+            }
+            if (edgeTrace) edgeTrace.push(`${uidOf(el)}${horizontal ? 'H' : 'V'}@${at}d${Math.round(dist)}${droppable ? 'ok' : 'x'}`);
+            if (droppable) {
+              const NEST_EPS = 8; // px within which two edges count as coincident
+              let better = false;
+              if (!bestEdge) {
+                better = true;
+              } else if (dist < bestEdge.dist - NEST_EPS) {
+                better = true; // clearly closer — cursor is genuinely nearer this edge
+              } else if (dist <= bestEdge.dist + NEST_EPS) {
+                // near-coincident: prefer the deeper (inner) edge; tie at equal depth → closer
+                better =
+                  depth > bestEdge.depth ||
+                  (depth === bestEdge.depth && dist < bestEdge.dist);
+              }
+              if (better) bestEdge = { el, at, dist, depth };
             }
           }
-          if (nearest.el) {
-            closestBlock = nearest.el;
-            insertAt = nearest.above ? 0 : 1;
+          if (edgeTrace) log('[drag-edge] candidates', edgeTrace.join(' '));
+          if (bestEdge) {
+            log('[drag-edge] nearest droppable edge ->', uidOf(bestEdge.el), 'insertAt', bestEdge.at);
+            closestBlock = bestEdge.el;
+            insertAt = bestEdge.at;
+          } else {
+            // Nothing anywhere accepts these blocks — no valid drop.
+            closestBlock = null;
           }
         }
 
         if (closestBlock) {
-          // Check if the dragged block type(s) are allowed in the target container
-          // If not, walk up the parent chain to find a valid drop target
-          // For template instances, check all child block types are allowed
-          const draggedBlockTypes = draggedBlockUids.map(uid => this.getBlockType(uid)).filter(Boolean);
+          // Walk up the parent chain to the first level that accepts the dragged
+          // block type(s) — natively or via conversion. When the cursor was over a
+          // container's chrome or over nothing, closestBlock is already the nearest
+          // DROPPABLE edge resolved above, so this normally accepts immediately; it
+          // still runs so a directly-hovered leaf that can't take the drop escapes to
+          // an ancestor that can.
 
           // Find a valid drop target by walking up the parent chain
           let validDropTarget = closestBlock;
@@ -9126,6 +9344,18 @@ export class Bridge {
             const allTypesAllowed = draggedBlockTypes.length === 0 ||
               draggedBlockTypes.every(type =>
                 acceptableAt(type, allowedSiblingTypes, isMulti, this.conversionMap));
+            // Trace WHY this level did/didn't accept — native fit vs conversion vs
+            // no-fit — so a mis-resolved drop is diagnosable from the log alone
+            // (enable HYDRA_DEBUG). A line like `level box-1 ACCEPT convSource:native`
+            // means it matched at the container's OUTER sibling level natively and
+            // never descended; `convert(convTargetA)` means it descended + converts.
+            log('[drag-walk] level', validDropTargetUid, allTypesAllowed ? 'ACCEPT' : 'escape->parent',
+              draggedBlockTypes.map((t) => {
+                if (!allowedSiblingTypes) return t + ':any';
+                if (allowedSiblingTypes.includes(t)) return t + ':native';
+                const opts = ((this.conversionMap && this.conversionMap[t]) || []).filter((x) => allowedSiblingTypes.includes(x));
+                return t + ':' + (opts.length === 0 ? 'no-fit' : opts.length === 1 ? 'convert(' + opts[0] + ')' : 'convert-choose');
+              }).join(','));
             if (allTypesAllowed) {
               // Drop is allowed at this level
               break;
@@ -9328,6 +9558,8 @@ export class Bridge {
             });
           }
           dropIndicatorVisible = true;
+          // TODO(scroll-into-view): if the resolved edge is off-screen, scroll it into
+          // view — deferred; scrolling mid-drag fights a held cursor, needs its own design.
         } else {
           // No valid drop target - hide indicator and mark as not droppable
           const existingIndicator = document.querySelector('.volto-hydra-drop-indicator');
@@ -9982,9 +10214,11 @@ export class Bridge {
       // why it belongs on the structural settle (like the rect/UI updates) and
       // not only on the inline-text flush, whose timing races the render that
       // finalizes the id (dropped a just-added heading's anchor intermittently).
-      // Safe to run on every settle now that anchors live in a transient store
-      // (LINKABLE_ANCHORS never mutates block formData → no iframe re-render); the
-      // echo guard in _maybeSendLinkableAnchors sends only when the map changes.
+      // Safe to run on every settle: the admin merges LINKABLE_ANCHORS into
+      // formData WITHOUT bouncing a FORM_DATA back (the inline-edit counter
+      // guard in View.jsx suppresses the send), so it never re-renders the
+      // iframe; the echo guard in _maybeSendLinkableAnchors sends only when the
+      // map changes.
       this._maybeSendLinkableAnchors();
       // Signal DOM settled — but only if no new mutations arrived during
       // this rAF callback. If new mutations come, the observer will fire
@@ -10123,6 +10357,244 @@ export class Bridge {
    * naturally skipped because isInlineEditing is false and pendingTransform
    * / _reRenderBlocking are unset.
    */
+  /**
+   * Build the copy of formData the RENDERER sees. `this.formData` is never
+   * mutated — it stays exactly what the admin sent, so echo detection and the
+   * data that goes back up stay truthful.
+   *
+   * Today this does one job: make "cleared" read as "absent".
+   *
+   * A frontend's natural rule for an optional field is plain truthiness —
+   * `{block.heading && …}`, `v-if="block.buttonLink"`. That's the rule we want
+   * developers to write without thinking about edit mode. It works for every
+   * state except one: a field the editor CLEARED. Volto's ObjectBrowserWidget
+   * writes `[]` on remove (removeItem, ObjectBrowserWidget.jsx:163), not
+   * undefined — and `[]` is truthy in JS, so the natural rule would render an
+   * element for a field that has nothing in it. Making every renderer write
+   * `.length` to dodge that is exactly the per-block complexity issue #296 is
+   * removing, so the bridge collapses it here instead.
+   *
+   * Safe because `undefined` is ALREADY a legal state for every one of these
+   * fields (a never-set field arrives that way), so this introduces no state a
+   * renderer isn't already handling.
+   *
+   * Scoped by schema, deliberately: a blind recursive sweep would also strip
+   * `blocks_layout.items: []` on an empty container and break renderers that
+   * map over it. Only declared, non-container schema fields are touched.
+   */
+  /**
+   * Zero-width space. The reveal sentinel for every text-ish shape.
+   * Not a new convention — the bridge already inserts ZWS into empty inline
+   * elements for cursor positioning (_ensureZeroWidthSpaces) and already ignores
+   * it when deciding emptiness (updateFieldEmptyState), and the admin plants it
+   * so empty inline slate nodes survive withEmptyInlineRemoval.
+   */
+  static get REVEAL_ZWS() { return '\u200B'; }
+
+  /**
+   * The reveal sentinel for a string-URL image field: a fully transparent SVG
+   * with REAL intrinsic dimensions.
+   *
+   * Not a 1x1. The size matters — the frontend styles this exactly as it styles
+   * any other image, so the editor gets a correctly-shaped click target and
+   * hydra's zero-dimension media guard is satisfied naturally. The alternative
+   * (a 1x1 plus injected min-width/min-height CSS) would have been the one
+   * injection that reshapes the host page's layout, which the existing injected
+   * rules deliberately avoid — they use `outline` precisely so "the host element
+   * position is NOT mutated".
+   *
+   * Transparent, so nothing of ours is ever painted into the frontend.
+   */
+  static get REVEAL_PIXEL() {
+    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'/%3E";
+  }
+
+  /**
+   * The sentinel for a field, chosen by WIDGET — never by inspecting the current
+   * value, which is absent precisely when a sentinel is needed.
+   *
+   * Shape-preserving is the whole point: a renderer reading an object_browser
+   * field does `block.href?.[0]?.['@id']` or maps over it, so handing it a bare
+   * string would make it iterate characters.
+   *
+   * Returns undefined for a field that has no inline affordance (select, boolean,
+   * number …) — those are sidebar-only and nothing can be revealed for them.
+   */
+  _revealSentinelFor(fieldDef, fieldType) {
+    const Z = Bridge.REVEAL_ZWS;
+    // The admin DECORATES field defs — a copyFromTargetField wrapper keeps the real
+    // one under `baseWidget`. Read the wrapper and every media/link field looks like
+    // an unknown widget and silently yields no sentinel, so it never reveals.
+    let def = fieldDef;
+    while (def?.baseWidget) def = def.baseWidget;
+    const widget = def?.widget;
+    fieldDef = def;
+
+    if (widget === 'object_browser') return [{ '@id': Z, title: Z }];
+    if (widget === 'image' || fieldDef?.type === 'image') return Bridge.REVEAL_PIXEL;
+    if (widget === 'url' || fieldDef?.type === 'url') return Z;
+    if (isSlateFieldType(fieldType)) return [{ type: 'p', children: [{ text: Z }] }];
+    if (isTextEditableFieldType(fieldType)) return Z;
+    return undefined;
+  }
+
+  /** True when a value is (or contains) a reveal sentinel rather than real content. */
+  _isRevealSentinel(value) {
+    const Z = Bridge.REVEAL_ZWS;
+    if (value === Z || value === Bridge.REVEAL_PIXEL) return true;
+    if (Array.isArray(value) && value.length === 1) {
+      const only = value[0];
+      if (only && only['@id'] === Z) return true;
+      if (only?.children?.length === 1 && only.children[0]?.text === Z) return true;
+    }
+    return false;
+  }
+
+  /**
+   * The block's schema fields that COULD be revealed: ones with an inline
+   * affordance that the frontend is currently rendering no element for.
+   *
+   * Purely observational — no schema annotation, no dependence on `required`
+   * (most block schemas here don't declare it).
+   *
+   * DELIBERATELY OVER-INCLUSIVE, don't "fix" this. The widget/type only says a
+   * field COULD be edited inline, not that this frontend renders it: alt text, a
+   * css class, a free-text style value are all plain strings that live in the
+   * sidebar. Telling them apart from an empty heading is impossible without data,
+   * since "renders nothing because it's empty" and "never renders inline" look
+   * identical — it would need a schema annotation or a frontend-side declaration,
+   * i.e. exactly the per-field bookkeeping #296 exists to remove.
+   *
+   * So reveal is BEST-EFFORT: it seeds every candidate, the ones the frontend
+   * renders appear, and the rest are a no-op. A sentinel for a field nobody
+   * renders is harmless — it lives only in the render projection, never in state
+   * and never in saved content — and the editor fills those from the sidebar as
+   * before. No warning is raised for them: a frontend that legitimately keeps a
+   * field sidebar-only is not misconfigured.
+   */
+  revealableFields(blockUid) {
+    const schema = this.getBlockSchema(blockUid);
+    const properties = schema?.properties;
+    const block = this.getBlockData(blockUid);
+    if (!properties || !block) return [];
+
+    const isEmpty = (v) =>
+      v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
+
+    return Object.entries(properties)
+      .filter(([fieldName, fieldDef]) => {
+        // Has an inline affordance at all. Returns undefined for select /
+        // boolean / number, so sidebar-only fields drop out for free.
+        if (!this._revealSentinelFor(fieldDef, this.getFieldType(blockUid, fieldName))) {
+          return false;
+        }
+        // A REQUIRED field is rendered unconditionally by the frontend (a value
+        // is guaranteed, so no `{field && …}` guard), which means its element
+        // always exists and there is nothing to reveal. Excluding it keeps the
+        // button's "N empty optional fields" count honest. If a required field
+        // ever IS missing an element, that's a renderer bug for the dev-warning
+        // to shout about — not something reveal should paper over.
+        if (schema.required?.includes(fieldName)) return false;
+        return isEmpty(block[fieldName]);
+      })
+      .map(([fieldName]) => fieldName);
+  }
+
+  /**
+   * Blocks currently in reveal mode, as a Set of blockUid.
+   *
+   * Per BLOCK, not per field: reveal is one mode ("show me this block's empty
+   * optional fields"), so whatever is empty at render time shows. That keeps it
+   * consistent while revealed — empty a field and its element stays, because the
+   * block is still in reveal mode — without any second, invisible way for a field
+   * to become revealed.
+   *
+   * Deliberately NOT sticky per field on edit. Emptying a field has to mean the
+   * field is gone, or there is no single action for "I want no image": the editor
+   * would delete, then have to dismiss the leftover placeholder through a
+   * block-level control. Swapping an image costs nothing either way — the quanta
+   * toolbar's image button (SyncedSlateToolbar.jsx, gated on focusedMediaField)
+   * replaces it in one click without deleting first.
+   */
+  get revealedBlocks() {
+    if (!this._revealedBlocks) this._revealedBlocks = new Set();
+    return this._revealedBlocks;
+  }
+
+  /**
+   * Toggle reveal for a block. Reveal is ALWAYS EXPLICIT — nothing here runs on
+   * selection, on insert, or on a field becoming empty.
+   */
+  toggleOptionalFields(blockUid) {
+    if (this.revealedBlocks.has(blockUid)) this.revealedBlocks.delete(blockUid);
+    else this.revealedBlocks.add(blockUid);
+    if (this.onContentChangeCallback) this._executeRender(this.onContentChangeCallback);
+  }
+
+  _projectForRender(formData) {
+    if (!formData || !this.blockPathMap) return formData;
+
+    // Container fields hold structure, not content — an empty one still has to
+    // arrive as an array for the renderer to map over.
+    const CONTAINER_WIDGETS = new Set(['blocks_layout', 'object_list']);
+
+    let projected = null; // cloned lazily; most renders change nothing
+    for (const blockUid of Object.keys(this.blockPathMap)) {
+      if (blockUid === '_schemas' || blockUid === '_page') continue;
+      const schema = this.getBlockSchema(blockUid);
+      const properties = schema?.properties;
+      if (!properties) continue;
+
+      const pathInfo = this.blockPathMap[blockUid];
+      const source = this.getBlockData(blockUid);
+      if (!source || !pathInfo?.path) continue;
+
+      for (const [fieldName, fieldDef] of Object.entries(properties)) {
+        if (CONTAINER_WIDGETS.has(fieldDef?.widget)) continue;
+        const value = source[fieldName];
+        if (!Array.isArray(value) || value.length > 0) continue;
+
+        // First actual change on this render — clone before touching anything.
+        if (!projected) projected = JSON.parse(JSON.stringify(formData));
+        let target = projected;
+        for (const key of pathInfo.path) target = target?.[key];
+        if (target) delete target[fieldName];
+      }
+
+      // Reveal: seed a sentinel into each empty inline field of a revealed
+      // block, so the renderer's own `{field && …}` rule fires and produces an
+      // element to click. Nothing here is persisted — the sentinel exists only
+      // in this projection and in the DOM.
+      // Re-derived every render, and stable BECAUSE sentinels never enter state:
+      // the projection reads this.formData, which stays empty for these fields, so
+      // the answer doesn't change once revealed. (The old DOM-based rule asked "is
+      // there no element?" — a question revealing itself falsified, so the field
+      // flickered back out on the next render.)
+      if (!this._revealedBlocks?.has(blockUid)) continue;
+      // revealableFields is already "empty AND has an inline affordance", so a
+      // field the editor has since filled drops out on its own and no sentinel is
+      // written over real content.
+      for (const fieldName of this.revealableFields(blockUid)) {
+        const fieldDef = properties[fieldName];
+        const sentinel = this._revealSentinelFor(
+          fieldDef,
+          this.getFieldType(blockUid, fieldName),
+        );
+        if (sentinel === undefined) continue;
+        if (!projected) projected = JSON.parse(JSON.stringify(formData));
+        let target = projected;
+        for (const key of pathInfo.path) target = target?.[key];
+        if (target) target[fieldName] = sentinel;
+      }
+    }
+    // What the renderer was actually handed. materializeHydraComments needs this
+    // (not this.formData) to tell "field is empty, so no element is CORRECT" from
+    // "field has content but the renderer produced no element" — including a
+    // revealed sentinel, whose element failing to appear means reveal did nothing.
+    this._lastRenderedData = projected || formData;
+    return this._lastRenderedData;
+  }
+
   _executeRender(callbackFn, afterRenderOptions = {}) {
     this._renderInProgress = true;
     this._renderStartTime = performance.now();
@@ -10166,8 +10638,9 @@ export class Bridge {
       this.blockTextMutationObserver.disconnect();
     }
 
-    // Call the callback to trigger the render
-    callbackFn(this.formData);
+    // Call the callback to trigger the render. The renderer never sees
+    // this.formData directly — it gets a projection (see _projectForRender).
+    callbackFn(this._projectForRender(this.formData));
 
     const afterRender = () => {
       this.afterContentRender(afterRenderOptions);
@@ -11905,6 +12378,17 @@ export class Bridge {
         this.pendingTextUpdate.flushRequestId = flushRequestId;
       }
 
+      // Fold the harvested anchors INTO this inline update. Editing a heading
+      // re-slugs it on every keystroke, so this is the common anchor-change path.
+      // Riding them on INLINE_EDIT_DATA — the message carrying the FRESH formData
+      // the admin adopts wholesale — means the admin never merges them into a
+      // stale snapshot (the cause of a lost-keystroke race), and there's no
+      // second message per keystroke. Keep _lastSentAnchors in sync so the
+      // structural-settle send (_maybeSendLinkableAnchors) doesn't re-emit these.
+      const anchors = this._harvestLinkableAnchors();
+      this.pendingTextUpdate.anchors = anchors;
+      this._lastSentAnchors = JSON.stringify(anchors);
+
       log('flushPendingTextUpdates: sending buffered update, seq:', seq,
           'anchor:', this.pendingTextUpdate.selection?.anchor,
           'focus:', this.pendingTextUpdate.selection?.focus);
@@ -11914,10 +12398,6 @@ export class Bridge {
       // This is needed because admin doesn't send FORM_DATA back for inline edits (echo prevention)
       this.lastReceivedFormData = JSON.parse(JSON.stringify(this.pendingTextUpdate.data));
       this.pendingTextUpdate = null;
-      // Inline edits don't trigger a re-render, so anchors derived from a
-      // live-edited heading (id kept fresh by the frontend on input) would
-      // otherwise never be harvested. Harvest on the normal update path too.
-      this._maybeSendLinkableAnchors();
       return true; // Had pending update
     }
     return false; // No pending update
@@ -12964,3 +13444,8 @@ const linkCancelSVG = `<svg width="20px" height="20px" xmlns="http://www.w3.org/
 // Container UX shared predicates / transforms (used by both iframe and admin).
 // canContainAll moved to @volto-hydra/helpers (SSR-safe).
 export { canContain, findConversionPath, mapLayoutItems } from './containerOps.js';
+
+// buildAnchorTree turns the flat, leveled deep-link anchor list into a nested
+// contents tree — re-exported so the admin (fragment picker) and frontends (an
+// in-page navigation block) build the hierarchy from ONE source.
+export { buildAnchorTree } from './linkableAnchors.js';

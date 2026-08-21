@@ -47,7 +47,7 @@ reachable via an existing `fieldMappings` conversion.
   re-checks `allowedBlocks` and breaks (hard reject) on a disallowed type.
 - **Paste re-validation (admin):** `View.jsx` `handlePaste` `:959` — same gate.
 - **Conversion graph:** `getConvertibleTypes(sourceType, blocksConfig,
-  allowedTypes)` (`schemaInheritance.js:2012`) BFS's `fieldMappings` and returns
+  allowedTypes)` (`blockSync.js:2012`) BFS's `fieldMappings` and returns
   the allowed types a source can convert into.
 - **Conversion op:** `convertContainerBlock(formData, blockPathMap, blockId,
   targetType, blocksConfig, intl)` (`blockPath.js:1178`).

@@ -135,6 +135,95 @@ describe('moveBlockBetweenContainers — cross-region within one field', () => {
   });
 });
 
+describe('moveBlockBetweenContainers — disallowDescendantBlocks (DnD rejection)', () => {
+  // The exact validation a drag runs: moveBlockBetweenContainers checks the
+  // dragged block's type against the target's allowedSiblingTypes. With a
+  // columns ancestor's disallowDescendantBlocks:['columns'], a cell's addable
+  // set excludes columns, so dropping a columns block into the cell is rejected
+  // (returns null). This is the deterministic counterpart to the admin DnD.
+  const makeCfg = (disallow) => ({
+    _page: {
+      id: '_page',
+      schema: () => ({
+        properties: {
+          items: { widget: 'blocks_layout', allowedBlocks: ['slate', 'columns'] },
+        },
+      }),
+    },
+    slate: { id: 'slate' },
+    columns: {
+      id: 'columns',
+      ...(disallow ? { disallowDescendantBlocks: ['columns'] } : {}),
+      blockSchema: {
+        properties: {
+          items: { widget: 'blocks_layout', allowedBlocks: ['column'] },
+        },
+      },
+    },
+    column: {
+      id: 'column',
+      blockSchema: {
+        properties: {
+          items: { widget: 'blocks_layout', allowedBlocks: ['slate', 'columns'] },
+        },
+      },
+    },
+  });
+
+  const makeColsForm = () => ({
+    '@type': 'Document',
+    blocks: {
+      outer: {
+        '@type': 'columns',
+        blocks: {
+          cell: {
+            '@type': 'column',
+            blocks: { inner: { '@type': 'slate' } },
+            blocks_layout: { items: ['inner'] },
+          },
+        },
+        blocks_layout: { items: ['cell'] },
+      },
+      src: {
+        '@type': 'columns',
+        blocks: {
+          scell: {
+            '@type': 'column',
+            blocks: { sinner: { '@type': 'slate' } },
+            blocks_layout: { items: ['sinner'] },
+          },
+        },
+        blocks_layout: { items: ['scell'] },
+      },
+    },
+    blocks_layout: { items: ['outer', 'src'] },
+  });
+
+  test('rejects dragging a columns block into a columns cell', () => {
+    const cfg = makeCfg(true);
+    const form = makeColsForm();
+    const map = buildBlockPathMap(form, cfg, intl);
+    // The cell's addable set excludes columns (ancestor disallow).
+    expect(map['inner'].allowedSiblingTypes).not.toContain('columns');
+    // Drag `src` (a columns block) after `inner` (inside the cell) → rejected.
+    const result = moveBlockBetweenContainers(
+      form, map, 'src', 'inner', true, PAGE, 'cell', cfg, intl,
+    );
+    expect(result).toBeNull();
+  });
+
+  test('control: the same move is allowed without the disallow declaration', () => {
+    const cfg = makeCfg(false);
+    const form = makeColsForm();
+    const map = buildBlockPathMap(form, cfg, intl);
+    expect(map['inner'].allowedSiblingTypes).toContain('columns');
+    const result = moveBlockBetweenContainers(
+      form, map, 'src', 'inner', true, PAGE, 'cell', cfg, intl,
+    );
+    expect(result).not.toBeNull();
+  });
+});
+
 describe('empty-region seeding', () => {
   const cfg = {
     _page: {
@@ -218,6 +307,58 @@ describe('ensureEmptyBlockIfEmpty — auto-content joins the template instance',
     // Reproduces the bug: the seeded child currently has NO templateInstanceId, so
     // it renders read-only in template edit mode (no add-after "+").
     expect(child.templateInstanceId).toBe('inst-1');
+  });
+});
+
+describe('ensureEmptyBlockIfEmpty — empty slot placeholders at fixed-anchor edges (next/prevSlotId)', () => {
+  // A fixed anchor names its adjacent slot region even when that region is empty:
+  //   nextSlotId → the slot AFTER it  (top-anchored layout / trailing slot)
+  //   prevSlotId → the slot BEFORE it (bottom-anchored layout / leading slot)
+  // Each empty region gets a seeded, editable placeholder carrying the slot membership so
+  // it is clickable/droppable. The two cases are mirror images.
+  const anchor = (extra) => ({
+    '@type': 'slate',
+    fixed: true,
+    readOnly: true,
+    templateId: 'resolveuid/x',
+    templateInstanceId: 'inst-1',
+    ...extra,
+  });
+
+  test('nextSlotId: an empty trailing slot after a fixed header seeds a placeholder AFTER it', () => {
+    const form = {
+      '@type': 'Document',
+      blocks: { header: anchor({ slotId: 'header', nextSlotId: 'primary' }) },
+      blocks_layout: { items: ['header'] },
+    };
+    const map = buildBlockPathMap(form, blocksConfig, intl);
+    let n = 0;
+    const result = ensureEmptyBlockIfEmpty(form, { parentId: PAGE }, map, () => `seed-${++n}`, blocksConfig, { intl });
+    const items = result.blocks_layout.items;
+    expect(items[0]).toBe('header');
+    expect(items.length).toBe(2);
+    const trailing = result.blocks[items[1]];
+    expect(trailing.slotId).toBe('primary');
+    expect(trailing.templateInstanceId).toBe('inst-1');
+    expect(trailing.fixed).toBeFalsy();
+  });
+
+  test('prevSlotId: an empty leading slot before a fixed footer seeds a placeholder BEFORE it', () => {
+    const form = {
+      '@type': 'Document',
+      blocks: { footer: anchor({ slotId: 'footer', prevSlotId: 'primary' }) },
+      blocks_layout: { items: ['footer'] },
+    };
+    const map = buildBlockPathMap(form, blocksConfig, intl);
+    let n = 0;
+    const result = ensureEmptyBlockIfEmpty(form, { parentId: PAGE }, map, () => `seed-${++n}`, blocksConfig, { intl });
+    const items = result.blocks_layout.items;
+    expect(items[items.length - 1]).toBe('footer');
+    expect(items.length).toBe(2);
+    const leading = result.blocks[items[0]];
+    expect(leading.slotId).toBe('primary');
+    expect(leading.templateInstanceId).toBe('inst-1');
+    expect(leading.fixed).toBeFalsy();
   });
 });
 

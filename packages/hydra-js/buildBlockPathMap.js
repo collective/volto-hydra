@@ -33,10 +33,16 @@ const PAGE_BLOCK_UID = '_page';
  * The other convertible item types are reached by changing the parent's
  * `itemTypeField`, not by adding a foreign block into the synced container.
  *
+ * An ancestor may also forbid types for its whole subtree via
+ * `disallowDescendantBlocks` (see buildBlockPathMap): those are subtracted here,
+ * last, so this stays the ONE place add/DnD/convert/type-sync agree on. An
+ * empty/absent `disallowedTypes` leaves the result unchanged (back-compat).
+ *
  * @param {string[]} allowedBlocks   the field's allowedBlocks
  * @param {string} [itemTypeField]   the field's sync field name (undefined = not synced)
  * @param {Object} [containerBlock]  the container block's data (source of the synced type)
  * @param {Object} [blocksConfig]
+ * @param {Set<string>|string[]} [disallowedTypes] types an ancestor disallows in its subtree
  * @returns {string[]}
  */
 export function addableSiblingTypes(
@@ -44,16 +50,37 @@ export function addableSiblingTypes(
   itemTypeField,
   containerBlock,
   blocksConfig,
+  disallowedTypes,
 ) {
-  if (!Array.isArray(allowedBlocks) || !itemTypeField) return allowedBlocks;
-  const syncedType = containerBlock?.[itemTypeField];
-  if (!syncedType) return allowedBlocks;
-  return allowedBlocks.filter(
-    (type) =>
-      type === syncedType ||
-      // structural (non-convertible) blocks stay addable alongside the item type
-      !blocksConfig?.[type]?.fieldMappings?.['@default'],
-  );
+  if (!Array.isArray(allowedBlocks)) return allowedBlocks;
+  let types = allowedBlocks;
+
+  // Synced-field narrowing: only the current item type + structural
+  // (non-convertible) blocks stay addable.
+  if (itemTypeField) {
+    const syncedType = containerBlock?.[itemTypeField];
+    if (syncedType) {
+      types = types.filter(
+        (type) =>
+          type === syncedType ||
+          !blocksConfig?.[type]?.fieldMappings?.['@default'],
+      );
+    }
+  }
+
+  // Ancestor restriction: drop anything an ancestor disallows in its subtree.
+  // Applied last so it composes with the synced-field narrowing.
+  if (disallowedTypes) {
+    const deny =
+      disallowedTypes instanceof Set
+        ? disallowedTypes
+        : new Set(disallowedTypes);
+    if (deny.size > 0) {
+      types = types.filter((type) => !deny.has(type));
+    }
+  }
+
+  return types;
 }
 
 // Cache for getBlockTypeSchema — keyed by blockType
@@ -427,20 +454,49 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
     return emptyFields.length > 0 ? emptyFields : null;
   }
 
+  // Union an ancestor-inherited disallow Set with a block's own
+  // `disallowDescendantBlocks`. Returns the SAME Set when `own` adds nothing (the
+  // Set is treated as immutable — only extended by cloning), so unchanged
+  // subtrees don't allocate.
+  function unionDisallow(inherited, own) {
+    if (!own || own.length === 0) return inherited || null;
+    const next = new Set(inherited || []);
+    for (const t of own) next.add(t);
+    return next;
+  }
+
   /**
    * Process container fields in an item (block or object_list item).
    * Scans schema for container fields and processes each one.
    * This is the single recursion point for all container types.
+   *
+   * `inheritedDisallow` is the Set of block types disallowed by this item's
+   * ancestors (their `disallowDescendantBlocks`). We fold in this item's own
+   * declaration to get the set that applies to its descendants, thread that into
+   * every container processor (so their children's `allowedSiblingTypes` exclude
+   * it), and record it on this item's entry for the type picker to reuse.
    */
-  function processItem(item, itemId, itemPath, schema) {
+  function processItem(item, itemId, itemPath, schema, inheritedDisallow = null) {
     if (!schema?.properties) return;
+
+    const itemType = itemId === PAGE_BLOCK_UID ? '_page' : item?.['@type'];
+    const disallow = unionDisallow(
+      inheritedDisallow,
+      itemType ? blocksConfig?.[itemType]?.disallowDescendantBlocks : null,
+    );
+    // Record the subtree disallow so the type picker (getBlockTypeChoices, which
+    // reads a container's own field allowedBlocks directly) applies the SAME set
+    // via the SAME helper, rather than re-deriving it.
+    if (disallow && disallow.size > 0 && pathMap[itemId]) {
+      pathMap[itemId].descendantDisallowedTypes = [...disallow];
+    }
 
     Object.entries(schema.properties).forEach(([fieldName, fieldDef]) => {
       // Nested object widget (e.g., slateTable.table with widget: 'object')
       // Descend into the nested schema
       if (fieldDef.widget === 'object' && fieldDef.schema?.properties) {
         if (item[fieldName]) {
-          processItem(item[fieldName], itemId, [...itemPath, fieldName], fieldDef.schema);
+          processItem(item[fieldName], itemId, [...itemPath, fieldName], fieldDef.schema, disallow);
         }
         return;
       }
@@ -448,14 +504,14 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
       // Nested object property (legacy: has properties but no widget/type)
       if (fieldDef.properties && !fieldDef.widget && !fieldDef.type) {
         if (item[fieldName]) {
-          processItem(item[fieldName], itemId, [...itemPath, fieldName], fieldDef);
+          processItem(item[fieldName], itemId, [...itemPath, fieldName], fieldDef, disallow);
         }
         return;
       }
 
       // Container field - process its contents
       if (fieldDef.widget === 'blocks_layout') {
-        processBlocksContainer(item, itemId, itemPath, fieldName, fieldDef);
+        processBlocksContainer(item, itemId, itemPath, fieldName, fieldDef, disallow);
       } else if (fieldDef.widget === 'object_list') {
         // Use dataPath if provided to find data in a different location
         const dataPath = fieldDef.dataPath || [fieldName];
@@ -464,7 +520,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
           fieldData = fieldData?.[key];
         }
         if (fieldData) {
-          processObjectListContainer(item, itemId, itemPath, fieldName, fieldDef, dataPath);
+          processObjectListContainer(item, itemId, itemPath, fieldName, fieldDef, dataPath, disallow);
         }
       }
     });
@@ -479,7 +535,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
       processBlocksContainer(item, itemId, itemPath, 'items', {
         allowedBlocks: blockConfig?.allowedBlocks || null,
         maxLength: blockConfig?.maxLength || null,
-      });
+      }, disallow);
     }
   }
 
@@ -487,7 +543,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
    * Process a widget: 'blocks_layout' container field.
    * Blocks are in shared parent.blocks dict; layout is parent[fieldName].items.
    */
-  function processBlocksContainer(parent, parentId, parentPath, fieldName, fieldDef) {
+  function processBlocksContainer(parent, parentId, parentPath, fieldName, fieldDef, disallow = null) {
     const blocks = parent.blocks;
     // `fieldName` is a blocks field (a schema field with widget 'blocks_layout');
     // its name is the key under the container's shared `blocks_layout` dict. So
@@ -630,6 +686,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
           fieldDef.itemTypeField,
           parent,
           blocksConfig,
+          disallow,
         ),
         allowedTemplates: fieldDef.allowedTemplates || null,
         maxSiblings: effectiveMaxLength,
@@ -642,9 +699,11 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         ...(!canInsertAfter && { canInsertAfter: false }),
       };
 
-      // RECURSE: process this block's container fields
+      // RECURSE: process this block's container fields. `disallow` is the set
+      // from this block's ancestors (parent + up); processItem folds in the
+      // block's own disallowDescendantBlocks for its descendants.
       if (blockSchema) {
-        processItem(block, blockId, blockPath, blockSchema);
+        processItem(block, blockId, blockPath, blockSchema, disallow);
       }
     });
   }
@@ -654,7 +713,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
    * Items are stored as array with configurable ID field.
    * @param {Array} dataPath - Path to actual data location (defaults to [fieldName])
    */
-  function processObjectListContainer(parent, parentId, parentPath, fieldName, fieldDef, dataPath = null) {
+  function processObjectListContainer(parent, parentId, parentPath, fieldName, fieldDef, dataPath = null, disallow = null) {
     // Navigate to actual data location using dataPath
     const effectiveDataPath = dataPath || [fieldName];
     let items = parent;
@@ -780,6 +839,13 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         isObjectListItem: true,
         idField,
         ...(typeField && { typeField }), // Only set if typed object_list
+        // A region-level `@type` RULE: a `when`-based fieldRule whose `set` is a
+        // block-TYPE name, deciding each item's `@type` by position (e.g. a table
+        // cell in a header row → `tableHeaderCell`). Carried onto every item so the
+        // normalization pass can re-resolve + convert the item when its position
+        // changes. Only meaningful for typed object_lists (an item must have an
+        // `@type` to rewrite).
+        ...(typeField && fieldDef.typeRule && { typeRule: fieldDef.typeRule }),
         ...(itemIsFixed && { isFixed: true }),
         ...(itemIsReadonly && { isReadonly: true }),
         ...(!canInsertBefore && { canInsertBefore: false }),
@@ -793,6 +859,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
               fieldDef.itemTypeField,
               parent,
               blocksConfig,
+              disallow,
             )
           : [virtualType],
         maxSiblings: fieldDef.maxLength || null,
@@ -803,10 +870,11 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         emptyRequiredFields: getEmptyRequiredFields(item, blockSchema),
       };
 
-      // RECURSE: process this item's container fields (same pattern!)
+      // RECURSE: process this item's container fields (same pattern!). Thread
+      // the ancestor disallow set through, like the blocks_layout path.
       const recurseSchema = hasAllowedBlocks ? blockSchema : itemSchema;
       if (recurseSchema) {
-        processItem(item, itemId, itemPath, recurseSchema);
+        processItem(item, itemId, itemPath, recurseSchema, disallow);
       }
     });
   }
@@ -848,7 +916,10 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
 
     const { blockType } = pathInfo;
     const blockConfig = blocksConfig?.[blockType];
-    // No config or no enhancer → nothing to re-do.
+    // No config or no enhancer → nothing to re-do. A non-typed object_list item's
+    // virtual type is REGISTERED into blocksConfig at mint time (see
+    // registerVirtualType), so its inline schemaEnhancer is found here by name —
+    // the same path as a real typed block.
     if (!blockConfig || typeof blockConfig.schemaEnhancer !== 'function') continue;
 
     // Look up block data via path
@@ -864,9 +935,9 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
       intl,
       blocksConfig,
       blockData,
-      formData,      // pageFormData
-      blockId,       // NEW: blockId in enhancer args
-      pathMap,       // NEW: full pathMap in enhancer args
+      formData, // pageFormData
+      blockId, // blockId in enhancer args
+      pathMap, // full pathMap in enhancer args
     );
     if (!enhancedSchema) continue;
 

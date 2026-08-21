@@ -1,0 +1,73 @@
+{
+  "@id": "/optional-fields-page",
+  "@type": "Document",
+  "id": "optional-fields-page",
+  "title": "Optional Fields Page",
+  "description": "Hero blocks with optional fields empty vs populated, for the reveal-optional-fields feature (issue #296). `hero` is the only block that exercises all four sentinel types at once: heading (plain string), subheading (textarea), description (slate), buttonLink (link), image (media). `anchor-slate` is here only so the page has a block-uid in VIEW mode: hero declares its uid in a hydra comment (renderer.js renderBlock), and comments are materialised by the bridge in edit mode only, so an all-hero page renders zero [data-block-uid] after save and AdminUIHelper.waitForIframeReady never settles.",
+  "blocks": {
+    "hero-empty": {
+      "@type": "hero"
+    },
+    "hero-cleared": {
+      "@type": "hero",
+      "heading": "",
+      "subheading": "",
+      "buttonText": "",
+      "buttonLink": [],
+      "description": []
+    },
+    "hero-full": {
+      "@type": "hero",
+      "heading": "Populated Hero",
+      "subheading": "Populated subheading",
+      "buttonText": "Populated Button",
+      "buttonLink": [
+        {
+          "@id": "/target-page",
+          "title": "Target Page"
+        }
+      ],
+      "image": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='400'%3E%3Crect width='100%25' height='100%25' fill='%234a90d9'/%3E%3C/svg%3E",
+      "description": [
+        {
+          "type": "p",
+          "children": [{ "text": "Populated description" }]
+        }
+      ]
+    },
+    "anchor-slate": {
+      "@type": "slate",
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "Anchor block" }]
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": ["hero-empty", "hero-cleared", "hero-full", "anchor-slate"]
+  },
+  "@components": {
+    "actions": {
+      "@id": "/optional-fields-page/@actions",
+      "object": [
+        {
+          "@id": "/optional-fields-page/edit",
+          "id": "edit",
+          "title": "Edit"
+        }
+      ],
+      "object_buttons": []
+    },
+    "breadcrumbs": {
+      "@id": "/optional-fields-page/@breadcrumbs",
+      "items": [
+        {
+          "@id": "/optional-fields-page",
+          "title": "Optional Fields Page"
+        }
+      ]
+    }
+  }
+}

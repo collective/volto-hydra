@@ -1,7 +1,12 @@
 /**
- * Schema Inheritance Utilities
+ * Block Sync Utilities
  *
- * Helpers for blocks that reference other block types and inherit their schemas.
+ * How a container block SYNCS schema + data with its child blocks: a grid/listing
+ * fixing its children's item type, inheriting shared defaults, hiding the fields
+ * the parent owns, and gating a child's fields on the parent's settings
+ * (`fieldRules`). Formerly "schemaInheritance" — the through-line is keeping
+ * parent and child blocks in sync, not inheritance per se.
+ *
  * Used by listing blocks, grid blocks, and other containers that need to show
  * editable fields from a referenced block type.
  *
@@ -32,11 +37,23 @@
  * inject `blockId` into the args at every Volto call site, the `hydraContext`
  * branch can be removed — until then, both branches are load-bearing.
  */
-import config from '@plone/volto/registry';
-import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField } from './blockPath';
+import { getInjectedBlocksConfig } from './injectedVoltoConfig.js';
+import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField, convertValueContainer, convertContainerBlock, getContainerRegionDescriptors, insertBlockInContainer, parseRegionPath, expandValueIntoRegion, collapseRegionToValue } from './blockPath.js';
+import { addableSiblingTypes, buildBlockPathMap } from '../../../hydra-js/buildBlockPathMap.js';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
-import { convertFieldValue } from '@volto-hydra/helpers';
-import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '../context';
+import {
+  convertFieldValue,
+  resolveFieldPath as resolveBlockFieldPath,
+  getFieldValue,
+  getFieldDef,
+  getFieldTypeString,
+  getChildBlockEntries,
+  setChildBlockEntries,
+  getBlockType,
+  isSlateFieldType,
+  slateNodesText,
+} from '@volto-hydra/helpers';
+import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '../context/index.js';
 // Pure validation/default-application logic lives in schemaValidation.js
 // (no dependencies — safe to import from CI scripts and test runners).
 // Re-exported here for backward compat; schemaValidation.js is the SSOT.
@@ -366,7 +383,7 @@ function getNeighborData(index, context) {
 }
 
 function getTemplateInfoFromNeighbors(context) {
-  const { position, layoutItems, allBlocks, insertAfter, containerId, field, items } = context;
+  const { position, layoutItems, allBlocks, containerId, field, items } = context;
   const containerLength = items ? items.length : layoutItems?.length || 0;
 
   if (containerLength === 0) {
@@ -392,60 +409,71 @@ function getTemplateInfoFromNeighbors(context) {
     return undefined;
   }
 
-  // Determine the primary neighbor based on insertion direction
-  // insertAfter=true: we're inserting AFTER the block at position-1, so inherit from it
-  // insertAfter=false: we're inserting BEFORE the block at position, so inherit from it
+  // Position-based membership: examine BOTH neighbors and see whether a slot region
+  // reaches this insertion gap. Drag DIRECTION is irrelevant — the same position always
+  // yields the same membership. (The old `insertAfter ? prev : next` "inherit from the
+  // target block" rule made one position mean two different things and, before the first
+  // fixed anchor, inherited templateId + fixed:true from the fixed block while finding no
+  // slot — an in-template, slot-less, read-only corrupt half-membership.)
+  //
+  // A neighbor "offers" this position into a slot when a slot region touches the gap:
+  //   - a non-fixed slot block on EITHER side (the slot continues into the gap) → its slotId
+  //   - the block BEFORE the gap, if fixed, via its `nextSlotId` (slot region AFTER it)
+  //   - the block AFTER  the gap, if fixed, via its `prevSlotId` (slot region BEFORE it)
+  // `prevSlotId` mirrors `nextSlotId` so a leading slot (bottom-anchored layout: slots
+  // above a fixed footer) is reachable, symmetric with a trailing slot. No offer from
+  // either side → outside every template. A block that joins a slot is a real slot
+  // member: never fixed, never readOnly.
   const prevNeighbor = getNeighborData(position - 1, context);
   const nextNeighbor = getNeighborData(position, context);
 
-  // The "target" block determines template membership
-  const primaryNeighbor = insertAfter ? prevNeighbor : nextNeighbor;
-
-  // If the primary neighbor (target of insertion) is not in a template, stay outside
-  if (!primaryNeighbor?.templateId) {
-    return undefined;
-  }
-
-  // Primary neighbor is in a template - inherit template info
-  const templateInfo = {
-    templateId: primaryNeighbor.templateId,
-    templateInstanceId: primaryNeighbor.templateInstanceId,
-    fixed: primaryNeighbor.fixed || false,
-    readOnly: primaryNeighbor.readOnly || false,
+  const slotOffer = (neighbor, fixedSlotField) => {
+    if (!neighbor?.templateId) return null;
+    const slotId =
+      !neighbor.fixed && neighbor.slotId
+        ? neighbor.slotId
+        : neighbor.fixed && neighbor[fixedSlotField]
+          ? neighbor[fixedSlotField]
+          : null;
+    if (!slotId) return null;
+    return {
+      templateId: neighbor.templateId,
+      templateInstanceId: neighbor.templateInstanceId,
+      slotId,
+    };
   };
 
-  // Inherit slotId from the primary neighbor if it's not fixed
-  // For slotId inheritance, also check the secondary neighbor
-  let inheritedSlotId = null;
-  const secondaryNeighbor = insertAfter ? nextNeighbor : prevNeighbor;
-
-  let fromNextPlaceholder = false;
-  for (const neighbor of [primaryNeighbor, secondaryNeighbor].filter(Boolean)) {
-    if (neighbor?.templateId === templateInfo.templateId) {
-      // Same template - can inherit slotId
-      if (!neighbor.fixed && neighbor.slotId && !inheritedSlotId) {
-        inheritedSlotId = neighbor.slotId;
-      }
-      // Fixed blocks with nextSlotId indicate an adjacent slot region.
-      // This preserves slot info even when all slot blocks are deleted.
-      if (neighbor.fixed && neighbor.nextSlotId && !inheritedSlotId) {
-        inheritedSlotId = neighbor.nextSlotId;
-        fromNextPlaceholder = true;
-      }
-    }
+  // prev reaches forward via nextSlotId; next reaches backward via prevSlotId.
+  const offer =
+    slotOffer(prevNeighbor, 'nextSlotId') || slotOffer(nextNeighbor, 'prevSlotId');
+  if (offer) {
+    return {
+      templateId: offer.templateId,
+      templateInstanceId: offer.templateInstanceId,
+      slotId: offer.slotId,
+      fixed: false,
+      readOnly: false,
+    };
   }
 
-  // nextSlotId overrides: the new block is in a slot region,
-  // so it should not inherit fixed/readOnly from the fixed neighbor.
-  if (fromNextPlaceholder) {
-    templateInfo.fixed = false;
-    templateInfo.readOnly = false;
+  // No slot faces this position. If the CONTAINER itself is a template instance (e.g. a
+  // columns block whose children are each their own fixed slot), a block added INSIDE it
+  // still joins that template — with a FRESH slotId (left null; the caller generates one).
+  // This is what separates "inside a template instance" (join) from the template's OUTER
+  // edge (746: the container is the page, which has no templateId, so a drop before a
+  // top/bottom fixed anchor correctly stays out).
+  const container = context.parentBlock || allBlocks?.[containerId];
+  if (container?.templateId) {
+    return {
+      templateId: container.templateId,
+      templateInstanceId: container.templateInstanceId,
+      slotId: null,
+      fixed: false,
+      readOnly: false,
+    };
   }
 
-  return {
-    ...templateInfo,
-    slotId: inheritedSlotId,
-  };
+  return undefined;
 }
 
 /**
@@ -586,7 +614,8 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
   return (args) => {
     let { formData, schema, intl } = args;
 
-    const blocksConfig = config.blocks.blocksConfig;
+    const blocksConfig =
+      getHydraSchemaContext?.()?.blocksConfig || getInjectedBlocksConfig();
 
     // Read typeField from block-level config if not provided directly.
     // Uses the standard lookup (recipe → schema walk).
@@ -953,7 +982,7 @@ export function hideParentOwnedFields() {
     const hydraContext = getHydraSchemaContext();
     const blockPathMap = passedBlockPathMap || hydraContext?.blockPathMap;
     const blockId = passedBlockId ?? hydraContext?.currentBlockId;
-    const blocksConfig = hydraContext?.blocksConfig || config.blocks.blocksConfig;
+    const blocksConfig = hydraContext?.blocksConfig || getInjectedBlocksConfig();
     // For getLiveBlockData below: pageFormData + pathMap let getBlockById
     // resolve siblings/parents during buildBlockPathMap pass 2 (no React).
     const liveFallback = { formData: args.pageFormData, blockPathMap };
@@ -1278,6 +1307,100 @@ export function computeSmartDefaults(sourceFields, targetSchema, declaredMapping
  * @param {Object} intl - React Intl object for translations
  * @returns {Object} - FormData with defaults applied to blocks (or original if no changes)
  */
+/**
+ * Resolve a block's EFFECTIVE schema — the base schema with its schemaEnhancer
+ * applied (fieldRules visibility, hideParentOwnedFields, inheritSchemaFrom). This
+ * is the schema the editor actually renders and validates against, so its
+ * `required` is the DYNAMIC required set: a field hidden by a `when` rule (a
+ * card's `image`, shown only when the grid enables it) is dropped from `required`.
+ *
+ * Recipe-object enhancers ARE converted here (via createSchemaEnhancerFromRecipe),
+ * unlike buildBlockPathMap's pass which skips them — so callers get the fully
+ * resolved schema for recipe-based blocks too. Enhancers that compose
+ * `hideParentOwnedFields` must already be installed (installChildBlockEnhancers).
+ *
+ * Extracted from applySchemaDefaultsToFormData (its per-block resolution) so
+ * block-sanity's offline required check can reuse the exact same resolution.
+ *
+ * @returns {Object|null} the enhanced schema, or null if the block has no schema.
+ */
+export function resolveEffectiveBlockSchema(blockId, formData, blockPathMap, blocksConfig, intl) {
+  const blockData = getBlockById(formData, blockPathMap, blockId);
+  if (!blockData) return null;
+
+  // Use blockPathMap for type lookup (single source of truth).
+  // Don't use blockData['@type'] as object_list items don't store @type.
+  const blockType = blockPathMap?.[blockId]?.blockType;
+  if (!blockType) return null;
+
+  const blockConfig = blocksConfig?.[blockType];
+
+  // Base schema + enhancer come from the registered block config OR — for a
+  // non-typed object_list item (virtual blockType, no blocksConfig entry) — from
+  // the inline `itemSchema` the pathMap recorded. This resolves an inline
+  // object_list item's schema (e.g. a table cell's fieldRules) WITHOUT registering
+  // virtual types into the shared blocksConfig, which would pollute block
+  // discovery and the chooser.
+  const itemSchema = blockPathMap?.[blockId]?.itemSchema;
+  if (!blockConfig && !itemSchema) return null;
+
+  // Get base schema + its enhancer from whichever source applies.
+  let schema = null;
+  let enhancer = null;
+  if (blockConfig) {
+    if (typeof blockConfig.blockSchema === 'function') {
+      schema = blockConfig.blockSchema({ formData: blockData, intl });
+    } else if (blockConfig.blockSchema) {
+      schema = blockConfig.blockSchema;
+    } else if (typeof blockConfig.schema === 'function') {
+      schema = blockConfig.schema({ formData: blockData, intl });
+    } else if (blockConfig.schema) {
+      schema = blockConfig.schema;
+    }
+    enhancer = blockConfig.schemaEnhancer;
+  } else {
+    schema = itemSchema;
+    enhancer = itemSchema.schemaEnhancer;
+  }
+
+  if (!schema) return null;
+
+  // Apply schemaEnhancer if present (fieldRules/hideParentOwnedFields/inheritSchemaFrom).
+  if (enhancer) {
+    // schemaEnhancer can be a function or a recipe object
+    if (typeof enhancer !== 'function') {
+      // It's a recipe object - create enhancer from it
+      enhancer = createSchemaEnhancerFromRecipe(enhancer);
+    }
+    if (enhancer) {
+      // Set context so schemaEnhancer can access currentBlockId and blockPathMap
+      // (Volto HOC call sites that pass only {schema,formData,intl}); also pass
+      // them in args (the buildBlockPathMap contract) so `../` lookups resolve
+      // even without an active context.
+      const restoreContext = setHydraSchemaContext({
+        blockPathMap,
+        currentBlockId: blockId,
+        blocksConfig,
+        formData,
+      });
+      try {
+        schema = enhancer({
+          formData: blockData,
+          schema: { ...schema, properties: { ...schema.properties } },
+          intl,
+          pageFormData: formData,
+          blockId,
+          blockPathMap,
+        });
+      } finally {
+        restoreContext();
+      }
+    }
+  }
+
+  return schema;
+}
+
 export function applySchemaDefaultsToFormData(formData, blockPathMap, blocksConfig, intl) {
   if (!blockPathMap) return formData;
 
@@ -1288,64 +1411,154 @@ export function applySchemaDefaultsToFormData(formData, blockPathMap, blocksConf
     const blockData = getBlockById(result, blockPathMap, blockId);
     if (!blockData) continue;
 
-    // Use blockPathMap for type lookup (single source of truth)
-    // Don't use blockData['@type'] as object_list items don't store @type
-    const blockType = blockPathMap[blockId]?.blockType;
-    if (!blockType) continue;
-
-    const blockConfig = blocksConfig?.[blockType];
-    if (!blockConfig) continue;
-
-    // Get base schema
-    let schema = null;
-    if (typeof blockConfig.blockSchema === 'function') {
-      schema = blockConfig.blockSchema({ formData: blockData, intl });
-    } else if (blockConfig.blockSchema) {
-      schema = blockConfig.blockSchema;
-    } else if (typeof blockConfig.schema === 'function') {
-      schema = blockConfig.schema({ formData: blockData, intl });
-    } else if (blockConfig.schema) {
-      schema = blockConfig.schema;
-    }
-
+    const schema = resolveEffectiveBlockSchema(
+      blockId,
+      result,
+      blockPathMap,
+      blocksConfig,
+      intl,
+    );
     if (!schema) continue;
-
-    // Apply schemaEnhancer if present (this sets the `default` values)
-    if (blockConfig.schemaEnhancer) {
-      // schemaEnhancer can be a function or a recipe object
-      let enhancer = blockConfig.schemaEnhancer;
-      if (typeof enhancer !== 'function') {
-        // It's a recipe object - create enhancer from it
-        enhancer = createSchemaEnhancerFromRecipe(enhancer);
-      }
-      if (enhancer) {
-        // Set context so schemaEnhancer can access currentBlockId and blockPathMap
-        const restoreContext = setHydraSchemaContext({
-          blockPathMap,
-          currentBlockId: blockId,
-          blocksConfig,
-          formData: result,
-        });
-        try {
-          schema = enhancer({
-            formData: blockData,
-            schema: { ...schema, properties: { ...schema.properties } },
-            intl,
-          });
-        } finally {
-          restoreContext();
-        }
-      }
-    }
 
     // Apply defaults from enhanced schema
     const updatedBlock = applySchemaDefaultsToBlock(blockData, schema);
     if (updatedBlock !== blockData) {
       result = updateBlockById(result, blockPathMap, blockId, updatedBlock);
     }
+
+    // `@type` RULE — a position-driven type. When a typed object_list item carries
+    // a `typeRule` (a `when`-based fieldRule whose `set` is a block-TYPE name),
+    // re-resolve the type the item SHOULD have at its current position and, if it
+    // differs from the stored `@type`, convert the item in place. This is the same
+    // "run the rules, see what changed, write it back" pass that applies defaults —
+    // no separate resolver, no editor plumbing. It's how a table cell flips between
+    // `tableHeaderCell` (a slate value) and `tableCell` (a blocks container) when
+    // its row moves to/from a header position. Deterministic by position, so it
+    // settles (the target type re-resolves to itself next pass — no oscillation).
+    const typeRule = blockPathMap[blockId]?.typeRule;
+    if (typeRule) {
+      const current = getBlockById(result, blockPathMap, blockId);
+      const currentType = current?.['@type'] || blockPathMap[blockId]?.blockType;
+      const targetType = evaluateFieldRule(typeRule, current, {
+        blockId,
+        blockPathMap,
+        pageFormData: result,
+      });
+      if (typeof targetType === 'string' && targetType !== currentType) {
+        const converted = convertValueContainer(
+          current,
+          currentType,
+          targetType,
+          blocksConfig,
+          intl,
+        );
+        // null → no bridge for this pair; leave the item as-is (fail visibly by
+        // simply not converting rather than corrupting it).
+        if (converted) {
+          result = updateBlockById(result, blockPathMap, blockId, converted);
+        }
+      }
+    }
   }
 
   return result;
+}
+
+/**
+ * TRIAL a would-be state (a candidate drop/paste result) and report every block
+ * whose `@type` the rules would CHANGE — so the caller can ask before committing.
+ *
+ * This is the generic "sandbox the drop, see what converts" detector: it runs the
+ * SAME normalization pass that commits use (`applySchemaDefaultsToFormData`, which
+ * applies defaults AND `@type` rules via the container⇄value bridge) against a
+ * candidate formData, then diffs each block's `@type` before vs after. A type
+ * changes for ANY reason a rule fires — position (`typeRule`), a field condition,
+ * anything — not just tables. The caller (DnD/paste) trials the post-move formData,
+ * and if `conversions` is non-empty, confirms with the user, then commits the
+ * returned `formData` (already converted); an empty list commits silently.
+ *
+ * Blocks REMOVED by a conversion (e.g. a container's children collapsed into a
+ * value) are not "type changes" and are not reported — only surviving blocks whose
+ * `@type` differs. `blockPathMap` is the candidate's map; `getBlockById` is
+ * path-based, so it still resolves a converted block (same position, new `@type`).
+ *
+ * @returns {{ formData: object, conversions: Array<{blockId, from, to}> }}
+ */
+export function previewSchemaDefaultConversions(formData, blockPathMap, blocksConfig, intl) {
+  const before = {};
+  if (blockPathMap) {
+    for (const blockId of Object.keys(blockPathMap)) {
+      const b = getBlockById(formData, blockPathMap, blockId);
+      if (b) before[blockId] = b['@type'];
+    }
+  }
+  const normalized = applySchemaDefaultsToFormData(formData, blockPathMap, blocksConfig, intl);
+  const conversions = [];
+  for (const blockId of Object.keys(before)) {
+    const b = getBlockById(normalized, blockPathMap, blockId);
+    if (b && b['@type'] !== before[blockId]) {
+      conversions.push({ blockId, from: before[blockId], to: b['@type'] });
+    }
+  }
+  return { formData: normalized, conversions };
+}
+
+/**
+ * Filter a container's `allowedBlocks` down to the types that are actually ADDABLE
+ * at a given position, when a position `@type` rule (typeRule) governs the region.
+ *
+ * For each allowed type, TRIAL it: probe-insert a minimal item of that type after
+ * `refBlockId`, run the schema-default pass (which applies the typeRule), and keep
+ * the type only if the rule did NOT change it. A type the rule immediately rewrites
+ * (e.g. `tableCell` dropped where the position forces `tableHeaderCell`) is not a
+ * real choice at that spot, so it's dropped from the menu — a typeRule-driven
+ * container thus offers only the rule-consistent type(s). Usually one survives, so
+ * the caller's "single allowed type → add directly (no chooser)" path fires.
+ *
+ * Returns the filtered list (never empty — falls back to the input if the trial
+ * would drop everything, so a mis-authored rule can't strand the add). A container
+ * with ≤1 allowed type, or one whose items are all left unchanged, is returned as-is.
+ */
+export function filterAddableTypesByRule(
+  allowedBlocks,
+  formData,
+  blockPathMap,
+  refBlockId,
+  containerConfig,
+  blocksConfig,
+  intl,
+) {
+  if (!Array.isArray(allowedBlocks) || allowedBlocks.length <= 1) return allowedBlocks;
+  // No position `@type` rule governs this region → nothing can re-type the new
+  // item, so every allowed type is addable as-is. Skip the per-type sandbox
+  // entirely (the common case — only a typeRule container needs filtering). The
+  // region's `typeRule` is carried onto each typed item's pathMap entry, so the
+  // ref sibling carries it when the region has one.
+  if (!blockPathMap?.[refBlockId]?.typeRule) return allowedBlocks;
+  const idField = containerConfig?.idField || '@id';
+  const filtered = allowedBlocks.filter((type) => {
+    const probeId = `__probe_${type}__`;
+    let sandbox;
+    try {
+      sandbox = insertBlockInContainer(
+        formData,
+        blockPathMap,
+        refBlockId,
+        probeId,
+        { '@type': type, [idField]: probeId },
+        containerConfig,
+        'after',
+      );
+    } catch {
+      return true; // couldn't probe this type → don't drop it
+    }
+    const map = buildBlockPathMap(sandbox, blocksConfig, intl);
+    const normalized = applySchemaDefaultsToFormData(sandbox, map, blocksConfig, intl);
+    const after = getBlockById(normalized, map, probeId);
+    // Keep only if the position rule left this type unchanged (addable as-is).
+    return !after || after['@type'] === type;
+  });
+  return filtered.length ? filtered : allowedBlocks;
 }
 
 /**
@@ -1546,12 +1759,21 @@ function createEnhancerByType(type, config) {
  *                                  — conditional definition override
  *   [ rule, rule, ... ]            — switch: first matching rule wins
  *
- * Condition format (when):
- *   { fieldName: value }           — equality: formData[fieldName] === value
- *   { fieldName: { isNot: v } }    — inequality
- *   { fieldName: { gte: n } }      — numeric comparison (gt, gte, lt, lte)
- *   { fieldName: { isSet: true } } — truthy check
- *   { fieldName: { contains: v } } — array membership (multiselect includes v)
+ * Condition format (when) — every operator is driven by the field's declared
+ * type (its SURFACE) and throws when used off-surface; see resolveWhenField /
+ * evaluateOperators for the full table:
+ *   { fieldName: value }           — equality (bare value ≡ { is: value })
+ *   { fieldName: { isNot: v } }    — inequality (arrays: set-equality)
+ *   { fieldName: { isSet: true } } — presence ('' / [] / unset are not set)
+ *   { fieldName: { oneOf: [a,b] } }— scalar (string/number) value ∈ set
+ *   { fieldName: { contains: v } } — STRING: substring; ARRAY: membership (a
+ *                                    multiselect value, or a region's block TYPE)
+ *   { fieldName: { containsAny: [a,b] } } — ARRAY shares any / (All) holds all
+ *   { fieldName: { regex: 're' } } — STRING (incl. slate plaintext) matches a
+ *                                    pattern ('re' or { pattern, flags })
+ *   { fieldName: { gte: n } }      — NUMBER compares; ARRAY (multiselect / a
+ *                                    region, named by its field) COUNTS its items
+ *                                    (one region only, never a cross-region total)
  *   { '../field': value }          — parent/root field path
  *
  * Field definitions can include a `fieldset` property to specify placement:
@@ -1747,121 +1969,327 @@ function evaluateFieldRule(rule, formData, args) {
 }
 
 /**
+ * Reduce a `when` field path to a comparison SURFACE — the single abstraction the
+ * operators act on — WITHOUT sniffing the value shape. Uses the central
+ * field-access API (the SAME one inline-edit / the sidebar use): the block-scope
+ * resolver (`/`, `..`) → `{ blockId, fieldName }`, then `getFieldValue` /
+ * `getFieldDef` / the storage-agnostic region reader.
+ *
+ * A surface is `{ kind, value, fieldPath }` where kind ∈:
+ *   - `'string'`  — text / textarea / url / Choice → the string; a SLATE field →
+ *                   its plaintext (`slateNodesText`), so contains/regex read prose.
+ *   - `'number'`  — integer / float / number → the number.
+ *   - `'boolean'` — boolean → true/false.
+ *   - `'array'`   — a MULTISELECT (type 'array') → its selected values; a REGION
+ *                   (object_list widget OR a blocks_layout region key) → the
+ *                   ordered list of its child block TYPES (`getBlockType`, so
+ *                   `contains: 'image'` means "has an image block").
+ *
+ * The virtual field `@index` is special: instead of field data it reads the
+ * block's ordinal POSITION within its parent object_list region (from the
+ * blockPathMap path) as a `'number'` surface — so `{ '@index': { lt: 1 } }` is
+ * "first in my region" and `../@index` is the parent block's index. Distinct
+ * from the region surface's numeric ops (which COUNT children); a non-object_list
+ * block yields an unset number (comparisons false, never a throw).
+ *
+ * Only the current block carries a schema here (`args.schema`); a `../`/`/` ref
+ * has none, so its non-region value defaults to the string surface.
+ * @private
+ */
+function resolveWhenField(fieldPath, formData, args) {
+  const hydraContext = getHydraSchemaContext?.();
+  const blockPathMap = args?.blockPathMap || hydraContext?.blockPathMap;
+  const curBlockId =
+    args?.blockId ?? hydraContext?.currentBlockId ?? PAGE_BLOCK_UID;
+  const { blockId: targetBlockId, fieldName } = resolveBlockFieldPath(
+    fieldPath,
+    curBlockId,
+    blockPathMap,
+  );
+
+  // Position surface — `@index` is a block's ordinal index within its parent
+  // object_list region, sourced from the blockPathMap PATH (its last element is
+  // the numeric array index for an object_list item), NOT from field data. It
+  // composes with the block-step grammar, so `../@index` is the parent block's
+  // index (a cell reading its row's position). This is what lets a rule key off
+  // POSITION rather than a field value — e.g. a table cell that is a header when
+  // its row is first (`../@index` < 1) or it is first in its row (`@index` < 1).
+  // It's a number surface, distinct from (and non-colliding with) the region
+  // surface's numeric ops, which COUNT a region's children. A non-object_list
+  // block (path with no numeric tail) yields an unset number, so comparisons are
+  // false rather than throwing.
+  //
+  // `../@index` can still carry its leading `../` here when there was no
+  // blockPathMap to resolve them — e.g. buildBlockPathMap PASS 1 computes a
+  // GENERIC schema (no blockId/blockPathMap), so `resolveFieldPath` returns the
+  // path verbatim. In that case the position is simply unknown → an UNSET number
+  // (every comparison false), never a throw. Pass 2 re-runs the enhancer WITH the
+  // blockPathMap, where `../@index` resolves to the parent block and this reads
+  // its real index. So strip any unresolved leading `../` before matching.
+  if (fieldName === '@index' || fieldName.replace(/^(?:\.\.\/)+/, '') === '@index') {
+    const p = blockPathMap?.[targetBlockId]?.path;
+    const last = Array.isArray(p) && p.length ? p[p.length - 1] : undefined;
+    return {
+      kind: 'number',
+      value: typeof last === 'number' ? last : undefined,
+      fieldPath,
+    };
+  }
+
+  // Which block owns the field, and (only for the current block) its schema.
+  let block;
+  let schema;
+  if (targetBlockId === curBlockId) {
+    block = formData;
+    schema = args?.schema;
+  } else if (targetBlockId === PAGE_BLOCK_UID) {
+    block = args?.pageFormData || hydraContext?.formData;
+  } else {
+    block = getLiveBlockData?.(targetBlockId, {
+      formData: args?.pageFormData,
+      blockPathMap,
+    });
+  }
+
+  const def = schema ? getFieldDef(schema, fieldName) : undefined;
+
+  // REGION → array of child block TYPES. object_list via widget, blocks_layout via
+  // the shared dict (incl. empty) OR a schema-declared blocks_layout field (so a
+  // region with no data yet — e.g. pass-1 resolution with formData={} — counts 0
+  // rather than throwing on a numeric op, mirroring object_list). A typed
+  // object_list stores its type in a `typeField`; blocks_layout children carry
+  // `@type` — getBlockType handles both.
+  const isObjectList = def?.widget === 'object_list';
+  const isBlocksLayoutRegion =
+    def?.widget === 'blocks_layout' ||
+    Array.isArray(block?.blocks_layout?.[fieldName]);
+  if (isObjectList || isBlocksLayoutRegion) {
+    const entries = getChildBlockEntries(block, { isObjectList, region: fieldName });
+    const types = entries.map((e) => getBlockType(e.block, def?.typeField));
+    return { kind: 'array', value: types, fieldPath };
+  }
+
+  const raw = block ? getFieldValue(block, fieldName) : undefined;
+  const typeStr = def ? getFieldTypeString(def) : undefined;
+  const type = def?.type;
+
+  // SLATE / rich text → plaintext string (checked before 'array', since slate can
+  // be `array:slate`).
+  if (isSlateFieldType(typeStr)) {
+    return { kind: 'string', value: slateNodesText(raw), fieldPath };
+  }
+  if (type === 'array') {
+    return { kind: 'array', value: Array.isArray(raw) ? raw : [], fieldPath };
+  }
+  if (['integer', 'int', 'float', 'number'].includes(type)) {
+    return { kind: 'number', value: raw, fieldPath };
+  }
+  if (type === 'boolean') {
+    return { kind: 'boolean', value: raw, fieldPath };
+  }
+  // Default scalar surface: text / textarea / url / Choice (and schemaless refs).
+  return { kind: 'string', value: raw, fieldPath };
+}
+
+/**
  * Evaluate a 'when' condition against form data.
  * Format: { fieldPath: expectedValue, ... } or { fieldPath: { operator: value }, ... }
- * All entries must match (AND logic).
+ * All entries must match (AND logic). A bare value is shorthand for `{ is: value }`.
  * @private
  */
 function evaluateWhenCondition(when, formData, args) {
   for (const [fieldPath, expected] of Object.entries(when)) {
-    const value = resolveFieldPath(fieldPath, formData, args);
-
-    // Object with operators: { isNot: v, gte: n, isSet: true, ... }
-    if (expected && typeof expected === 'object' && !Array.isArray(expected)) {
-      if (!evaluateOperators(value, expected)) return false;
-      continue;
-    }
-
-    // Simple equality
-    if (value !== expected) return false;
+    const surface = resolveWhenField(fieldPath, formData, args);
+    const operators =
+      expected && typeof expected === 'object' && !Array.isArray(expected)
+        ? expected
+        : { is: expected };
+    if (!evaluateOperators(surface, operators)) return false;
   }
   return true;
 }
 
+/** Throw when an operator is used on a field surface it can't act on. @private */
+function assertKind(op, surface, allowed) {
+  if (!allowed.includes(surface.kind)) {
+    throw new Error(
+      `fieldRules: operator "${op}" is not valid for a ${surface.kind} field${
+        surface.fieldPath ? ` ("${surface.fieldPath}")` : ''
+      }; it applies to ${allowed.join('/')} fields`,
+    );
+  }
+}
+
+/** The set operand of oneOf/containsAny/… — must be an array. @private */
+function requireSet(op, operand) {
+  if (!Array.isArray(operand)) {
+    throw new Error(`fieldRules: operator "${op}" expects an array (a set)`);
+  }
+  return operand;
+}
+
+/** Does the field have a meaningful value? '' / [] / null / undefined are unset. @private */
+function isPresent({ kind, value }) {
+  if (value === undefined || value === null) return false;
+  if (kind === 'string') return value !== '';
+  if (kind === 'array') return Array.isArray(value) && value.length > 0;
+  return true; // number 0 and boolean false are present
+}
+
+/** Coerce a number surface's value for comparison; '' / null → NaN. @private */
+function numberOf(value) {
+  return value === '' || value == null ? NaN : Number(value);
+}
+
+/** Equality per surface: set-equality for arrays, numeric for numbers, === else. @private */
+function surfaceEquals(surface, operand) {
+  const { kind, value } = surface;
+  if (kind === 'array') {
+    const set = requireSet('is', operand);
+    const a = new Set(value);
+    const b = new Set(set);
+    return a.size === b.size && [...a].every((v) => b.has(v));
+  }
+  if (kind === 'number') return numberOf(value) === numberOf(operand);
+  return value === operand;
+}
+
+/** Compile a regex operand — `'pattern'` or `{ pattern, flags }`. @private */
+function toRegExp(op, operand) {
+  const pattern = typeof operand === 'string' ? operand : operand?.pattern;
+  const flags = typeof operand === 'string' ? undefined : operand?.flags;
+  try {
+    return new RegExp(pattern, flags);
+  } catch (e) {
+    throw new Error(`fieldRules: operator "${op}" has an invalid pattern: ${e.message}`);
+  }
+}
+
 /**
- * Evaluate operator conditions against a value.
- * Operators: is, isNot, gt, gte, lt, lte, isSet, isNotSet, contains, notContains
- * `contains`/`notContains` test array membership (for multiselect fields):
- * `{ contains: 'date' }` matches when `value` is an array that includes 'date'.
+ * Evaluate operator conditions against a field SURFACE (from resolveWhenField).
+ * Every operator is valid only for specific surface kinds and THROWS otherwise —
+ * count-vs-compare, membership-vs-substring, etc. are driven by the surface, never
+ * the value shape:
+ *   is / isNot        — any surface (arrays: set-equality; numbers: numeric)
+ *   isSet / isNotSet  — any surface (presence)
+ *   oneOf / notOneOf  — string | number | boolean: the scalar is (not) in the set
+ *   contains          — string: substring · array: membership (a value, or a
+ *   / notContains       region's child block TYPE)
+ *   containsAny/All   — array: the array shares any / holds all of the set
+ *   (+ inverses)
+ *   regex / notRegex  — string: matches a pattern (`'re'` or `{ pattern, flags }`)
+ *   gt/gte/lt/lte     — number: compare · array: COUNT its items
  * @private
  */
-function evaluateOperators(value, operators) {
-  const { is, isNot, gt, gte, lt, lte, isSet, isNotSet, contains, notContains } =
-    operators;
+function evaluateOperators(surface, operators) {
+  const { kind, value } = surface;
+  const {
+    is,
+    isNot,
+    gt,
+    gte,
+    lt,
+    lte,
+    isSet,
+    isNotSet,
+    contains,
+    notContains,
+    oneOf,
+    notOneOf,
+    containsAny,
+    notContainsAny,
+    containsAll,
+    notContainsAll,
+    regex,
+    notRegex,
+  } = operators;
 
-  // An empty array counts as unset. The widgets that store arrays — multiselect,
-  // object_browser — leave `[]` behind when the last entry is removed rather
-  // than dropping the key, so without this a field the author has just cleared
-  // still reads as answered.
-  const hasValue =
-    value !== undefined &&
-    value !== null &&
-    value !== '' &&
-    !(Array.isArray(value) && value.length === 0);
+  // Presence (isSet/isNotSet) goes through `isPresent`, which treats an empty
+  // array as unset — the array widgets (multiselect, object_browser) leave `[]`
+  // behind when the last entry is removed rather than dropping the key, so a
+  // field the author has just cleared must not still read as answered.
+  if (isSet !== undefined && (isSet ? !isPresent(surface) : isPresent(surface)))
+    return false;
+  if (
+    isNotSet !== undefined &&
+    (isNotSet ? isPresent(surface) : !isPresent(surface))
+  )
+    return false;
 
-  if (isSet !== undefined) {
-    if (isSet ? !hasValue : hasValue) return false;
+  if (is !== undefined && !surfaceEquals(surface, is)) return false;
+  if (isNot !== undefined && surfaceEquals(surface, isNot)) return false;
+
+  if (oneOf !== undefined) {
+    // Scalar set membership — the field's single value is (not) in the set.
+    assertKind('oneOf', surface, ['string', 'number', 'boolean']);
+    const v = kind === 'number' ? numberOf(value) : value;
+    if (!requireSet('oneOf', oneOf).includes(v)) return false;
   }
-  if (isNotSet !== undefined) {
-    if (isNotSet ? hasValue : !hasValue) return false;
+  if (notOneOf !== undefined) {
+    assertKind('notOneOf', surface, ['string', 'number', 'boolean']);
+    const v = kind === 'number' ? numberOf(value) : value;
+    if (requireSet('notOneOf', notOneOf).includes(v)) return false;
   }
+
   if (contains !== undefined) {
-    // Array membership: a non-array value (missing/unset multiselect) never
-    // contains anything, so the condition fails.
-    if (!Array.isArray(value) || !value.includes(contains)) return false;
+    // string → substring; array → membership (a value, or a region's block type).
+    assertKind('contains', surface, ['string', 'array']);
+    const hay = kind === 'array' ? value : String(value ?? '');
+    if (!hay.includes(contains)) return false;
   }
   if (notContains !== undefined) {
-    if (Array.isArray(value) && value.includes(notContains)) return false;
+    assertKind('notContains', surface, ['string', 'array']);
+    const hay = kind === 'array' ? value : String(value ?? '');
+    if (hay.includes(notContains)) return false;
   }
-  if (is !== undefined && value !== is) return false;
-  if (isNot !== undefined && value === isNot) return false;
 
-  const numValue = typeof value === 'number' ? value : parseFloat(value);
-  if (!isNaN(numValue)) {
-    if (gt !== undefined && !(numValue > gt)) return false;
-    if (gte !== undefined && !(numValue >= gte)) return false;
-    if (lt !== undefined && !(numValue < lt)) return false;
-    if (lte !== undefined && !(numValue <= lte)) return false;
+  if (containsAny !== undefined) {
+    assertKind('containsAny', surface, ['array']);
+    if (!requireSet('containsAny', containsAny).some((v) => value.includes(v)))
+      return false;
+  }
+  if (notContainsAny !== undefined) {
+    assertKind('notContainsAny', surface, ['array']);
+    if (requireSet('notContainsAny', notContainsAny).some((v) => value.includes(v)))
+      return false;
+  }
+  if (containsAll !== undefined) {
+    assertKind('containsAll', surface, ['array']);
+    if (!requireSet('containsAll', containsAll).every((v) => value.includes(v)))
+      return false;
+  }
+  if (notContainsAll !== undefined) {
+    assertKind('notContainsAll', surface, ['array']);
+    if (requireSet('notContainsAll', notContainsAll).every((v) => value.includes(v)))
+      return false;
+  }
+
+  if (regex !== undefined) {
+    assertKind('regex', surface, ['string']);
+    if (!toRegExp('regex', regex).test(value ?? '')) return false;
+  }
+  if (notRegex !== undefined) {
+    assertKind('notRegex', surface, ['string']);
+    if (toRegExp('notRegex', notRegex).test(value ?? '')) return false;
+  }
+
+  const hasNumericOp =
+    gt !== undefined ||
+    gte !== undefined ||
+    lt !== undefined ||
+    lte !== undefined;
+  if (hasNumericOp) {
+    // number → compare the value; array → COUNT its items. Unset/blank number →
+    // NaN → every comparison is false (no "skip-and-match").
+    assertKind('gt/gte/lt/lte', surface, ['number', 'array']);
+    const n = kind === 'array' ? value.length : numberOf(value);
+    if (gt !== undefined && !(n > gt)) return false;
+    if (gte !== undefined && !(n >= gte)) return false;
+    if (lt !== undefined && !(n < lt)) return false;
+    if (lte !== undefined && !(n <= lte)) return false;
   }
 
   return true;
-}
-
-/**
- * Resolve a field path to its value.
- * Supports: 'field' (current), '../field' (parent), '/field' (root)
- * @private
- */
-function resolveFieldPath(fieldPath, formData, args) {
-  if (!fieldPath) return undefined;
-
-  // Root path: /field
-  if (fieldPath.startsWith('/')) {
-    const rootField = fieldPath.slice(1);
-    // args may have rootFormData for accessing page-level fields
-    const rootData = args.rootFormData || formData;
-    return rootData?.[rootField];
-  }
-
-  // Parent path: ../field
-  if (fieldPath.startsWith('../')) {
-    const parentField = fieldPath.slice(3);
-    // Two valid sources for blockPathMap/blockId, see inheritSchemaFrom and
-    // hideParentOwnedFields for the full design note. Args drives the
-    // buildBlockPathMap pass 2 path; hydraContext drives sidebar render.
-    const hydraContext = getHydraSchemaContext?.();
-    const blockPathMap = args?.blockPathMap || hydraContext?.blockPathMap;
-    const blockId = args?.blockId ?? hydraContext?.currentBlockId;
-    if (blockPathMap && blockId) {
-      const pathInfo = blockPathMap[blockId];
-      if (pathInfo?.parentId && pathInfo.parentId !== PAGE_BLOCK_UID) {
-        // Nested block - get parent block data
-        const liveFallback = { formData: args?.pageFormData, blockPathMap };
-        const parentBlock = getLiveBlockData?.(pathInfo.parentId, liveFallback);
-        return parentBlock?.[parentField];
-      } else {
-        // Top-level block - parent is the page, use page-level formData
-        const pageFormData = args?.pageFormData || hydraContext?.formData;
-        return pageFormData?.[parentField];
-      }
-    }
-    // Last resort: pageFormData was passed but pathmap/blockId weren't.
-    // Treat ../field as a page-level lookup.
-    return args?.pageFormData?.[parentField];
-  }
-
-  // Current block path: field
-  return formData?.[fieldPath];
 }
 
 /**
@@ -1943,13 +2371,14 @@ export function getBlockTypeChoices(options, blocksConfig, blockPathMap, blockId
       const blockType = formData['@type'];
       const blockSchema = getBlockTypeSchema(blockType, intl, blocksConfig);
       const fieldDef = blockSchema?.properties?.[effectiveBlocksField];
-      if (fieldDef?.allowedBlocks) {
-        // Get allowedBlocks from the field definition in schema
-        types = fieldDef.allowedBlocks;
-      } else {
-        // For implicit containers (blocks/blocks_layout), check block config's allowedBlocks
-        types = blocksConfig[blockType]?.allowedBlocks;
-      }
+      // Field def's allowedBlocks, else the block config's (implicit containers).
+      const raw = fieldDef?.allowedBlocks ?? blocksConfig[blockType]?.allowedBlocks;
+      // Subtract any ancestor `disallowDescendantBlocks` via the SAME helper the
+      // pathMap uses, so the type picker agrees with add/DnD. No sync-narrowing
+      // here (itemTypeField undefined) — the picker enumerates ALL type choices;
+      // the set applying to this container's children was recorded on its entry.
+      const disallow = blockPathMap?.[blockId]?.descendantDisallowedTypes;
+      types = addableSiblingTypes(raw, undefined, formData, blocksConfig, disallow);
     }
   }
 
@@ -2220,6 +2649,75 @@ export function widgetToTargetType(widget, fieldDef) {
 }
 
 /**
+ * Resolve a fieldMapping value that names a container REGION (a `blocks_layout`
+ * or `object_list` field), possibly nested under `widget:'object'` wrappers,
+ * into a getChildBlockEntries/setChildBlockEntries descriptor. Segments are
+ * '/'-separated: every segment but the last must be an object wrapper (→
+ * regionPath), the last a region field. So `"items"` → { region:'items',
+ * regionPath:[] } and `"data/items"` → { region:'items', regionPath:['data'] }.
+ * Returns null when the path is NOT a region (a plain scalar mapping) — that's
+ * how convertBlockType tells a region↔region mapping from a scalar one.
+ */
+function resolveRegionDescriptor(blockType, path, blocksConfig, intl) {
+  if (typeof path !== 'string') return null;
+  const segs = path.split('/');
+  let schema = getResolvedSchema(blocksConfig, blockType, intl);
+  const regionPath = [];
+  for (let i = 0; i < segs.length; i++) {
+    const fieldDef = schema?.properties?.[segs[i]];
+    if (!fieldDef) return null;
+    const isLast = i === segs.length - 1;
+    if (isLast) {
+      const base = {
+        region: segs[i],
+        regionPath,
+        allowedBlocks: fieldDef.allowedBlocks || null,
+        // The region's synced-type field, if any (e.g. a card-grid's
+        // `variation`). Passed to addableSiblingTypes so a reshape resolves the
+        // SAME addable set as add/DnD, narrowing a synced container to its one
+        // item type rather than the raw allowedBlocks list.
+        itemTypeField: fieldDef.itemTypeField || null,
+      };
+      if (fieldDef.widget === 'blocks_layout') {
+        return { ...base, isObjectList: false };
+      }
+      if (fieldDef.widget === 'object_list') {
+        return {
+          ...base,
+          isObjectList: true,
+          idField: fieldDef.idField || '@id',
+          typeField: fieldDef.typeField || null,
+        };
+      }
+      return null; // last segment is a scalar, not a region
+    }
+    // Non-last segment must be an object wrapper to descend into.
+    if (fieldDef.widget !== 'object' || !fieldDef.schema) return null;
+    regionPath.push(segs[i]);
+    schema = fieldDef.schema;
+  }
+  return null;
+}
+
+/**
+ * Record a source container region's raw storage fields so convertBlockType's
+ * "preserve unmapped fields" step drops them (nothing should leak the old
+ * children back onto the target). A nested region lives under its wrapper
+ * object (regionPath[0]); a top-level object_list is the field itself; a
+ * top-level blocks_layout is the shared blocks/blocks_layout pair.
+ */
+function consumeSourceRegion(region, consumed) {
+  if (region.regionPath.length) {
+    consumed.add(region.regionPath[0]);
+  } else if (region.isObjectList) {
+    consumed.add(region.region);
+  } else {
+    consumed.add('blocks');
+    consumed.add('blocks_layout');
+  }
+}
+
+/**
  * Convert a block from one type to another using fieldMappings.
  *
  * Supports transitive conversions - if Image→Teaser and Teaser→Hero exist,
@@ -2266,6 +2764,13 @@ export function convertBlockType(blockData, newType, blocksConfig, typeFieldName
     }
   }
 
+  // Source fields already consumed by a region conversion — a moved region's
+  // raw storage (top-level `blocks`/`blocks_layout`, a `data` wrapper, or an
+  // object_list field), or a scalar value field expanded into a region.
+  // Excluded from the "preserve unmapped fields" step below so nothing leaks
+  // onto the target alongside the freshly converted result.
+  const consumedSourceFields = new Set();
+
   for (let i = 1; i < path.length; i++) {
     const fromType = path[i - 1];
     const toType = path[i];
@@ -2292,6 +2797,54 @@ export function convertBlockType(blockData, newType, blocksConfig, typeFieldName
     // Apply mappings: source-specific first, then default as fallback
     const mappings = { ...targetMappings?.['@default'], ...targetMappings?.[fromType] };
     for (const [sourceField, targetField] of Object.entries(mappings)) {
+      // Value↔region: a `region/type/field` path (parseRegionPath) on one side
+      // bridges a single scalar VALUE and a container region — the same bridge
+      // convertValueContainer uses, via shared helpers.
+      //   value → container (EXPAND): target is `region/type/field`; wrap the
+      //     source scalar into one child of that type in the region.
+      const targetRp = parseRegionPath(targetField);
+      if (targetRp) {
+        const region = resolveRegionDescriptor(
+          toType,
+          targetRp.region,
+          blocksConfig,
+          intl,
+        );
+        if (!region) continue;
+        expandValueIntoRegion(
+          newData,
+          region,
+          targetRp,
+          canonicalData[sourceField],
+        );
+        consumedSourceFields.add(sourceField);
+        continue;
+      }
+      //   container → value (COLLAPSE): source is `region/type/field`; gather
+      //     the region's matching children's field into the target scalar.
+      const sourceRp = parseRegionPath(sourceField);
+      if (sourceRp) {
+        const region = resolveRegionDescriptor(
+          fromType,
+          sourceRp.region,
+          blocksConfig,
+          intl,
+        );
+        if (!region) continue;
+        const { value } = collapseRegionToValue(canonicalData, region, sourceRp);
+        const targetFieldDef = targetSchema?.properties?.[targetField];
+        newData[targetField] = convertFieldValue(
+          value,
+          widgetToTargetType(targetFieldDef?.widget, targetFieldDef),
+        );
+        consumeSourceRegion(region, consumedSourceFields);
+        continue;
+      }
+      // NOTE: container↔container region moves + cell cascade do NOT live here —
+      // they need the live blockPathMap (see reshapeContainerBlock). This pure
+      // converter handles childless / value sources: scalar fields + the
+      // value↔region bridge above. A container source reaches reshapeContainerBlock
+      // via convertBlockInPlace, never this function.
       if (canonicalData[sourceField] !== undefined) {
         const targetFieldDef = targetSchema?.properties?.[targetField];
         const targetType = widgetToTargetType(targetFieldDef?.widget, targetFieldDef);
@@ -2316,6 +2869,11 @@ export function convertBlockType(blockData, newType, blocksConfig, typeFieldName
   const { [typeFieldName]: _originalType, ...originalFields } = blockData;
   const { [typeFieldName]: finalType, ...convertedFields } = currentData;
 
+  // Region conversions already moved/collapsed the source's children (or
+  // expanded a scalar into a region); drop the consumed source fields so
+  // nothing stale gets preserved back on top of the converted result.
+  for (const field of consumedSourceFields) delete originalFields[field];
+
   // Coerce preserved fields to match target schema widget types
   // e.g., description (string from summary) → Slate array for hero
   const targetSchema = getResolvedSchema(blocksConfig, finalType, intl);
@@ -2336,6 +2894,117 @@ export function convertBlockType(blockData, newType, blocksConfig, typeFieldName
     ...convertedFields,
     [typeFieldName]: finalType,
   };
+}
+
+/**
+ * Convert a CONTAINER block to another type IN PLACE — the pathMap-aware
+ * counterpart to convertBlockType (which handles childless / value sources).
+ * A container's cells must land as types the target region ALLOWS, and that
+ * resolution needs the live blockPathMap: a synced target narrows to its item
+ * type, and an ancestor's `disallowDescendantBlocks` is subtracted. convertBlockType
+ * can't know either — it has no pathMap — so container conversions route here.
+ *
+ * Two shapes:
+ *  - container → value (collapse): the target declares no regions but a
+ *    value↔region bridge exists — fold the region's children into the value
+ *    field (convertValueContainer).
+ *  - container → container (reshape): move each region's children across
+ *    (convertContainerBlock — by-name / primary→first), then cascade-convert any
+ *    cell whose type isn't in the target region's ADDABLE set (addableSiblingTypes
+ *    + the pathMap's descendantDisallowedTypes) to the first allowed type its own
+ *    fieldMappings can reach. Each cell converts via convertBlockType; its content
+ *    (valid in both shapes) is preserved.
+ *
+ * @returns {Object} new formData
+ */
+export function reshapeContainerBlock(
+  formData,
+  blockPathMap,
+  blockId,
+  targetType,
+  blocksConfig,
+  intl = null,
+) {
+  const sourceBlock = getBlockById(formData, blockPathMap, blockId);
+  if (!sourceBlock) {
+    throw new Error(`reshapeContainerBlock: block ${blockId} not found`);
+  }
+  const sourceType = sourceBlock['@type'];
+
+  // container → value: the target holds no regions. A value↔region bridge folds
+  // the children into the value field; without one, a plain type change.
+  const targetRegions = getContainerRegionDescriptors(
+    targetType,
+    blocksConfig,
+    intl,
+  );
+  if (targetRegions.length === 0) {
+    const collapsed = convertValueContainer(
+      sourceBlock,
+      sourceType,
+      targetType,
+      blocksConfig,
+      intl,
+    );
+    const typeField = blockPathMap[blockId]?.typeField || '@type';
+    const next =
+      collapsed ||
+      convertBlockType(sourceBlock, targetType, blocksConfig, typeField, intl);
+    return updateBlockById(formData, blockPathMap, blockId, next);
+  }
+
+  // container → container: move the regions verbatim, then cascade the cells.
+  const disallowed = blockPathMap[blockId]?.descendantDisallowedTypes;
+  const moved = convertContainerBlock(
+    formData,
+    blockPathMap,
+    blockId,
+    targetType,
+    blocksConfig,
+    intl,
+  );
+  const movedMap = buildBlockPathMap(moved, blocksConfig, intl);
+  const container = getBlockById(moved, movedMap, blockId);
+  const regions = getContainerRegionDescriptors(
+    targetType,
+    blocksConfig,
+    intl,
+    container,
+  );
+  for (const region of regions) {
+    // The addable set for THIS region — the SAME resolver add/DnD/type-sync use.
+    const allowed = addableSiblingTypes(
+      region.allowedBlocks,
+      region.itemTypeField,
+      container,
+      blocksConfig,
+      disallowed,
+    );
+    if (!allowed) continue; // unrestricted region: every cell is already permitted
+    const entries = getChildBlockEntries(container, region);
+    let changed = false;
+    const next = entries.map(({ id, block }) => {
+      const cellType = block?.['@type'];
+      if (!cellType || allowed.includes(cellType)) return { id, block };
+      // The cell's own fieldMappings decide the target — the first allowed type
+      // it can reach (transitively). None ⇒ it can't legally live here ⇒ throw.
+      const target = allowed.find((t) =>
+        findConversionPath(cellType, t, blocksConfig),
+      );
+      if (!target) {
+        throw new Error(
+          `reshapeContainerBlock: cell "${cellType}" has no conversion to any type allowed in region "${region.region}" of "${targetType}" (allowed: ${allowed.join(', ')})`,
+        );
+      }
+      changed = true;
+      return {
+        id,
+        block: convertBlockType(block, target, blocksConfig, '@type', intl),
+      };
+    });
+    if (changed) setChildBlockEntries(container, region, next);
+  }
+  return updateBlockById(moved, movedMap, blockId, container);
 }
 
 /**

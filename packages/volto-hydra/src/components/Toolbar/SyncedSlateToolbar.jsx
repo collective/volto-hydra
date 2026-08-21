@@ -14,12 +14,13 @@ import { isSlateFieldType, isBlockPositionLocked, isBlockReadonly, getFieldValue
 import { useDispatch, useSelector } from 'react-redux';
 import FormatDropdown from './FormatDropdown';
 import DropdownMenu from './DropdownMenu';
+import TemplateLockToggle from './TemplateLockToggle';
+import OptionalFieldsToggle from './OptionalFieldsToggle';
 import linkSVG from '@plone/volto/icons/link.svg';
 import imageSVG from '@plone/volto/icons/image.svg';
 import clearSVG from '@plone/volto/icons/clear.svg';
 import upSVG from '@plone/volto/icons/up.svg';
 import lockSVG from '@plone/volto/icons/lock.svg';
-import unlockSVG from '@plone/volto/icons/unlock.svg';
 import AddLinkForm from '@plone/volto/components/manage/AnchorPlugin/components/LinkButton/AddLinkForm';
 import { ImageInput } from '@plone/volto/components/manage/Widgets/ImageWidget';
 import { createLog } from '../../utils/log';
@@ -1297,6 +1298,23 @@ const SyncedSlateToolbar = ({
   // Block action buttons (e.g., add row/column for tables) also need slots
   const blockActionToolbarItems = blockActions?.toolbar || [];
 
+  // Reveal empty optional fields on the selected block (#296). Hydra owns the
+  // revealed set — it's ephemeral edit state that must never reach the admin's
+  // formData, so the admin only sends the intent and reads the result back off
+  // BLOCK_SELECTED (blockUI.revealableFields / blockUI.revealed).
+  // NOT a hook: this sits below the component's early returns, so a useCallback
+  // here would change hook order between renders ("Rendered more hooks than
+  // during the previous render"). It needs no memoisation anyway.
+  const toggleOptionalFields = (blockUid) => {
+    const iframe = document.getElementById('previewIframe');
+    if (iframe?.contentWindow) {
+      iframe.contentWindow.postMessage(
+        { type: 'TOGGLE_OPTIONAL_FIELDS', blockUid },
+        '*',
+      );
+    }
+  };
+
   // Slate buttons come first in toolbar, so they get priority for slots
   // Calculate slots for Slate (format dropdown + inline buttons) first
   const slotsAfterFormatDropdown = Math.max(0, availableSlots - formatDropdownSlots);
@@ -1413,33 +1431,16 @@ const SyncedSlateToolbar = ({
           !!instanceId && !!onToggleTemplateEditMode && canEditToolbarTemplate;
         if (canToggleTemplate && (isPositionLocked || isEditingToolbarTemplate)) {
           const editing = isEditingToolbarTemplate;
+          // The ONE shared template lock/unlock control (same component the sidebar
+          // renders) — a whole-template action.
           const toggle = (
-            <button
-              type="button"
-              className="lock-icon template-lock-toggle"
-              aria-pressed={editing}
-              title={editing ? 'Lock template (review & save changes)' : 'Click to edit this template'}
-              aria-label={editing ? 'Lock template' : 'Unlock template to edit'}
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleTemplateEditMode(instanceId);
-              }}
-              style={{
-                padding: '4px 6px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                pointerEvents: 'auto',
-                cursor: 'pointer',
-                color: '#999',
-                fontSize: '14px',
-                background: '#f5f5f5',
-                border: 'none',
-                borderRadius: '2px',
-              }}
-            >
-              <Icon name={editing ? unlockSVG : lockSVG} size="16px" color="#684cc9" />
-            </button>
+            <TemplateLockToggle
+              instanceId={instanceId}
+              editing={editing}
+              canEdit={canEditToolbarTemplate}
+              onToggle={onToggleTemplateEditMode}
+              variant="toolbar"
+            />
           );
           // While editing the block is movable — the drag handle keeps its canonical
           // (leftmost) position so DnD alignment is unaffected; the toggle sits to its
@@ -1482,6 +1483,22 @@ const SyncedSlateToolbar = ({
         }
         return dragHandle;
       })()}
+
+      {/* Reveal empty optional fields (#296). Rendered only when the selected block
+          actually has some — a fully populated block shows no control. pointerEvents
+          must be re-enabled: the toolbar itself sets 'none' so drag events reach the
+          iframe's invisible drag button underneath. */}
+      {selectedBlock && selectedBlock !== PAGE_BLOCK_UID &&
+        !isBlockReadonly(getBlock(selectedBlock), templateEditMode) && (
+          <div style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center' }}>
+            <OptionalFieldsToggle
+              blockUid={selectedBlock}
+              revealableFields={blockUI?.revealableFields}
+              revealed={blockUI?.revealed}
+              onToggle={toggleOptionalFields}
+            />
+          </div>
+        )}
 
       {/* Real Slate buttons - only show if we have a valid slate field value */}
       {/* IMPORTANT: Wrap in div with pointerEvents: 'auto' to make buttons clickable

@@ -32,7 +32,7 @@ const messages = defineMessages({
   },
 });
 import Cookies from 'js-cookie';
-import frontendPreviewUrl, { viewportPreset, linkableAnchors } from './reducers';
+import frontendPreviewUrl, { viewportPreset } from './reducers';
 import FrontendSwitcherPlug from './components/Toolbar/FrontendSwitcherPlug';
 import SidebarToggleToolbarPlug from './components/Toolbar/SidebarToggleToolbarPlug';
 import FrontendSwitcherPanel from './components/Toolbar/FrontendSwitcherPanel';
@@ -64,7 +64,7 @@ import { ImageSchema } from '@plone/volto/components/manage/Blocks/Image/schema'
 import {
   QUERY_RESULT_FIELDS,
   createSchemaEnhancerFromRecipe,
-} from './utils/schemaInheritance';
+} from './utils/blockSync';
 import rowBeforeSVG from '@plone/volto/icons/row-before.svg';
 import rowAfterSVG from '@plone/volto/icons/row-after.svg';
 import rowDeleteSVG from '@plone/volto/icons/row-delete.svg';
@@ -72,8 +72,20 @@ import columnBeforeSVG from '@plone/volto/icons/column-before.svg';
 import './components/mobile-tablet.css';
 import columnAfterSVG from '@plone/volto/icons/column-after.svg';
 import columnDeleteSVG from '@plone/volto/icons/column-delete.svg';
+import { applyBlockDefaults } from '@plone/volto/helpers';
+import { setInjectedVoltoConfig } from './utils/injectedVoltoConfig';
 
 const applyConfig = (config) => {
+  // Inject the Volto-config-derived values the pure block-path / schema utils
+  // need, so those modules carry NO static `@plone/volto/registry` import and can
+  // be loaded (bare Node) by block-sanity's offline discovery. Lazy getters so a
+  // later addon that changes a setting is still honoured. See injectedVoltoConfig.
+  setInjectedVoltoConfig({
+    applyBlockDefaults,
+    getDefaultBlockType: () => config.settings.defaultBlockType,
+    getBlocksConfig: () => config.blocks.blocksConfig,
+  });
+
   // Patch setTimeout to catch focus errors from AddLinkForm
   // AddLinkForm does: setTimeout(() => this.input.focus(), 50)
   // But if component unmounts before 50ms, this.input is null and focus() throws
@@ -107,7 +119,6 @@ const applyConfig = (config) => {
   // Add reducers
   config.addonReducers.frontendPreviewUrl = frontendPreviewUrl;
   config.addonReducers.viewportPreset = viewportPreset;
-  config.addonReducers.linkableAnchors = linkableAnchors;
 
   // HYDRA: keep settings.publicURL pinned to the currently selected
   // iframe frontend. publicURL in Hydra means "where this content is
@@ -406,7 +417,7 @@ const applyConfig = (config) => {
   //
   // Fully declarative schemaEnhancer composed from recipe parts:
   // - existingListingSchemaEnhancer: Volto's core listing enhancer (handles variations)
-  // - inheritSchemaFrom: type selector + schema inheritance
+  // - inheritSchemaFrom: type selector + block sync
   // - fieldRules: admin-only field modifications (hide b_size, add fieldMapping)
   const existingListingSchemaEnhancer =
     config.blocks.blocksConfig.listing?.schemaEnhancer;
@@ -458,7 +469,7 @@ const applyConfig = (config) => {
     ],
   };
 
-  // Configure image block with blockSchema for schema inheritance
+  // Configure image block with blockSchema for block sync
   // The default image block only has 'schema' (settings), not 'blockSchema' (data schema)
   // We add 'url' field here (not in schemaEnhancer) so a frontend-supplied
   // schemaEnhancer recipe doesn't lose it when it replaces the schemaEnhancer.

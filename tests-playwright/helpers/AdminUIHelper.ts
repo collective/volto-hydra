@@ -3,6 +3,7 @@
  */
 import { Page, Locator, FrameLocator, expect, ElementHandle } from '@playwright/test';
 import { TEST_DATA_PREFIX } from './test-paths';
+import { showCaption, clearCaption } from './caption';
 import { URLS } from '../ports';
 import { randomUUID } from 'node:crypto';
 
@@ -19,6 +20,11 @@ export class AdminUIHelper {
   // running in parallel. A unique token per AdminUIHelper instance (one
   // per test) gives each test its own isolated mock-api session.
   readonly authToken = `${TEST_AUTH_TOKEN}-${randomUUID()}`;
+
+  // Opt-in demo pacing: recorded demos set this (e.g. 1200) so viewport-branching
+  // steps that flash by — the mobile settings sheet opening/closing — linger long
+  // enough to read. Default 0: functional tests are completely unaffected.
+  demoPacingMs = 0;
 
   constructor(
     public readonly page: Page,
@@ -180,6 +186,38 @@ export class AdminUIHelper {
     await this.waitForBridgeConnected();
 
     // Wait for all blocks to render (Nuxt async components may still be loading)
+    await this.getStableBlockCount();
+  }
+
+  /**
+   * Enter edit mode by clicking the toolbar Edit link (Volto's React-Router
+   * `<Link to="{path}/edit" className="edit">`) — an in-place SPA transition FROM
+   * the current view page. The admin does NOT reload; only the preview iframe
+   * re-navigates to `?_edit=true` (~0.6s blank, measured). Prefer this over
+   * navigateToEdit when you're already viewing the page and want the real
+   * view→edit transition to stay fast + on-camera: navigateToEdit's on-Volto path
+   * pushStates a malformed `//edit` for the ROOT (SecurityError), so callers drop
+   * to about:blank + a full page.goto that re-boots the whole admin (seconds). The
+   * actual Edit link routes correctly for the root too, so none of that is needed.
+   */
+  async enterEditInPlace(contentPath: string): Promise<void> {
+    if (!contentPath.startsWith('/')) contentPath = '/' + contentPath;
+    contentPath = `${this.contentPrefix}${contentPath}`;
+
+    const editLink = this.page.locator('a.edit').first();
+    await editLink.waitFor({ state: 'visible', timeout: 10000 });
+    await editLink.click();
+
+    // Volto's Edit link routes to `${path}/edit`; for the ROOT that's `/edit`
+    // (path=''), so don't build `${contentPath}/edit` (='//edit' for root) and
+    // string-match it. Match the normalised pathname ending in /edit instead.
+    await this.page.waitForURL(
+      (u) => /\/edit\/?$/.test(new URL(u).pathname.replace(/\/{2,}/g, '/')),
+      { timeout: 10000 },
+    );
+    await this.waitForIframeUrl(contentPath);
+    await this.waitForIframeReady();
+    await this.waitForBridgeConnected();
     await this.getStableBlockCount();
   }
 
@@ -955,6 +993,102 @@ export class AdminUIHelper {
   }
 
   /**
+   * True when the admin is rendering its mobile layout (viewport ≤ hydra's
+   * largestMobileScreen = 767). At that width the settings sidebar is a
+   * collapsed off-screen sheet and the main toolbar is pinned to the bottom;
+   * openSidebar/closeSidebar branch on this so callers don't have to.
+   */
+  isMobileViewport(): boolean {
+    const vp = this.page.viewportSize();
+    return !!vp && vp.width <= 767;
+  }
+
+  /**
+   * Ensure the settings sidebar is OPEN, on desktop and mobile alike.
+   * - Desktop edit mode: the sidebar is normally already open — no-op; if it was
+   *   collapsed to its right-edge sliver, click the `.trigger` to expand it.
+   * - Mobile: the sidebar starts as a collapsed off-screen sheet; the Settings
+   *   icon in the bottom toolbar (`.sidebar-toggle-toolbar-btn`) opens it
+   *   full-screen (mobile-tablet-admin-layout.spec: 'Settings icon … opens the sidebar').
+   * Idempotent: returns immediately if the sidebar is already expanded.
+   */
+  async openSidebar(timeout: number = 5000): Promise<void> {
+    // Branch on the `.collapsed` CLASS being present, NOT on the visibility of
+    // `:not(.collapsed)` — the latter races to false for a beat right after a
+    // selection changes the sidebar, and would then click the desktop `.trigger`
+    // sliver, which COLLAPSES an already-open sidebar (the exact opposite). If no
+    // collapsed container exists, the sidebar is already open — nothing to do.
+    const collapsed = this.page.locator('.sidebar-container.collapsed');
+    if ((await collapsed.count()) === 0) {
+      await this.waitForSidebarOpen(timeout).catch(() => {});
+      return;
+    }
+    if (this.isMobileViewport()) {
+      await this.page.locator('#toolbar-body .sidebar-toggle-toolbar-btn').click();
+    } else {
+      await this.page.locator('.sidebar-container .trigger').click();
+    }
+    await expect(this.page.locator('.sidebar-container.collapsed')).toHaveCount(0, { timeout });
+    await this.waitForSidebarOpen(timeout);
+    // Demo pacing: let the freshly-opened sheet be seen before the next action.
+    if (this.demoPacingMs) await this.page.waitForTimeout(this.demoPacingMs);
+  }
+
+  /**
+   * Ensure the sidebar is out of the way so canvas blocks are clickable again.
+   * - Mobile: the open sidebar is a full-screen sheet covering the iframe, so it
+   *   MUST be dismissed (its page-header X, `.sidebar-close-button`) before the
+   *   next block tap. Idempotent — no-op if already collapsed.
+   * - Desktop: an open sidebar sits beside the canvas and doesn't block clicks;
+   *   leaving it open is the normal edit state, so this is a no-op.
+   */
+  async closeSidebar(timeout: number = 5000): Promise<void> {
+    if (!this.isMobileViewport()) return;
+    const close = this.page.locator('.sidebar-container .sidebar-close-button');
+    if (await close.isVisible().catch(() => false)) {
+      // Demo pacing: hold on the sheet's final state before dismissing it.
+      if (this.demoPacingMs) await this.page.waitForTimeout(this.demoPacingMs);
+      await close.click();
+      await expect(this.page.locator('.sidebar-container.collapsed')).toBeAttached({ timeout });
+    }
+  }
+
+  /**
+   * Demo recordings (Playwright ≥1.61): turn on the screencast CURSOR — an animated
+   * pointer that tracks between action points, over the admin iframe too (Playwright
+   * composites it into the recording, so unlike an injected DOM cursor it isn't trapped
+   * in one document). The per-action title overlays are suppressed (duration:0):
+   * "Click"/"Type" reads as noise — narrate deliberately with caption() instead. No-op
+   * when screencast is unavailable (older Playwright / video off), so it's safe to leave
+   * in any test.
+   */
+  async enableDemoCursor(cursor: 'pointer' | 'none' = 'pointer'): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sc = (this.page as any).screencast;
+    if (sc?.showActions) await sc.showActions({ cursor, duration: 0 });
+  }
+
+  /**
+   * High-level caption for a demo recording — a subtitle pill saying what's happening
+   * NEXT ("Unlock the shared footer template"). Non-blocking: the pill stays up for
+   * `ms` while the following actions run, so place it right before a beat.
+   *
+   * Delegates to the shared caption module, which prefers Playwright >= 1.61's
+   * screencast overlay (composited into the video, so nothing is injected into the
+   * app being demoed) and falls back to a DOM overlay otherwise. `showCaption` from
+   * `demo-video/caption` is the same implementation — there is only one, so a demo
+   * can mix the two call styles without ending up with two pills on screen.
+   */
+  async caption(text: string, ms: number = 15_000): Promise<void> {
+    await showCaption(this.page, text, ms);
+  }
+
+  /** Remove the caption pill entirely (see `caption()`). */
+  async clearCaption(): Promise<void> {
+    await clearCaption(this.page);
+  }
+
+  /**
    * Wait for a block to be shown as readonly (has hydra-locked class).
    * Used to verify template edit mode is active (blocks outside template get locked).
    * @param blockId - The block ID to check
@@ -983,48 +1117,47 @@ export class AdminUIHelper {
   }
 
   /**
-   * v2 template edit: UNLOCK a template for editing.
-   * Selects one of its member blocks, opens the template instance's sidebar bar,
-   * clicks the lock toggle, and confirms the "changes affect every page" warning
-   * modal. After this, the template's fixed blocks are editable (verify with
-   * waitForBlockEditable on a fixed member) while the rest of the page stays
-   * editable (v2: no page lock).
-   * @param memberBlockId - any block belonging to the template instance
+   * v2 template edit: UNLOCK a template for editing via the ON-CANVAS Quanta toolbar
+   * lock toggle (🔒). No sidebar on any width — `toolbarTemplateInstanceId` is derived
+   * from the selected block's ancestry, so tapping the toggle targets the template
+   * even from a deeply-nested member, and the "changes show on every page" warning
+   * modal renders on the canvas (visible, not buried in a settings sheet). Select a
+   * FIXED (locked) member so the toggle shows. demoPacingMs (opt-in) holds on the
+   * modal so recordings can read it.
+   * @param memberBlockId - a fixed/locked block belonging to the template instance
    */
   async unlockTemplate(memberBlockId: string): Promise<void> {
     await this.clickBlockInIframe(memberBlockId);
-    await this.waitForSidebarOpen();
-    await this.escapeToParent();
-    const toggle = this.page.locator('.sidebar-section-header[data-is-current="true"] .edit-template-toggle');
+    const toggle = this.page.locator('.quanta-toolbar .template-lock-toggle');
     await expect(toggle).toBeVisible({ timeout: 5000 });
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
     await toggle.click();
-    // v2: unlocking warns first — the template's edits will appear on every page
-    // that uses it once locked.
     const confirm = this.page.locator('.template-unlock-modal .template-confirm');
     await expect(confirm).toBeVisible({ timeout: 5000 });
+    // Demo pacing: hold on the warning modal before confirming.
+    if (this.demoPacingMs) await this.page.waitForTimeout(this.demoPacingMs);
     await confirm.click();
     await expect(this.page.locator('.template-unlock-modal')).toHaveCount(0, { timeout: 5000 });
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
   }
 
   /**
-   * v2 template edit: LOCK a template, choosing what to do with the edits.
-   * Re-selects the instance (edits may have moved the selection), clicks the
-   * unlocked toggle to raise the decision modal, and picks an option.
-   * @param memberBlockId - any surviving block belonging to the template instance
+   * v2 template edit: LOCK a template via the Quanta toolbar toggle (🔓), choosing
+   * what to do with the edits. Re-selects the member (edits may have moved the
+   * selection), taps the toggle to raise the decision modal, and picks an option.
+   * @param memberBlockId - a surviving block belonging to the template instance
    * @param choice - 'commit' (Change on all pages), 'reset' (Reset changes), or 'cancel'
    */
   async lockTemplate(memberBlockId: string, choice: 'commit' | 'reset' | 'cancel'): Promise<void> {
     await this.clickBlockInIframe(memberBlockId);
-    await this.waitForSidebarOpen();
-    await this.escapeToParent();
-    const toggle = this.page.locator('.sidebar-section-header[data-is-current="true"] .edit-template-toggle');
+    const toggle = this.page.locator('.quanta-toolbar .template-lock-toggle');
     await expect(toggle).toBeVisible({ timeout: 5000 });
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
     await toggle.click();
     const modal = this.page.locator('.template-lock-modal');
     await expect(modal).toBeVisible({ timeout: 5000 });
+    // Demo pacing: hold on the decision modal before choosing.
+    if (this.demoPacingMs) await this.page.waitForTimeout(this.demoPacingMs);
     const btn = { commit: '.template-commit', reset: '.template-reset', cancel: '.template-cancel' }[choice];
     await modal.locator(btn).click();
     await expect(modal).toHaveCount(0, { timeout: 5000 });
@@ -2309,6 +2442,21 @@ export class AdminUIHelper {
    * Save the current content being edited.
    * Clicks Save, waits for navigation out of /edit, and waits for iframe to render.
    */
+  /**
+   * Press the quanta toolbar's "reveal optional fields" toggle for the selected
+   * block (issue #296).
+   *
+   * Needed after emptying a field inline: "no data ⇒ no element" means clearing a
+   * media or link field removes its element, so getting an inline target back is
+   * an explicit ask. (Replacing an image doesn't need this — the toolbar's image
+   * button swaps it in one click without clearing first.)
+   */
+  async revealOptionalFields(): Promise<void> {
+    const toggle = this.page.locator('.optional-fields-toggle');
+    await expect(toggle).toBeVisible({ timeout: 5000 });
+    await toggle.click();
+  }
+
   async saveContent(): Promise<void> {
     const saveButton = this.page.locator('#toolbar-save, button:has-text("Save")');
     await saveButton.click();
@@ -3991,6 +4139,73 @@ export class AdminUIHelper {
     }).toPass({ timeout: 2000, intervals: [100, 200, 300, 500] });
   }
 
+  /**
+   * Press-drag the mouse to a position relative to a target that may MOVE
+   * because of hydra's auto-scroll, retargeting until the target stops drifting.
+   *
+   * Generalises the block-DnD retarget loop (moveToDropPosition, which recomputes
+   * the drop point from the target's live box each pass) so it isn't tied to the
+   * drag-shadow / insertAfter flow: any press-drag whose target auto-scrolls can
+   * reuse it — e.g. a container edge-handle drag whose child slides up under the
+   * cursor. The naive alternative (compute one target Y before the drag, move in
+   * fixed steps) loses the target the moment auto-scroll engages.
+   *
+   * Each pass reads the target's LIVE page-coord box, moves the cursor to
+   * `cursorFor(box)`, and settles once the box's Y has stopped changing for a few
+   * passes (auto-scroll has either stopped or pinned the target at the viewport
+   * edge). The mouse must already be pressed; the caller releases.
+   *
+   * @param target    element the cursor must reach a position relative to
+   * @param cursorFor given the target's current page box, the {x,y} to move to
+   * @param maxPasses attempts before giving up
+   */
+  async dragCursorToMovingTarget(
+    target: Locator,
+    cursorFor: (box: { x: number; y: number; width: number; height: number }) => { x: number; y: number },
+    maxPasses: number = 40,
+  ): Promise<void> {
+    // hydra auto-scrolls when the cursor is within ~80px of the iframe viewport
+    // edges. Compute a slightly larger safe band in page coords: a cursor inside
+    // it is provably NOT triggering auto-scroll, so a stable target there is
+    // genuinely settled — not merely paused by a load hiccup mid-scroll.
+    const iframeBox = await this.page.locator('#previewIframe').boundingBox();
+    if (!iframeBox) throw new Error('dragCursorToMovingTarget: no iframe bounding box');
+    const ZONE = 90;
+    const inSafeBand = (p: { x: number; y: number }) =>
+      p.x >= iframeBox.x + ZONE && p.x <= iframeBox.x + iframeBox.width - ZONE &&
+      p.y >= iframeBox.y + ZONE && p.y <= iframeBox.y + iframeBox.height - ZONE;
+
+    let lastX: number | null = null;
+    let lastY: number | null = null;
+    let stablePasses = 0;
+    for (let pass = 0; pass < maxPasses; pass++) {
+      const box = await target.boundingBox();
+      if (!box) throw new Error('dragCursorToMovingTarget: target has no bounding box');
+      const pos = cursorFor(box);
+      await this.page.mouse.move(pos.x, pos.y, { steps: 3 });
+      await this.page.waitForTimeout(50);
+      // Target stopped drifting on BOTH axes (axis-agnostic: vertical and
+      // horizontal edge drags share this path).
+      const stable = lastX !== null && Math.abs(box.x - lastX) < 2 && Math.abs(box.y - lastY!) < 2;
+      // Settle when stable AND the cursor is clear of the auto-scroll zone (so
+      // releasing here won't drift) — OR, as a fallback for a target pinned in
+      // the zone at the scroll limit (can't be brought further in), when it has
+      // been fully stable for a longer window. If stable-but-in-zone and NOT yet
+      // at the limit, that's a load pause: keep going, don't settle early.
+      if (stable && (inSafeBand(pos) ? ++stablePasses >= 3 : ++stablePasses >= 10)) {
+        const settledBox = await target.boundingBox();
+        if (!settledBox) throw new Error('dragCursorToMovingTarget: target vanished while settling');
+        const settledPos = cursorFor(settledBox);
+        await this.page.mouse.move(settledPos.x, settledPos.y, { steps: 3 });
+        return;
+      }
+      if (!stable) stablePasses = 0;
+      lastX = box.x;
+      lastY = box.y;
+    }
+    throw new Error(`dragCursorToMovingTarget: target still drifting after ${maxPasses} passes`);
+  }
+
   // ============================================================================
   // DRAG AND DROP HELPER - STEP 3: MOVE TO DROP POSITION
   // ============================================================================
@@ -4206,6 +4421,28 @@ export class AdminUIHelper {
     // Position after the target with the mouse still down, then release.
     await this.dragBlockWithMouseNoDrop(targetBlock, targetBlock, true);
     await this.page.mouse.up();
+  }
+
+  /**
+   * Click "Convert" on the "Convert blocks?" confirm that a drop/paste opens when
+   * it would change any block's @type (the trial-then-confirm gate). Waits for the
+   * dialog, then commits.
+   */
+  async confirmConvert(): Promise<void> {
+    const btn = this.page.locator('.ui.modal .actions button.primary');
+    await expect(btn).toBeVisible({ timeout: 5000 });
+    await btn.click();
+    await expect(this.page.locator('.ui.modal')).toBeHidden({ timeout: 5000 });
+  }
+
+  /**
+   * Drag a block after another and, because the drop converts its type, click
+   * through the "Convert blocks?" confirm. Releases without asserting a reorder
+   * (the move waits on the confirm), then commits via {@link confirmConvert}.
+   */
+  async dragBlockAfterConfirmConvert(sourceBlockId: string, targetBlockId: string): Promise<void> {
+    await this.dragBlockAfterNoReorderAssert(sourceBlockId, targetBlockId);
+    await this.confirmConvert();
   }
 
   /**
@@ -4908,6 +5145,10 @@ export class AdminUIHelper {
     containerFieldTitle: string,
     blockType?: string,
   ): Promise<void> {
+    // The container field section lives in the settings sidebar, which on mobile is a
+    // collapsed off-screen sheet — open it first (no-op on desktop, where it's already
+    // beside the canvas). Caller must have selected the container block.
+    await this.openSidebar();
     // Find the container field section and its add button
     const section = this.page.locator('.container-field-section', {
       has: this.page.locator('.widget-title', { hasText: containerFieldTitle }),
@@ -4959,6 +5200,9 @@ export class AdminUIHelper {
         .waitFor({ state: 'visible', timeout: 1000 })
         .catch(() => {});
     }
+    // Mobile: dismiss the full-screen sheet so the newly-added block is tappable on
+    // the canvas for the next step. Desktop: no-op.
+    await this.closeSidebar();
   }
 
   /**

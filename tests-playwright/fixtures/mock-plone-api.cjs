@@ -2278,10 +2278,17 @@ app.post('*/@querystring-search', (req, res) => {
         });
       }
       allItems = allItems.filter((item) => new URL(item['@id']).pathname !== contextPath);
-    } else if (index === 'SearchableText' && operation.includes('string.contains')) {
+    } else if (
+      index === 'SearchableText' &&
+      (operation.includes('string.contains') ||
+        operation.includes('string.search'))
+    ) {
       // Full-text search across title/description/id. Mirrors Plone 6.2's
       // plone.app.querystring 3.0.0 wildcard-prefix behavior — each word in
       // the search term must prefix-match a word token in one of those fields.
+      // Both `string.contains` (Standard) and `string.search` (Advanced,
+      // queryType=search) resolve to a SearchableText full-text match; the
+      // block's queryType picks the operation, and both filter here.
       if (value) {
         allItems = allItems.filter((item) => matchSearchableText(value, item));
       }

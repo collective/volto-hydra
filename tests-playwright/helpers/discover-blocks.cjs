@@ -11,18 +11,10 @@
  */
 
 /**
- * Build a map of blockType → { fieldName → { idField, typeField } } for
- * object_list fields.
+ * Build a map of blockType → { fieldName → idField } for object_list fields.
  * Same logic as BlockVerificationHelper.buildObjectListFieldsMap but in plain JS.
- *
- * `typeField` matters as much as `idField`: an object_list may be TYPED, with
- * each item naming its own registered block type in that field (a form's
- * `subblocks` name theirs in `field_type`, so one is a `text` block and the next
- * a `select`). Without it every item collapses into one virtual
- * `<parent>:<field>` type, and the real per-item types look like registered
- * blocks that no content example ever exercises.
  * @param {Object} blocksConfig - Block schemas from initBridge INIT message
- * @returns {Map<string, Map<string, {idField: string, typeField: string|null}>>}
+ * @returns {Map<string, Map<string, string>>}
  */
 function buildObjectListFieldsMap(blocksConfig) {
   const map = new Map();
@@ -32,10 +24,8 @@ function buildObjectListFieldsMap(blocksConfig) {
     for (const [fieldName, fieldDef] of Object.entries(props)) {
       if (fieldDef?.widget === 'object_list') {
         if (!map.has(blockType)) map.set(blockType, new Map());
-        map.get(blockType).set(fieldName, {
-          idField: fieldDef.idField || '@id',
-          typeField: fieldDef.typeField || null,
-        });
+        const idField = fieldDef.idField || '@id';
+        map.get(blockType).set(fieldName, idField);
       }
     }
   }
@@ -194,26 +184,18 @@ function extractBlocks(blocks, layout, objectListFields) {
     // Handle object_list fields from schema (clients items, features items, etc.)
     const knownListFields = objectListFields?.get(blockType);
     if (knownListFields) {
-      for (const [fieldName, { idField, typeField }] of knownListFields) {
+      for (const [fieldName, idField] of knownListFields) {
         const items = block[fieldName];
         if (!Array.isArray(items)) continue;
         for (const item of items) {
           if (!item || typeof item !== 'object') continue;
           const subId = item[idField];
           if (!subId) continue;
-          // A TYPED object_list names each item's own registered block type in
-          // `typeField` (a form's `subblocks` name theirs in `field_type`), so
-          // credit the item to that type — it has its own schema, its own
-          // sidebar and its own rendering, and is exactly what the coverage
-          // check below is asking for an example of. An UNTYPED list has no
-          // per-item type, so its items keep the parent's virtual type
-          // (`clients:items`, `features:items`).
-          const itemType =
-            (typeField && typeof item[typeField] === 'string' && item[typeField]) ||
-            `${blockType}:${fieldName}`;
+          // Sub-blocks from object_list use the parent's @type as a virtual type
+          // e.g. clients items are "clients:item", features items are "features:item"
           result.push({
             blockId: subId,
-            blockType: itemType,
+            blockType: `${blockType}:${fieldName}`,
             blockData: item,
           });
         }
@@ -421,31 +403,95 @@ const UNDECLARED_EXEMPT = new Set([
   'id', 'blocks', 'blocks_layout', 'image_scales', 'plaintext', 'value',
   'styles', 'override', 'block',
   'fixed', 'slotId', 'templateId', 'templateInstanceId', 'readOnly',
+  // Deep-link anchors hydra harvests + persists on the owning block (#273/#281).
+  // Not sidebar-authored — a consumer (in-page nav) reads them; exempt like the
+  // other serialisation/runtime fields above.
+  '_linkableAnchors',
 ]);
 
-/**
- * Names that are an object_list item's IDENTITY rather than its content: the
- * `idField` and `typeField` every typed list declares (a form's `subblocks` use
- * `field_id` and `field_type`). They are in the stored data of every item but in
- * no item schema — they say which block this is, not what the author wrote — so
- * flagging them as undeclared would ask for a sidebar field that must never
- * exist. Derived from the schemas rather than hardcoded, so a list that keys on
- * something else is covered too.
- */
-function objectListKeyFields(blocksConfig) {
-  const names = new Set();
-  for (const fields of buildObjectListFieldsMap(blocksConfig).values()) {
-    for (const { idField, typeField } of fields.values()) {
-      if (idField) names.add(idField);
-      if (typeField) names.add(typeField);
+// Block-level slate STYLES a person can actually choose from the editor's style
+// menu (Volto's slate styleName plugin). There is no slate style menu yet, so
+// this is EMPTY: any `styleName` on a slate node is content a person cannot
+// author — it was hand-injected — and block-sanity must flag it. When a style
+// menu is added, list its style values here (or derive from the slate config).
+const AUTHORABLE_SLATE_STYLES = new Set([]);
+
+// Hydra's own value validator (packages/volto-hydra/.../schemaValidation.mjs) —
+// the SAME `isValidValue` Hydra runs to strip un-authorable values on load, so
+// block-sanity and the editor agree on "is this a valid value?". Loaded lazily
+// via dynamic import (it's ESM but dependency-free by design) in discoverBlocks.
+let isValidValueFn = null;
+
+// Hydra's REAL schema resolver, run offline. resolveEffectiveBlockSchema(blockId,
+// pageFormData, blockPathMap, blocksConfig, intl) returns a block's schema with
+// its schemaEnhancer applied — so `.required` is the DYNAMIC required set (a
+// card's `image` is required only when its grid enables it). blockSync.js /
+// blockPath.js are idiomatic Volto source (JSX, lodash CJS, extensionless imports)
+// that bare Node can't load, so we esbuild-bundle the offline API once (see
+// loadOfflineBlockSyncApi). null until loaded.
+let resolveEffectiveSchemaFn = null;
+
+// Offline stub intl: block schemas call intl.formatMessage for titles; we only
+// need field NAMES/required, not translations.
+const STUB_INTL = { formatMessage: (m) => (m && (m.defaultMessage || m.id)) || '' };
+
+// Evaluate one `when` operator against a resolved surface value. Mirrors the
+// operators our schemaEnhancer.fieldRules use (see volto-hydra blockSync).
+function condMatches(cond, val) {
+  if (cond && typeof cond === 'object' && !Array.isArray(cond)) {
+    if ('gte' in cond && !(val >= cond.gte)) return false;
+    if ('gt' in cond && !(val > cond.gt)) return false;
+    if ('lte' in cond && !(val <= cond.lte)) return false;
+    if ('lt' in cond && !(val < cond.lt)) return false;
+    if ('isSet' in cond && (cond.isSet ? val == null : val != null)) return false;
+    if ('isNot' in cond && val === cond.isNot) return false;
+    if ('eq' in cond && val !== cond.eq) return false;
+    return true;
+  }
+  return val === cond;
+}
+
+// Resolve a field def against a block's data when it's driven by
+// `schemaEnhancer.fieldRules` — so we validate against the ACTUAL option set the
+// editor would show (e.g. columns `layout` gains "wide-middle" at 3+ columns via
+// `{ when: { items: { gte: 3 } }, set: columnsLayoutField(3) }`). The `set` values
+// are pre-computed defs in the served config, so we only need to pick the first
+// matching rule. Region operators (a blocks_layout field in `when`) compare the
+// region's child count. Returns the resolved def, or `false` if the field is
+// hidden (no validation), or the base def when no rule applies.
+function resolveFieldDef(field, def, blockData, blockConfig, props) {
+  const rules = blockConfig?.schemaEnhancer?.fieldRules?.[field];
+  if (!rules) return def;
+  const childCount =
+    (Array.isArray(blockData?.blocks_layout?.items) && blockData.blocks_layout.items.length) ||
+    (blockData?.blocks && typeof blockData.blocks === 'object' ? Object.keys(blockData.blocks).length : 0);
+  const surface = (name) =>
+    props?.[name]?.widget === 'blocks_layout' ? childCount : blockData?.[name];
+  const list = Array.isArray(rules) ? rules : [rules];
+  for (const r of list) {
+    if (r === false) return false;
+    const when = r && r.when;
+    const ok = !when || Object.entries(when).every(([n, c]) => condMatches(c, surface(n)));
+    if (ok) return 'set' in r ? r.set : def;
+  }
+  return def;
+}
+
+// Recursively collect any `styleName` on a slate value's nodes that isn't an
+// authorable style. Catches hand-injected styles a person can't reproduce.
+function unauthorableSlateStyles(nodes, seen = new Set()) {
+  for (const n of Array.isArray(nodes) ? nodes : []) {
+    if (n && typeof n === 'object') {
+      if (n.styleName && !AUTHORABLE_SLATE_STYLES.has(n.styleName)) seen.add(n.styleName);
+      if (Array.isArray(n.children)) unauthorableSlateStyles(n.children, seen);
     }
   }
-  return names;
+  return seen;
 }
 
 function collectWidgetShapeIssues(
-  blockData, blockSchema, pagePath, blockId, out, blockType, undeclaredFields, blockConfig,
-  exemptFields,
+  blockData, blockSchema, pagePath, blockId, out, blockType, undeclaredFields, blockConfig, blocksConfig,
+  effectiveRequired, pathInfo,
 ) {
   const props = blockSchema?.properties;
   if (!props || !blockData || typeof blockData !== 'object') return;
@@ -554,14 +600,74 @@ function collectWidgetShapeIssues(
       issues.push(
         `field "${field}": image content must use \`widget: 'image'\`, not \`widget: 'file'\`.`,
       );
-    } else if (widget === 'select' || widget === 'choice' || def?.factory === 'Choice') {
-      const choices = def.choices || [];
-      const allowed = choices.map(c => (Array.isArray(c) ? c[0] : c));
-      if (allowed.length && !allowed.includes(value)) {
-        issues.push(`field "${field}": value ${JSON.stringify(value)} not in declared choices ${JSON.stringify(allowed)}`);
+    } else if (
+      widget === 'select' || widget === 'choice' || def?.factory === 'Choice' ||
+      Array.isArray(def?.actions) || widget === 'blockTypeSelect'
+    ) {
+      // Resolve the field against this block's data first, so a fieldRules-driven
+      // field (columns `layout`, which gains "wide-middle" at 3+ columns) is
+      // checked against its ACTUAL option set. Then reuse Hydra's `isValidValue`
+      // — the SAME check Hydra strips content with — so block-sanity flags exactly
+      // what the editor can't produce (a size:"xxl", a tags variation:"card").
+      // blockTypeSelect derives its options from the container's `allowedBlocks`,
+      // so hand isValidValue an explicit `choices` set for it.
+      const eff = resolveFieldDef(field, def, blockData, blockConfig, props);
+      if (eff !== false) {
+        let checkDef = eff;
+        let skip = false;
+        if (widget === 'blockTypeSelect') {
+          // A blockTypeSelect's valid values are the container's addable item
+          // types — hydra resolves them in getBlockTypeChoices, which needs the
+          // bridge's blockPathMap/registry and can't run offline. Mirror only the
+          // two OFFLINE-decidable forms:
+          //   • region-synced (grid / tags): a sibling region field carries
+          //     itemTypeField===field, so its `allowedBlocks` is the set.
+          //   • region-less convertible (listing): the field declares
+          //     `filterConvertibleFrom`, and the set is every block type whose
+          //     config has `fieldMappings[that source]` — the SAME filter
+          //     getBlockTypeChoices applies.
+          // Any other form (parent `allowedSiblingTypes`, blocksField '..') needs
+          // the pathMap — skip rather than guess (guessing choices=[] was flagging
+          // every valid listing variation).
+          const region = Object.values(props).find((p) => p && p.itemTypeField === field);
+          if (region) {
+            checkDef = { ...eff, choices: region.allowedBlocks || [] };
+          } else if (eff.filterConvertibleFrom && blocksConfig) {
+            checkDef = {
+              ...eff,
+              choices: Object.keys(blocksConfig).filter(
+                (t) => blocksConfig[t]?.fieldMappings?.[eff.filterConvertibleFrom],
+              ),
+            };
+          } else {
+            skip = true; // unresolvable offline
+          }
+        }
+        if (!skip && isValidValueFn && !isValidValueFn(value, checkDef)) {
+          issues.push(
+            `field "${field}": value ${JSON.stringify(value)} is not an allowed value — the ` +
+              `editor can't produce it (Hydra would strip it on load).`,
+          );
+        }
       }
     } else if (widget === 'slate') {
-      if (!Array.isArray(value)) issues.push(describe('slate array', value));
+      if (!Array.isArray(value)) {
+        issues.push(describe('slate array', value));
+      } else {
+        // The value being an array isn't enough: a slate node's block-level
+        // `styleName` must be a style the editor's style menu can apply. Any
+        // other styleName is content nobody can author — hand-injected to fake a
+        // rendering. Flag each one (this is what caught a fabricated nsw-intro).
+        const bad = unauthorableSlateStyles(value);
+        for (const s of bad) {
+          issues.push(
+            `field "${field}": slate node styleName ${JSON.stringify(s)} is not an ` +
+              `authorable style — no such option exists in the editor's style menu, so ` +
+              `this content can't be reproduced by hand. Register the style (add it to ` +
+              `the slate style menu) or remove it.`,
+          );
+        }
+      }
     } else if (widget === 'object_list') {
       // object_list stores an array of items; an idField (default '@id')
       // identifies each. If data is nested (dataPath), value may be an
@@ -604,6 +710,67 @@ function collectWidgetShapeIssues(
     }
   }
 
+  // Required fields: a `required` field must hold a value — the editor blocks
+  // saving a block with an empty required field, so content that omits one is
+  // data nobody could have authored (an untitled card, a link with no href).
+  //
+  // `required` is DYNAMIC: hydra drops hidden fields from it, so a card's `image`
+  // is required only when its grid enables the image element (its `fieldRules`
+  // read the parent grid's `../itemDefaults_elements` with `contains`). We resolve
+  // that with Hydra's REAL evaluator offline: `effectiveRequired` is the resolved
+  // set (hidden fields already dropped), so we check it directly — no guessing.
+  // Fallback (resolver unavailable): enforce only fields with NO fieldRules entry,
+  // never a conditional one (under-enforce, never false-flag).
+  const usingResolved = Array.isArray(effectiveRequired);
+  const requiredFields = usingResolved
+    ? effectiveRequired
+    : Array.isArray(blockSchema.required)
+      ? blockSchema.required
+      : [];
+  const fieldRules = blockConfig?.schemaEnhancer?.fieldRules || {};
+  const isEmptyRequired = (v) =>
+    v == null ||
+    (typeof v === 'string' && v.trim() === '') ||
+    (Array.isArray(v) && v.length === 0) ||
+    (typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0);
+  for (const field of requiredFields) {
+    if (!props[field]) continue; // required names an undeclared field — a schema bug, not a value issue
+    if (!usingResolved && field in fieldRules) continue; // no resolver: defer conditional fields
+    if (isEmptyRequired(blockData[field])) {
+      issues.push(
+        `field "${field}": required but empty — the editor won't let a block save without ` +
+          `it, so this content can't be authored. Provide a value, or drop the field from \`required\`.`,
+      );
+    }
+  }
+
+  // Synced container: a container with an `itemTypeField` (a blockTypeSelect —
+  // grid, tags, …) fixes ONE item type, so every child must be that type. A
+  // `listing` child is the one structural exception (it expands into the synced
+  // type). allowedBlocks permits several types at once, so THIS is the check that
+  // catches a MIXED synced container — e.g. a tags variation="link" holding a
+  // textItem — which allowedBlocks alone can't.
+  const regionEntry = Object.entries(props).find(([, p]) => p && p.itemTypeField);
+  if (regionEntry) {
+    const variation = blockData[regionEntry[1].itemTypeField];
+    const kids =
+      blockData.blocks && typeof blockData.blocks === 'object'
+        ? Object.values(blockData.blocks)
+        : [];
+    if (typeof variation === 'string' && variation && variation !== 'default') {
+      for (const kid of kids) {
+        const kt = kid && kid['@type'];
+        if (kt && kt !== variation && kt !== 'listing') {
+          issues.push(
+            `synced container item type is ${JSON.stringify(variation)} but it holds a ` +
+              `${JSON.stringify(kt)} child — a synced container can't mix types; every child ` +
+              `must be ${JSON.stringify(variation)} (or a structural "listing").`,
+          );
+        }
+      }
+    }
+  }
+
   // Reverse check: a stored field with no schema property. Only declared fields
   // (plus blocks/blocks_layout) belong in a block's data — an undeclared field
   // means the schema is missing it (it can't be edited in the sidebar) or the
@@ -622,10 +789,16 @@ function collectWidgetShapeIssues(
     blockConfig.schemaEnhancer.inheritSchemaFrom &&
     blockConfig.schemaEnhancer.inheritSchemaFrom.defaultsField;
   const defaultsPrefix = defaultsField ? (defaultsField + '_') : null;
+  // A typed / keyed object_list item carries STRUCTURAL keys that are not schema
+  // properties: the container's idField (its own uid, e.g. `key`) and typeField
+  // (e.g. `@type` — already `@`-exempt, but a custom typeField like `variation`
+  // is not). They're set by the container, not sidebar-authored, so exempt them.
+  const idField = pathInfo?.idField;
+  const typeField = pathInfo?.typeField;
   if (blockType) {
     for (const key of Object.keys(blockData)) {
       if (key.startsWith('@') || UNDECLARED_EXEMPT.has(key) || props[key]) continue;
-      if (exemptFields && exemptFields.has(key)) continue;
+      if (key === idField || key === typeField) continue;
       if (defaultsPrefix && key.startsWith(defaultsPrefix)) continue;
       const dedupeKey = `${blockType} ${key}`;
       if (!undeclaredFields.has(dedupeKey)) {
@@ -639,12 +812,90 @@ function collectWidgetShapeIssues(
   }
 }
 
+// blocksConfig objects whose child-block enhancers have already been installed
+// Maps the pristine discovery blocksConfig -> an enhanced CLONE. installChild
+// BlockEnhancers composes hideParentOwnedFields into each container-child's
+// schemaEnhancer; running it on the discovery's OWN blocksConfig would make
+// buildBlockPathMap resolve child schemas with parent-owned fields DROPPED, so
+// the undeclared-field check would then flag those legit parent-owned fields
+// (contentBlock's imagePosition/imageIsIcon/showViewMoreLink) as stray. So the
+// enhancers go on a copy — only the required check (resolveEffectiveBlockSchema)
+// uses it; buildBlockPathMap + every other check keep the pristine config.
+const _enhancedConfigFor = new WeakMap();
+let _offlineApiModule = null;
+
+// esbuild-bundle Hydra's offline block-sync API once and wire it up: idiomatic
+// Volto source (JSX, lodash CJS, extensionless imports) can't load in bare Node,
+// so esbuild transpiles the small entry into one self-contained ESM module. Then
+// inject blocksConfig + install the child-block enhancers, exactly as the addon's
+// applyConfig does at init, so resolveEffectiveBlockSchema resolves dynamic
+// `required` (fieldRules / hideParentOwnedFields) the same way the editor does.
+async function loadOfflineBlockSyncApi(blocksConfig) {
+  if (!_offlineApiModule) {
+    const path = require('path');
+    const os = require('os');
+    const { pathToFileURL } = require('url');
+    const esbuild = require('esbuild');
+    const entry = path.resolve(
+      __dirname,
+      '../../packages/volto-hydra/src/utils/offlineBlockSyncApi.js',
+    );
+    const outfile = path.join(
+      os.tmpdir(),
+      `hydra-offline-block-sync-${process.pid}.mjs`,
+    );
+    esbuild.buildSync({
+      entryPoints: [entry],
+      bundle: true,
+      format: 'esm',
+      platform: 'node',
+      outfile,
+      loader: { '.js': 'jsx' },
+      logLevel: 'silent',
+    });
+    _offlineApiModule = await import(pathToFileURL(outfile).href);
+  }
+  const api = _offlineApiModule;
+  let enhanced = _enhancedConfigFor.get(blocksConfig);
+  if (!enhanced) {
+    // Shallow-per-block clone: installChildBlockEnhancers sets each block's
+    // `schemaEnhancer`, so copy the block config objects (shared functions like
+    // blockSchema are referenced, never mutated). Enhancers + the injected
+    // getBlocksConfig all point at the clone, so hideParentOwnedFields resolves
+    // consistently against it — while the discovery's blocksConfig stays pristine.
+    enhanced = {};
+    for (const [k, v] of Object.entries(blocksConfig)) {
+      enhanced[k] = v && typeof v === 'object' && !Array.isArray(v) ? { ...v } : v;
+    }
+    api.setInjectedVoltoConfig({ getBlocksConfig: () => enhanced });
+    api.populateTypeSchemaCache?.(enhanced, STUB_INTL);
+    api.installVariationFieldEnhancers?.(enhanced);
+    api.installChildBlockEnhancers?.(enhanced);
+    _enhancedConfigFor.set(blocksConfig, enhanced);
+  }
+  // Resolve required against the enhanced clone (fieldRules + hideParentOwnedFields),
+  // ignoring the caller's blocksConfig arg so the pristine config never leaks in.
+  resolveEffectiveSchemaFn = (blockId, formData, pathMap, _bc, intl) =>
+    api.resolveEffectiveBlockSchema(blockId, formData, pathMap, enhanced, intl);
+}
+
 async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, frontendKeys = []) {
   // Use hydra's canonical buildBlockPathMap to walk content — it knows
   // the schema-defined container fields (blocks_layout, object_list,
   // columns, …) and distinguishes real blocks from inline sub-items.
   // Dynamically imported because the module is ESM and this helper is CJS.
   const { buildBlockPathMap } = await import('../../packages/hydra-js/buildBlockPathMap.js');
+  // Reuse Hydra's canonical value validator (choices/enum/actions) — same check
+  // it strips content with, so block-sanity flags exactly what the editor can't
+  // produce. Dependency-free ESM.
+  ({ isValidValue: isValidValueFn } = await import(
+    '../../packages/volto-hydra/src/utils/schemaValidation.mjs'
+  ));
+
+  // Load Hydra's real schema resolver offline (esbuild-bundled) and install the
+  // child-block enhancers + inject blocksConfig, exactly as the addon does at
+  // init. After this, resolveEffectiveSchemaFn gives the dynamic required set.
+  await loadOfflineBlockSyncApi(blocksConfig);
 
   const seen = new Map();
   const slateIssues = [];
@@ -674,7 +925,6 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   // — skip these, they're not blocks.
   const PAGE_TYPES = new Set(['Document', 'Folder', 'Plone Site', 'News Item', 'Event']);
   const objectListFields = buildObjectListFieldsMap(blocksConfig);
-  const objectListKeys = objectListKeyFields(blocksConfig);
   const allowedBlocksList = buildAllowedBlocksList(blocksConfig);
 
   if (objectListFields.size > 0) {
@@ -746,14 +996,12 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         }
         if (!blockData || typeof blockData !== 'object') continue;
 
-        // An object_list item has no `@type` of its own: a TYPED list names each
-        // item's registered block type in a `typeField` (a form's `subblocks`
-        // name theirs in `field_type`), and buildBlockPathMap has already
-        // resolved that into the entry's `blockType` — real type where the list
-        // is typed, virtual `<parent>:<field>` where it is not. Falling back to
-        // it is what lets a typed sub-block be credited as its own type: without
-        // this every form field looked like a registered block that no content
-        // example ever exercised, and the coverage check failed for all twelve.
+        // `@type` for a real block; for a TYPED object_list item (a form's
+        // `subblocks`, keyed by `field_id` and typed by `field_type`) the item
+        // has no `@type`, so fall back to the per-item type buildBlockPathMap
+        // already resolved from the container's `typeField`. Without this a form
+        // field (text / select / single_choice …) is skipped from coverage
+        // instead of being credited as its own registered block type.
         const blockType = blockData['@type'] || entry.blockType;
         // Resolved schema for this entry — may be inline (object_list schema)
         // or come from blocksConfig[blockType].
@@ -783,9 +1031,25 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         }
 
         collectSlateIssues(blockData, pagePath, blockId, slateIssues, blockType);
+        // Effective (dynamic) required set from Hydra's REAL resolver — fieldRules
+        // + hideParentOwnedFields applied, so a conditionally-hidden field (a
+        // card's `image` when its grid disables the image element) is correctly
+        // dropped. Per-block try/catch: one odd block must not abort discovery;
+        // on failure the shape check falls back to unconditional-required only.
+        let effectiveRequired = null;
+        if (resolveEffectiveSchemaFn) {
+          try {
+            effectiveRequired =
+              resolveEffectiveSchemaFn(blockId, content, pathMap, blocksConfig, STUB_INTL)
+                ?.required || null;
+          } catch {
+            effectiveRequired = null;
+          }
+        }
         collectWidgetShapeIssues(
           blockData, schema, pagePath, blockId, shapeIssues, blockType, undeclaredFields,
-          blockType ? blocksConfig[blockType] : undefined, objectListKeys,
+          blockType ? blocksConfig[blockType] : undefined, blocksConfig, effectiveRequired,
+          pathMap?.[blockId],
         );
 
         // Unregistered block type: any real @type the frontend can't render is

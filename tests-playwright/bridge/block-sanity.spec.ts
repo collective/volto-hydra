@@ -18,7 +18,7 @@ import { test as base, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 import { verifyBlockRendering } from '../helpers/BlockVerificationHelper';
 import { fieldsNeverEditable } from '../helpers/field-coverage';
-import { axeCheckBlock, formatViolations } from '../helpers/axe-sanity';
+import { axeCheckPage, formatViolations } from '../helpers/axe-sanity';
 import { getFrontendUrl } from './fixtures';
 import { URLS } from '../ports';
 import * as fs from 'fs';
@@ -202,12 +202,27 @@ test.describe('Block sanity (auto-discovered)', () => {
         checkEditTextClicks: false,
       });
 
-      // Optional per-block accessibility pass (axe-core). Off by default; opt in
-      // with SANITY_AXE=1. Runs axe scoped to just this block — blocking =
-      // serious/critical WCAG A/AA that's block-level; advisory (moderate/minor
-      // or page-context rules) is logged but doesn't fail.
-      if (process.env.SANITY_AXE) {
-        const { blocking, advisory } = await axeCheckBlock(iframe, block.blockId);
+      // Accessibility pass (axe-core) over the WHOLE rendered fixture page —
+      // not scoped to this one block — so document-outline rules (heading-order)
+      // are judged in context. serious/critical WCAG A/AA violations (incl.
+      // heading-order) BLOCK; advisory (moderate/minor, best-practice-only, or
+      // page-SHELL rules a minimal fixture can't be judged on) is logged only.
+      // OPT-IN: off by default (the mock fixtures aren't a11y-clean and their
+      // cosmetics aren't what block-sanity guards — real-site a11y is enforced
+      // elsewhere). Run the a11y pass with SANITY_AXE=1.
+      //
+      // Some doc pages deliberately render MULTIPLE instances of a layout-chrome
+      // component (header/masthead/main-nav) as structural-parity examples. That
+      // duplication trips axe's duplicate-id / one-landmark rules — but the
+      // chrome's a11y is already proven by the SINGLE live instance on every
+      // other page (the layout renders it everywhere), so axe is skipped on the
+      // example page rather than exempting a pile of rules there.
+      const AXE_SKIP_PAGES = ['/components/header'];
+      const axeSkipped = AXE_SKIP_PAGES.some((p) =>
+        (block.pagePath || '').startsWith(p),
+      );
+      if (process.env.SANITY_AXE && !axeSkipped) {
+        const { blocking, advisory } = await axeCheckPage(iframe);
         if (advisory.length > 0) {
           console.log(
             `[axe] ${label}: ${advisory.length} advisory finding(s)\n${formatViolations(advisory)}`,

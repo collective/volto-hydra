@@ -143,13 +143,19 @@ test.describe('deep-link fragments', () => {
     await helper.navigateToEdit('/template-test-page');
     await helper.waitForIframeReady();
 
-    // Record every anchor NAME hydra harvests (LINKABLE_ANCHORS → admin window).
+    // Record every anchor NAME hydra harvests. Anchors ride whichever message
+    // carries them: INLINE_EDIT_DATA for inline edits (a re-slugged heading title),
+    // LINKABLE_ANCHORS for structural settles (reorder/delete). Both carry `anchors`.
     await page.evaluate(() => {
       (window as any).__harvestedNames = [];
       window.addEventListener(
         'message',
         (e: MessageEvent) => {
-          if (e.data?.type !== 'LINKABLE_ANCHORS') return;
+          if (
+            e.data?.type !== 'LINKABLE_ANCHORS' &&
+            e.data?.type !== 'INLINE_EDIT_DATA'
+          )
+            return;
           const map = e.data.anchors || {};
           for (const list of Object.values<any>(map))
             for (const a of list)
@@ -182,6 +188,50 @@ test.describe('deep-link fragments', () => {
     );
     expect(names).not.toContain('Template Header - From Template');
   });
+
+  // A heading's anchor auto-derives from its typed title. EDITING that title must
+  // re-harvest so the picker offers the NEW slug and drops the stale one — the
+  // hot path for the whole feature, and the one that fires the LINKABLE_ANCHORS
+  // merge on every keystroke.
+  test('editing a heading title re-slugs its offered anchor', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/deep-link-page');
+    const iframe = helper.getIframe();
+
+    // Add a heading "Alpha" (anchor auto-slugs to alpha / "Alpha").
+    const uid = await addHeadingBlock(helper, page, 's1', '## Alpha');
+
+    // Update the title: Alpha -> "Alpha Bravo" (the slug MUST follow).
+    await helper.clickBlockInIframe(uid);
+    const editor = await helper.getEditorLocator(uid);
+    await expect(editor).toHaveAttribute('contenteditable', 'true', {
+      timeout: 5000,
+    });
+    await editor.click();
+    await page.keyboard.press('End');
+    await editor.pressSequentially(' Bravo', { delay: 25 });
+    await expect(iframe.locator(`[data-block-uid="${uid}"]`)).toContainText(
+      'Alpha Bravo',
+      { timeout: 10000 },
+    );
+    // Re-select a neighbour so the harvest flushes the final slug.
+    await helper.clickBlockInIframe('s1');
+
+    // The picker offers the UPDATED anchor; the stale "Alpha" is gone.
+    const fragments = await openPageAnchors(
+      helper,
+      page,
+      iframe,
+      'btn',
+      /^Deep Link Page$/,
+    );
+    await expect(fragments.filter({ hasText: 'Alpha Bravo' })).toBeVisible();
+    await expect(fragments.filter({ hasText: /^Alpha$/ })).toHaveCount(0);
+  });
+
 });
 
 // Add a slate block after `afterBlockId`, type `markdown` (e.g. '## Chapter One'),
@@ -220,9 +270,12 @@ async function navigateIntoItem(page, titleRe) {
 }
 
 // Switch the level being browsed to its fragments and return the items locator.
+// The fragment picker is a nested list (the heading hierarchy is structural), so
+// target the label span — it carries the click handler and its text is just the
+// anchor name, without a parent <li> absorbing its nested children's text.
 async function showLevelFragments(page) {
   await page.locator('.ob-level-mode-fragments').click();
-  return page.locator('.ob-fragment-item');
+  return page.locator('.ob-fragment-label');
 }
 
 // Open the object browser for a button's link field, navigate to Test Data and

@@ -27,7 +27,7 @@
 import React from 'react';
 import { useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
-import { getBlockTypeChoices } from '../../utils/schemaInheritance';
+import { getBlockTypeChoices } from '../../utils/blockSync';
 import { useHydraSchemaContext } from '../../context/HydraSchemaContext';
 import { getBlockById } from '../../utils/blockPath';
 

@@ -56,7 +56,7 @@ traversed by *id* (it has named fields). A value is terminal.
 `..` **always means "up to the parent BLOCK"** — never up an object or region
 level. Rationale:
 
-- It matches what `..` means **today** (`schemaInheritance` fieldRules,
+- It matches what `..` means **today** (`blockSync` fieldRules,
   `resolveFieldPath`), so **no migration** of existing `../field` references.
 - It keeps the axes asymmetric but simple: `/` descends *down* through objects
   and regions; `..` only ever crosses *block* boundaries going up. Within-block

@@ -7,6 +7,19 @@ const defaultVoltoRazzleConfig = require(`${voltoPath}/razzle.config`);
 
 module.exports = {
   ...defaultVoltoRazzleConfig,
+  options: {
+    ...defaultVoltoRazzleConfig.options,
+    // Read PORT at RUNTIME, not baked at build time. Razzle's DefinePlugin inlines
+    // process.env.* unless the var is in forceRuntimeEnvVars (razzle env.js). Without
+    // this, `razzle build` bakes the build-time PORT into build/server.js
+    // (start-server.js: `process.env.PORT || 3000`), pinning the prod admin build to one
+    // port — serving on another needs a full rebuild. Listing PORT here leaves it as a
+    // runtime lookup, so `PORT=<n> pnpm start:prod` binds <n> from the SAME build.
+    forceRuntimeEnvVars: [
+      ...(defaultVoltoRazzleConfig.options?.forceRuntimeEnvVars || []),
+      'PORT',
+    ],
+  },
   modifyWebpackConfig: (opts) => {
     let config = defaultVoltoRazzleConfig.modifyWebpackConfig
       ? defaultVoltoRazzleConfig.modifyWebpackConfig(opts)

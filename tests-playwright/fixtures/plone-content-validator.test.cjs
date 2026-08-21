@@ -144,6 +144,109 @@ describe('plone-content-validator validate()', () => {
     );
   });
 
+  // The two tests above use path-shaped directories (section/child/data.json).
+  // Real distributions are UID-keyed and FLAT — every data.json sits in its own
+  // <uid>/ dir and the hierarchy lives ONLY in the `@id` field. Deriving the
+  // parent from the directory path silently no-ops on that layout, which is how
+  // 90 of 150 objects got dropped at import with nothing going red.
+  it('reports child before parent in a UID-keyed (flat) layout', () => {
+    const { root, contentDir } = buildFixture({
+      dataFiles: [
+        'plone_site_root/data.json',
+        'childuid12345678/data.json',   // /components/card — child first
+        'parentuid1234567/data.json',   // /components      — parent second
+      ],
+    });
+    const flat = {
+      childuid12345678: { '@id': '/components/card', id: 'card' },
+      parentuid1234567: { '@id': '/components', id: 'components' },
+    };
+    for (const [uid, item] of Object.entries(flat)) {
+      fs.mkdirSync(path.join(contentDir, uid), { recursive: true });
+      fs.writeFileSync(
+        path.join(contentDir, uid, 'data.json'),
+        JSON.stringify({ ...item, '@type': 'Document', UID: uid }),
+      );
+    }
+    const r = validate(contentDir);
+    cleanup(root);
+    assert.ok(
+      r.errors.some((e) => e.includes('appears before its parent')),
+      r.errors.join('\n'),
+    );
+  });
+
+  it('reports a missing parent container in a UID-keyed (flat) layout', () => {
+    const { root, contentDir } = buildFixture({
+      dataFiles: ['plone_site_root/data.json', 'orphanuid1234567/data.json'],
+    });
+    fs.mkdirSync(path.join(contentDir, 'orphanuid1234567'), { recursive: true });
+    fs.writeFileSync(
+      path.join(contentDir, 'orphanuid1234567', 'data.json'),
+      JSON.stringify({
+        '@id': '/editing/pages', '@type': 'Document', id: 'pages', UID: 'orphanuid1234567',
+      }),
+    );
+    const r = validate(contentDir);
+    cleanup(root);
+    assert.ok(
+      r.errors.some((e) => e.includes('parent container missing')),
+      r.errors.join('\n'),
+    );
+  });
+
+  it('accepts a correctly ordered UID-keyed (flat) layout', () => {
+    const { root, contentDir } = buildFixture({
+      dataFiles: [
+        'plone_site_root/data.json',
+        'parentuid1234567/data.json',   // parent first
+        'childuid12345678/data.json',   // child second
+      ],
+    });
+    const flat = {
+      parentuid1234567: { '@id': '/components', id: 'components' },
+      childuid12345678: { '@id': '/components/card', id: 'card' },
+    };
+    for (const [uid, item] of Object.entries(flat)) {
+      fs.mkdirSync(path.join(contentDir, uid), { recursive: true });
+      fs.writeFileSync(
+        path.join(contentDir, uid, 'data.json'),
+        JSON.stringify({ ...item, '@type': 'Document', UID: uid }),
+      );
+    }
+    const r = validate(contentDir);
+    cleanup(root);
+    assert.ok(
+      !r.errors.some((e) => e.includes('appears before its parent') || e.includes('parent container missing')),
+      r.errors.join('\n'),
+    );
+  });
+
+  // A child whose id shadows an attribute the FTI machinery reads makes its
+  // CONTAINER un-serializable: BTreeFolder2Base.__getattr__ resolves the name
+  // out of _tree, so getViewMethod's `getattr(aq_base(context), "layout")`
+  // returns the child object, calls it unwrapped, and plone.restapi 500s with
+  // `AttributeError: REQUEST`. /components died this way in production.
+  it('reports a content id that shadows the layout attribute', () => {
+    const { root, contentDir } = buildFixture({
+      dataFiles: ['plone_site_root/data.json', 'shadowuid1234567/data.json'],
+    });
+    fs.mkdirSync(path.join(contentDir, 'shadowuid1234567'), { recursive: true });
+    fs.writeFileSync(
+      path.join(contentDir, 'shadowuid1234567', 'data.json'),
+      JSON.stringify({
+        '@id': '/page-a/layout', '@type': 'Document', id: 'layout',
+        UID: 'shadowuid1234567',
+      }),
+    );
+    const r = validate(contentDir);
+    cleanup(root);
+    assert.ok(
+      r.errors.some((e) => e.includes('reserved')),
+      r.errors.join('\n'),
+    );
+  });
+
   it('reports id starting with underscore', () => {
     const { root, contentDir } = buildFixture({
       dataFiles: ['plone_site_root/data.json', '_underscore/data.json'],

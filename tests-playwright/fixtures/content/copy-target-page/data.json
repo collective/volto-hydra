@@ -30,7 +30,22 @@
       "heading": "Author Heading",
       "subheading": "",
       "buttonText": "Go",
-      "buttonLink": [{ "@id": "/news/big" }],
+      "buttonLink": [
+        {
+          "@id": "/news/big",
+          "image_field": "preview_image",
+          "image_scales": {
+            "preview_image": [
+              {
+                "content-type": "image/svg+xml",
+                "download": "@@images/preview_image/preview",
+                "width": 400,
+                "height": 300
+              }
+            ]
+          }
+        }
+      ],
       "description": [{ "type": "p", "children": [{ "text": "" }] }]
     },
     "btn-pick": {

@@ -1,15 +1,15 @@
 /**
- * Tests for schema inheritance and type selection.
+ * Tests for block sync and type selection.
  *
  * Tests the Phase 2 features:
  * - Type selection: choosing block types for container items (via inheritSchemaFrom)
  * - FieldMappingWidget: mapping source fields to target block fields
- * - Schema inheritance: inheriting non-mapped fields from referenced type
+ * - Block sync: inheriting non-mapped fields from referenced type
  */
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
-test.describe('Schema Inheritance - Listing Block Item Type', () => {
+test.describe('Block Sync - Listing Block Item Type', () => {
   test('listing block shows variation selector in sidebar', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
@@ -375,7 +375,7 @@ test.describe('Schema Inheritance - Listing Block Item Type', () => {
   });
 });
 
-test.describe('Schema Inheritance - Search Block with Listing Container', () => {
+test.describe('Block Sync - Search Block with Listing Container', () => {
   test('can select search block, facet, and listing block', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
