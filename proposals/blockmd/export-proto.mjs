@@ -22,7 +22,8 @@ const typeForFile = (f) => (IMAGE_EXT.has(extname(f).toLowerCase()) ? 'Image' : 
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const INKA = resolve(HERE, '../..');
-const SRC = resolve(INKA, 'docs/content/content/content');
+const srcArg = process.argv.indexOf('--src');
+const SRC = srcArg > -1 ? resolve(process.argv[srcArg + 1]) : resolve(INKA, 'docs/content/content/content');
 const outArg = process.argv.indexOf('--out');
 const OUT = outArg > -1 ? resolve(process.argv[outArg + 1]) : resolve(INKA, 'docs/content-md-proto');
 

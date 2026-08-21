@@ -20,8 +20,10 @@ import { resolveLiteralIncludes } from '../../lib/markdown-mount.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const INKA = resolve(HERE, '../..');
-const MD = resolve(INKA, 'docs/content-md-proto');
-const SRC = resolve(INKA, 'docs/content/content/content');
+const mdArg = process.argv.indexOf('--md');
+const MD = mdArg > -1 ? resolve(process.argv[mdArg + 1]) : resolve(INKA, 'docs/content-md-proto');
+const srcArg = process.argv.indexOf('--src');
+const SRC = srcArg > -1 ? resolve(process.argv[srcArg + 1]) : resolve(INKA, 'docs/content/content/content');
 
 // A link value's stored JSON carries an embedded object-browser summary: `@id`
 // plus the picked item's fields. Plone does NOT resolve this on read -- 12 of 18
