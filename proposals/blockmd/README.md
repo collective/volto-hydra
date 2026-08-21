@@ -101,9 +101,20 @@ So `${p[Summary]/text}` is "the paragraph under the *Summary* heading", by name
 rather than position. (Matching by literal text is intentional but brittle — use
 it for stable structural labels, not prose.)
 
+A def-list carries named values, read by term with the label selector:
+```
+Start
+: 2024-01-01
+Location
+: Berlin
+```
+`start="${dd[Start]/text}"` → `2024-01-01`. (`remark-definition-list` parses it;
+MyST renders it as a `<dl>` with `deflist` enabled.)
+
 The **node kinds** a ref can target: `p`, `h1`–`h6` / `h` (relative) / `h*` (any),
-`img`, `a`, `ul`, `ol`, `li`, `blockquote`, `pre` (code fence), `hr`, `table`, and
-`strong` / `em` (a lone-bold / lone-italic paragraph). A trailing `?`
+`img`, `a`, `ul`, `ol`, `li`, `blockquote`, `pre` (code fence), `hr`, `table`,
+`strong` / `em` (a lone-bold / lone-italic paragraph), and `dl` / `dt` / `dd`
+(a definition list). A trailing `?`
 (`${strong?/text}`) makes the slot **optional**. The **parts** a ref can read:
 
 | part | from | yields |
