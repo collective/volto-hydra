@@ -58,7 +58,7 @@
       "buttonText": "Click Me",
       "buttonLink": [
         {
-          "@id": "/target-page",
+          "@id": "/_test_data/target-page",
           "title": "Target Page"
         }
       ],
@@ -96,7 +96,7 @@
       "overwrite": false,
       "href": [
         {
-          "@id": "/target-page",
+          "@id": "/_test_data/target-page",
           "title": "Target Page",
           "description": "Target page description",
           "hasPreviewImage": false
@@ -112,7 +112,7 @@
           "description": "This is a manually added teaser",
           "href": [
             {
-              "@id": "/target-page",
+              "@id": "/_test_data/target-page",
               "title": "Target Page"
             }
           ]
@@ -164,7 +164,7 @@
           "description": "Teaser in a grid that has variation pre-set to teaser",
           "href": [
             {
-              "@id": "/target-page",
+              "@id": "/_test_data/target-page",
               "title": "Target"
             }
           ]

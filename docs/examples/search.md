@@ -11,8 +11,13 @@ This is a **built-in** block. The facet types are custom sub-blocks.
   "search": {
     "blockSchema": {
       "properties": {
+        "headline": {
+          "title": "Headline",
+          "type": "string"
+        },
         "facetsTitle": {
-          "title": "Facets Title"
+          "title": "Facets Title",
+          "type": "string"
         },
         "facets": {
           "title": "Facets",

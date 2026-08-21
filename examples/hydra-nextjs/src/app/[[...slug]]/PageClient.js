@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { stripPagingFromPath } from "#utils/paging";
 import { initBridge } from "#utils/hydra";
 import BlocksList from "@/components/BlocksList";
 // Bundle the doc-blocks schema bundle so addNodeIdsToAllSlateFields can
@@ -13,7 +14,10 @@ const docBlocksConfig = Object.fromEntries(
 
 export default function PageClient({ initialData, apiUrl }) {
   const [data, setData] = useState(initialData);
-  const pathname = usePathname();
+  // The blocks below use this as the CONTENT path they belong to (a listing
+  // queries relative to it), so the paging segment has to come off — it names a
+  // block, not a place in the content tree.
+  const pathname = stripPagingFromPath(usePathname());
 
   useEffect(() => {
     initBridge({

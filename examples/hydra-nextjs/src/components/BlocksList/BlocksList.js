@@ -6,6 +6,7 @@ import SlateBlock, { SlateInline } from "@/components/SlateBlock";
 import CodeExampleBlock from "@/components/CodeExampleBlock/CodeExampleBlock";
 import { expandTemplatesSync, expandListingBlocks, ploneFetchItems, staticBlocks, contentPath } from "#utils/helpers";
 import SwiperSlider from "@/components/SwiperSlider";
+import { pageFromPath } from "#utils/paging";
 
 // Template context for nested block expansion
 const TemplateContext = createContext({ templates: {}, templateState: {} });
@@ -335,11 +336,7 @@ function ListingBlock({ id, block, data, apiUrl, contextPath }) {
   // Read initial page from URL on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const path = window.location.pathname;
-      const match = path.match(new RegExp(`@pg_${id}_(\\d+)`));
-      if (match) {
-        setCurrentPage(parseInt(match[1], 10));
-      }
+      setCurrentPage(pageFromPath(window.location.pathname, id));
     }
   }, [id]);
 

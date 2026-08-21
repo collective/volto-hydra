@@ -440,6 +440,585 @@
     },
     "h-14": {
       "@type": "slate",
+      "plaintext": "Deep-link anchors (fragments)",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Deep-link anchors (fragments)"
+            }
+          ]
+        }
+      ]
+    },
+    "p-15": {
+      "@type": "slate",
+      "plaintext": "To let editors link to a spot *inside* a page, mark the element with a real `id` (the `#fragment` the browser scrolls to) **and** a linkable-anchor attribute carrying the label shown in the link picker. The attribute you pick also records the anchor's **level**, so the picker (and consumers like an in-page navigation block) can show a hierarchy:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "To let editors link to a spot "
+            },
+            {
+              "type": "em",
+              "children": [
+                {
+                  "text": "inside"
+                }
+              ]
+            },
+            {
+              "text": " a page, mark the element with a real "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "id"
+                }
+              ]
+            },
+            {
+              "text": " (the "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "#fragment"
+                }
+              ]
+            },
+            {
+              "text": " the browser scrolls to) "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "and"
+                }
+              ]
+            },
+            {
+              "text": " a linkable-anchor attribute carrying the label shown in the link picker. The attribute you pick also records the anchor's "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "level"
+                }
+              ]
+            },
+            {
+              "text": ", so the picker (and consumers like an in-page navigation block) can show a hierarchy:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-16": {
+      "@type": "slate",
+      "plaintext": "data-linkable-h1 … data-linkable-h6=\"Label\" — a heading anchor **at that",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "data-linkable-h1"
+                    }
+                  ]
+                },
+                {
+                  "text": " … "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "data-linkable-h6=\"Label\""
+                    }
+                  ]
+                },
+                {
+                  "text": " — a heading anchor **at that"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-17": {
+      "@type": "slate",
+      "plaintext": "level**. Use these on your headings; the suffix is the level.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "level**. Use these on your headings; the suffix is the level."
+            }
+          ]
+        }
+      ]
+    },
+    "ul-18": {
+      "@type": "slate",
+      "plaintext": "data-linkable-id=\"Label\" — a level-less anchor (a figure, a defined term,",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "data-linkable-id=\"Label\""
+                    }
+                  ]
+                },
+                {
+                  "text": " — a "
+                },
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "level-less"
+                    }
+                  ]
+                },
+                {
+                  "text": " anchor (a figure, a defined term,"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-19": {
+      "@type": "slate",
+      "plaintext": "any non-heading target).",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "any non-heading target)."
+            }
+          ]
+        }
+      ]
+    },
+    "ce-20": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-20-html-fe64be",
+          "label": "Html",
+          "language": "html",
+          "code": "<h2 id=\"pricing\" data-linkable-h2=\"Pricing\">Pricing</h2>\n<h3 id=\"enterprise\" data-linkable-h3=\"Enterprise plan\">Enterprise plan</h3>\n<figure id=\"fig-1\" data-linkable-id=\"Figure 1\">…</figure>"
+        }
+      ]
+    },
+    "p-21": {
+      "@type": "slate",
+      "plaintext": "Hydra harvests these per block on render as `{ id, name, level }` and stores them in the block's data, so the object browser offers them as `path#pricing` link targets — as a nested list reflecting the page's structure. Both attributes must survive into your **published** render for the anchor to resolve at runtime — Hydra only reads them in edit mode.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Hydra harvests these per block on render as "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "{ id, name, level }"
+                }
+              ]
+            },
+            {
+              "text": " and stores them in the block's data, so the object browser offers them as "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "path#pricing"
+                }
+              ]
+            },
+            {
+              "text": " link targets — as a nested list reflecting the page's structure. Both attributes must survive into your "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "published"
+                }
+              ]
+            },
+            {
+              "text": " render for the anchor to resolve at runtime — Hydra only reads them in edit mode."
+            }
+          ]
+        }
+      ]
+    },
+    "p-22": {
+      "@type": "slate",
+      "plaintext": "**Level is optional / automatic.** If you use plain `data-linkable-id` on an element that is *itself* an `h1`–`h6`, Hydra infers the level from the tag — so tagging every heading with `data-linkable-id` still yields a hierarchy for free. Precedence is: explicit `data-linkable-h{n}` > the element's heading tag > none (a level-less leaf). Given the flat, document-ordered anchor list, `buildAnchorTree` (in `@volto-hydra/hydra-js`) turns the levels into a nested contents tree; no levels means a flat list.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Level is optional / automatic."
+                }
+              ]
+            },
+            {
+              "text": " If you use plain "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "data-linkable-id"
+                }
+              ]
+            },
+            {
+              "text": " on an element that is "
+            },
+            {
+              "type": "em",
+              "children": [
+                {
+                  "text": "itself"
+                }
+              ]
+            },
+            {
+              "text": " an "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "h1"
+                }
+              ]
+            },
+            {
+              "text": "–"
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "h6"
+                }
+              ]
+            },
+            {
+              "text": ", Hydra infers the level from the tag — so tagging every heading with "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "data-linkable-id"
+                }
+              ]
+            },
+            {
+              "text": " still yields a hierarchy for free. Precedence is: explicit "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "data-linkable-h{n}"
+                }
+              ]
+            },
+            {
+              "text": " > the element's heading tag > none (a level-less leaf). Given the flat, document-ordered anchor list, "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "buildAnchorTree"
+                }
+              ]
+            },
+            {
+              "text": " (in "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "@volto-hydra/hydra-js"
+                }
+              ]
+            },
+            {
+              "text": ") turns the levels into a nested contents tree; no levels means a flat list."
+            }
+          ]
+        }
+      ]
+    },
+    "p-23": {
+      "@type": "slate",
+      "plaintext": "It's your choice which elements are linkable — a common pattern is to tag every heading, deriving its `id` from a slug of the heading text. If you want a heading to be linkable *while it's being edited* (before save), keep its `id`/`data-linkable-id` current as the text changes — e.g. a small `input` listener that re-slugifies the heading. Hydra harvests anchors both on render **and** when inline edits flush, merging them into the edit form's `block._linkableAnchors` so a freshly-typed heading becomes linkable on the page being edited without saving first; other pages use their last saved anchors.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "It's your choice which elements are linkable — a common pattern is to tag every heading, deriving its "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "id"
+                }
+              ]
+            },
+            {
+              "text": " from a slug of the heading text. If you want a heading to be linkable "
+            },
+            {
+              "type": "em",
+              "children": [
+                {
+                  "text": "while it's being edited"
+                }
+              ]
+            },
+            {
+              "text": " (before save), keep its "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "id"
+                }
+              ]
+            },
+            {
+              "text": "/"
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "data-linkable-id"
+                }
+              ]
+            },
+            {
+              "text": " current as the text changes — e.g. a small "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "input"
+                }
+              ]
+            },
+            {
+              "text": " listener that re-slugifies the heading. Hydra harvests anchors both on render "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "and"
+                }
+              ]
+            },
+            {
+              "text": " when inline edits flush, merging them into the edit form's "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "block._linkableAnchors"
+                }
+              ]
+            },
+            {
+              "text": " so a freshly-typed heading becomes linkable on the page being edited without saving first; other pages use their last saved anchors."
+            }
+          ]
+        }
+      ]
+    },
+    "h-24": {
+      "@type": "slate",
+      "plaintext": "Building an in-page navigation",
+      "value": [
+        {
+          "type": "h4",
+          "children": [
+            {
+              "text": "Building an in-page navigation"
+            }
+          ]
+        }
+      ]
+    },
+    "p-25": {
+      "@type": "slate",
+      "plaintext": "To build something *from* the anchors — an in-page navigation (\"On this page\") block — **derive the list from the page content you already render**, the same way you stamp the heading `id`s. That works identically published (no bridge, JS off) and while editing: structural edits (adding, removing, reordering heading blocks) re-render your frontend with fresh content, so the nav follows them. There is no bridge callback for this — the anchors ride in the ordinary edit-form data (`block._linkableAnchors`), which is what the object browser's link picker reads; a nav rebuilds itself from content on the next render.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "To build something "
+            },
+            {
+              "type": "em",
+              "children": [
+                {
+                  "text": "from"
+                }
+              ]
+            },
+            {
+              "text": " the anchors — an in-page navigation (\"On this page\") block — "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "derive the list from the page content you already render"
+                }
+              ]
+            },
+            {
+              "text": ", the same way you stamp the heading "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "id"
+                }
+              ]
+            },
+            {
+              "text": "s. That works identically published (no bridge, JS off) and while editing: structural edits (adding, removing, reordering heading blocks) re-render your frontend with fresh content, so the nav follows them. There is no bridge callback for this — the anchors ride in the ordinary edit-form data ("
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "block._linkableAnchors"
+                }
+              ]
+            },
+            {
+              "text": "), which is what the object browser's link picker reads; a nav rebuilds itself from content on the next render."
+            }
+          ]
+        }
+      ]
+    },
+    "p-26": {
+      "@type": "slate",
+      "plaintext": "> One consequence: text typed into an *existing* heading updates the nav on the next > render (when you blur the block), not on every keystroke — inline text edits don't > re-render the frontend until they're flushed. Adding or removing headings updates it > immediately.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "> One consequence: text typed into an "
+            },
+            {
+              "type": "em",
+              "children": [
+                {
+                  "text": "existing"
+                }
+              ]
+            },
+            {
+              "text": " heading updates the nav on the next > render (when you blur the block), not on every keystroke — inline text edits don't > re-render the frontend until they're flushed. Adding or removing headings updates it > immediately."
+            }
+          ]
+        }
+      ]
+    },
+    "p-27": {
+      "@type": "slate",
+      "plaintext": "If your anchors carry levels, pair the derived list with `buildAnchorTree(anchors)` (from `@volto-hydra/hydra-js`) to render a nested contents list; no levels means a flat list.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "If your anchors carry levels, pair the derived list with "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "buildAnchorTree(anchors)"
+                }
+              ]
+            },
+            {
+              "text": " (from "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "@volto-hydra/hydra-js"
+                }
+              ]
+            },
+            {
+              "text": ") to render a nested contents list; no levels means a flat list."
+            }
+          ]
+        }
+      ]
+    },
+    "h-28": {
+      "@type": "slate",
       "plaintext": "The steps",
       "value": [
         {
@@ -452,7 +1031,7 @@
         }
       ]
     },
-    "p-15": {
+    "p-29": {
       "@type": "slate",
       "plaintext": "The steps involved in creating a frontend are roughly the same for all these frameworks:",
       "value": [
@@ -466,7 +1045,7 @@
         }
       ]
     },
-    "h-16": {
+    "h-30": {
       "@type": "slate",
       "plaintext": "1. Create a Catch-All Route",
       "value": [
@@ -480,7 +1059,7 @@
         }
       ]
     },
-    "p-17": {
+    "p-31": {
       "@type": "slate",
       "plaintext": "Create a route for any path which goes to a single page.",
       "value": [
@@ -494,7 +1073,7 @@
         }
       ]
     },
-    "p-18": {
+    "p-32": {
       "@type": "slate",
       "plaintext": "For example, in Nuxt.js you create a file `pages/[..slug].vue`.",
       "value": [
@@ -519,7 +1098,7 @@
         }
       ]
     },
-    "h-19": {
+    "h-33": {
       "@type": "slate",
       "plaintext": "2. Build the Page Template",
       "value": [
@@ -533,7 +1112,7 @@
         }
       ]
     },
-    "p-20": {
+    "p-34": {
       "@type": "slate",
       "plaintext": "The page has a template with the static parts of your theme like header and footer. You might also check the content type to render each differently.",
       "value": [
@@ -547,7 +1126,7 @@
         }
       ]
     },
-    "h-21": {
+    "h-35": {
       "@type": "slate",
       "plaintext": "3. Fetch Content from Plone REST API",
       "value": [
@@ -561,7 +1140,7 @@
         }
       ]
     },
-    "p-22": {
+    "p-36": {
       "@type": "slate",
       "plaintext": "On page setup, take the path and make a [REST API call to the contents endpoint](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/content-types.html) to get the JSON for this page.",
       "value": [
@@ -589,7 +1168,7 @@
         }
       ]
     },
-    "ul-23": {
+    "ul-37": {
       "@type": "slate",
       "plaintext": "You can use @plone/client for this In some frameworks (such as Nuxt.js) it's better to use their built-in fetch You can also use the Plone GraphQL API",
       "value": [
@@ -646,7 +1225,7 @@
         }
       ]
     },
-    "p-24": {
+    "p-38": {
       "@type": "slate",
       "plaintext": "- Note: this is just a wrapper on the REST API rather than a server-side implementation, so it's not more efficient than using the REST API directly",
       "value": [
@@ -660,7 +1239,7 @@
         }
       ]
     },
-    "h-25": {
+    "h-39": {
       "@type": "slate",
       "plaintext": "4. Render Page Metadata",
       "value": [
@@ -674,7 +1253,7 @@
         }
       ]
     },
-    "p-26": {
+    "p-40": {
       "@type": "slate",
       "plaintext": "In your page template, fill title etc. from the content metadata.",
       "value": [
@@ -688,7 +1267,7 @@
         }
       ]
     },
-    "h-27": {
+    "h-41": {
       "@type": "slate",
       "plaintext": "5. Navigation",
       "value": [
@@ -702,7 +1281,7 @@
         }
       ]
     },
-    "ol-28": {
+    "ol-42": {
       "@type": "slate",
       "plaintext": "Adjust the contents API call to use @expand and return navigation data in the same call Create a component for your top-level nav that uses this nav JSON to create a menu",
       "value": [
@@ -757,7 +1336,7 @@
         }
       ]
     },
-    "h-29": {
+    "h-43": {
       "@type": "slate",
       "plaintext": "6. Blocks",
       "value": [
@@ -771,7 +1350,7 @@
         }
       ]
     },
-    "ol-30": {
+    "ol-44": {
       "@type": "slate",
       "plaintext": "Create a Block component that takes the id and block JSON as arguments Use if statements to check the block type and determine how to render that block If the block is a container, call the Block component recursively In your page, iterate down the blocks_layout list and render a Block component for each Rendering Slate — split into a separate component as it's used in many blocks and is also recursive",
       "value": [
@@ -866,7 +1445,7 @@
         }
       ]
     },
-    "p-31": {
+    "p-45": {
       "@type": "slate",
       "plaintext": "Give `Block` an `@type: \"empty\"` case: a container region with no `defaultBlockType` and more than one `allowedBlocks` seeds an `empty` placeholder for the user to type in place, and any custom container renderer must route its children through `Block` so `empty` is handled rather than rejected. See [Empty Blocks](container-blocks.md#empty-blocks).",
       "value": [
@@ -956,7 +1535,7 @@
             {
               "type": "link",
               "data": {
-                "url": "container-blocks.md#empty-blocks"
+                "url": "/docs/container-blocks#empty-blocks"
               },
               "children": [
                 {
@@ -971,7 +1550,7 @@
         }
       ]
     },
-    "h-32": {
+    "h-46": {
       "@type": "slate",
       "plaintext": "7. Helper Functions",
       "value": [
@@ -985,7 +1564,7 @@
         }
       ]
     },
-    "p-33": {
+    "p-47": {
       "@type": "slate",
       "plaintext": "Several helper functions get reused in many blocks:",
       "value": [
@@ -999,7 +1578,7 @@
         }
       ]
     },
-    "ol-34": {
+    "ol-48": {
       "@type": "slate",
       "plaintext": "Generating a URL for links — all REST API URLs are relative to the API URL, so you need to convert these to the right frontend URL Generating a URL for an image — blocks have image data in many formats so a helper function is useful",
       "value": [
@@ -1042,7 +1621,7 @@
         }
       ]
     },
-    "p-35": {
+    "p-49": {
       "@type": "slate",
       "plaintext": "- You may also decide to use your framework or hosting solution for image resizing",
       "value": [
@@ -1056,7 +1635,7 @@
         }
       ]
     },
-    "h-36": {
+    "h-50": {
       "@type": "slate",
       "plaintext": "8. Listing Blocks",
       "value": [
@@ -1070,7 +1649,7 @@
         }
       ]
     },
-    "ul-37": {
+    "ul-51": {
       "@type": "slate",
       "plaintext": "Use the Listing Helpers or make your own REST API call to query items Create your own pagination scheme (e.g., embed page in URL for static generation) Render the items and pagination",
       "value": [
@@ -1086,7 +1665,7 @@
                 {
                   "type": "link",
                   "data": {
-                    "url": "listings.md"
+                    "url": "/docs/listings"
                   },
                   "children": [
                     {
@@ -1130,7 +1709,7 @@
         }
       ]
     },
-    "h-38": {
+    "h-52": {
       "@type": "slate",
       "plaintext": "9. Redirects",
       "value": [
@@ -1144,7 +1723,7 @@
         }
       ]
     },
-    "ol-39": {
+    "ol-53": {
       "@type": "slate",
       "plaintext": "If your contents call results in a redirect, you will need to do an internal redirect in the framework so the path shown is correct If you are using SSG, you will need special code to query all the redirects at generate time and add redirect routes",
       "value": [
@@ -1185,7 +1764,7 @@
         }
       ]
     },
-    "h-40": {
+    "h-54": {
       "@type": "slate",
       "plaintext": "10. Error Pages",
       "value": [
@@ -1199,7 +1778,7 @@
         }
       ]
     },
-    "p-41": {
+    "p-55": {
       "@type": "slate",
       "plaintext": "If your [REST API call returns an error](https://6.docs.plone.org/plone.restapi/docs/source/http-status-codes.html), handle this within the framework to display the error and set the status code.",
       "value": [
@@ -1227,7 +1806,7 @@
         }
       ]
     },
-    "h-42": {
+    "h-56": {
       "@type": "slate",
       "plaintext": "11. Search Blocks",
       "value": [
@@ -1241,7 +1820,7 @@
         }
       ]
     },
-    "p-43": {
+    "p-57": {
       "@type": "slate",
       "plaintext": "If you choose to allow Volto's built-in Search Block for end-user customisable search:",
       "value": [
@@ -1255,7 +1834,7 @@
         }
       ]
     },
-    "ul-44": {
+    "ul-58": {
       "@type": "slate",
       "plaintext": "Render Facets/Filters (currently not as sub-blocks but this could change) Build your query and make a REST API call to query items",
       "value": [
@@ -1293,7 +1872,7 @@
         }
       ]
     },
-    "h-45": {
+    "h-59": {
       "@type": "slate",
       "plaintext": "12. Form Blocks",
       "value": [
@@ -1307,7 +1886,7 @@
         }
       ]
     },
-    "p-46": {
+    "p-60": {
       "@type": "slate",
       "plaintext": "Form-block is a plugin that allows a visual form builder:",
       "value": [
@@ -1321,7 +1900,7 @@
         }
       ]
     },
-    "ul-47": {
+    "ul-61": {
       "@type": "slate",
       "plaintext": "Currently not a container with sub-blocks but this could change Render each field type component (or limit which are available) Produce a compatible JSON submission to the form-block endpoint Handle field validation errors Handle the thank-you page",
       "value": [
@@ -1372,7 +1951,7 @@
         }
       ]
     },
-    "h-48": {
+    "h-62": {
       "@type": "slate",
       "plaintext": "Deployment patterns",
       "value": [
@@ -1386,7 +1965,7 @@
         }
       ]
     },
-    "p-49": {
+    "p-63": {
       "@type": "slate",
       "plaintext": "Hydra separates your production frontend from the editing experience, which gives you choice in how each is deployed.",
       "value": [
@@ -1400,7 +1979,7 @@
         }
       ]
     },
-    "h-50": {
+    "h-64": {
       "@type": "slate",
       "plaintext": "SPA / Hybrid — full visual editing",
       "value": [
@@ -1414,7 +1993,7 @@
         }
       ]
     },
-    "p-51": {
+    "p-65": {
       "@type": "slate",
       "plaintext": "The simplest setup — your frontend handles both production and editing:",
       "value": [
@@ -1428,7 +2007,7 @@
         }
       ]
     },
-    "ol-52": {
+    "ol-66": {
       "@type": "slate",
       "plaintext": "Deploy your frontend as SPA or Hybrid (SSR + client-side hydration). Deploy Hydra and the Plone API server. Log in to Hydra, go to user preferences, set your frontend URL.",
       "value": [
@@ -1463,7 +2042,7 @@
         }
       ]
     },
-    "p-53": {
+    "p-67": {
       "@type": "slate",
       "plaintext": "This gives you all visual editing features including inline text editing, drag and drop, and realtime preview.",
       "value": [
@@ -1477,7 +2056,7 @@
         }
       ]
     },
-    "h-54": {
+    "h-68": {
       "@type": "slate",
       "plaintext": "SSG / SSR — production speed + visual editing",
       "value": [
@@ -1491,7 +2070,7 @@
         }
       ]
     },
-    "p-55": {
+    "p-69": {
       "@type": "slate",
       "plaintext": "Get the speed of static generation while keeping visual editing. Deploy two versions of the same frontend:",
       "value": [
@@ -1505,7 +2084,7 @@
         }
       ]
     },
-    "ol-56": {
+    "ol-70": {
       "@type": "slate",
       "plaintext": "Production — deploy your frontend in SSG or SSR mode (fast, cacheable). Editing — deploy the same frontend in SPA mode to a separate URL (used only inside Hydra). Hydra + Plone — only needs to run during editing, so scale-to-zero / serverless works. SSG rebuild — for SSG, configure collective.webhook to trigger a rebuild on edit. SSR doesn't need this.",
       "value": [
@@ -1594,7 +2173,7 @@
         }
       ]
     },
-    "h-57": {
+    "h-71": {
       "@type": "slate",
       "plaintext": "Example: the Nuxt.js demo",
       "value": [
@@ -1608,7 +2187,7 @@
         }
       ]
     },
-    "p-58": {
+    "p-72": {
       "@type": "slate",
       "plaintext": "The default Hydra demo uses exactly the SSG / SSR pattern above:",
       "value": [
@@ -1622,7 +2201,7 @@
         }
       ]
     },
-    "ul-59": {
+    "ul-73": {
       "@type": "slate",
       "plaintext": "Production — SSG on Netlify. All pages statically generated, images optimized, fast globally. Editing — same Nuxt codebase deployed as SPA to a different Netlify URL. Only loaded inside Hydra's iframe. Hydra + Plone — deployed to fly.io with scale-to-zero. Cost is free or minimal since it only runs during editing.",
       "value": [
@@ -1709,7 +2288,7 @@
         }
       ]
     },
-    "p-60": {
+    "p-74": {
       "@type": "slate",
       "plaintext": "For most frameworks, switching between SSG / SSR and SPA is just a config toggle, so you get the best of both worlds with minimal effort.",
       "value": [
@@ -1742,51 +2321,65 @@
       "ce-13",
       "h-14",
       "p-15",
-      "h-16",
+      "ul-16",
       "p-17",
-      "p-18",
-      "h-19",
-      "p-20",
-      "h-21",
+      "ul-18",
+      "p-19",
+      "ce-20",
+      "p-21",
       "p-22",
-      "ul-23",
-      "p-24",
-      "h-25",
+      "p-23",
+      "h-24",
+      "p-25",
       "p-26",
-      "h-27",
-      "ol-28",
-      "h-29",
-      "ol-30",
+      "p-27",
+      "h-28",
+      "p-29",
+      "h-30",
       "p-31",
-      "h-32",
-      "p-33",
-      "ol-34",
-      "p-35",
-      "h-36",
+      "p-32",
+      "h-33",
+      "p-34",
+      "h-35",
+      "p-36",
       "ul-37",
-      "h-38",
-      "ol-39",
-      "h-40",
-      "p-41",
-      "h-42",
-      "p-43",
-      "ul-44",
-      "h-45",
-      "p-46",
-      "ul-47",
-      "h-48",
+      "p-38",
+      "h-39",
+      "p-40",
+      "h-41",
+      "ol-42",
+      "h-43",
+      "ol-44",
+      "p-45",
+      "h-46",
+      "p-47",
+      "ol-48",
       "p-49",
       "h-50",
-      "p-51",
-      "ol-52",
-      "p-53",
+      "ul-51",
+      "h-52",
+      "ol-53",
       "h-54",
       "p-55",
-      "ol-56",
-      "h-57",
-      "p-58",
-      "ul-59",
-      "p-60"
+      "h-56",
+      "p-57",
+      "ul-58",
+      "h-59",
+      "p-60",
+      "ul-61",
+      "h-62",
+      "p-63",
+      "h-64",
+      "p-65",
+      "ol-66",
+      "p-67",
+      "h-68",
+      "p-69",
+      "ol-70",
+      "h-71",
+      "p-72",
+      "ul-73",
+      "p-74"
     ]
   }
 }
