@@ -85,6 +85,22 @@ because `${` is not a JSON token:
 | `value="${p,h*,ul/slate}"` | a node **set** — any of these node kinds → slate |
 | `_="${hr}"` | match-only: consumes a node, captures nothing (separator) |
 
+A ref has three slots — **`${ type [sel]… /part }`** — the type, a chainable
+"which one" selector, and the accessor. The selector is keyed *or* positional
+(like `sections["Contents"].paragraphs[2]`, **not** a CSS attribute selector —
+CSS can't match text):
+
+| selector | meaning |
+|---|---|
+| *(none)* | the first of that kind |
+| `[2]` | the 2nd — **position** (a number) |
+| `[Contents]` | within the section under `## Contents` (or a def-list term) — **label** (an identifier, matched by text) |
+| `[Contents][2]` | chained: the 2nd, scoped to that label |
+
+So `${p[Summary]/text}` is "the paragraph under the *Summary* heading", by name
+rather than position. (Matching by literal text is intentional but brittle — use
+it for stable structural labels, not prose.)
+
 The **node kinds** a ref can target: `p`, `h1`–`h6` / `h` (relative) / `h*` (any),
 `img`, `a`, `ul`, `ol`, `li`, `blockquote`, `pre` (code fence), `hr`, `table`, and
 `strong` / `em` (a lone-bold / lone-italic paragraph). A trailing `?`
