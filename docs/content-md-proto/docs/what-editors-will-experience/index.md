@@ -69,8 +69,8 @@ blocks-assignments:
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
-  <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+  <block type="image" description="${p?/text}" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
+  <block type="image" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
@@ -139,7 +139,11 @@ A toolbar button opens the **Frontend switcher** panel with two sections:
 
 A **Settings** button at the bottom of the panel manages the saved URLs (add, remove, rename). The currently active frontend is highlighted in the list.
 
-<block type="image" url="/docs/images/frontend-switcher" alt="Frontend switcher panel — Viewport section with Mobile/Tablet/Desktop, Frontend section listing four saved frontends, Settings button at the bottom." align="center" size="l" />
+<block type="image">
+
+![Frontend switcher panel — Viewport section with Mobile/Tablet/Desktop, Frontend section listing four saved frontends, Settings button at the bottom.](/docs/images/frontend-switcher)
+
+</block>
 
 ## Two ways to edit any field
 
@@ -170,25 +174,41 @@ So `Escape` repeatedly takes you up one level at a time. See [Selecting blocks](
 
 On narrow screens (≤767 px) the editor reshapes into a two-bar layout: the **Quanta toolbar** pins to the top of the viewport — always visible, never fades — and the **main toolbar** (Save, Cancel, Frontend switcher, Settings shortcut) sits as a compact bar at the bottom. The iframe canvas fills the space in between. There is no side panel: the sidebar opens as a full-screen sheet, popups slide up from the bottom, and the link editor takes over the top bar.
 
-<block type="image" url="/docs/images/mobile-block-selected" alt="Mobile editing — Quanta toolbar pinned at the top with chevrons and format buttons, a slate block selected mid-screen with its selection outline, and the compact main toolbar at the bottom." align="center" size="l" />
+<block type="image">
+
+![Mobile editing — Quanta toolbar pinned at the top with chevrons and format buttons, a slate block selected mid-screen with its selection outline, and the compact main toolbar at the bottom.](/docs/images/mobile-block-selected)
+
+</block>
 
 ### Bottom-sheet popups
 
 The `⋯` menu — and every other contextual chooser (block-type picker, frontend switcher, convert chooser) — slides up from the bottom of the screen with the canvas dimmed behind. Tap the back arrow at the bottom-left of the sheet to dismiss; the canvas underneath comes back unchanged.
 
-<block type="image" url="/docs/images/mobile-dropdown-menu" alt="Mobile ⋯ menu as a slide-up bottom sheet showing Settings, Make Template, Copy, Cut, Remove with a back arrow at the bottom-left and the canvas dimmed behind it." align="center" size="l" />
+<block type="image">
+
+![Mobile ⋯ menu as a slide-up bottom sheet showing Settings, Make Template, Copy, Cut, Remove with a back arrow at the bottom-left and the canvas dimmed behind it.](/docs/images/mobile-dropdown-menu)
+
+</block>
 
 ### Sidebar as a full-screen sheet
 
 A side panel is impossible on a 375 px screen. Instead, opening the sidebar (via the **Settings** shortcut in the main toolbar, or by choosing **Settings** in the `⋯` menu) covers the entire viewport. The `X` button in the top-right closes it and brings you back to the canvas. While the sidebar is open, the iframe is hidden behind it — same source of truth, just a different surface.
 
-<block type="image" url="/docs/images/mobile-sidebar-fullscreen" alt="Mobile sidebar as a full-screen sheet showing the Page header with an X close button, the DEFAULT section open with Title and Summary fields, and the DATES section below." align="center" size="l" />
+<block type="image">
+
+![Mobile sidebar as a full-screen sheet showing the Page header with an X close button, the DEFAULT section open with Title and Summary fields, and the DATES section below.](/docs/images/mobile-sidebar-fullscreen)
+
+</block>
 
 ### Escaping nested blocks with `⬆`
 
 Phones don't have an `Escape` key. To walk back up out of a nested block (a teaser inside a grid, a paragraph inside a column), the Quanta toolbar shows an extra **`⬆` button** to the left of `⋯` whenever the selected block has a parent. One tap selects the parent container; tap again to keep walking up.
 
-<block type="image" url="/docs/images/mobile-select-parent" alt="Mobile Quanta toolbar with a nested teaser selected — the ⬆ select-parent button is visible to the left of ⋯, and the teaser's grid parent is highlighted with a dashed selection outline." align="center" size="l" />
+<block type="image">
+
+![Mobile Quanta toolbar with a nested teaser selected — the ⬆ select-parent button is visible to the left of ⋯, and the teaser's grid parent is highlighted with a dashed selection outline.](/docs/images/mobile-select-parent)
+
+</block>
 
 ### Differences from desktop in one place
 

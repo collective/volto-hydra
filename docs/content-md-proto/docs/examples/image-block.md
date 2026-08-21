@@ -63,8 +63,8 @@ blocks-assignments:
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
-  <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+  <block type="image" description="${p?/text}" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
+  <block type="image" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
@@ -76,7 +76,11 @@ blocks-matched: |
 
 Displays an image with optional alt text and link. Supports the image picker widget for selecting images from the Plone content tree or uploading new ones.
 
-<block type="image" url="/docs/images/image-block-edit" alt="The image-block example block being edited in Volto Hydra" align="center" size="l" />
+<block type="image">
+
+![The image-block example block being edited in Volto Hydra](/docs/images/image-block-edit)
+
+</block>
 
 ## Bild-block (Standard Size)
 

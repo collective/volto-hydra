@@ -60,8 +60,8 @@ blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" styles={"align":"full"} />
-  <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
-  <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+  <block type="image" description="${p?/text}" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
+  <block type="image" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
@@ -73,7 +73,11 @@ blocks-matched: |
 
 A horizontal rule used to visually divide sections of content. Supports an alignment style property.
 
-<block type="image" url="/docs/images/separator-edit" alt="The separator example block being edited in Volto Hydra" align="center" size="l" />
+<block type="image">
+
+![The separator example block being edited in Volto Hydra](/docs/images/separator-edit)
+
+</block>
 
 ---
 

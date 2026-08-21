@@ -62,8 +62,8 @@ blocks-assignments:
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
-  <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+  <block type="image" description="${p?/text}" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
+  <block type="image" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
@@ -94,7 +94,7 @@ Click on a block in the preview. If the frontend marks any of its fields as inli
 - The Quanta toolbar appears above the block (formatting, convert-to, delete, etc.).
 - The sidebar switches to that block's settings.
 
-<block type="image" url="/docs/images/block-selected" alt="Slate paragraph in text mode — cursor in the field, sidebar showing block's settings." align="center" size="l" />
+![Slate paragraph in text mode — cursor in the field, sidebar showing block's settings.](/docs/images/block-selected)
 
 ## Block mode
 
@@ -108,7 +108,11 @@ Press `Escape` to leave text editing. The block stays selected, but you're no lo
 
 Press `Escape` again to **deselect** (or go up to the parent container if this block is inside one). Each `Escape` walks one step up the hierarchy.
 
-<block type="image" url="/docs/images/block-mode" alt="Same paragraph in block mode — full blue border, no cursor." align="center" size="l" />
+<block type="image">
+
+![Same paragraph in block mode — full blue border, no cursor.](/docs/images/block-mode)
+
+</block>
 
 ## Multi-selection
 
@@ -132,7 +136,7 @@ While multiple blocks are selected:
 - The Quanta toolbar dropdown offers actions that apply to all (e.g. "Wrap in...", see [Containers](containers.md)).
 - The sidebar shows the count and lists each selected block by type.
 
-<block type="image" url="/docs/images/multi-select" align="center" size="l" data-json='{"alt":"Two adjacent paragraphs multi-selected — combined bounding box, sidebar shows \"2 selected\", toolbar shows count badge."}' />
+![Two adjacent paragraphs multi-selected — combined bounding box, sidebar shows "2 selected", toolbar shows count badge.](/docs/images/multi-select)
 
 ## Selecting from the sidebar
 

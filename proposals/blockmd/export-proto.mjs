@@ -62,9 +62,12 @@ const PROTO_TEXT = {
   // stored redundantly here. block.title (the heading text) is the teaser's own
   // override, shown only when overwrite is on.
   teaser: '<block type="teaser" title="${h/text}" href="${h/link}" description="${p/text}" />',
+  // title comes from the markdown image's title-string (`![alt](url "title")`),
+  // not a fixed default -- real image titles vary. align/size keep their
+  // defaults; image_field (when present) spills to <fields>.
   image: [
-    '<block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />',
-    '<block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />',
+    '<block type="image" description="${p?/text}" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />',
+    '<block type="image" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />',
   ].join('\n'),
   slateTable: [
     '<block type="slateTable">',

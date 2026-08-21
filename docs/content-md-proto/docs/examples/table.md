@@ -50,8 +50,8 @@ blocks-assignments:
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
-  <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+  <block type="image" description="${p?/text}" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
+  <block type="image" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
@@ -73,7 +73,11 @@ blocks-tagged: |
 
 A table with rich text (Slate) content in each cell. Supports adding/removing rows and columns via toolbar actions.
 
-<block type="image" url="/docs/images/table-edit" alt="The table example block being edited in Volto Hydra" align="center" size="l" />
+<block type="image">
+
+![The table example block being edited in Volto Hydra](/docs/images/table-edit)
+
+</block>
 
 <block type="heading" alignment="left" heading="Basic Table" tag="h2" />
 

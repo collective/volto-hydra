@@ -114,7 +114,9 @@ MyST renders it as a `<dl>` with `deflist` enabled.)
 The **node kinds** a ref can target: `p`, `h1`–`h6` / `h` (relative) / `h*` (any),
 `img`, `a`, `ul`, `ol`, `li`, `blockquote`, `pre` (code fence), `hr`, `table`,
 `strong` / `em` (a lone-bold / lone-italic paragraph), and `dl` / `dt` / `dd`
-(a definition list). A trailing `?`
+(a definition list). A trailing `?` marks the ref **optional** — matched when
+present, skipped when absent — for an optional node (a subtitle) *or* an optional
+part (`${img?/title}`, an image with no title-string). A trailing `?`
 (`${strong?/text}`) makes the slot **optional**. The **parts** a ref can read:
 
 | part | from | yields |

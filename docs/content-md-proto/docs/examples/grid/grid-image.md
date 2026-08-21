@@ -55,8 +55,8 @@ blocks-assignments:
   - { uid: a7d1d9b8-1caa-41cd-825e-15d4564a57f6 }
 blocks-matched: |
   <block type="title" _="${h1}" />
-  <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
-  <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+  <block type="image" description="${p?/text}" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
+  <block type="image" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
 blocks-tagged: |
   <block type="gridBlock" headline="${h/text}">
     <region name="blocks" widget="blocks_layout">

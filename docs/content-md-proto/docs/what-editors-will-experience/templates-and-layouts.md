@@ -71,8 +71,8 @@ blocks-assignments:
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
-  <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+  <block type="image" description="${p?/text}" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
+  <block type="image" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
 ---
 
 # Templates and layouts
@@ -120,7 +120,11 @@ Typical use: a "callout" block in the middle of a layout — every page has one,
 
 Regular blocks where you can do anything — add, edit, move, delete. The template marks regions as slots (with a `slotId`) and your existing content is placed into the matching slots when the template merges.
 
-<block type="image" url="/docs/images/template-locked" align="center" size="l" data-json='{"alt":"A snippet template applied to a page. The \"Snippet Header\" block is selected, rendered muted as a locked block. Its sidebar shows its content read-only — a \"Text\" field with the value \"Snippet Header - From Template\" — above the template&#39;s own read-only settings (Template Name, Save Location)."}' />
+<block type="image">
+
+![A snippet template applied to a page. The "Snippet Header" block is selected, rendered muted as a locked block. Its sidebar shows its content read-only — a "Text" field with the value "Snippet Header - From Template" — above the template's own read-only settings (Template Name, Save Location).](/docs/images/template-locked)
+
+</block>
 
 ## Inserting between fixed blocks
 
@@ -166,7 +170,11 @@ Unlocking one template unlocks only *that* template. The rest of the page stays 
 
 Templates are saved when you **lock** them, not when you save the page. If you save the page while a template is still unlocked, you're prompted to lock it first.
 
-<block type="image" url="/docs/images/template-edit-locked" alt="A template's sidebar bar, locked (🔒) — the Template Settings show as read-only text. Clicking the lock unlocks it (🔓) and makes the template editable." align="center" size="l" />
+<block type="image">
+
+![A template's sidebar bar, locked (🔒) — the Template Settings show as read-only text. Clicking the lock unlocks it (🔓) and makes the template editable.](/docs/images/template-edit-locked)
+
+</block>
 
 ## Template instances in the sidebar
 

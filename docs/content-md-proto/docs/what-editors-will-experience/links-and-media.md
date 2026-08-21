@@ -56,8 +56,8 @@ blocks-assignments:
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
   <block type="title" _="${h1}" />
-  <block type="image" description="${p/text}" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
-  <block type="image" url="${img/src}" alt="${img/alt}" align="center" size="l" image_field="image" title="Image" />
+  <block type="image" description="${p?/text}" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
+  <block type="image" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
 ---
 
 # Links and media
@@ -73,9 +73,13 @@ When the frontend has wired up a link field as inline-editable, clicking the lin
 - **Open the URL in a new tab** (toggle the "Open in new tab" option).
 - **Clear the link.**
 
-<block type="image" url="/docs/images/link-picker" alt="Link picker on a slate link — URL field with /another-page, browse / clear / open-new-tab / submit icons." align="center" size="l" />
+![Link picker on a slate link — URL field with /another-page, browse / clear / open-new-tab / submit icons.](/docs/images/link-picker)
+
+<block type="slate">
 
 The Quanta toolbar's link icon does the same thing and is available on slate text fields too — select some text, click the link icon, and the link picker opens for that text range.
+
+</block>
 
 ## Linking to a spot inside a page
 
@@ -83,7 +87,11 @@ Sometimes you don't want to link to the top of a page — you want to land the r
 
 The two buttons at the top right switch between **Sub items** (pages inside this one) and **Fragments**, so you can always get back to either.
 
-<block type="image" url="/docs/images/link-fragments" alt="Object browser opened on Deep Link Page with the top-right switch set to Fragments, listing the page's headings — Intro and Details — as link targets." align="center" size="l" />
+<block type="image">
+
+![Object browser opened on Deep Link Page with the top-right switch set to Fragments, listing the page's headings — Intro and Details — as link targets.](/docs/images/link-fragments)
+
+</block>
 
 Which spots are offered is up to the site's design system — most sites make every heading linkable. Two things worth knowing:
 
@@ -102,7 +110,7 @@ You'll see an empty placeholder with a prompt to **upload, browse, or drag in** 
 - Drag an image file from your desktop and drop it directly onto the placeholder.
 - Drag an image from another tab / source if your browser supports it.
 
-<block type="image" url="/docs/images/media-empty-placeholder" align="center" size="l" data-json='{"alt":"Empty image block selected — placeholder with image icon, \"Browse the site, drop an image...\" input, sidebar showing \"NO IMAGE SELECTED\"."}' />
+![Empty image block selected — placeholder with image icon, "Browse the site, drop an image..." input, sidebar showing "NO IMAGE SELECTED".](/docs/images/media-empty-placeholder)
 
 ### Replacing an existing media element
 
