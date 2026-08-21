@@ -59,7 +59,7 @@ blocks-assignments:
   - { uid: p-32 }
   - { uid: p-33 }
 blocks-matched: |
-  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
+  <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
 blocks-tagged: |
   <block type="slateTable">

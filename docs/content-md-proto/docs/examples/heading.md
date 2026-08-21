@@ -50,7 +50,7 @@ blocks-assignments:
   - { id: ref-heading-rendering-svelte-f5f71c }
   - { id: ref-heading-rendering-astro-a73687 }
 blocks-matched: |
-  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
+  <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" styles={"align":"full"} />
   <block type="codeExample">

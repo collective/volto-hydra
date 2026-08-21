@@ -29,7 +29,7 @@ blocks-assignments:
   - { uid: 603e7230-53ed-4364-977d-4bfd11809a35 }
   - { uid: 1923851d-b62e-45b7-8425-aa047aaa6e76 }
 blocks-matched: |
-  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
+  <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
   <block type="image" description="${p?/text}" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
   <block type="image" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />

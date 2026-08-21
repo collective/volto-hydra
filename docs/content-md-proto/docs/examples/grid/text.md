@@ -54,7 +54,7 @@ blocks-assignments:
   - { uid: 103b3b0e-c54e-4d0a-bf84-6e28898260dd }
   - { uid: 019e7dd0-63b9-4421-8824-3544391e9b23 }
 blocks-matched: |
-  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
+  <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
 blocks-tagged: |
   <block type="gridBlock" headline="${h/text}">

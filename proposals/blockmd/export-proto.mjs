@@ -51,7 +51,7 @@ function referenceRenderers(markdown, destDir) {
 const PROTO_TEXT = {
   // slate is the catch-all; more specific same-specificity prototypes (title on an
   // h1) are declared AFTER it so they win the CSS cascade tie.
-  slate: '<block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />',
+  slate: '<block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />',
   title: '<block type="title" _="${h1}" />',
   // `align: full` is the default separator style (34 of 56); declaring it here
   // makes those emit as a bare `---` and be restored on decode, while left/center
@@ -112,6 +112,9 @@ const PROTO_TEXT = {
     '  </region>',
     '</block>',
   ].join('\n'),
+  // A hero: h1 heading, a bold subheading, an italic (slate) description, and a
+  // button link — captured positionally, the italic description only in this run.
+  hero: '<block type="hero" heading="${h1/text}" subheading="${strong/text}" description="${em/richtext}" buttonText="${p/text}" buttonLink="${p/link}" />',
 };
 // Prototypes split into two frontmatter sections: `blocks-matched` (implicit --
 // auto-matched from bare markdown, source order = cascade) and `blocks-tagged`

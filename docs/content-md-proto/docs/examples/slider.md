@@ -35,7 +35,7 @@ blocks-assignments:
   - { id: ref-slider-rendering-svelte-586973 }
   - { id: ref-slider-rendering-astro-a4ec65 }
 blocks-matched: |
-  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
+  <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">

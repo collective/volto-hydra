@@ -34,7 +34,7 @@ blocks-assignments:
   - { id: ref-hero-rendering-svelte-a2ecf7 }
   - { id: ref-hero-rendering-astro-239496 }
 blocks-matched: |
-  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
+  <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">

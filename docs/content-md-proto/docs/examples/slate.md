@@ -61,7 +61,7 @@ blocks-assignments:
   - { id: ref-text-rendering-svelte-2aa474 }
   - { id: ref-slate-rendering-astro-6ff068 }
 blocks-matched: |
-  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
+  <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" styles={"align":"full"} />
   <block type="image" description="${p?/text}" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
@@ -87,9 +87,9 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 <block type="separator" />
 
-<block type="slate" data-json='{"value":[{"children":[{"text":""},{"children":[{"text":"This is bold text."}],"type":"strong"},{"text":""}],"type":"p"}]}' />
+**This is bold text.**
 
-<block type="slate" data-json='{"value":[{"children":[{"text":""},{"children":[{"text":"This is Italics."}],"type":"em"},{"text":""}],"type":"p"}]}' />
+*This is Italics.*
 
 [This is link.](https://www.google.com/)
 

@@ -34,7 +34,7 @@ blocks-assignments:
   - { id: ref-columns-rendering-svelte-9b4eec }
   - { id: ref-columns-rendering-astro-481d9d }
 blocks-matched: |
-  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
+  <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">

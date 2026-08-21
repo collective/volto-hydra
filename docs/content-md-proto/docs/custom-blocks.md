@@ -129,7 +129,7 @@ blocks-assignments:
   - { id: ce-88-javascript-e562d7 }
   - { uid: p-89 }
 blocks-matched: |
-  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
+  <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
   <block type="codeExample">
     <region name="tabs" widget="object_list">

@@ -71,7 +71,7 @@ blocks-assignments:
   - { uid: ce4b6f34-ca2e-4d3b-a097-53628fa224e7 }
   - { uid: 9a3d1a33-d559-45af-846b-8a2a37a51e0d }
 blocks-matched: |
-  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
+  <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" styles={"align":"full"} />
   <block type="image" description="${p?/text}" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />

@@ -24,7 +24,7 @@ blocks-assignments:
   - { id: tpl-rendering-vue-000000 }
   - { id: tpl-rendering-svelte-000000 }
 blocks-matched: |
-  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
+  <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="separator" _="${hr}" styles={"align":"full"} />
   <block type="codeExample">
     <region name="tabs" widget="object_list">

@@ -69,7 +69,7 @@ blocks-assignments:
   - { uid: 09891614-7ed6-444c-9925-8589801ca8ea }
   - { uid: 8fe9052b-d9a4-48dd-ae47-80b256826aca }
 blocks-matched: |
-  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
+  <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" styles={"align":"full"} />
   <block type="image" description="${p?/text}" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />

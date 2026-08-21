@@ -51,7 +51,7 @@ blocks-assignments:
   - { uid: caa483f6-bc0f-4a5a-94d2-925897969928 }
   - { uid: e770913c-fb7b-4cf1-94a8-7eb6e24ff66e }
 blocks-matched: |
-  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
+  <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
   <block type="image" description="${p?/text}" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
   <block type="image" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />

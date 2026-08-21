@@ -10,7 +10,7 @@ blocks-assignments:
   - { uid: footer-social }
   - { uid: footer-copyright }
 blocks-matched: |
-  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
+  <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
 ---
 
 <fields templateId="/templates/site-footer" templateInstanceId="site-footer-def-instance" data-json='{"fixed":true,"readOnly":true}'>

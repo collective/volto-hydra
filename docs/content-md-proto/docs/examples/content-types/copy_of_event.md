@@ -43,7 +43,7 @@ blocks-assignments:
   - { uid: 7cc3f9dc-c91b-41ec-8a51-ce2cf7affe17 }
   - { uid: 1a9dbeac-4f8e-4a75-9859-fd8012bd2c1a }
 blocks-matched: |
-  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
+  <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
 ---
 

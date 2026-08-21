@@ -10,7 +10,7 @@ blocks-assignments:
   - { uid: tpl-context-nav }
   - { uid: tpl-default-slot }
 blocks-matched: |
-  <block type="slate" value="${p,h*,ul,ol,blockquote/slate}" />
+  <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
 ---
 
 <fields templateId="/templates/context-navigation-layout" templateInstanceId="context-navigation-layout-def-instance">
