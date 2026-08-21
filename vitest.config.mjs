@@ -42,6 +42,8 @@ export default defineConfig({
       'docs/**/*.{test,spec}.mjs',
       // the block <-> markdown converter and the prototype-mapping spike
       'lib/**/*.{test,spec}.mjs',
+      // blockmd tooling: exporters, checks, and content migrations
+      'proposals/blockmd/**/*.{test,spec}.mjs',
     ],
     // hydra-js has its own jest harness; covered by `cd packages/hydra-js && pnpm test` in CI.
     exclude: ['**/node_modules/**', 'packages/hydra-js/**'],
