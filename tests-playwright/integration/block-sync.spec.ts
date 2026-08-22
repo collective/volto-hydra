@@ -93,10 +93,8 @@ test.describe('Block Sync - Listing Block Item Type', () => {
     const imageDefaultsFieldset = page.locator('#blockform-fieldset-inherited_fields');
     await expect(imageDefaultsFieldset).toBeVisible({ timeout: 5000 });
 
-    // Wait for Nuxt async re-rendering to settle after variation change
-    await helper.getStableBlockCount();
-
-    // Wait for teasers to disappear first (confirms variation change is taking effect)
+    // The variation change is confirmed by the teasers going away — assert
+    // that directly rather than waiting for the count to stop moving.
     await expect(teaserItems).toHaveCount(0, { timeout: 5000 });
 
     // Then wait for image blocks to appear
@@ -501,19 +499,23 @@ test.describe('Block Sync - Search Block with Listing Container', () => {
     const searchInputAfter = iframe.locator('[data-block-uid="search-block-1"] input[name="SearchableText"]');
     await expect(searchInputAfter).toHaveValue('accordion', { timeout: 10000 });
 
-    // Wait for block count to stabilize after reactive re-fetch
-    await helper.getStableBlockCount();
-
-    // Check filtered results
     const filteredResults = iframe.locator('[data-block-uid="search-block-1"] .search-results [data-block-uid]');
 
-    // Should have at least one result (accordion-test-page matches "accordion")
-    await expect(filteredResults.first()).toBeVisible({ timeout: 10000 });
-    const filteredCount = await filteredResults.count();
-    expect(filteredCount).toBeGreaterThan(0);
+    // Wait for the RESULT of the re-fetch — fewer rows than before — not for
+    // the DOM to go quiet. `first()` being visible is satisfied by the OLD rows
+    // still on screen, which is how this read a stale 6-of-6 and failed on the
+    // comparison below; polling the count retries until the new rows land and
+    // reports what it saw if they never do.
+    await expect
+      .poll(() => filteredResults.count(), {
+        timeout: 10000,
+        message:
+          `search for "accordion" never narrowed the results (started at ${initialCount})`,
+      })
+      .toBeLessThan(initialCount);
 
-    // Should have fewer results than initial (search filtered them)
-    expect(filteredCount).toBeLessThan(initialCount);
+    // …and it filtered rather than emptied: accordion-test-page matches.
+    expect(await filteredResults.count()).toBeGreaterThan(0);
   });
 
   test('search block filters results when user clicks facet checkbox', async ({ page }) => {

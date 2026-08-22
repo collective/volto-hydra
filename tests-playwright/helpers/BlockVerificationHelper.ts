@@ -38,6 +38,26 @@ export interface SubBlock {
  * never opens. Fields belonging to NESTED blocks are skipped — they are that
  * block's contract, checked when it is the subject.
  */
+/**
+ * Let the browser reach its next frame in the iframe.
+ *
+ * The bridge answers a click synchronously in the click handler, and a
+ * MutationObserver callback is delivered as a microtask — so both have run by
+ * the time a frame is painted. Waiting for that boundary is CAUSAL: it waits
+ * for the work to be possible, not for a guessed number of milliseconds. Use it
+ * before asserting that something did NOT happen, where there is no positive
+ * signal to await.
+ */
+async function nextFrame(iframe: FrameLocator): Promise<void> {
+  await iframe.locator('body').evaluate(
+    (node) =>
+      new Promise<void>((resolve) => {
+        const win = node.ownerDocument.defaultView as Window;
+        win.requestAnimationFrame(() => win.requestAnimationFrame(() => resolve()));
+      }),
+  );
+}
+
 export async function checkDataEditTextClicks(
   page: Page,
   iframe: FrameLocator,
@@ -90,7 +110,9 @@ export async function checkDataEditTextClicks(
     );
 
     await el.click();
-    await page.waitForTimeout(300);
+    // The warning below is asserted ABSENT, so give the bridge its frame to
+    // raise one — see nextFrame. (Was a 300ms sleep.)
+    await nextFrame(iframe);
 
     const warning = iframe.locator('#hydra-dev-warning');
     await expect(
