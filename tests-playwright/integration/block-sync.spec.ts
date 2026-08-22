@@ -93,10 +93,8 @@ test.describe('Block Sync - Listing Block Item Type', () => {
     const imageDefaultsFieldset = page.locator('#blockform-fieldset-inherited_fields');
     await expect(imageDefaultsFieldset).toBeVisible({ timeout: 5000 });
 
-    // Wait for Nuxt async re-rendering to settle after variation change
-    await helper.getStableBlockCount();
-
-    // Wait for teasers to disappear first (confirms variation change is taking effect)
+    // The variation change is confirmed by the teasers going away — assert
+    // that directly rather than waiting for the count to stop moving.
     await expect(teaserItems).toHaveCount(0, { timeout: 5000 });
 
     // Then wait for image blocks to appear
@@ -501,10 +499,9 @@ test.describe('Block Sync - Search Block with Listing Container', () => {
     const searchInputAfter = iframe.locator('[data-block-uid="search-block-1"] input[name="SearchableText"]');
     await expect(searchInputAfter).toHaveValue('accordion', { timeout: 10000 });
 
-    // Wait for block count to stabilize after reactive re-fetch
-    await helper.getStableBlockCount();
-
-    // Check filtered results
+    // Check filtered results — the assertion below waits for the re-fetch,
+    // which is the condition we mean (a settled count would not prove the
+    // filter had been applied).
     const filteredResults = iframe.locator('[data-block-uid="search-block-1"] .search-results [data-block-uid]');
 
     // Should have at least one result (accordion-test-page matches "accordion")

@@ -4635,23 +4635,28 @@ export class AdminUIHelper {
   }
 
   /**
-   * Wait for block count to stabilize and return it.
-   * Use this when the page may still be rendering (e.g., Nuxt async components).
-   * Returns after getting the same count on consecutive checks.
+   * Wait for the block count to stop changing, and return it.
+   *
+   * QUIESCENCE, NOT A CONDITION — and that distinction is the whole caveat.
+   * "Same count twice" cannot tell FINISHED from HASN'T STARTED: sample before
+   * an add lands and 1,1 reads as settled, so the caller proceeds too early.
+   * Whenever the expected end state is known, don't call this — assert it:
+   * `await expect(blocks).toHaveCount(n)` waits for the thing you actually mean
+   * and says what went wrong when it doesn't happen. This is for the case where
+   * no target exists (a frontend still hydrating async components).
+   *
+   * Fails rather than guesses: on timeout it throws with the counts it saw.
+   * (It used to sleep 100ms per turn and, on timeout, RETURN the last count —
+   * so a never-settling page silently handed the caller a number.)
    *
    * @param timeout - Maximum time to wait in milliseconds (default 5000)
    * @returns The stable block count
    */
   async getStableBlockCount(timeout: number = 5000): Promise<number> {
-    const startTime = Date.now();
-    let lastCount = -1;
-    let stableChecks = 0;
-    const requiredStableChecks = 2;
-
-    // Caller often triggers a navigation (e.g. search form submit) then
-    // immediately polls. evaluateAll throws "Execution context was
-    // destroyed" if the iframe navigates mid-call. Treat that as
-    // "iframe is still settling" and keep polling instead of failing.
+    // A caller often triggers a navigation (e.g. a search form submit) and then
+    // polls immediately; evaluateAll throws "Execution context was destroyed"
+    // if the iframe navigates mid-call. Treat that as "still settling" rather
+    // than an error, and keep polling.
     const safeCount = async (): Promise<number> => {
       try {
         return await this.getBlockCount();
@@ -4662,24 +4667,37 @@ export class AdminUIHelper {
       }
     };
 
-    while (Date.now() - startTime < timeout) {
-      const currentCount = await safeCount();
+    const seen: number[] = [];
+    let lastCount = -1;
+    let stableChecks = 0;
 
-      if (currentCount !== -1 && currentCount === lastCount) {
-        stableChecks++;
-        if (stableChecks >= requiredStableChecks) {
-          return currentCount;
-        }
-      } else {
-        lastCount = currentCount;
-        stableChecks = 1;
-      }
+    // expect.poll owns the interval and the failure — no sleep of our own, and
+    // a page that never settles fails loudly instead of returning a number.
+    await expect
+      .poll(
+        async () => {
+          const currentCount = await safeCount();
+          seen.push(currentCount);
+          if (currentCount !== -1 && currentCount === lastCount) {
+            stableChecks += 1;
+          } else {
+            lastCount = currentCount;
+            stableChecks = 1;
+          }
+          return stableChecks;
+        },
+        {
+          timeout,
+          message:
+            `Block count never settled within ${timeout}ms — counts seen: ` +
+            `[${seen.join(', ')}] (-1 = iframe was navigating). The page kept ` +
+            `re-rendering; if you know the count you expect, assert it with ` +
+            `toHaveCount instead of waiting for quiescence.`,
+        },
+      )
+      .toBeGreaterThanOrEqual(2);
 
-      await this.page.waitForTimeout(100);
-    }
-
-    // Return the last count if timeout reached
-    return await safeCount();
+    return lastCount;
   }
 
   /**

@@ -43,7 +43,23 @@ test.describe('Deferred SELECT_BLOCK', () => {
       });
 
     // The author's selection stands.
-    await page.waitForTimeout(500);
+    //
+    // Asserting that something did NOT happen has no positive signal to wait
+    // for, so wait for the browser to reach a frame instead of sleeping: the
+    // MutationObserver callback that would steal the selection is delivered as
+    // a microtask, so if it were going to fire it has fired by then.
+    await helper
+      .getIframe()
+      .locator('body')
+      .evaluate(
+        (node: HTMLElement) =>
+          new Promise<void>((resolve) => {
+            const win = node.ownerDocument.defaultView as Window;
+            win.requestAnimationFrame(() =>
+              win.requestAnimationFrame(() => resolve()),
+            );
+          }),
+      );
     expect(await selectedUid(helper)).toBe('mock-hero-block');
   });
 });
