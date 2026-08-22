@@ -454,68 +454,68 @@ function slateEqualIgnoringIds(a: unknown, b: unknown): boolean {
   return false;
 }
 
-/**
- * Press the editor's reveal toggle for a block, and hand back the undo.
- *
- * A missing edit annotation does NOT prove a field is uneditable. An EMPTY
- * optional field renders no element at all (issue #296 — "empty means absent"),
- * so there is simply nothing to annotate yet. The author reaches such a field
- * through the quanta toolbar's reveal toggle: it posts TOGGLE_OPTIONAL_FIELDS,
- * and the bridge seeds a shape-preserving sentinel into the projected data so
- * the renderer's own `{field && …}` rule fires and produces the element.
- *
- * This drives that same message (the bridge accepts a same-origin post), so the
- * check asks its question after the gesture an author would actually make —
- * the same reasoning as revealBlock() for a field inside a collapsed tab.
- *
- * Reveal is per BLOCK, not per field, so one press covers every empty field.
- * The undo restores the block to how it was found, because later checks read
- * the same DOM and an empty field left revealed reads as content.
- */
-async function pressRevealToggle(block: Locator): Promise<() => Promise<void>> {
-  const blockUid = await block.getAttribute('data-block-uid');
-  if (!blockUid) return async () => {};
-  const post = () =>
-    block.evaluate((el, uid) => {
-      const win = el.ownerDocument.defaultView as Window;
-      win.postMessage({ type: 'TOGGLE_OPTIONAL_FIELDS', blockUid: uid }, win.location.origin);
-    }, blockUid);
-  await post();
-  return post;
-}
+
 
 /**
- * True once `check` passes, giving the reveal's re-render time to land. Polls
- * rather than waiting a fixed interval: the re-render is a frontend callback,
- * so its duration is the frontend's business, not a number to guess at.
- */
-async function pollFor(check: () => Promise<boolean>, timeoutMs = 2000): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    if (await check()) return true;
-    if (Date.now() > deadline) return false;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-}
-
-/**
- * Second opinion on a field that showed no edit annotation: reveal the block's
- * empty optional fields and ask again, then put the block back.
+ * Every edit annotation on a block, read in ONE round trip.
  *
- * A field that stays unannotated through reveal is genuinely unreachable — the
- * renderer ignores the sentinel, or the field has real content it failed to
- * annotate (reveal can't help there: revealableFields is empty-fields-only).
+ * Asking the page per field costs a message each way per field, and a block with
+ * a dozen fields (a grid of contentBlocks) spent its whole 20s budget on that
+ * before it could assert anything. One evaluate returns the lot; the questions
+ * are then set lookups in Node.
+ *
+ * Values are normalised for the leading slash some renderers emit
+ * (`data-edit-media="/image"`).
  */
-async function editableAfterReveal(
+async function annotationsOn(
   block: Locator,
-  check: () => Promise<boolean>,
-): Promise<boolean> {
-  const undo = await pressRevealToggle(block);
-  try {
-    return await pollFor(check);
-  } finally {
-    await undo();
-  }
+): Promise<Record<string, Set<string>>> {
+  const raw = await block.evaluate((el) => {
+    const attrs = ['data-edit-text', 'data-edit-media', 'data-edit-link'];
+    const strip = (v: string | null) => (v || '').replace(/^\//, '');
+    const out: Record<string, string[]> = {};
+    for (const attr of attrs) {
+      const found: string[] = [];
+      if (el.hasAttribute(attr)) found.push(strip(el.getAttribute(attr)));
+      for (const d of Array.from(el.querySelectorAll(`[${attr}]`))) {
+        found.push(strip(d.getAttribute(attr)));
+      }
+      out[attr] = found;
+    }
+    return out;
+  });
+  return Object.fromEntries(
+    Object.entries(raw).map(([attr, values]) => [attr, new Set(values)]),
+  );
+}
+
+/**
+ * The fields this block would REVEAL — i.e. the ones that are empty and have an
+ * inline affordance, so their annotation is legitimately absent until the editor
+ * presses the reveal toggle (#296).
+ *
+ * Asked of the bridge, which computes it from the schema and the block's data —
+ * no press, no re-render, one round trip per block. Pressing the toggle for real
+ * was the first version and it does not scale: a grid re-renders the whole page
+ * on every press, and doing that per child (press + undo, twice per field) spent
+ * the test's entire budget before it could assert anything.
+ *
+ * That reveal ACTUALLY renders the field is proven once, properly, by hydra's
+ * own optional-fields spec — it doesn't need re-proving for every block in every
+ * example. What this check needs is only the reason an annotation is missing.
+ */
+async function revealableFieldsOf(block: Locator): Promise<Set<string>> {
+  const uid = await block.getAttribute('data-block-uid');
+  if (!uid) return new Set();
+  const fields = await block.evaluate((el, blockUid) => {
+    const bridge = (el.ownerDocument.defaultView as any)?.__hydraBridge;
+    try {
+      return (bridge?.revealableFields?.(blockUid) as string[]) ?? [];
+    } catch {
+      return [];
+    }
+  }, uid);
+  return new Set(fields);
 }
 
 /**
@@ -575,18 +575,22 @@ export async function checkSlateAnnotations(
 
   const blockType = (blockData?.['@type'] as string | undefined) ?? '(unknown)';
   const coverageUid = (await block.getAttribute('data-block-uid')) ?? '(no uid)';
+
+  // One read of every annotation on the block (see annotationsOn), then the
+  // per-field questions are set lookups. Anything absent may simply be an empty
+  // optional field, which renders no element until the editor reveals it
+  // (#296), so the misses go to a single reveal press below.
+  const present = await annotationsOn(block);
+  const revealable = await revealableFieldsOf(block);
+
   for (const field of slateFields) {
     // Accept either a descendant [data-edit-text="<field>"] OR the block
     // element itself carrying the attribute (renderers are free to collapse
     // the block wrapper and the edit-text container onto one element).
     const blockHasAttr = (await block.getAttribute('data-edit-text')) === field;
     const container = blockHasAttr ? block : block.locator(`[data-edit-text="${field}"]`).first();
-    const present = async () =>
-      ((await block.getAttribute('data-edit-text')) === field) ||
-      (await block.locator(`[data-edit-text="${field}"]`).count()) > 0;
-    // Absent may just mean EMPTY: an empty optional field renders no element
-    // until the editor reveals it (#296). Ask again after the reveal gesture.
-    const hasContainer = (await container.count()) > 0 || (await editableAfterReveal(block, present));
+    const hasContainer =
+      present['data-edit-text'].has(field) || revealable.has(field);
 
     // Record editability rather than failing per-instance: a slate field only
     // needs its edit container in ONE example of a block type. Some fields are
@@ -691,31 +695,19 @@ export async function checkSlateAnnotations(
         return { kind: 'link', attr: 'data-edit-link' };
       return null;
     };
+    // Same two passes as the slate loop, off the same single read: gather what
+    // is missing, then put it all to ONE reveal press.
+    const annotatedFields: Array<[string, { kind: 'text' | 'media' | 'link'; attr: string }, unknown]> = [];
     for (const [field, prop] of Object.entries(blockSchema.properties)) {
       const a = annotationFor(prop as Record<string, unknown>);
-      if (!a) continue;
-      // The annotation value may carry a leading slash (some renderers emit
-      // `data-edit-media="/image"`) — normalize before comparing to the field.
-      const annotated = () =>
-        block.evaluate(
-          (el, args) => {
-            const { attr, field } = args as { attr: string; field: string };
-            const norm = (v: string | null) => (v || '').replace(/^\//, '');
-            if (norm(el.getAttribute(attr)) === field) return true;
-            return Array.from(el.querySelectorAll(`[${attr}]`)).some(
-              (d) => norm(d.getAttribute(attr)) === field,
-            );
-          },
-          { attr: a.attr, field },
-        );
-      // Same second opinion as the slate loop: an empty media/link field has no
-      // element to annotate until the editor reveals it (#296).
-      const editable = (await annotated()) || (await editableAfterReveal(block, annotated));
+      if (a) annotatedFields.push([field, a, prop]);
+    }
+    for (const [field, a, prop] of annotatedFields) {
       recordFieldEditable(
         a.kind,
         blockType,
         field,
-        editable,
+        present[a.attr].has(field) || revealable.has(field),
         `[${coverageUid}] widget=${(prop as { widget?: string })?.widget}`,
       );
     }
