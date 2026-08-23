@@ -505,23 +505,13 @@
                                 document.getElementById('page-title').textContent = formData.title;
                             }
 
-                            // Update preview image if provided. The serialised
-                            // download path is relative to the CONTENT on the API
-                            // ("@@images/preview_image-800--….svg"), so it has to
-                            // be resolved against the API origin and the content's
-                            // own path — assigning it raw made the browser resolve
-                            // it against the FRONTEND, where it 404s.
+                            // Update preview image if provided
                             const previewImg = document.getElementById('preview-image');
-                            const previewDownload =
-                                formData.preview_image?.scales?.preview?.download
-                                || formData.preview_image?.download;
-                            if (previewDownload) {
-                                previewImg.src = /^https?:\/\//.test(previewDownload)
-                                    ? previewDownload
-                                    : new URL(
-                                        previewDownload,
-                                        `${window._apiOrigin || ''}${contentPath.replace(/\/?$/, '/')}`,
-                                      ).href;
+                            if (formData.preview_image?.scales?.preview?.download) {
+                                previewImg.src = formData.preview_image.scales.preview.download;
+                                previewImg.style.display = 'block';
+                            } else if (formData.preview_image?.download) {
+                                previewImg.src = formData.preview_image.download;
                                 previewImg.style.display = 'block';
                             } else {
                                 previewImg.style.display = 'none';

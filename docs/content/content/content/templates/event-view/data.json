@@ -1,6 +1,6 @@
 {
   "@id": "/templates/event-view",
-  "@type": "Event",
+  "@type": "Document",
   "UID": "tpl-ct-event-view",
   "id": "event-view",
   "title": "Event View",
@@ -56,10 +56,5 @@
     "description": "Layout and block templates",
     "title": "Templates",
     "type_title": "Page"
-  },
-  "start": "2023-01-01T11:00:00+00:00",
-  "end": "2023-12-31T12:00:00+00:00",
-  "location": "Musterhausener Landstrasse 134 Standort E123 67111 Musterhausen",
-  "contact_name": "Max Mustermann",
-  "contact_phone": "+49 1234 567-890"
+  }
 }
