@@ -472,6 +472,13 @@
                                 properties: {
                                     items: {
                                         title: 'Blocks',
+                                        // A page blocks field is identified by its widget — that is
+                                        // what buildBlockPathMap keys on when it walks
+                                        // formData.blocks_layout[<field>]. Declaring it here (as a
+                                        // real frontend's _page schema does) is what lets the admin
+                                        // — and the mock parent, which now merges templates the same
+                                        // way — resolve blocks in a non-default region.
+                                        widget: 'blocks_layout',
                                         allowedBlocks: ['slate', 'image', 'separator', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest', 'title', 'description', 'section', 'contextNavigation', 'codeExample', 'objectBlocks', 'convSource', 'relatedItemsListing', 'searchShortcuts', 'rssFeed'],
                                         allowedTemplates: ['/_test_data/templates/test-layout'],
                                         allowedLayouts: contextNavLayoutForced
@@ -479,6 +486,7 @@
                                     },
                                     footer: {
                                         title: 'Footer',
+                                        widget: 'blocks_layout',
                                         allowedBlocks: ['slate', 'image'],
                                         ...(forceFooterLayout ? { allowedLayouts: ['/_test_data/templates/footer-layout'] } : {}),
                                     },
