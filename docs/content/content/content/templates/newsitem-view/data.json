@@ -1,6 +1,6 @@
 {
   "@id": "/templates/newsitem-view",
-  "@type": "Document",
+  "@type": "News Item",
   "UID": "tpl-ct-newsitem-view",
   "id": "newsitem-view",
   "title": "News Item View",
@@ -66,5 +66,8 @@
     "description": "Layout and block templates",
     "title": "Templates",
     "type_title": "Page"
+  },
+  "preview_image": {
+    "@id": "/docs-images-block-selected-001"
   }
 }
