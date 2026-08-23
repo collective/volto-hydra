@@ -107,11 +107,22 @@ const test = base.extend<{ helper: AdminUIHelper }>({
 
 test.describe('Block sanity (auto-discovered)', () => {
   for (const block of discoveredBlocks) {
+    // Run each discovered case only on the frontend it came from. Discovery is
+    // per-frontend because they do not register the same blocks — one found via
+    // nextjs must not be asserted against f7, which never claimed it.
+    // Playwright collects this file once for all projects, so the cases are all
+    // generated and the foreign ones skip at run time (the idiom dnd-convert
+    // already uses for its mock-only conversion blocks).
+    const belongsHere = (name: string) =>
+      !block.frontend || block.frontend === name
+      || block.frontend === '(env)' || block.frontend === 'mock';
+
     // A block @type used in content but not registered in the frontend's
     // blocksConfig fails as its own test (it renders as "Not implemented
     // Block") rather than blocking the whole suite.
     if (block.unregistered) {
-      test(`${block.blockType} block @type is registered in the frontend`, () => {
+      test(`${block.blockType} block @type is registered in the frontend`, ({}, testInfo) => {
+        test.skip(!belongsHere(testInfo.project.name), `discovered via ${block.frontend}`);
         throw new Error(
           `Block @type "${block.blockType}" is used in content (${block.occurrenceCount} ` +
             `occurrence(s), e.g. ${block.pagePath}) but is not registered in the frontend's ` +
@@ -124,7 +135,8 @@ test.describe('Block sanity (auto-discovered)', () => {
     // A frontend-registered type with no content example — fails as its own
     // test (nothing to render) rather than blocking the suite.
     if (block.noExample) {
-      test(`${block.blockType} block has an editable content example to render`, () => {
+      test(`${block.blockType} block has an editable content example to render`, ({}, testInfo) => {
+        test.skip(!belongsHere(testInfo.project.name), `discovered via ${block.frontend}`);
         throw new Error(
           `Block @type "${block.blockType}" is registered in the frontend but no EDITABLE content ` +
             `example exists to run its render test. Add a fixture (a page with a populated ` +
@@ -141,7 +153,8 @@ test.describe('Block sanity (auto-discovered)', () => {
     // nearest ancestor that accepts the type). Fails as its own test rather
     // than blocking the suite.
     if (block.allowedBlocksViolation) {
-      test(`${block.blockType} block [${block.blockId}] is allowed in its container`, () => {
+      test(`${block.blockType} block [${block.blockId}] is allowed in its container`, ({}, testInfo) => {
+        test.skip(!belongsHere(testInfo.project.name), `discovered via ${block.frontend}`);
         throw new Error(
           `Block "${block.blockType}" [${block.blockId}] on ${block.pagePath} is placed in a ` +
             `${block.parentType} container that doesn't allow its @type ` +
@@ -190,6 +203,7 @@ test.describe('Block sanity (auto-discovered)', () => {
     const labelKind = block.kind ? ` [${block.kind}]` : '';
     const label = `${block.blockType}${labelVariation}${labelKind}`;
     test(`${label} block renders and has edit annotations`, async ({ page, helper }, testInfo) => {
+      test.skip(!belongsHere(testInfo.project.name), `discovered via ${block.frontend}`);
       const frontendUrl = process.env.FRONTEND_URL || getFrontendUrl(testInfo.project.name);
       const frontend = frontendUrl ? `&frontend=${encodeURIComponent(frontendUrl)}` : '';
 

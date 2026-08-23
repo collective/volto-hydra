@@ -17,7 +17,7 @@ import { URLS } from '../ports';
  * Map project names to frontend URLs.
  * The default (mock) uses the test frontend embedded on port 8888.
  */
-const FRONTEND_URLS: Record<string, string> = {
+export const FRONTEND_URLS: Record<string, string> = {
   nuxt: URLS.nuxt,
   react: URLS.reactDoc,
   svelte: URLS.svelteDoc,

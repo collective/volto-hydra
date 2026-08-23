@@ -35,6 +35,7 @@ coverage/
 cache/
 .discovered-blocks.json
 .discovered-empty-regions.json
+.discovered-coverage.json
 
 # Built bridge artifacts — source of truth is packages/hydra-js/hydra.src.js.
 # Consumers either bundle from source via their build tool's alias, or import

@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { chromium } from '@playwright/test';
 import { URLS } from './ports';
+import { FRONTEND_URLS } from './bridge/fixtures';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 const { discoverBlocks, buildEmptyRegionCases } = require('./helpers/discover-blocks.cjs');
@@ -47,6 +48,16 @@ async function fetchBlocksConfig(
   return { blocksConfig: {}, frontendKeys: [] };
 }
 
+/** Is a frontend actually serving in this job? */
+async function reachable(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    return res.ok || res.status === 404; // serving, even if / has no route
+  } catch {
+    return false;
+  }
+}
+
 async function globalSetup() {
   // Run block discovery if configured (before health checks — SKIP_VOLTO_CHECK
   // causes early return but discovery still needs to run for bridge tests)
@@ -78,24 +89,55 @@ async function globalSetup() {
     }
 
     console.log(`[SETUP] Discovering blocks from ${discoverApi} (${maxLabel})...`);
-    // Schemas are REQUIRED, not optional. Without them discovery is type-only:
-    // it cannot see container regions, so every nested block is invisible and
-    // the checks that depend on schemas quietly measure nothing. That mode
-    // exists for consumers pointing this at a bare API with no harness — it is
-    // not a mode CI should be in, and CI was in it only because MOCK_PARENT_URL
-    // was never passed while FRONTEND_URL beside it was.
-    if (Object.keys(blocksConfig).length === 0) {
+    // Discovery runs PER FRONTEND, not once per job.
+    //
+    // A job can run several frontends (mock + react + svelte + vue + astro;
+    // nextjs + f7) and they do not register the same blocks. Reading one
+    // registry and applying it to all of them was the compromise this replaces:
+    // it either misses a container region a frontend declares (so its nested
+    // blocks are never discovered) or attributes a block to a frontend that
+    // never claimed it. Unioning them has the same second fault. Each frontend
+    // gets its own pass, and every discovered block carries the frontend it
+    // came from so the spec can run it only there.
+    //
+    // Frontends that aren't up in this job are skipped quietly — a job runs a
+    // subset by design.
+    const targets: Array<[string, string]> = Object.entries(FRONTEND_URLS);
+    if (process.env.FRONTEND_URL) {
+      targets.unshift(['(env)', process.env.FRONTEND_URL]);
+    }
+    targets.push(['mock', URLS.testFrontend]);
+
+    const mockParent = process.env.MOCK_PARENT_URL || `${URLS.testFrontend}/mock-parent.html`;
+    const blocks: any[] = [];
+    const perFrontend: Record<string, number> = {};
+    for (const [project, url] of targets) {
+      if (!(await reachable(url))) continue;
+      const { blocksConfig: cfg, frontendKeys: keys } = await fetchBlocksConfig(
+        mockParent, url, discoverApi);
+      if (Object.keys(cfg).length === 0) {
+        console.warn(`[SETUP] ${project} (${url}) returned no schemas — skipped`);
+        continue;
+      }
+      const found = await discoverBlocks(discoverApi, maxPages, cfg, keys);
+      for (const b of found) blocks.push({ ...b, frontend: project });
+      perFrontend[project] = found.length;
+      blocksConfig = cfg;      // last one wins for the legacy single-config uses
+      frontendKeys = keys;
+    }
+    if (blocks.length === 0) {
       throw new Error(
-        '[SETUP] No block schemas. Discovery would run type-only, and every ' +
-        'schema-dependent check would pass by measuring nothing.\n' +
-        '  Set MOCK_PARENT_URL (e.g. http://localhost:8889/mock-parent.html) and ' +
-        'FRONTEND_URL so globalSetup can read the frontend INIT.\n' +
-        '  A run with several frontends has no single registry to read — give ' +
-        'each frontend its own job, or its own run.',
+        '[SETUP] No frontend yielded schemas. Discovery would be type-only, and ' +
+        'every schema-dependent check would pass by measuring nothing.\n' +
+        '  Start at least one frontend and set MOCK_PARENT_URL so globalSetup ' +
+        'can read its INIT.',
       );
     }
+    console.log(
+      `[SETUP] Discovered per frontend: ` +
+      Object.entries(perFrontend).map(([p, n]) => `${p}=${n}`).join(', '),
+    );
 
-    const blocks = await discoverBlocks(discoverApi, maxPages, blocksConfig, frontendKeys);
     const outPath = path.resolve(__dirname, '../.discovered-blocks.json');
     fs.writeFileSync(outPath, JSON.stringify(blocks, null, 2));
     console.log(`[SETUP] Wrote ${blocks.length} discovered blocks to ${outPath}`);
