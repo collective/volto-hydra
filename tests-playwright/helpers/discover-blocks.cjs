@@ -1436,6 +1436,27 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
     const discoveredTypes = new Set(
       result.filter((r) => r.blockData !== undefined).map((r) => r.blockType),
     );
+    // An object_list sub-item IS an example of its own type, even though its
+    // render test is anchored on the parent and therefore carries the parent's
+    // blockType (kind: 'sub:<type>'). Counting only `blockType` reported "no
+    // content example" for every form field type while form-test-page plainly
+    // contained a text, a textarea, a select, a single_choice, a checkbox and a
+    // from. Turning that into a failure would have asked maintainers to add
+    // fixtures that already exist.
+    // `allCovered` holds "parentType|field|subType" for every sub-type an
+    // already-selected example contains; a `sub:` filler entry is added only for
+    // the ones it does NOT cover. So covered sub-types appear in neither
+    // `result` nor as a `sub:` kind — which is why every form field type
+    // reported "no content example" while form-test-page plainly contained a
+    // text, a textarea, a select, a single_choice, a checkbox and a from.
+    // Turning that into a failure would have asked maintainers to add fixtures
+    // that already exist.
+    for (const key of allCovered) discoveredTypes.add(key.split('|')[2]);
+    for (const r of seen.values()) {
+      if (typeof r.kind === 'string' && r.kind.startsWith('sub:')) {
+        discoveredTypes.add(r.kind.slice(4));
+      }
+    }
     for (const blockType of required) {
       if (discoveredTypes.has(blockType)) continue;
       // A dynamic listing/grid item type has no stored authored instance, but a
