@@ -1060,6 +1060,7 @@ async function discoverBlocks(
   const PAGE_TYPES = new Set(['Document', 'Folder', 'Plone Site', 'News Item', 'Event']);
   const covConfig =
     coverageConfig && Object.keys(coverageConfig).length ? coverageConfig : blocksConfig;
+  const COV_REGISTERED = new Set(Object.keys(covConfig || {}));
   // Which types actually appear in content, according to the container API
   // itself. Collected from the path map rather than rebuilt from `allCovered`
   // and the `sub:` filler entries: buildBlockPathMap is what knows the
@@ -1242,15 +1243,26 @@ async function discoverBlocks(
         // this block's page even without a stored instance of its own). When it
         // isn't, flag it: every result would fall through to "Unimplemented".
         if (blockType) {
-          const itemTypeField = itemTypeFieldOf(blocksConfig[blockType]);
+          // covConfig, not blocksConfig: in a schema-less sweep the latter is
+          // empty, so no item type was ever recorded and `summary` reported "no
+          // content example" in CI while passing locally. Coverage questions
+          // get the coverage schemas — the same rule as the path map above.
+          const itemTypeField = itemTypeFieldOf(covConfig[blockType]);
           if (itemTypeField) {
             const itemType = blockData[itemTypeField];
             if (typeof itemType === 'string' && itemType && itemType !== 'default') {
-              if (REGISTERED.has(itemType)) {
+              // Recording coverage and judging validity are different questions
+              // with different inputs. COV_REGISTERED answers "is this a real
+              // type" using the coverage schemas, so a schema-less sweep still
+              // records that a listing renders `summary`. REGISTERED stays the
+              // authority for the shape ISSUE below: with an empty blocksConfig
+              // nothing is known to be registered, and reporting every item
+              // type as invalid on that basis produced 10 phantom issues.
+              if (COV_REGISTERED.has(itemType)) {
                 if (!itemTypeExamples.has(itemType)) {
                   itemTypeExamples.set(itemType, { pagePath, containerUid: blockId });
                 }
-              } else if (!PAGE_TYPES.has(itemType)) {
+              } else if (REGISTERED.size && !PAGE_TYPES.has(itemType)) {
                 shapeIssues.push({
                   pagePath,
                   blockId,
@@ -1503,6 +1515,12 @@ async function discoverBlocks(
     for (const t of typesInContent) discoveredTypes.add(t);
     for (const blockType of required) {
       if (discoveredTypes.has(blockType)) continue;
+      // `default` is a sentinel, not an item type: the item-type pass above
+      // deliberately skips the literal value ('itemType !== "default"'), so a
+      // listing naming it can never register coverage. Demanding an example for
+      // it would contradict a rule this file already states — and no fixture
+      // could satisfy it, because nothing ever carries @type "default".
+      if (blockType === 'default') continue;
       // A dynamic listing/grid item type has no stored authored instance, but a
       // stored listing/grid that VALIDLY names it renders it on a real page.
       // Emit its render test anchored on that page against the container's uid:
