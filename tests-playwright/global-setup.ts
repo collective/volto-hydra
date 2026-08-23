@@ -122,6 +122,11 @@ async function globalSetup() {
     // A skipped check and a passing check are indistinguishable in a log that
     // says nothing, so write the fact down and let block-sanity assert on it.
     const coverage = {
+      // Distinguish "could have measured and didn't" from "nothing to ask".
+      // A bridge-only job runs no example frontend, so coverage is impossible
+      // there and demanding it is noise; a job that HAS a frontend and still
+      // got no keys is misconfigured, and that must fail.
+      possible: Boolean(process.env.FRONTEND_URL),
       measured: frontendKeys.length > 0,
       frontendKeys: frontendKeys.length,
       discoveredTypes: new Set(

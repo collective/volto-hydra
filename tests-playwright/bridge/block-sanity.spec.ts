@@ -339,19 +339,25 @@ test.describe('Block sanity (auto-discovered)', () => {
     const covPath = path.resolve(__dirname, '../../.discovered-coverage.json');
     const cov = fs.existsSync(covPath)
       ? JSON.parse(fs.readFileSync(covPath, 'utf-8'))
-      : { measured: false, frontendKeys: 0 };
+      : { measured: false, possible: Boolean(process.env.FRONTEND_URL), frontendKeys: 0 };
 
-    if (process.env.BLOCK_SANITY_NO_EXAMPLE_COVERAGE === '1') {
+    if (process.env.BLOCK_SANITY_NO_EXAMPLE_COVERAGE === '1' || cov.possible === false) {
+      // No example frontend in this job (bridge-only sweep), or the skip was
+      // declared deliberately. Either way the fact is recorded rather than
+      // implied by a green tick.
       test.info().annotations.push({
         type: 'coverage',
-        description: 'example coverage deliberately not measured (schema-less sweep)',
+        description: cov.possible === false
+          ? 'example coverage impossible: no frontend (FRONTEND_URL unset)'
+          : 'example coverage deliberately not measured',
       });
       return;
     }
 
     expect(
       cov.measured,
-      'Example coverage was NOT measured: discovery received 0 frontend schemas, so ' +
+      'Example coverage was NOT measured even though a frontend was available: discovery ' +
+        'received 0 schemas from it, so ' +
         '"registered block type has no content example" was never checked. Set ' +
         'MOCK_PARENT_URL + FRONTEND_URL so globalSetup can fetch the frontend INIT, ' +
         'or set BLOCK_SANITY_NO_EXAMPLE_COVERAGE=1 to say the skip is intended.',
