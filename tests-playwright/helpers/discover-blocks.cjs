@@ -283,6 +283,18 @@ function isOwnDefinition(content, templateId) {
 function editableInstance(content, blockData) {
   const templateId = blockData?.templateId;
   const onOwnDefinition = isOwnDefinition(content, templateId);
+  // Template CHROME (`fixed` or `readOnly`) as opposed to slot CONTENT (neither,
+  // and the author's own). A `fixed` member is re-inserted from the template on
+  // every render — "copy block content from a page block with the same slotId" —
+  // so the copy on an ordinary page gets a freshly minted uid each load and
+  // cannot be addressed by the id discovery read from stored content. The
+  // definition is where it is authored and where its id is stable.
+  //
+  // `fixed` alone is NOT chrome: a contentLayout is fixed with no templateId,
+  // position-locked rather than template-owned, and is edited in place.
+  if (templateId && blockData?.fixed === true && !onOwnDefinition) {
+    return null;
+  }
   if (blockData?.readOnly === true) {
     // Unlock by the instance id the block ALREADY carries — definitions often
     // store their own (`tpl-block-ref-def`, `editable-fixed-def-instance`), and
