@@ -617,8 +617,14 @@
           // fields and any layouts forced on them — the same input the admin
           // passes as pageBlocksFields. A frontend that sends none has nothing to
           // merge, so its page data is used exactly as fetched.
-          const pageBlocksFields = message.page?.schema?.properties;
-          if (pageBlocksFields) {
+          // The frontend's page schema when it sends one, otherwise the mock
+          // parent's own `_page` — the same default buildBlockPathMap already
+          // uses, so a frontend that declares no page schema still gets its
+          // `items` region merged (the admin reads its registered _page for
+          // exactly this reason).
+          const pageBlocksFields =
+            message.page?.schema?.properties || mockBlocksConfig._page.schema().properties;
+          if (message.page?.schema?.properties) {
             // Adopt the frontend's page schema, exactly as the admin does: it is
             // what tells buildBlockPathMap which regions exist (a property with
             // widget 'blocks_layout' maps to formData.blocks_layout[<name>]), so
@@ -633,18 +639,22 @@
               properties[field] = { ...baseline[field], ...def };
             }
             mockBlocksConfig._page = { schema: () => ({ properties }) };
-
-            const { merged } = await mergeTemplatesIntoPage(mockFormData, {
-              loadTemplate,
-              preloadedTemplates: templateCache,
-              pageBlocksFields,
-              idFieldMap: buildIdFieldMap(mockBlocksConfig),
-              // Same as the admin's INITIAL_DATA merge: this document is being
-              // opened to edit, so it is never merged against its own template.
-              skipOwnTemplate: true,
-            });
-            mockFormData = merged;
           }
+
+          // Merge UNCONDITIONALLY, exactly as View.jsx does ("Always call
+          // mergeTemplatesIntoPage — it handles all cases"). It is a no-op for a
+          // page with no templates, and gating it on the frontend sending a page
+          // schema would leave such a frontend's template definitions unstamped.
+          const { merged } = await mergeTemplatesIntoPage(mockFormData, {
+            loadTemplate,
+            preloadedTemplates: templateCache,
+            pageBlocksFields,
+            idFieldMap: buildIdFieldMap(mockBlocksConfig),
+            // Same as the admin's INITIAL_DATA merge: this document is being
+            // opened to edit, so it is never merged against its own template.
+            skipOwnTemplate: true,
+          });
+          mockFormData = merged;
 
           const blockPathMap = buildBlockPathMap(mockFormData, mockBlocksConfig);
 

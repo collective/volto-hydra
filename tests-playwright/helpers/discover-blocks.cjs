@@ -284,7 +284,14 @@ function editableInstance(content, blockData) {
   const templateId = blockData?.templateId;
   const onOwnDefinition = isOwnDefinition(content, templateId);
   if (blockData?.readOnly === true) {
-    return onOwnDefinition ? { unlockTemplateId: templateId } : null;
+    // Unlock by the instance id the block ALREADY carries — definitions often
+    // store their own (`tpl-block-ref-def`, `editable-fixed-def-instance`), and
+    // the merge only mints `templateInstanceId = templateId` for those that
+    // don't. Sending the templateId regardless unlocked an instance nobody was
+    // in, and every such block reported "stayed locked".
+    return onOwnDefinition
+      ? { unlockTemplateId: blockData.templateInstanceId || templateId }
+      : null;
   }
   return { unlockTemplateId: null };
 }
