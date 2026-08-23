@@ -820,6 +820,12 @@ export const sharedBlocksConfig = {
     // for teasers via inheritSchemaFrom.parentControlled.teaser.
     teaser: {
         id: 'teaser',
+        // A listing renders each result as this type, so it must declare how a
+        // result's fields land on it — that mapping is also what makes it
+        // selectable in the Item Type widget (filterConvertibleFrom: '@default').
+        fieldMappings: {
+            '@default': { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'preview_image' },
+        },
         title: 'Teaser',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>',
         group: 'common',
@@ -840,7 +846,7 @@ export const sharedBlocksConfig = {
                 description: { title: 'Description', widget: 'textarea' },
                 preview_image: { title: 'Image override', widget: 'object_browser', mode: 'image', allowExternals: true },
             },
-            required: ['href'],
+            required: [],
         },
         // The teaser's RULE, not a snapshot of one side of it. A teaser MIRRORS
         // its target by default — title/description/image belong to the page it
@@ -905,7 +911,7 @@ export const sharedBlocksConfig = {
                 },
                 openLinkInNewTab: { title: 'Open in a new tab', type: 'boolean' },
             },
-            required: ['url'],
+            required: [],
         },
         schemaEnhancer: {
             fieldRules: {
@@ -1308,6 +1314,83 @@ export const sharedBlocksConfig = {
             },
         },
     },
+    // Page-metadata and content-type blocks. These RENDER in every example
+    // frontend (block.vue branches for each) but were never declared, so
+    // discovery reported them as "used in content but not registered — it
+    // renders as Not implemented Block", which was wrong: they render fine.
+    //
+    // Their editable content is the PAGE's fields, not the block's — the
+    // annotations are page-field paths (/title, /description, /start) — so the
+    // block schemas are legitimately empty. `restricted` keeps them out of the
+    // page block chooser, which is where they would make no sense: a page has
+    // one title.
+    title: {
+      id: 'title',
+      title: 'Title',
+      group: 'text',
+      restricted: true,
+      blockSchema: { fieldsets: [], properties: {}, required: [] },
+    },
+    description: {
+      id: 'description',
+      title: 'Description',
+      group: 'text',
+      restricted: true,
+      blockSchema: { fieldsets: [], properties: {}, required: [] },
+    },
+    leadimage: {
+      id: 'leadimage',
+      title: 'Lead image',
+      group: 'media',
+      restricted: true,
+      blockSchema: { fieldsets: [], properties: {}, required: [] },
+    },
+    // Which page date field to show — the block's own setting.
+    dateField: {
+      id: 'dateField',
+      title: 'Date',
+      group: 'text',
+      restricted: true,
+      blockSchema: {
+        fieldsets: [{ id: 'default', title: 'Default', fields: ['dateField'] }],
+        properties: {
+          dateField: {
+            title: 'Field',
+            type: 'string',
+            factory: 'Choice',
+            choices: [['effective', 'Published'], ['created', 'Created'], ['modified', 'Modified']],
+          },
+        },
+        required: [],
+      },
+    },
+    eventMetadata: {
+      id: 'eventMetadata',
+      title: 'Event metadata',
+      group: 'text',
+      restricted: true,
+      blockSchema: { fieldsets: [], properties: {}, required: [] },
+    },
+    socialLinks: {
+      id: 'socialLinks',
+      title: 'Social links',
+      group: 'common',
+      blockSchema: {
+        fieldsets: [{ id: 'default', title: 'Default', fields: ['url'] }],
+        properties: { url: { title: 'Link', widget: 'object_browser', mode: 'link', allowExternals: true } },
+        required: [],
+      },
+    },
+    // The placeholder a container seeds into an empty region. Registered so it
+    // is not reported as unimplemented; it has nothing to edit.
+    empty: {
+      id: 'empty',
+      title: 'Empty',
+      group: 'common',
+      restricted: true,
+      blockSchema: { fieldsets: [], properties: {}, required: [] },
+    },
+
     // Highlight block: banner with title, slate description, image, CTA
     highlight: {
         id: 'highlight',
@@ -1344,8 +1427,8 @@ export const sharedBlocksConfig = {
     // Edge direction: `X.fieldMappings[Y]` = "X can be built FROM Y" (Y → X).
     convSource: {
         id: 'convSource',
-        restricted: true,
         title: 'Conv Source',
+        restricted: true,
         group: 'common',
         fieldMappings: {}, // present (truthy) so it's a valid conversion source
         blockSchema: {
@@ -1382,8 +1465,8 @@ export const sharedBlocksConfig = {
     // restricted container that doesn't list it rejects it outright.
     convAlien: {
         id: 'convAlien',
-        restricted: true,
         title: 'Conv Alien',
+        restricted: true,
         group: 'common',
         blockSchema: {
             fieldsets: [{ id: 'default', title: 'Default', fields: ['title'] }],
@@ -1395,8 +1478,8 @@ export const sharedBlocksConfig = {
     // convGroupDst, carrying its children. Exercises convertContainerBlock on drop.
     convGroupSrc: {
         id: 'convGroupSrc',
-        restricted: true,
         title: 'Conv Group Src',
+        restricted: true,
         group: 'common',
         fieldMappings: {}, // valid conversion source
         blockSchema: {
@@ -1424,8 +1507,8 @@ export const sharedBlocksConfig = {
     // Restricted to convGroupDst → a dropped convGroupSrc auto-converts to it.
     convGroupBox: {
         id: 'convGroupBox',
-        restricted: true,
         title: 'Conv Group Box',
+        restricted: true,
         group: 'common',
         blockSchema: {
             fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
@@ -1438,8 +1521,8 @@ export const sharedBlocksConfig = {
     // Container restricted to a SINGLE convert-target → convSource drops auto-convert.
     convBox: {
         id: 'convBox',
-        restricted: true,
         title: 'Convert Box',
+        restricted: true,
         group: 'common',
         blockSchema: {
             fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
@@ -1452,8 +1535,8 @@ export const sharedBlocksConfig = {
     // Container restricted to TWO convert-targets → convSource drop opens the chooser.
     convBoxMulti: {
         id: 'convBoxMulti',
-        restricted: true,
         title: 'Convert Box (multi)',
+        restricted: true,
         group: 'common',
         blockSchema: {
             fieldsets: [{ id: 'default', title: 'Default', fields: [] }],

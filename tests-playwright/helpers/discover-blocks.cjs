@@ -420,7 +420,7 @@ function validateSlateNode(node, pathStr, issues) {
  *
  * Schema-independent; runs against raw API data.
  */
-function collectSlateIssues(blockData, pagePath, blockId, out, blockType) {
+function collectSlateIssues(blockData, pagePath, blockId, out, blockType, inTableCell = false) {
   if (!blockData || typeof blockData !== 'object') return;
   for (const [key, value] of Object.entries(blockData)) {
     if (key.startsWith('@') || key === 'blocks' || key === 'blocks_layout') continue;
@@ -432,7 +432,7 @@ function collectSlateIssues(blockData, pagePath, blockId, out, blockType) {
     if (!looksSlate) continue;
 
     const issues = [];
-    if (value.length > 1) {
+    if (value.length > 1 && !inTableCell) {
       // Advice differs by where the field lives, but both are invalid stored data.
       const advice =
         blockType === 'slate'
@@ -973,12 +973,32 @@ const CONTAINMENT_EXEMPT_TYPES = new Set(['empty', 'column', 'title', 'descripti
  * template knows which slot means "an example lives here", so hydra takes it as
  * configuration instead of guessing.
  */
+// Pages that are test APPARATUS, not authored content. Their placements are
+// not a project's choice to get wrong, so the containment check does not apply.
+//
+// dnd-convert-page is the whole synthetic conversion graph: convSource and the
+// conv containers sit at page level because a drag source has to exist
+// somewhere to be dragged FROM, and they are `restricted` because you should
+// never be offered "convAlien" in a real block chooser. Both are correct, and
+// together they read as a containment violation — the page's allowed set is the
+// non-restricted types. Un-restricting them to satisfy this check breaks 28
+// tests: the option-counting those specs assert on ("one option -> auto-convert,
+// two -> chooser") flows from that same flag.
+const APPARATUS_PAGES = new Set(['/_test_data/dnd-convert-page']);
+
 function readContainmentRules(env = process.env) {
   return {
     slots: (env.CONTAINMENT_EXEMPT_SLOTS || '')
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),
+    pages: [
+      ...APPARATUS_PAGES,
+      ...(env.CONTAINMENT_EXEMPT_PAGES || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ],
   };
 }
 
@@ -987,9 +1007,11 @@ function readContainmentRules(env = process.env) {
  *
  * Exempt when: it is structural, template-placed or position-fixed; its
  * container declares no allowed set, or declares one that includes the type;
- * or it sits in a slot the project nominated (see readContainmentRules).
+ * or it sits in a slot, or on an apparatus page, the project nominated
+ * (see readContainmentRules).
  */
-function isContainmentExempt(entry, blockData, rules = { slots: [] }) {
+function isContainmentExempt(entry, blockData, rules = { slots: [] }, pagePath = null) {
+  if (pagePath && (rules.pages || []).includes(pagePath)) return true;
   if (entry.isTemplateInstance || entry.isFixed) return true;
   if (CONTAINMENT_EXEMPT_TYPES.has(entry.blockType)) return true;
   if (!Array.isArray(entry.allowedSiblingTypes) || entry.allowedSiblingTypes.length === 0) {
@@ -1136,7 +1158,7 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         // placed in a container that doesn't allow its @type.
         if (
           entry.blockType &&
-          !isContainmentExempt(entry, blockData, containmentRules)
+          !isContainmentExempt(entry, blockData, containmentRules, pagePath)
         ) {
           allowedBlocksViolations.push({
             blockType: entry.blockType,
@@ -1147,7 +1169,16 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
           });
         }
 
-        collectSlateIssues(blockData, pagePath, blockId, slateIssues, blockType);
+        // A slateTable cell is addressable, so it arrives here as its own
+        // entry. Its path runs through `cells`, which is the signal: the editor
+        // FLATTENS a multi-node cell value on load rather than splitting it
+        // (container-blocks.spec: splitting corrupts the row and loops until
+        // "Maximum update depth exceeded"), and table-multinode-page holds a
+        // [h2, p] cell precisely to keep that behaviour honest.
+        collectSlateIssues(
+          blockData, pagePath, blockId, slateIssues, blockType,
+          Array.isArray(entry.path) && entry.path.includes('cells'),
+        );
         // Effective (dynamic) required set from Hydra's REAL resolver — fieldRules
         // + hideParentOwnedFields applied, so a conditionally-hidden field (a
         // card's `image` when its grid disables the image element) is correctly

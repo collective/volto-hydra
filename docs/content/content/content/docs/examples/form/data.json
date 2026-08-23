@@ -52,7 +52,10 @@
           "required": false
         }
       ],
-      "title": "A simple form"
+      "title": "A simple form",
+      "default_to": "admin@example.com",
+      "default_subject": "New form submission",
+      "captcha": "honeypot"
     },
     "eb25b89c-d64a-4566-8e6e-71fd0f371964": {
       "@type": "slate",

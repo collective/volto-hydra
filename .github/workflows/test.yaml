@@ -152,6 +152,14 @@ jobs:
           NO_WEBSERVER: true
           SKIP_VOLTO_CHECK: true
           DISCOVER_BLOCKS_API: http://localhost:8888
+          # Discovery needs a frontend: without one it is type-only, container
+          # regions are invisible, and the schema-dependent checks measure less
+          # than they appear to. This job runs several frontends and discovery
+          # runs once, so it nominates its primary — the vite test-frontend,
+          # which carries the shared registry the fixtures are written against.
+          # Per-frontend discovery would remove the need to choose.
+          FRONTEND_URL: http://localhost:8889
+          MOCK_PARENT_URL: http://localhost:8889/mock-parent.html
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v4
@@ -584,6 +592,10 @@ jobs:
           # nextjs project is inside block-sanity's own scope, so it had simply
           # stopped being checked while the job reported green.
           DISCOVER_BLOCKS_API: http://localhost:8888
+          # See the bridge-unit job: discovery needs a frontend. This job runs
+          # two, and nominates nextjs.
+          FRONTEND_URL: http://localhost:3007
+          MOCK_PARENT_URL: http://localhost:8889/mock-parent.html
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v4
