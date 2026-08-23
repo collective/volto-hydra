@@ -12,6 +12,30 @@ const docBlocksConfig = Object.fromEntries(
   Object.values(docPageDefinitions).flatMap((page) => Object.entries(page.blocks)),
 );
 
+// socialLinks renders one <a data-block-uid> per entry in `links`, but the doc
+// bundle never declared the block, so buildBlockPathMap had no schema to descend
+// into: the links appeared on screen and were absent from the pathMap, i.e. they
+// could not be selected, edited, moved or navigated. Declared here (rather than
+// in block-definitions.json) because that file also drives the generated block
+// reference pages, and this is a gap in THIS example's config.
+docBlocksConfig.socialLinks = {
+  ...docBlocksConfig.socialLinks,
+  blockSchema: {
+    properties: {
+      links: {
+        title: 'Links',
+        widget: 'object_list',
+        idField: '@id',
+        schema: {
+          properties: {
+            url: { title: 'URL', widget: 'url' },
+          },
+        },
+      },
+    },
+  },
+};
+
 export default function PageClient({ initialData, apiUrl }) {
   const [data, setData] = useState(initialData);
   // The blocks below use this as the CONTENT path they belong to (a listing
