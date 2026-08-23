@@ -366,9 +366,13 @@
   <!-- Highlight -->
   <section v-else-if="block['@type'] == 'highlight'" :data-block-uid="block_uid" class="highlight-block"
            :style="{ position: 'relative', overflow: 'hidden', borderRadius: '8px', padding: '0' }">
-    <div v-if="imageProps(block.image).url"
+    <!-- data-edit-media on BOTH branches, matching hydra-nextjs: the backdrop is
+         the only element this image ever produces, and it has to be pickable
+         when EMPTY (that is how an author sets one) as well as when filled. -->
+    <div v-if="imageProps(block.image).url" data-edit-media="image"
          :style="{ position: 'absolute', inset: '0', backgroundSize: 'cover', backgroundPosition: 'center', backgroundImage: `url(${imageProps(block.image).url})` }" />
-    <div v-else :style="{ position: 'absolute', inset: '0', background: highlightGradient(block.styles?.descriptionColor) }" />
+    <div v-else data-edit-media="image"
+         :style="{ position: 'absolute', inset: '0', background: highlightGradient(block.styles?.descriptionColor) }" />
     <div :style="{ position: 'absolute', inset: '0', background: 'rgba(0,0,0,0.5)' }" />
     <div :style="{ position: 'relative', zIndex: '1', padding: '4rem 2rem', textAlign: 'center', color: 'white' }">
       <h2 data-edit-text="title" style="margin-bottom:1rem; font-size:2rem; font-weight:800;">{{ block.title }}</h2>
