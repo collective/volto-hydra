@@ -243,8 +243,17 @@ function variationOf(blockData) {
  *
  * Two kinds are excluded:
  *   - anything on a /templates/* page (the definitions themselves)
- *   - any block flagged readOnly/fixed (a locked member of a template instance
+ *   - any block flagged readOnly (a locked member of a template instance
  *     stamped onto an ordinary page)
+ *
+ * `fixed` is NOT one of them. Fixed means position-locked — the bridge uses
+ * isFixed to keep a block out of drag and edge-drag candidates — and that is a
+ * different thing from uneditable, which is what isBlockReadonly answers. A
+ * contentLayout is the clearest case: the page has exactly one and you switch
+ * which layout rather than dragging it about, yet its own fields are edited in
+ * the sidebar and its regions hold ordinary authored content. Excluding fixed
+ * blocks reported "contentLayout has no editable content example" about a block
+ * that is edited on every page that has one.
  *
  * Everything else — a doc page's examples, its narrative, a dev fixture — is a
  * fair subject. WHICH of them is picked stays the richness choice below; this
@@ -256,7 +265,7 @@ function variationOf(blockData) {
  */
 function isEditableInstance(pagePath, blockData) {
   if (pagePath.startsWith('/templates/')) return false;
-  return blockData?.readOnly !== true && blockData?.fixed !== true;
+  return blockData?.readOnly !== true;
 }
 
 /**
