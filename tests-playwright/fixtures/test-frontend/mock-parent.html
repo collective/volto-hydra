@@ -639,6 +639,9 @@
               preloadedTemplates: templateCache,
               pageBlocksFields,
               idFieldMap: buildIdFieldMap(mockBlocksConfig),
+              // Same as the admin's INITIAL_DATA merge: this document is being
+              // opened to edit, so it is never merged against its own template.
+              skipOwnTemplate: true,
             });
             mockFormData = merged;
           }

@@ -18,6 +18,13 @@ import { expandTemplates } from '@volto-hydra/helpers';
  * @param {Object} options.pageBlocksFields - Map of field names to field config (e.g. { blocks_layout: { allowedLayouts: [...] } })
  * @param {Function} options.uuidGenerator - UUID generator function (required)
  * @param {string} options.filterInstanceId - Only process blocks matching this instance ID
+ * @param {boolean} options.skipOwnTemplate - Set when preparing a document to be
+ *   EDITED (the INITIAL_DATA path): don't merge it against its own template. Off
+ *   by default because the reverse direction — capturing a page's edits back into
+ *   a template — is deliberately a document merged against itself, and the two are
+ *   structurally identical (same shapes, same self-reference). Only the caller
+ *   knows which way the content is meant to flow, and the editing path is the one
+ *   that has to say so.
  * @param {Object} options.preloadedTemplates - Pre-loaded template cache
  * @returns {Promise<{merged: Object, newTemplateIds: string[]}>}
  */
@@ -91,6 +98,7 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
     pageBlocksFields = { items: {} },
     uuidGenerator,
     filterInstanceId,
+    skipOwnTemplate = false,
     preloadedTemplates = {},
     firstInsert,
     idFieldMap,
@@ -140,12 +148,12 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
     ? pageBlocksFields
     : { items: {} }; // Default to the main 'items' blocks field
 
-  // The self-merge guard applies to the FORWARD (display) merge only. The reverse
-  // merge — the one call that passes filterInstanceId (View.jsx's commit path,
-  // `loadTemplate: async () => formData`) — deliberately merges a template
-  // document against itself to capture a page's edits back into the template.
-  // Guarding that one would silently drop every "Change on all pages" edit.
-  const isOwnTemplate = filterInstanceId ? () => false : ownTemplateMatcher(page);
+  // Only the caller preparing a document for EDITING asks for this. Merging a
+  // page's edits back INTO its template is deliberately a document merged against
+  // its own template (`loadTemplate: async () => formData`), and it is the far
+  // more common call, so guarding by default drops every "Change on all pages"
+  // edit and every capture the unit tests cover. Opt in, don't opt out.
+  const isOwnTemplate = skipOwnTemplate ? ownTemplateMatcher(page) : () => false;
 
   for (const [fieldName, fieldDef] of Object.entries(fieldsToProcess)) {
     const blocksData = result.blocks || {};

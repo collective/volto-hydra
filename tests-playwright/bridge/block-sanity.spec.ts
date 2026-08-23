@@ -51,7 +51,6 @@ interface DiscoveredBlock {
   // Set by discovery for a locked block found on its own template document:
   // the template instance the spec unlocks before checking editability.
   unlockTemplateId?: string | null;
-  fromTemplate?: boolean;
   allowedBlocksViolation?: boolean;
   parentType?: string;
   allowed?: string[];

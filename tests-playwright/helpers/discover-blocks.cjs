@@ -267,13 +267,14 @@ function isOwnDefinition(content, templateId) {
  * which layout rather than dragging it about, yet its own fields are edited in
  * the sidebar and its regions hold ordinary authored content.
  *
- * Definition pages used to be excluded outright, because ranking candidates by
- * richness alone picked `alert0` in /templates/site-announcement for globalAlert
- * — the locked original every page inherits — over a doc page's real example.
- * That is a RANKING problem, and it is fixed by ranking (see the preference in
- * the selection loop): excluding them also hid every block whose only home is a
- * template, which is how `footer` came to report "no editable content example"
- * while being the most-edited chrome on the site.
+ * Definition pages used to be excluded outright, because ranking by richness
+ * picked `alert0` in /templates/site-announcement for globalAlert — and back
+ * then a definition could not be edited at all, so the subject was doomed:
+ * "locked by design". Definitions unlock now, so a definition is as good a
+ * subject as any other instance and richness alone decides. The exclusion also
+ * hid every block whose only home is a template, which is how `footer` came to
+ * report "no editable content example" while being the most-edited chrome on
+ * the site.
  *
  * @param {Object} content - The page JSON the block was found in
  * @param {Object} blockData - The block's stored data
@@ -1208,23 +1209,11 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         const editable = editableInstance(content, blockData);
         if (!editable) continue;
 
-        // A definition page is a valid subject but the LAST resort: its blocks
-        // are the locked originals every page inherits, so wherever a page has
-        // authored its own instance, that is the truer example. Preference, not
-        // exclusion — a block whose only home is a template (site chrome such as
-        // footer) still gets tested, on its definition, with an unlock.
-        const fromTemplate = pagePath.startsWith('/templates/');
-
         for (const kind of ['rich', 'simple']) {
           const key = `${blockType}:${variation}:${kind}`;
           const existing = seen.get(key);
-          const scoreBetter = kind === 'rich' ? score > (existing?._score ?? -Infinity)
-                                              : score < (existing?._score ?? Infinity);
-          // An authored instance beats a definition whatever the scores say;
-          // between two of the same kind, richness decides as before.
-          const better = existing && existing.fromTemplate !== fromTemplate
-            ? existing.fromTemplate
-            : scoreBetter;
+          const better = kind === 'rich' ? score > (existing?._score ?? -Infinity)
+                                         : score < (existing?._score ?? Infinity);
           if (existing && !better) continue;
           if (existing) {
             console.log(`[DISCOVER] Replaced ${label} (${kind}) with ${kind === 'rich' ? 'richer' : 'simpler'} example from ${pagePath} (score ${existing._score} → ${score})`);
@@ -1239,7 +1228,6 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
             pagePath,
             blockData,
             isListing: blockType === 'listing',
-            fromTemplate,
             // Set only for a locked block on its own definition page: the spec
             // unlocks this template instance before checking editability.
             unlockTemplateId: editable.unlockTemplateId,

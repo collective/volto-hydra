@@ -3945,6 +3945,11 @@ const Iframe = (props) => {
             pageBlocksFields,
             uuidGenerator: uuid,
             idFieldMap,
+            // This document is being opened to edit: never merge it against its
+            // own template, or a template forced into a region other than the one
+            // its definition blocks live in loses them and its own page comes up
+            // an empty shell.
+            skipOwnTemplate: true,
           });
           let blockPathMap = buildBlockPathMap(mergedFormData, config.blocks.blocksConfig, intl);
 
