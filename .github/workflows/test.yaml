@@ -353,6 +353,13 @@ jobs:
           SKIP_VOLTO_CHECK: true
           DISCOVER_BLOCKS_API: http://localhost:8888
           FRONTEND_URL: http://localhost:3003
+          # Discovery reads the frontend's INIT through mock-parent. Without it
+          # discovery is type-only: no container regions, so nested blocks are
+          # invisible and every schema-dependent check passes by measuring
+          # nothing. The server has always been up in this job (8889, waited on
+          # above) — the variable was simply never passed, while FRONTEND_URL
+          # beside it was. globalSetup now fails rather than run type-only.
+          MOCK_PARENT_URL: http://localhost:8889/mock-parent.html
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v4

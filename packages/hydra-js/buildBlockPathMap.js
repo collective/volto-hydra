@@ -83,19 +83,8 @@ export function addableSiblingTypes(
   return types;
 }
 
-// Cache for getBlockTypeSchema — keyed by the REGISTRY, then by blockType.
-//
-// Keying by blockType alone made the cache leak across registries: whichever
-// blocksConfig asked first decided the answer for every later caller. One
-// process holds one registry in the app, so this never showed up there — but a
-// tool that builds a path map with real schemas and then another with an empty
-// config got the real schemas back for the empty one, and duly reported
-// "listing.variation is not an allowed value" 24 times against a config that
-// declares no such field. Found while making block-sanity's coverage read the
-// container API instead of re-deriving it.
-//
-// WeakMap so a discarded registry doesn't pin its schemas in memory.
-const _typeSchemaCacheByConfig = new WeakMap();
+// Cache for getBlockTypeSchema — keyed by blockType
+const _typeSchemaCache = new Map();
 
 /**
  * Get the default schema for a block type (with empty formData).
@@ -112,11 +101,6 @@ export function getBlockTypeSchema(blockType, intl, blocksConfig) {
   if (!blockType) return null;
   if (!blocksConfig) throw new Error('getBlockTypeSchema requires blocksConfig');
 
-  let _typeSchemaCache = _typeSchemaCacheByConfig.get(blocksConfig);
-  if (!_typeSchemaCache) {
-    _typeSchemaCache = new Map();
-    _typeSchemaCacheByConfig.set(blocksConfig, _typeSchemaCache);
-  }
   const cached = _typeSchemaCache.get(blockType);
   if (cached) return cached;
 

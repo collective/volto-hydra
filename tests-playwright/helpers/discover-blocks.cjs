@@ -1000,20 +1000,7 @@ function isContainmentExempt(entry, blockData, rules = { slots: [] }) {
   return !!slotId && (rules.slots || []).includes(slotId);
 }
 
-async function discoverBlocks(
-  apiUrl,
-  maxPages = Infinity,
-  blocksConfig = {},
-  frontendKeys = [],
-  // Schemas used ONLY to work out coverage — which fields are object_lists and
-  // what each container allows. A schema-less CI sweep deliberately passes an
-  // empty blocksConfig to keep the strict shape/slate checks off, but coverage
-  // still has to know that a form's `subblocks` holds typed sub-items;
-  // otherwise every sub-type reports "no content example" while an example sits
-  // right there in the fixture. Defaults to blocksConfig, so schema-ful callers
-  // are unaffected.
-  coverageConfig = null,
-) {
+async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, frontendKeys = []) {
   // Use hydra's canonical buildBlockPathMap to walk content — it knows
   // the schema-defined container fields (blocks_layout, object_list,
   // columns, …) and distinguishes real blocks from inline sub-items.
@@ -1058,19 +1045,10 @@ async function discoverBlocks(
   // Plone content types appear as @type on the page root (Document, etc.)
   // — skip these, they're not blocks.
   const PAGE_TYPES = new Set(['Document', 'Folder', 'Plone Site', 'News Item', 'Event']);
-  const covConfig =
-    coverageConfig && Object.keys(coverageConfig).length ? coverageConfig : blocksConfig;
-  const COV_REGISTERED = new Set(Object.keys(covConfig || {}));
-  // Which types actually appear in content, according to the container API
-  // itself. Collected from the path map rather than rebuilt from `allCovered`
-  // and the `sub:` filler entries: buildBlockPathMap is what knows the
-  // schema-defined container fields and resolves an object_list item's real
-  // type from its typeField, so asking it is both shorter and the single
-  // source of truth. Re-deriving that is how the earlier version managed to
-  // report "no content example" for a form field type sitting in the fixture.
-  const typesInContent = new Set();
-  const objectListFields = buildObjectListFieldsMap(covConfig);
-  const allowedBlocksList = buildAllowedBlocksList(covConfig);
+
+
+  const objectListFields = buildObjectListFieldsMap(blocksConfig);
+  const allowedBlocksList = buildAllowedBlocksList(blocksConfig);
 
   if (objectListFields.size > 0) {
     console.log(`[DISCOVER] Using schemas for ${objectListFields.size} block types with object_list fields`);
@@ -1128,36 +1106,6 @@ async function discoverBlocks(
       // object_list sub-item) has a real path + resolved schema via
       // `_schemaRef`. No synthetic `parentType:field` types.
       const pathMap = buildBlockPathMap(content, blocksConfig);
-
-      // Coverage view of the same page. In a schema-less sweep blocksConfig is
-      // empty, so the map above cannot see object_list fields at all — and
-      // every typed sub-item would look absent from content. Built only when
-      // the two configs differ, so schema-ful callers pay nothing.
-      //
-      // On a CLONE, deliberately: buildBlockPathMap normalizes as it walks, so
-      // running it a second time over the same object left the main walk seeing
-      // typed items it had not seen before — 48 shape/slate issues appeared out
-      // of nowhere in a schema-less run that had reported none.
-      const covMap =
-        covConfig === blocksConfig
-          ? pathMap
-          : buildBlockPathMap(JSON.parse(JSON.stringify(content)), covConfig);
-      for (const [id, e] of Object.entries(covMap)) {
-        if (id === '_schemas' || id === '_page' || !e || !Array.isArray(e.path)) continue;
-        // An untyped object_list item has a virtual type (`parent:field`) and is
-        // not a registrable block; only typed items count as their own type.
-        if (e.isObjectListItem && !e.typeField) continue;
-        if (!e.blockType) continue;
-        // Same bar as the render tests: a locked instance is not an editable
-        // example. Counting one would let a type whose only appearance is a
-        // readOnly template member look covered — the opposite of what this
-        // check is for.
-        let d = content;
-        for (const seg of e.path) d = d?.[seg];
-        if (!d || typeof d !== 'object') continue;
-        if (!isEditableInstance(pagePath, d)) continue;
-        typesInContent.add(e.blockType);
-      }
 
       for (const [blockId, entry] of Object.entries(pathMap)) {
         if (blockId === '_schemas' || blockId === '_page') continue;
@@ -1243,26 +1191,15 @@ async function discoverBlocks(
         // this block's page even without a stored instance of its own). When it
         // isn't, flag it: every result would fall through to "Unimplemented".
         if (blockType) {
-          // covConfig, not blocksConfig: in a schema-less sweep the latter is
-          // empty, so no item type was ever recorded and `summary` reported "no
-          // content example" in CI while passing locally. Coverage questions
-          // get the coverage schemas — the same rule as the path map above.
-          const itemTypeField = itemTypeFieldOf(covConfig[blockType]);
+          const itemTypeField = itemTypeFieldOf(blocksConfig[blockType]);
           if (itemTypeField) {
             const itemType = blockData[itemTypeField];
             if (typeof itemType === 'string' && itemType && itemType !== 'default') {
-              // Recording coverage and judging validity are different questions
-              // with different inputs. COV_REGISTERED answers "is this a real
-              // type" using the coverage schemas, so a schema-less sweep still
-              // records that a listing renders `summary`. REGISTERED stays the
-              // authority for the shape ISSUE below: with an empty blocksConfig
-              // nothing is known to be registered, and reporting every item
-              // type as invalid on that basis produced 10 phantom issues.
-              if (COV_REGISTERED.has(itemType)) {
+              if (REGISTERED.has(itemType)) {
                 if (!itemTypeExamples.has(itemType)) {
                   itemTypeExamples.set(itemType, { pagePath, containerUid: blockId });
                 }
-              } else if (REGISTERED.size && !PAGE_TYPES.has(itemType)) {
+              } else if (!PAGE_TYPES.has(itemType)) {
                 shapeIssues.push({
                   pagePath,
                   blockId,
@@ -1508,11 +1445,22 @@ async function discoverBlocks(
     // contained a text, a textarea, a select, a single_choice, a checkbox and a
     // from. Turning that into a failure would have asked maintainers to add
     // fixtures that already exist.
-    // Every type the container API found in content — including object_list
-    // sub-items, whose examples live inside a parent and so never appear in
-    // `result` under their own blockType. Without this a form field type
-    // reported "no content example" while form-test-page plainly contained one.
-    for (const t of typesInContent) discoveredTypes.add(t);
+    // Sub-item examples live inside a parent, so they never appear in `result`
+    // under their own blockType. `allCovered` is the schema-driven record of
+    // which sub-types a selected example contains, from the same container
+    // helpers (buildAllowedBlocksList + subTypesInField).
+    //
+    // Not a second buildBlockPathMap call: it populates a module-level schema
+    // cache keyed by blockType alone, so schemas leak into any later walk with
+    // a different registry. Keying that cache by registry fixes the leak and
+    // breaks the editor — block-sync's inherited_fields fieldset stops
+    // rendering — so it stays as it is.
+    for (const key of allCovered) discoveredTypes.add(key.split('|')[2]);
+    for (const r of seen.values()) {
+      if (typeof r.kind === 'string' && r.kind.startsWith('sub:')) {
+        discoveredTypes.add(r.kind.slice(4));
+      }
+    }
     for (const blockType of required) {
       if (discoveredTypes.has(blockType)) continue;
       // `default` is a sentinel, not an item type: the item-type pass above

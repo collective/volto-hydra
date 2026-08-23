@@ -324,46 +324,6 @@ test.describe('Block sanity (auto-discovered)', () => {
   // (e.g. an image block's sidebar-only `alt`) are excluded — they carry no
   // canvas annotation. This runs last (defined after the per-block loop;
   // block-sanity is serial) so coverage is fully accumulated.
-  // Was the "registered type has no content example" check even RUN?
-  //
-  // discoverBlocks builds its required set only when frontendKeys is non-empty
-  // — i.e. when a frontend's INIT schemas were fetched via MOCK_PARENT_URL. CI
-  // does not set it, so every CI run has skipped that check while reporting
-  // green. With schemas, it flags types that nothing renders anywhere.
-  //
-  // A skipped check and a passing check look identical from a green tick, which
-  // is the failure this repo keeps finding in its own gates (see #306). So the
-  // skip is now stated out loud: opt out deliberately with
-  // BLOCK_SANITY_NO_EXAMPLE_COVERAGE=1 when running a schema-less sweep.
-  test('example coverage was actually measured', () => {
-    const covPath = path.resolve(__dirname, '../../.discovered-coverage.json');
-    const cov = fs.existsSync(covPath)
-      ? JSON.parse(fs.readFileSync(covPath, 'utf-8'))
-      : { measured: false, possible: Boolean(process.env.FRONTEND_URL), frontendKeys: 0 };
-
-    if (process.env.BLOCK_SANITY_NO_EXAMPLE_COVERAGE === '1' || cov.possible === false) {
-      // No example frontend in this job (bridge-only sweep), or the skip was
-      // declared deliberately. Either way the fact is recorded rather than
-      // implied by a green tick.
-      test.info().annotations.push({
-        type: 'coverage',
-        description: cov.possible === false
-          ? 'example coverage impossible: no frontend (FRONTEND_URL unset)'
-          : 'example coverage deliberately not measured',
-      });
-      return;
-    }
-
-    expect(
-      cov.measured,
-      'Example coverage was NOT measured even though a frontend was available: discovery ' +
-        'received 0 schemas from it, so ' +
-        '"registered block type has no content example" was never checked. Set ' +
-        'MOCK_PARENT_URL + FRONTEND_URL so globalSetup can fetch the frontend INIT, ' +
-        'or set BLOCK_SANITY_NO_EXAMPLE_COVERAGE=1 to say the skip is intended.',
-    ).toBe(true);
-  });
-
   test('every canvas-editable field is editable in at least one example', () => {
     const never = fieldsNeverEditable();
     expect(
