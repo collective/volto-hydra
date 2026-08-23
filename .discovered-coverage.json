@@ -1,0 +1,27 @@
+{
+  "measured": true,
+  "frontendKeys": 54,
+  "discoveredTypes": 36,
+  "noExample": [
+    "column",
+    "navItem",
+    "slide",
+    "summary",
+    "default",
+    "text",
+    "textarea",
+    "number",
+    "select",
+    "single_choice",
+    "multiple_choice",
+    "checkbox",
+    "date",
+    "from",
+    "static_text",
+    "hidden",
+    "attachment",
+    "convTargetA",
+    "convTargetB",
+    "convGroupDst"
+  ]
+}

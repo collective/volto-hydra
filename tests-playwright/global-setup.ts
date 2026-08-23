@@ -78,10 +78,60 @@ async function globalSetup() {
     }
 
     console.log(`[SETUP] Discovering blocks from ${discoverApi} (${maxLabel})...`);
+    // Coverage needs the frontend's registered keys, NOT its full schemas. When
+    // only FRONTEND_URL is set (every CI job), fetch them from the always-present
+    // mock test-frontend purely to build the required set — the same trick the
+    // empty-region sweep below already uses to get schemas "without turning
+    // block-sanity's checks on". blocksConfig stays as it was, so the strict
+    // schema checks remain off; only the "registered type has no example" check
+    // comes alive. Best-effort: a failure leaves coverage unmeasured, which the
+    // block-sanity assertion then reports rather than hides.
+    if (frontendKeys.length === 0 && process.env.FRONTEND_URL) {
+      try {
+        const { frontendKeys: fk } = await fetchBlocksConfig(
+          process.env.MOCK_PARENT_URL || `${URLS.testFrontend}/mock-parent.html`,
+          process.env.FRONTEND_URL,
+          discoverApi,
+        );
+        frontendKeys = fk;
+        console.log(`[SETUP] Fetched ${fk.length} frontend block keys for example-coverage only`);
+      } catch (err) {
+        console.warn(`[SETUP] example-coverage key fetch failed: ${err}`);
+      }
+    }
+
     const blocks = await discoverBlocks(discoverApi, maxPages, blocksConfig, frontendKeys);
     const outPath = path.resolve(__dirname, '../.discovered-blocks.json');
     fs.writeFileSync(outPath, JSON.stringify(blocks, null, 2));
     console.log(`[SETUP] Wrote ${blocks.length} discovered blocks to ${outPath}`);
+
+    // Record whether example-coverage was MEASURED, not just its result.
+    //
+    // discoverBlocks only builds the required set — and therefore only emits
+    // `noExample` — when frontendKeys is non-empty, i.e. when a frontend's INIT
+    // schemas were fetched via MOCK_PARENT_URL. CI never sets that, so every CI
+    // run has skipped the "registered type with no content example" check
+    // entirely while reporting green. Locally, with schemas, it flags 15 types.
+    //
+    // A skipped check and a passing check are indistinguishable in a log that
+    // says nothing, so write the fact down and let block-sanity assert on it.
+    const coverage = {
+      measured: frontendKeys.length > 0,
+      frontendKeys: frontendKeys.length,
+      discoveredTypes: new Set(
+        blocks.filter((b: any) => b.blockData !== undefined).map((b: any) => b.blockType),
+      ).size,
+      noExample: blocks.filter((b: any) => b.noExample).map((b: any) => b.blockType),
+    };
+    const covPath = path.resolve(__dirname, '../.discovered-coverage.json');
+    fs.writeFileSync(covPath, JSON.stringify(coverage, null, 2));
+    console.log(
+      coverage.measured
+        ? `[SETUP] Example coverage MEASURED: ${coverage.discoveredTypes} types with examples, ` +
+          `${coverage.noExample.length} without (${coverage.noExample.join(', ') || 'none'})`
+        : `[SETUP] Example coverage NOT MEASURED — no frontend schemas (MOCK_PARENT_URL unset). ` +
+          `"Registered type has no content example" is not being checked in this run.`,
+    );
 
     // The empty-region sweep needs block schemas (allowedBlocks/defaultBlockType)
     // to know which regions seed an `empty`. block-sanity deliberately runs
