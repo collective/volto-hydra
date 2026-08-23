@@ -48,6 +48,10 @@ interface DiscoveredBlock {
   field?: string;
   issues?: string[];
   noExample?: boolean;
+  // Set by discovery for a locked block found on its own template document:
+  // the template instance the spec unlocks before checking editability.
+  unlockTemplateId?: string | null;
+  fromTemplate?: boolean;
   allowedBlocksViolation?: boolean;
   parentType?: string;
   allowed?: string[];
@@ -204,6 +208,33 @@ test.describe('Block sanity (auto-discovered)', () => {
       // bridge has received INITIAL_DATA. Without this wait the render check
       // races bridge init and flakily throws "blockPathMap not available".
       await helper.waitForBridgeConnected();
+
+      // Site chrome (a footer, a global announcement) is authored on its
+      // template's own document, where its blocks are locked until the template
+      // is unlocked — the gesture that says "this changes everywhere", and the
+      // one an author makes before editing it anywhere. Unlocking is a single
+      // message; the admin's toggle sends the same one.
+      if (block.unlockTemplateId) {
+        await page.evaluate((instanceId) => {
+          (document.getElementById('previewIframe') as HTMLIFrameElement)
+            .contentWindow!.postMessage(
+              { type: 'TEMPLATE_EDIT_MODE', instanceIds: [instanceId] },
+              '*',
+            );
+        }, block.unlockTemplateId);
+
+        const frame = page.frames().find((f) => f !== page.mainFrame())!;
+        await expect
+          .poll(
+            () =>
+              frame.evaluate(
+                (uid) => !(window as any).__hydraBridge?.isBlockReadonly(uid),
+                block.blockId,
+              ),
+            { message: `${block.blockType} stayed locked after unlocking ${block.unlockTemplateId}` },
+          )
+          .toBe(true);
+      }
 
       const iframe = helper.getIframe();
 
