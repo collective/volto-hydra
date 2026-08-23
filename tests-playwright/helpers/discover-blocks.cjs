@@ -1000,7 +1000,20 @@ function isContainmentExempt(entry, blockData, rules = { slots: [] }) {
   return !!slotId && (rules.slots || []).includes(slotId);
 }
 
-async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, frontendKeys = []) {
+async function discoverBlocks(
+  apiUrl,
+  maxPages = Infinity,
+  blocksConfig = {},
+  frontendKeys = [],
+  // Schemas used ONLY to work out coverage — which fields are object_lists and
+  // what each container allows. A schema-less CI sweep deliberately passes an
+  // empty blocksConfig to keep the strict shape/slate checks off, but coverage
+  // still has to know that a form's `subblocks` holds typed sub-items;
+  // otherwise every sub-type reports "no content example" while an example sits
+  // right there in the fixture. Defaults to blocksConfig, so schema-ful callers
+  // are unaffected.
+  coverageConfig = null,
+) {
   // Use hydra's canonical buildBlockPathMap to walk content — it knows
   // the schema-defined container fields (blocks_layout, object_list,
   // columns, …) and distinguishes real blocks from inline sub-items.
@@ -1045,8 +1058,10 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   // Plone content types appear as @type on the page root (Document, etc.)
   // — skip these, they're not blocks.
   const PAGE_TYPES = new Set(['Document', 'Folder', 'Plone Site', 'News Item', 'Event']);
-  const objectListFields = buildObjectListFieldsMap(blocksConfig);
-  const allowedBlocksList = buildAllowedBlocksList(blocksConfig);
+  const covConfig =
+    coverageConfig && Object.keys(coverageConfig).length ? coverageConfig : blocksConfig;
+  const objectListFields = buildObjectListFieldsMap(covConfig);
+  const allowedBlocksList = buildAllowedBlocksList(covConfig);
 
   if (objectListFields.size > 0) {
     console.log(`[DISCOVER] Using schemas for ${objectListFields.size} block types with object_list fields`);

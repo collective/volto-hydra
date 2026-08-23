@@ -64,6 +64,7 @@ async function globalSetup() {
     // aren't set.
     let blocksConfig: Record<string, any> = {};
     let frontendKeys: string[] = [];
+    let coverageConfig: Record<string, any> = {};
     if (process.env.MOCK_PARENT_URL && process.env.FRONTEND_URL) {
       console.log(`[SETUP] Fetching blocksConfig via ${process.env.MOCK_PARENT_URL}...`);
       ({ blocksConfig, frontendKeys } = await fetchBlocksConfig(
@@ -88,19 +89,24 @@ async function globalSetup() {
     // block-sanity assertion then reports rather than hides.
     if (frontendKeys.length === 0 && process.env.FRONTEND_URL) {
       try {
-        const { frontendKeys: fk } = await fetchBlocksConfig(
+        const { blocksConfig: cc, frontendKeys: fk } = await fetchBlocksConfig(
           process.env.MOCK_PARENT_URL || `${URLS.testFrontend}/mock-parent.html`,
           process.env.FRONTEND_URL,
           discoverApi,
         );
         frontendKeys = fk;
-        console.log(`[SETUP] Fetched ${fk.length} frontend block keys for example-coverage only`);
+        coverageConfig = cc;
+        console.log(
+          `[SETUP] Fetched ${fk.length} frontend block keys (+${Object.keys(cc).length} schemas) ` +
+            `for example-coverage only`,
+        );
       } catch (err) {
         console.warn(`[SETUP] example-coverage key fetch failed: ${err}`);
       }
     }
 
-    const blocks = await discoverBlocks(discoverApi, maxPages, blocksConfig, frontendKeys);
+    const blocks = await discoverBlocks(
+      discoverApi, maxPages, blocksConfig, frontendKeys, coverageConfig);
     const outPath = path.resolve(__dirname, '../.discovered-blocks.json');
     fs.writeFileSync(outPath, JSON.stringify(blocks, null, 2));
     console.log(`[SETUP] Wrote ${blocks.length} discovered blocks to ${outPath}`);
