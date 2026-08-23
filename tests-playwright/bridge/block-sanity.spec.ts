@@ -48,9 +48,9 @@ interface DiscoveredBlock {
   field?: string;
   issues?: string[];
   noExample?: boolean;
-  // Set by discovery for a locked block found on its own template document:
-  // the template instance the spec unlocks before checking editability.
-  unlockTemplateId?: string | null;
+  // Set by discovery for a locked block found on its own template document.
+  // The instance to unlock is read from the bridge at runtime — see below.
+  needsUnlock?: boolean;
   allowedBlocksViolation?: boolean;
   parentType?: string;
   allowed?: string[];
@@ -213,16 +213,47 @@ test.describe('Block sanity (auto-discovered)', () => {
       // is unlocked — the gesture that says "this changes everywhere", and the
       // one an author makes before editing it anywhere. Unlocking is a single
       // message; the admin's toggle sends the same one.
-      if (block.unlockTemplateId) {
-        await page.evaluate((instanceId) => {
+      //
+      // The instance id comes from the BRIDGE, not from discovery. It identifies
+      // one application of a template and the merge mints it
+      // (`const instanceId = uuidGenerator()`), so stored content cannot say what
+      // it will be; deriving it offline worked only for the deterministic cases
+      // and failed as "stayed locked" for the rest. Reading it here also makes
+      // "locked with nothing able to unlock it" a legible failure instead of a
+      // silent mismatch.
+      if (block.needsUnlock) {
+        const frame = page.frames().find((f) => f !== page.mainFrame())!;
+        const instanceId = await frame.evaluate((uid) => {
+          const bridge = (window as any).__hydraBridge;
+          let found: string | null = null;
+          const walk = (blocks: Record<string, any>) => {
+            for (const [id, b] of Object.entries(blocks || {})) {
+              if (!b || typeof b !== 'object') continue;
+              if (id === uid) found = b.templateInstanceId ?? null;
+              for (const [key, value] of Object.entries<any>(b)) {
+                if (key === 'blocks' && value && typeof value === 'object') walk(value);
+                else if (value && typeof value === 'object' && value.blocks) walk(value.blocks);
+              }
+            }
+          };
+          walk(bridge?.formData?.blocks || {});
+          return found;
+        }, block.blockId);
+
+        expect(
+          instanceId,
+          `${block.blockType} block "${block.blockId}" is readOnly with no templateInstanceId — ` +
+            `nothing can unlock it, so it is uneditable everywhere`,
+        ).toBeTruthy();
+
+        await page.evaluate((id) => {
           (document.getElementById('previewIframe') as HTMLIFrameElement)
             .contentWindow!.postMessage(
-              { type: 'TEMPLATE_EDIT_MODE', instanceIds: [instanceId] },
+              { type: 'TEMPLATE_EDIT_MODE', instanceIds: [id] },
               '*',
             );
-        }, block.unlockTemplateId);
+        }, instanceId);
 
-        const frame = page.frames().find((f) => f !== page.mainFrame())!;
         await expect
           .poll(
             () =>
@@ -230,7 +261,7 @@ test.describe('Block sanity (auto-discovered)', () => {
                 (uid) => !(window as any).__hydraBridge?.isBlockReadonly(uid),
                 block.blockId,
               ),
-            { message: `${block.blockType} stayed locked after unlocking ${block.unlockTemplateId}` },
+            { message: `${block.blockType} stayed locked after unlocking instance ${instanceId}` },
           )
           .toBe(true);
       }

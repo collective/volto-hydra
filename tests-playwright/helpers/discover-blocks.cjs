@@ -276,9 +276,17 @@ function isOwnDefinition(content, templateId) {
  * report "no editable content example" while being the most-edited chrome on
  * the site.
  *
+ * The caller learns only WHETHER unlocking is needed, never with what id. An
+ * unlock id is a `templateInstanceId` — one APPLICATION of a template — and in
+ * the general case the merge mints it (`const instanceId = uuidGenerator()`), so
+ * it cannot be derived from stored content at all. Predicting it worked only for
+ * the deterministic cases (a forced layout's `instanceId === templateId`, a
+ * fixture storing its own, the stamp for definitions lacking one) and failed as
+ * "stayed locked" for every other. The spec reads the id off the bridge instead.
+ *
  * @param {Object} content - The page JSON the block was found in
  * @param {Object} blockData - The block's stored data
- * @returns {{unlockTemplateId: string|null}|null} null when not a subject
+ * @returns {{needsUnlock: boolean}|null} null when not a subject
  */
 function editableInstance(content, blockData) {
   const templateId = blockData?.templateId;
@@ -296,16 +304,9 @@ function editableInstance(content, blockData) {
     return null;
   }
   if (blockData?.readOnly === true) {
-    // Unlock by the instance id the block ALREADY carries — definitions often
-    // store their own (`tpl-block-ref-def`, `editable-fixed-def-instance`), and
-    // the merge only mints `templateInstanceId = templateId` for those that
-    // don't. Sending the templateId regardless unlocked an instance nobody was
-    // in, and every such block reported "stayed locked".
-    return onOwnDefinition
-      ? { unlockTemplateId: blockData.templateInstanceId || templateId }
-      : null;
+    return onOwnDefinition ? { needsUnlock: true } : null;
   }
-  return { unlockTemplateId: null };
+  return { needsUnlock: false };
 }
 
 /**
@@ -1247,9 +1248,9 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
             pagePath,
             blockData,
             isListing: blockType === 'listing',
-            // Set only for a locked block on its own definition page: the spec
-            // unlocks this template instance before checking editability.
-            unlockTemplateId: editable.unlockTemplateId,
+            // A locked block on its own definition page: the spec unlocks its
+            // template instance (id read from the bridge) before checking.
+            needsUnlock: editable.needsUnlock,
             _score: score,
           });
         }
