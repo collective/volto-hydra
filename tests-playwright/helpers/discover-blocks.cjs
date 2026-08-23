@@ -1060,6 +1060,14 @@ async function discoverBlocks(
   const PAGE_TYPES = new Set(['Document', 'Folder', 'Plone Site', 'News Item', 'Event']);
   const covConfig =
     coverageConfig && Object.keys(coverageConfig).length ? coverageConfig : blocksConfig;
+  // Which types actually appear in content, according to the container API
+  // itself. Collected from the path map rather than rebuilt from `allCovered`
+  // and the `sub:` filler entries: buildBlockPathMap is what knows the
+  // schema-defined container fields and resolves an object_list item's real
+  // type from its typeField, so asking it is both shorter and the single
+  // source of truth. Re-deriving that is how the earlier version managed to
+  // report "no content example" for a form field type sitting in the fixture.
+  const typesInContent = new Set();
   const objectListFields = buildObjectListFieldsMap(covConfig);
   const allowedBlocksList = buildAllowedBlocksList(covConfig);
 
@@ -1119,6 +1127,36 @@ async function discoverBlocks(
       // object_list sub-item) has a real path + resolved schema via
       // `_schemaRef`. No synthetic `parentType:field` types.
       const pathMap = buildBlockPathMap(content, blocksConfig);
+
+      // Coverage view of the same page. In a schema-less sweep blocksConfig is
+      // empty, so the map above cannot see object_list fields at all — and
+      // every typed sub-item would look absent from content. Built only when
+      // the two configs differ, so schema-ful callers pay nothing.
+      //
+      // On a CLONE, deliberately: buildBlockPathMap normalizes as it walks, so
+      // running it a second time over the same object left the main walk seeing
+      // typed items it had not seen before — 48 shape/slate issues appeared out
+      // of nowhere in a schema-less run that had reported none.
+      const covMap =
+        covConfig === blocksConfig
+          ? pathMap
+          : buildBlockPathMap(JSON.parse(JSON.stringify(content)), covConfig);
+      for (const [id, e] of Object.entries(covMap)) {
+        if (id === '_schemas' || id === '_page' || !e || !Array.isArray(e.path)) continue;
+        // An untyped object_list item has a virtual type (`parent:field`) and is
+        // not a registrable block; only typed items count as their own type.
+        if (e.isObjectListItem && !e.typeField) continue;
+        if (!e.blockType) continue;
+        // Same bar as the render tests: a locked instance is not an editable
+        // example. Counting one would let a type whose only appearance is a
+        // readOnly template member look covered — the opposite of what this
+        // check is for.
+        let d = content;
+        for (const seg of e.path) d = d?.[seg];
+        if (!d || typeof d !== 'object') continue;
+        if (!isEditableInstance(pagePath, d)) continue;
+        typesInContent.add(e.blockType);
+      }
 
       for (const [blockId, entry] of Object.entries(pathMap)) {
         if (blockId === '_schemas' || blockId === '_page') continue;
@@ -1458,20 +1496,11 @@ async function discoverBlocks(
     // contained a text, a textarea, a select, a single_choice, a checkbox and a
     // from. Turning that into a failure would have asked maintainers to add
     // fixtures that already exist.
-    // `allCovered` holds "parentType|field|subType" for every sub-type an
-    // already-selected example contains; a `sub:` filler entry is added only for
-    // the ones it does NOT cover. So covered sub-types appear in neither
-    // `result` nor as a `sub:` kind — which is why every form field type
-    // reported "no content example" while form-test-page plainly contained a
-    // text, a textarea, a select, a single_choice, a checkbox and a from.
-    // Turning that into a failure would have asked maintainers to add fixtures
-    // that already exist.
-    for (const key of allCovered) discoveredTypes.add(key.split('|')[2]);
-    for (const r of seen.values()) {
-      if (typeof r.kind === 'string' && r.kind.startsWith('sub:')) {
-        discoveredTypes.add(r.kind.slice(4));
-      }
-    }
+    // Every type the container API found in content — including object_list
+    // sub-items, whose examples live inside a parent and so never appear in
+    // `result` under their own blockType. Without this a form field type
+    // reported "no content example" while form-test-page plainly contained one.
+    for (const t of typesInContent) discoveredTypes.add(t);
     for (const blockType of required) {
       if (discoveredTypes.has(blockType)) continue;
       // A dynamic listing/grid item type has no stored authored instance, but a
