@@ -21,6 +21,70 @@ import { expandTemplates } from '@volto-hydra/helpers';
  * @param {Object} options.preloadedTemplates - Pre-loaded template cache
  * @returns {Promise<{merged: Object, newTemplateIds: string[]}>}
  */
+/**
+ * The ids by which THIS document is referenced as a template: its path, and the
+ * resolveuid form of its UID. A template's own blocks carry one of these in
+ * `templateId` (the fixtures use both spellings), and a `templateId` may also
+ * arrive as a full URL.
+ *
+ * @param {Object} page - Page formData
+ * @returns {(templateId: string) => boolean} predicate: "is this me?"
+ */
+function ownTemplateMatcher(page) {
+  const ids = new Set();
+  if (page?.['@id']) ids.add(new URL(page['@id'], 'http://x').pathname);
+  if (page?.UID) ids.add(`resolveuid/${page.UID}`);
+  return (templateId) => {
+    if (!templateId || typeof templateId !== 'string') return false;
+    if (ids.has(templateId)) return true;
+    // Path-compare so an absolute URL matches the same document.
+    return ids.has(new URL(templateId, 'http://x').pathname);
+  };
+}
+
+/**
+ * Give a template definition's own blocks an instance id, so the editor treats
+ * them as a template member and offers the unlock toggle. Editing a definition
+ * goes through the SAME unlock gesture as editing it from a page — the lock is
+ * what says "this changes everywhere", which is no less true on the definition
+ * page — and that gesture keys on `templateInstanceId`
+ * (isBlockInEditedTemplate). Stored definition blocks carry only `templateId`,
+ * so the toggle never appeared and the blocks were locked with no way to unlock.
+ *
+ * The id is the templateId itself, matching what forced layouts already do
+ * (`templateInstanceId === templateId`) and staying deterministic — a minted
+ * uuid would differ on every load. `readOnly` is left exactly as stored: it
+ * describes how the block behaves on pages that USE the template and has to
+ * survive a save. Applying the template to a page is unaffected, since the
+ * expand path never reads a definition's stored instance ids — it generates
+ * fresh per-application ones.
+ *
+ * @param {Object} block
+ * @param {(templateId: string) => boolean} isOwnTemplate
+ * @returns {Object} the block, with definition-side instance ids filled in
+ */
+function stampDefinitionInstanceIds(block, isOwnTemplate) {
+  if (!block || typeof block !== 'object') return block;
+  let next = block;
+  if (isOwnTemplate(block.templateId) && !block.templateInstanceId) {
+    next = { ...next, templateInstanceId: block.templateId };
+  }
+  for (const [key, value] of Object.entries(next)) {
+    if (!value || typeof value !== 'object') continue;
+    const nested = key === 'blocks' ? value : value.blocks;
+    if (!nested || typeof nested !== 'object') continue;
+    const stampedNested = {};
+    for (const [uid, child] of Object.entries(nested)) {
+      stampedNested[uid] = stampDefinitionInstanceIds(child, isOwnTemplate);
+    }
+    next =
+      key === 'blocks'
+        ? { ...next, blocks: stampedNested }
+        : { ...next, [key]: { ...value, blocks: stampedNested } };
+  }
+  return next;
+}
+
 export async function mergeTemplatesIntoPage(page, options = {}) {
   const {
     loadTemplate,
@@ -76,10 +140,27 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
     ? pageBlocksFields
     : { items: {} }; // Default to the main 'items' blocks field
 
+  // The self-merge guard applies to the FORWARD (display) merge only. The reverse
+  // merge — the one call that passes filterInstanceId (View.jsx's commit path,
+  // `loadTemplate: async () => formData`) — deliberately merges a template
+  // document against itself to capture a page's edits back into the template.
+  // Guarding that one would silently drop every "Change on all pages" edit.
+  const isOwnTemplate = filterInstanceId ? () => false : ownTemplateMatcher(page);
+
   for (const [fieldName, fieldDef] of Object.entries(fieldsToProcess)) {
     const blocksData = result.blocks || {};
     const layout = result.blocks_layout?.[fieldName] || [];
-    const allowedLayouts = fieldDef?.allowedLayouts || null;
+    // A page is never merged against its OWN template. Forcing a document's
+    // template onto itself either re-inserts what is already there (harmless but
+    // pointless) or — when the template is forced into a different region than
+    // the one its definition blocks live in — removes them and re-inserts
+    // nothing, leaving the definition page an empty shell. The save path has
+    // always known this (`getUniqueTemplateIds(...).filter(id => id !== currentPath)`);
+    // the load path did not, so a footer template opened in the editor showed
+    // nothing to edit.
+    const declaredLayouts = fieldDef?.allowedLayouts || null;
+    const externalLayouts = declaredLayouts?.filter((id) => !isOwnTemplate(id)) ?? null;
+    const allowedLayouts = externalLayouts?.length ? externalLayouts : null;
 
     if (layout.length === 0 && !allowedLayouts) {
       // No layout items and no forced layout - leave this field as-is
@@ -92,6 +173,18 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
       if (blocksData[blockId]) {
         fieldBlocks[blockId] = blocksData[blockId];
       }
+    }
+
+    // This field holds the document's own definition blocks — leave their content
+    // exactly as stored, so the template can be authored on its own page, and
+    // give them the instance id the unlock toggle keys on.
+    if (Object.values(fieldBlocks).some((block) => isOwnTemplate(block?.templateId))) {
+      const stamped = { ...result.blocks };
+      for (const [uid, block] of Object.entries(fieldBlocks)) {
+        stamped[uid] = stampDefinitionInstanceIds(block, isOwnTemplate);
+      }
+      result.blocks = stamped;
+      continue;
     }
 
     const templateState = {};
