@@ -585,10 +585,13 @@
 
   <section v-else-if="block['@type'] == 'highlight'" :data-block-uid="block_uid"
            class="relative overflow-hidden rounded-lg my-6 isolate">
+    <!-- data-edit-media on BOTH branches: the field has to be pickable when it
+         is empty (that is how you set one) as well as when it is filled. -->
     <div v-if="imageProps(block.image).url"
          class="absolute inset-0 bg-cover bg-center z-0"
+         data-edit-media="image"
          :style="{ backgroundImage: `url(${imageProps(block.image).url})` }" />
-    <div v-else class="absolute inset-0 z-0"
+    <div v-else class="absolute inset-0 z-0" data-edit-media="image"
          :class="highlightGradient(block.styles?.descriptionColor)"></div>
     <div class="absolute inset-0 bg-black/50 z-10"></div>
     <div class="relative z-20 py-16 px-4 mx-auto max-w-screen-xl text-center lg:py-24">

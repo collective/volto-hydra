@@ -13,8 +13,16 @@
  * keystrokes went to the sidebar input instead. Clicking a second time appeared
  * to fix it, because by then the form was mounted and did not re-fire.
  *
- * The fixture's highlight block has a title and NO image, which is the whole
- * trigger: an image field that is empty renders the picker on every selection.
+ * The fixture's highlight block has text and NO image, which is the whole
+ * trigger: an image field with no value renders its picker on every selection.
+ * (A hero with an empty image does NOT reproduce it — verified — so the fixture
+ * is not incidental.)
+ *
+ * Adding it made `highlight` discoverable for the first time, which promptly
+ * failed block-sanity's media-coverage check: the nuxt example painted
+ * highlight.image as a CSS background and never annotated it, so the field was
+ * uneditable everywhere it appeared. A block type with no example escapes that
+ * check entirely. Annotating it here is the smaller half of this PR.
  */
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';

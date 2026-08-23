@@ -3,7 +3,7 @@
  "@type": "Document",
  "id": "sidebar-focus-page",
  "title": "Sidebar Focus Page",
- "description": "Fixture for the sidebar-steals-the-caret test. The highlight block has a title to type into and NO image, so selecting it renders the image widget's empty state — the case where an inline AddLinkForm used to focus itself and pull the caret out of the preview.",
+ "description": "Fixture for the sidebar-steals-the-caret test. The highlight block has text to type into and NO image, which is the trigger: an image field with no value renders its picker on every selection.",
  "review_state": "published",
  "UID": "sidebar-focus-page-uid",
  "is_folderish": false,
@@ -17,6 +17,12 @@
   "highlight-1": {
    "@type": "highlight",
    "title": "Type into me",
+   "description": [
+    {
+     "type": "p",
+     "children": [{ "text": "Clicking this text must leave the caret in the preview." }]
+    }
+   ],
    "cta_title": "Read more"
   }
  }
