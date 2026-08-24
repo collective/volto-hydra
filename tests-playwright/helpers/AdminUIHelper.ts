@@ -2779,25 +2779,43 @@ export class AdminUIHelper {
    * @param position - The character offset position to move to (0-based)
    */
   async moveCursorToPosition(editor: any, position: number): Promise<void> {
-    await editor.evaluate(
-      (el: any, pos: number) => {
-        const doc = el.ownerDocument;
-        const selection = doc.defaultView.getSelection();
+    // selection.modify() steps the caret one grapheme at a time from the
+    // element start. On the slow CI static build a single pass can land short
+    // (e.g. the editable isn't focused yet, or a text-node boundary eats a
+    // step), leaving the caret at pos-1 — so typing "Beautiful " lands after
+    // "Hello" instead of "Hello ", yielding "HelloBeautiful  World". Measure the
+    // caret's absolute offset after stepping and re-step until it genuinely
+    // reaches `position`; don't trust the loop to arrive on the first pass.
+    await expect(async () => {
+      const offset = await editor.evaluate(
+        (el: any, pos: number) => {
+          const doc = el.ownerDocument;
+          const selection = doc.defaultView.getSelection();
 
-        // First, move cursor to start of element
-        const range = doc.createRange();
-        range.selectNodeContents(el);
-        range.collapse(true); // Collapse to start
-        selection.removeAllRanges();
-        selection.addRange(range);
+          // Collapse the caret to the start of the element.
+          const range = doc.createRange();
+          range.selectNodeContents(el);
+          range.collapse(true);
+          selection.removeAllRanges();
+          selection.addRange(range);
 
-        // Then move forward by visible characters using Selection.modify()
-        for (let i = 0; i < pos; i++) {
-          selection.modify('move', 'forward', 'character');
-        }
-      },
-      position,
-    );
+          // Step forward by visible characters.
+          for (let i = 0; i < pos; i++) {
+            selection.modify('move', 'forward', 'character');
+          }
+
+          // Report the caret's absolute character offset from the element start
+          // so the caller can confirm it actually reached `pos`.
+          const caret = selection.getRangeAt(0);
+          const measure = doc.createRange();
+          measure.selectNodeContents(el);
+          measure.setEnd(caret.startContainer, caret.startOffset);
+          return measure.toString().length;
+        },
+        position,
+      );
+      expect(offset).toBe(position);
+    }).toPass({ timeout: 5000 });
   }
 
   /**
