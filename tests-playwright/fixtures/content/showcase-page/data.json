@@ -37,11 +37,6 @@
         }
       ]
     },
-    "image-empty": {
-      "@type": "image",
-      "url": "",
-      "alt": ""
-    },
     "columns-1": {
       "@type": "columns",
       "title": "Two columns",
@@ -126,7 +121,6 @@
     "items": [
       "title-block",
       "intro",
-      "image-empty",
       "columns-1",
       "after-columns",
       "another-paragraph",

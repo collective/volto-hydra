@@ -85,12 +85,6 @@
       "alt": "Linked test image",
       "href": "https://example.com"
     },
-    "block-6-empty-teaser": {
-      "@type": "teaser",
-      "href": [],
-      "title": "",
-      "description": ""
-    },
     "block-7-filled-teaser": {
       "@type": "teaser",
       "overwrite": false,
@@ -263,7 +257,6 @@
       "block-3-uuid",
       "block-4-hero",
       "block-5-linked-image",
-      "block-6-empty-teaser",
       "block-7-filled-teaser",
       "block-8-grid",
       "block-preset-grid",
