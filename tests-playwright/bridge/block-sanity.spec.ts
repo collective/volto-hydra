@@ -116,12 +116,18 @@ test.describe('Block sanity (auto-discovered)', () => {
     const belongsHere = (name: string) =>
       !block.frontend || block.frontend === name
       || block.frontend === '(env)' || block.frontend === 'mock';
+    // Discovery runs once per frontend, so the SAME block surfaces once per
+    // frontend that registered it. Playwright rejects a file with two identical
+    // titles — it aborts the whole run before a single test executes — so every
+    // generated title carries its source frontend. It is also the honest label:
+    // these are separate measurements, not one shared result.
+    const src = block.frontend ? ` @${block.frontend}` : '';
 
     // A block @type used in content but not registered in the frontend's
     // blocksConfig fails as its own test (it renders as "Not implemented
     // Block") rather than blocking the whole suite.
     if (block.unregistered) {
-      test(`${block.blockType} block @type is registered in the frontend`, ({}, testInfo) => {
+      test(`${block.blockType} block @type is registered in the frontend${src}`, ({}, testInfo) => {
         test.skip(!belongsHere(testInfo.project.name), `discovered via ${block.frontend}`);
         throw new Error(
           `Block @type "${block.blockType}" is used in content (${block.occurrenceCount} ` +
@@ -135,7 +141,7 @@ test.describe('Block sanity (auto-discovered)', () => {
     // A frontend-registered type with no content example — fails as its own
     // test (nothing to render) rather than blocking the suite.
     if (block.noExample) {
-      test(`${block.blockType} block has an editable content example to render`, ({}, testInfo) => {
+      test(`${block.blockType} block has an editable content example to render${src}`, ({}, testInfo) => {
         test.skip(!belongsHere(testInfo.project.name), `discovered via ${block.frontend}`);
         throw new Error(
           `Block @type "${block.blockType}" is registered in the frontend but no EDITABLE content ` +
@@ -153,7 +159,7 @@ test.describe('Block sanity (auto-discovered)', () => {
     // nearest ancestor that accepts the type). Fails as its own test rather
     // than blocking the suite.
     if (block.allowedBlocksViolation) {
-      test(`${block.blockType} block [${block.blockId}] is allowed in its container`, ({}, testInfo) => {
+      test(`${block.blockType} block [${block.blockId}] is allowed in its container${src}`, ({}, testInfo) => {
         test.skip(!belongsHere(testInfo.project.name), `discovered via ${block.frontend}`);
         throw new Error(
           `Block "${block.blockType}" [${block.blockId}] on ${block.pagePath} is placed in a ` +
@@ -174,7 +180,7 @@ test.describe('Block sanity (auto-discovered)', () => {
       // can have per-field shape/slate issues — without them, two entries would
       // collide into a "duplicate test title" error and abort the whole run.
       const where = `${block.pagePath || '?'}${block.field ? `.${block.field}` : ''}`;
-      test(`${block.blockType} block [${block.blockId}] on ${where} has valid ${kind}`, () => {
+      test(`${block.blockType} block [${block.blockId}] on ${where} has valid ${kind}${src}`, () => {
         throw new Error(
           `Block "${block.blockType}" [${block.blockId}] on ${block.pagePath}` +
             (block.field ? ` field "${block.field}"` : '') +
@@ -188,7 +194,7 @@ test.describe('Block sanity (auto-discovered)', () => {
     // test per (blockType, field) so each missing field is reported once. It
     // can't be edited in the sidebar until the schema declares it.
     if (block.undeclaredField) {
-      test(`${block.blockType} block declares field "${block.field}" in its schema`, () => {
+      test(`${block.blockType} block declares field "${block.field}" in its schema${src}`, () => {
         throw new Error(
           `Block "${block.blockType}" stores field "${block.field}" (e.g. on ` +
             `${block.pagePath}) but its schema does not declare it — the field can't be ` +
@@ -202,7 +208,7 @@ test.describe('Block sanity (auto-discovered)', () => {
       : '';
     const labelKind = block.kind ? ` [${block.kind}]` : '';
     const label = `${block.blockType}${labelVariation}${labelKind}`;
-    test(`${label} block renders and has edit annotations`, async ({ page, helper }, testInfo) => {
+    test(`${label} block renders and has edit annotations${src}`, async ({ page, helper }, testInfo) => {
       test.skip(!belongsHere(testInfo.project.name), `discovered via ${block.frontend}`);
       const frontendUrl = process.env.FRONTEND_URL || getFrontendUrl(testInfo.project.name);
       const frontend = frontendUrl ? `&frontend=${encodeURIComponent(frontendUrl)}` : '';

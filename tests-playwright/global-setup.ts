@@ -102,11 +102,29 @@ async function globalSetup() {
     //
     // Frontends that aren't up in this job are skipped quietly — a job runs a
     // subset by design.
-    const targets: Array<[string, string]> = Object.entries(FRONTEND_URLS);
-    if (process.env.FRONTEND_URL) {
-      targets.unshift(['(env)', process.env.FRONTEND_URL]);
+    //
+    // Two keys can point at the SAME server (a job sets FRONTEND_URL to the very
+    // frontend it also names as a project). That is one frontend, not two:
+    // scanning it twice doubles the slowest part of setup and emits a second,
+    // identical set of cases. Named projects are considered first so a frontend
+    // is tagged with its project name rather than the anonymous '(env)'.
+    const normUrl = (u: string) => u.replace(/\/+$/, '');
+    const candidates: Array<[string, string]> = [
+      ...Object.entries(FRONTEND_URLS),
+      ['mock', URLS.testFrontend],
+    ];
+    // '(env)' is last on purpose: it is the fallback name for a frontend no
+    // project claims, so it only gets used when FRONTEND_URL really is a server
+    // none of the named entries above already cover.
+    if (process.env.FRONTEND_URL) candidates.push(['(env)', process.env.FRONTEND_URL]);
+
+    const seenUrls = new Set<string>();
+    const targets: Array<[string, string]> = [];
+    for (const [project, url] of candidates) {
+      if (seenUrls.has(normUrl(url))) continue;
+      seenUrls.add(normUrl(url));
+      targets.push([project, url]);
     }
-    targets.push(['mock', URLS.testFrontend]);
 
     const mockParent = process.env.MOCK_PARENT_URL || `${URLS.testFrontend}/mock-parent.html`;
     const blocks: any[] = [];
@@ -144,19 +162,30 @@ async function globalSetup() {
 
     // Record what coverage found. Whether it RAN is no longer a question —
     // setup fails without schemas — so this is the result, not a caveat.
-    const coverage = {
-      frontendKeys: frontendKeys.length,
-      discoveredTypes: new Set(
-        blocks.filter((b: any) => b.blockData !== undefined).map((b: any) => b.blockType),
-      ).size,
-      noExample: blocks.filter((b: any) => b.noExample).map((b: any) => b.blockType),
-    };
+    // Coverage is reported PER FRONTEND, never unioned. A union answers the
+    // wrong question: "some frontend has an example for this type" says nothing
+    // about the frontend actually under test, and a type missing everywhere
+    // would be listed once per frontend that missed it — noise that reads like
+    // several distinct gaps.
+    const byFrontend: Record<string, { types: number; noExample: string[] }> = {};
+    for (const project of Object.keys(perFrontend)) {
+      const mine = blocks.filter((b: any) => b.frontend === project);
+      byFrontend[project] = {
+        types: new Set(
+          mine.filter((b: any) => b.blockData !== undefined).map((b: any) => b.blockType),
+        ).size,
+        noExample: [...new Set(mine.filter((b: any) => b.noExample).map((b: any) => b.blockType))],
+      };
+    }
+    const coverage = { frontendKeys: frontendKeys.length, byFrontend };
     const covPath = path.resolve(__dirname, '../.discovered-coverage.json');
     fs.writeFileSync(covPath, JSON.stringify(coverage, null, 2));
-    console.log(
-      `[SETUP] Example coverage: ${coverage.discoveredTypes} types with examples, ` +
-        `${coverage.noExample.length} without (${coverage.noExample.join(', ') || 'none'})`,
-    );
+    for (const [project, c] of Object.entries(byFrontend)) {
+      console.log(
+        `[SETUP] Example coverage [${project}]: ${c.types} types with examples, ` +
+          `${c.noExample.length} without (${c.noExample.join(', ') || 'none'})`,
+      );
+    }
 
     // The empty-region sweep needs block schemas (allowedBlocks/defaultBlockType)
     // to know which regions seed an `empty`. block-sanity deliberately runs
