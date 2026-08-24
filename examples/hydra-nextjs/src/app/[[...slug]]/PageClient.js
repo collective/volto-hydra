@@ -8,81 +8,20 @@ import BlocksList from "@/components/BlocksList";
 // see e.g. highlight.description as a slate widget — without this the
 // bridge skips assigning data-node-id to slate field nodes.
 import docPageDefinitions from "../../../../../docs/examples/block-definitions.json";
-const docBlocksConfig = Object.fromEntries(
-  Object.values(docPageDefinitions).flatMap((page) => Object.entries(page.blocks)),
-);
-
-// socialLinks renders one <a data-block-uid> per entry in `links`, but the doc
-// bundle never declared the block, so buildBlockPathMap had no schema to descend
-// into: the links appeared on screen and were absent from the pathMap, i.e. they
-// could not be selected, edited, moved or navigated. Declared here (rather than
-// in block-definitions.json) because that file also drives the generated block
-// reference pages, and this is a gap in THIS example's config.
-docBlocksConfig.socialLinks = {
-  ...docBlocksConfig.socialLinks,
-  blockSchema: {
-    properties: {
-      links: {
-        title: 'Links',
-        widget: 'object_list',
-        idField: '@id',
-        schema: {
-          properties: {
-            url: { title: 'URL', widget: 'url' },
-          },
-        },
-      },
-    },
-  },
+import { sharedBlocksConfig } from "@test-fixtures/shared-block-schemas.js";
+const docBlocksConfig = {
+  ...Object.fromEntries(
+    Object.values(docPageDefinitions).flatMap((page) => Object.entries(page.blocks)),
+  ),
+  // One registry for every frontend. The doc bundle stays underneath because it
+  // is what generates the block reference pages, but the schemas a frontend
+  // publishes at INIT come from the shared file — the Nuxt example and the mock
+  // test frontend read the same one. Building a separate registry here is why
+  // title, description, leadimage, dateField and eventMetadata rendered as
+  // "Not implemented Block" in this example while working everywhere else.
+  ...sharedBlocksConfig,
 };
 
-// The content-type metadata blocks. They project a field of the CONTENT item
-// (its title, description, lead image, a date, event details) rather than
-// holding their own content, and the docs pages use all of them — but the doc
-// bundle never declared them, so they rendered as "Not implemented Block"
-// (title alone appears in 102 places). Declared here for the same reason
-// socialLinks is: block-definitions.json also drives the generated block
-// reference pages, and this is a gap in THIS example's config.
-//
-// All are `restricted`: an author never inserts them from the chooser — a
-// content-type layout places them.
-const metadataBlock = (id, title, group, properties = {}, fieldsets = []) => ({
-  id,
-  title,
-  group,
-  restricted: true,
-  blockSchema: { fieldsets, properties, required: [] },
-});
-
-Object.assign(docBlocksConfig, {
-  title: metadataBlock('title', 'Title', 'text'),
-  description: metadataBlock('description', 'Description', 'text'),
-  leadimage: metadataBlock('leadimage', 'Lead image', 'media', {
-    align: { title: 'Alignment', widget: 'align' },
-  }),
-  dateField: metadataBlock(
-    'dateField',
-    'Date',
-    'text',
-    {
-      dateField: {
-        title: 'Field',
-        type: 'string',
-        factory: 'Choice',
-        choices: [
-          ['effective', 'Published'],
-          ['created', 'Created'],
-          ['modified', 'Modified'],
-        ],
-      },
-      showTime: { title: 'Show time', type: 'boolean' },
-    },
-    [{ id: 'default', title: 'Default', fields: ['dateField', 'showTime'] }],
-  ),
-  eventMetadata: metadataBlock('eventMetadata', 'Event metadata', 'text', {
-    required: { title: 'Required', type: 'boolean' },
-  }),
-});
 
 export default function PageClient({ initialData, apiUrl }) {
   const [data, setData] = useState(initialData);

@@ -34,18 +34,6 @@
           "title": "Subject",
           "field": "Subject",
           "type": "selectFacet"
-        },
-        {
-          "@id": "facet-created",
-          "title": "Created",
-          "field": "created",
-          "type": "daterangeFacet"
-        },
-        {
-          "@id": "facet-images",
-          "title": "Has image",
-          "field": "hasPreviewImage",
-          "type": "toggleFacet"
         }
       ],
       "sortOnOptions": ["effective", "created", "sortable_title"],

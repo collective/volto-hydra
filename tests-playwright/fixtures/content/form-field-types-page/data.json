@@ -1,0 +1,73 @@
+{
+  "@id": "http://localhost:8888/_test_data/form-field-types-page",
+  "@type": "Document",
+  "UID": "form-field-types-page-uid",
+  "id": "form-field-types-page",
+  "title": "Form Field Types",
+  "description": "One instance of each remaining form field type, so every type has an editable example.",
+  "review_state": "published",
+  "blocks": {
+    "title-1": {
+      "@type": "title"
+    },
+    "form-1": {
+      "@type": "form",
+      "title": "Field type coverage",
+      "submit_label": "Submit",
+      "subblocks": [
+        {
+          "field_id": "field-quantity",
+          "field_type": "number",
+          "label": "Quantity",
+          "plaintext": "Quantity",
+          "required": false
+        },
+        {
+          "field_id": "field-when",
+          "field_type": "date",
+          "label": "Preferred date",
+          "plaintext": "Preferred date",
+          "required": false
+        },
+        {
+          "field_id": "field-note",
+          "field_type": "static_text",
+          "label": "We reply within two working days.",
+          "plaintext": "We reply within two working days."
+        },
+        {
+          "field_id": "field-source",
+          "field_type": "hidden",
+          "label": "Source",
+          "plaintext": "Source",
+          "default_value": "test-fixture"
+        },
+        {
+          "field_id": "field-file",
+          "field_type": "attachment",
+          "label": "Attach a file",
+          "plaintext": "Attach a file",
+          "required": false
+        }
+      ],
+      "description": "Please fill out this form",
+      "default_to": "admin@example.com",
+      "default_from": "noreply@example.com",
+      "default_subject": "New form submission: ${field-subject}",
+      "show_cancel": true,
+      "cancel_label": "Reset",
+      "captcha": "honeypot",
+      "email_otp_verification": false,
+      "store": true,
+      "send": true,
+      "send_message": "Thank you, your form has been submitted.",
+      "remove_data_after_days": -1
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "title-1",
+      "form-1"
+    ]
+  }
+}
