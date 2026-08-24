@@ -129,8 +129,11 @@ test.describe('Form Block', () => {
     // Wait for form fields to render
     const formFields = iframe.locator('.form-field[data-block-uid]');
     await expect(formFields.first()).toBeVisible({ timeout: 10000 });
+    // How many fields the fixture ships is incidental — this test is about the
+    // chooser adding ONE. Hardcoding the count made the page un-extendable:
+    // giving the form's unused field types a content example broke it.
     const initialCount = await formFields.count();
-    expect(initialCount).toBe(6);
+    expect(initialCount).toBeGreaterThan(0);
 
     await helper.getStableBlockCount();
 

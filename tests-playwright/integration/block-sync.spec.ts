@@ -572,7 +572,10 @@ test.describe('Block Sync - Search Block with Listing Container', () => {
 
     // Count initial facets (wait for async expandListingBlocks to complete)
     const initialFacets = iframe.locator('.facet-item[data-block-uid]');
-    await expect(initialFacets).toHaveCount(3, { timeout: 10000 }); // facet-type, facet-state, facet-subject
+    // Wait for expandListingBlocks to finish, without asserting how many facets
+    // the fixture happens to carry — that number is incidental here.
+    await expect(initialFacets.first()).toBeVisible({ timeout: 10000 });
+    const initialFacetCount = await initialFacets.count();
 
     // Wait for iframe to finish re-rendering after initial load —
     // expanding facets triggers multiple FORM_DATA updates to iframe.
@@ -611,7 +614,7 @@ test.describe('Block Sync - Search Block with Listing Container', () => {
 
     // Wait for the new facet to be added (count goes from 3 to 4)
     const allFacets = iframe.locator('.facet-item[data-block-uid]');
-    await expect(allFacets).toHaveCount(4, { timeout: 10000 });
+    await expect(allFacets).toHaveCount(initialFacetCount + 1, { timeout: 10000 });
 
     // Find the new facet ID (not one of the known initial facets)
     const knownIds = ['facet-type', 'facet-state', 'facet-subject'];

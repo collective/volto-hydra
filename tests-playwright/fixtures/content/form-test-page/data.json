@@ -71,6 +71,40 @@
           "label": "I agree to the terms",
           "plaintext": "I agree to the terms",
           "required": true
+        },
+        {
+          "field_id": "field-quantity",
+          "field_type": "number",
+          "label": "Quantity",
+          "plaintext": "Quantity",
+          "required": false
+        },
+        {
+          "field_id": "field-when",
+          "field_type": "date",
+          "label": "Preferred date",
+          "plaintext": "Preferred date",
+          "required": false
+        },
+        {
+          "field_id": "field-note",
+          "field_type": "static_text",
+          "label": "We reply within two working days.",
+          "plaintext": "We reply within two working days."
+        },
+        {
+          "field_id": "field-source",
+          "field_type": "hidden",
+          "label": "Source",
+          "plaintext": "Source",
+          "default_value": "test-fixture"
+        },
+        {
+          "field_id": "field-file",
+          "field_type": "attachment",
+          "label": "Attach a file",
+          "plaintext": "Attach a file",
+          "required": false
         }
       ]
     }
