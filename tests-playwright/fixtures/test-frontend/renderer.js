@@ -2200,24 +2200,32 @@ async function renderAccordionPanelBlock(block, blockId) {
     for (const childBlock of expandedItems) {
         if (!childBlock) continue;
         const uid = childBlock['@uid'];
-        html += `<div data-block-uid="${uid}" data-block-add="bottom">`;
+        let inner;
         switch (childBlock['@type']) {
             case 'slate':
-                html += renderNestedSlateBlock(childBlock);
+                inner = renderNestedSlateBlock(childBlock);
                 break;
             case 'image':
-                html += renderImageBlock(childBlock);
+                inner = renderImageBlock(childBlock);
                 break;
             case 'teaser':
-                html += renderTeaserBlock(childBlock, null);
+                inner = renderTeaserBlock(childBlock, null);
                 break;
             case 'summary':
-                html += renderSummaryItemBlock(childBlock, null);
+                inner = renderSummaryItemBlock(childBlock, null);
                 break;
-            default:
-                html += renderNestedSlateBlock(childBlock);
+            default: {
+                // Anything else — including CONTAINERS — goes through the normal
+                // renderer so nested blocks render as they do anywhere else. The
+                // old default treated an unknown type as a slate, so a grid in a
+                // panel produced no children at all and its blocks existed
+                // nowhere in the DOM.
+                const el = await renderBlock(uid, childBlock);
+                if (el) html += el.outerHTML;
+                continue;
+            }
         }
-        html += '</div>';
+        html += `<div data-block-uid="${uid}" data-block-add="bottom">${inner}</div>`;
     }
 
     html += '</div>';

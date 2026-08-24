@@ -11209,9 +11209,41 @@ export class Bridge {
     let clickedSelector = null;
     let nextUid = targetUid; // UID we expect to become visible after one click
 
+    // Nothing published a handle for this uid: ask its ANCESTORS. A container
+    // that can reveal its contents publishes one handle carrying its own uid;
+    // making every frontend also enumerate each descendant duplicates what
+    // blockPathMap already knows, and a descendant it forgets is simply
+    // unreachable. Walk up and use the nearest ancestor that published one.
+    //
+    // The +1/-1 path below can't cover this case: it needs the target element
+    // already in the DOM, and a block inside a closed container often isn't
+    // rendered at all.
+    let ancestorSelector = null;
+    if (!directSelector) {
+      const seen = new Set([targetUid]);
+      let parentUid = this.blockPathMap?.[targetUid]?.parentId;
+      while (parentUid && !seen.has(parentUid)) {
+        seen.add(parentUid);
+        const handle = document.querySelector(
+          `[data-block-selector~="${parentUid}"]`,
+        );
+        if (handle) {
+          log(`tryMakeBlockVisible: no handle for ${targetUid}, using ancestor ${parentUid}`);
+          ancestorSelector = handle;
+          break;
+        }
+        parentUid = this.blockPathMap?.[parentUid]?.parentId;
+      }
+    }
+
     if (directSelector) {
       log(`tryMakeBlockVisible: found direct selector for ${targetUid}`);
       clickedSelector = directSelector;
+    } else if (ancestorSelector) {
+      // Opening the ancestor may expose the target directly, or reveal another
+      // closed container inside it — the caller re-checks visibility and calls
+      // again, so each call peels one layer.
+      clickedSelector = ancestorSelector;
     } else {
       // No direct selector - try +1/-1 navigation
       log(`tryMakeBlockVisible: no direct selector, trying +1/-1 navigation`);
