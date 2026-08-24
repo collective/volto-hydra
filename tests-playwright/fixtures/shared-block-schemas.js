@@ -1425,18 +1425,25 @@ export const sharedBlocksConfig = {
       id: 'socialLinks',
       title: 'Social links',
       group: 'common',
+      // Matches the declaration the Next.js example ships (PageClient.js): the
+      // links are an object_list keyed by `@id`, and each item's `url` is a
+      // plain string, not a link object. Without idField the items cannot be
+      // addressed by their stored id, so they never become selectable
+      // sub-items — the block renders but nothing inside it can be edited.
       blockSchema: {
-        fieldsets: [{ id: 'default', title: 'Default', fields: ['url', 'links'] }],
+        fieldsets: [{ id: 'default', title: 'Default', fields: ['links'] }],
         properties: {
-            links: {
-              title: 'Links',
-              widget: 'object_list',
-              schema: {
-                fieldsets: [{ id: 'default', title: 'Default', fields: ['url'] }],
-                properties: { url: { title: 'Link', widget: 'object_browser', mode: 'link', allowExternals: true } },
-                required: [],
-              },
-            }, url: { title: 'Link', widget: 'object_browser', mode: 'link', allowExternals: true } },
+          links: {
+            title: 'Links',
+            widget: 'object_list',
+            idField: '@id',
+            schema: {
+              fieldsets: [{ id: 'default', title: 'Default', fields: ['url'] }],
+              properties: { url: { title: 'URL', widget: 'url' } },
+              required: [],
+            },
+          },
+        },
         required: [],
       },
     },
