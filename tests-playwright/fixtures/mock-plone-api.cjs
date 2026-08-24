@@ -1100,10 +1100,33 @@ function enrichContent(content, urlPath, baseUrl, expandList = []) {
   // 1. Resolve resolveuid/UID references to actual URLs (like Plone's serializer)
   // 2. Turn relation fields into summaries of their target (RelationChoiceFieldSerializer)
   // 3. Add image_scales to anything summary-shaped (image_field + @id)
-  return enrichImageBrains(
-    summarizeRelations(resolveUidUrls(enriched), baseUrl),
-    baseUrl,
+  // 4. Give every form block the validator catalogue its serializer injects
+  return addFormValidationSettings(
+    enrichImageBrains(
+      summarizeRelations(resolveUidUrls(enriched), baseUrl),
+      baseUrl,
+    ),
   );
+}
+
+/**
+ * collective.volto.formsupport's form serializer adds `validationSettings` to
+ * every form block on read — the catalogue of settable validators the sidebar
+ * builds its "Rule settings" widget from. It is regenerated on each GET, so it
+ * is a property of the RESPONSE, not of what is stored, and a fixture that
+ * carried one by hand would be testing its own copy instead of the contract.
+ */
+function addFormValidationSettings(node) {
+  if (Array.isArray(node)) return node.map(addFormValidationSettings);
+  if (!node || typeof node !== 'object') return node;
+  const out = {};
+  for (const [key, value] of Object.entries(node)) {
+    out[key] = addFormValidationSettings(value);
+  }
+  if (out['@type'] === 'form') {
+    out.validationSettings = { ...VALIDATION_SETTINGS_CATALOGUE };
+  }
+  return out;
 }
 
 /**
@@ -2620,9 +2643,326 @@ app.get('*/@contents', (req, res) => {
  * Form submission endpoint (collective.volto.formsupport)
  * Accepts { block_id, data: [{ field_id, label, value }] }
  */
+// Submissions recorded in memory, keyed by `${contentPath}::${block_id}` —
+// exactly how formsupport keys stored data (its records carry a `block_id` that
+// the CSV export and clear service filter on), so two forms on a page keep
+// separate result sets here too.
+const formSubmissions = new Map();
+
+const submissionKey = (contentPath, blockId) => `${contentPath}::${blockId || ''}`;
+
+/**
+ * Find a block by uid anywhere in a content item's block tree, top level or
+ * nested in a container. Mirrors formsupport's get_block_data, which resolves
+ * against a FLATTENED hierarchy and refuses anything that is not a form block.
+ */
+function findFormBlock(node, blockId) {
+  const blocks = node && node.blocks;
+  if (!blocks || typeof blocks !== 'object') return null;
+  if (blocks[blockId]) {
+    return blocks[blockId]['@type'] === 'form' ? blocks[blockId] : null;
+  }
+  for (const child of Object.values(blocks)) {
+    const found = findFormBlock(child, blockId);
+    if (found) return found;
+  }
+  return null;
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * The field `validations` collective.volto.formsupport enforces.
+ *
+ * The real backend registers `Products.validation`'s base validators (minus
+ * `inNumericRange`) as named utilities, plus four custom ones that take a
+ * setting. This reproduces the four settable ones and the regex validators a
+ * form is realistically authored with — enough that a test can prove a rule is
+ * enforced SERVER-side, which is the whole point of moving these off our own
+ * invented `minLength`/`maxLength`/`pattern` keys.
+ *
+ * Messages are the real ones. The backend strips the
+ * `Validation failed(<id>): ` prefix its custom validators emit, so they read
+ * as a continuation of the field's label.
+ */
+const FORM_VALIDATORS = {
+  maxCharacters: (value, s) =>
+    value.length > Number(s.characters)
+      ? `is more than ${s.characters} characters long`
+      : null,
+  minCharacters: (value, s) =>
+    value.length < Number(s.characters)
+      ? `is less than ${s.characters} characters long`
+      : null,
+  maxWords: (value, s) =>
+    (value.match(/\w+/g) || []).length > Number(s.words)
+      ? `is more than ${s.words} words long`
+      : null,
+  minWords: (value, s) =>
+    (value.match(/\w+/g) || []).length < Number(s.words)
+      ? `is less than ${s.words} words long`
+      : null,
+  isEmail: (value) => (EMAIL_RE.test(value) ? null : 'is not a valid email address.'),
+  isURL: (value) => (/^\w+:\/\/\S+$/.test(value) ? null : 'is not a valid url.'),
+  isInt: (value) => (/^[+-]?\d+$/.test(value) ? null : 'is not an integer.'),
+  isDecimal: (value) =>
+    /^([+-]?)(?=\d|[.,]\d)\d*([.,]\d*)?([Ee][+-]?\d+)?$/.test(value)
+      ? null
+      : 'is not a decimal number.',
+  isPrintable: (value) =>
+    /^[a-zA-Z0-9\s]+$/.test(value) ? null : 'contains unprintable characters',
+};
+
+/**
+ * The block-level catalogue the form serializer injects on GET: every settable
+ * validator's parameter, keyed `<validatorId>-<settingName>`. The sidebar builds
+ * the "Rule settings" widget from this, so it has to be present on the block the
+ * editor loads, not just understood at submit time.
+ */
+const VALIDATION_SETTINGS_CATALOGUE = {
+  'maxCharacters-characters': {
+    validation_title: 'maxCharacters',
+    title: 'characters',
+    type: 'integer',
+    default: 0,
+  },
+  'minCharacters-characters': {
+    validation_title: 'minCharacters',
+    title: 'characters',
+    type: 'integer',
+    default: 0,
+  },
+  'maxWords-words': {
+    validation_title: 'maxWords',
+    title: 'words',
+    type: 'integer',
+    default: 0,
+  },
+  'minWords-words': {
+    validation_title: 'minWords',
+    title: 'words',
+    type: 'integer',
+    default: 0,
+  },
+};
+
+/**
+ * Run a field's authored rules, exactly as @submit-form does: the field names
+ * validators in `validations`, and their parameters live in a FLAT
+ * `validationSettings` keyed `<validatorId>-<settingName>` which the backend
+ * splits on the hyphen to rebuild `{validator: {setting: value}}`.
+ *
+ * Returns `{validatorId: message}` — the backend's per-field error shape.
+ */
+function runFieldValidations(field, value) {
+  const names = Array.isArray(field.validations) ? field.validations : [];
+  if (!names.length || !value) return null;
+  const settings = {};
+  for (const [key, val] of Object.entries(field.validationSettings || {})) {
+    const [id, setting] = key.split('-');
+    if (!id || !setting || !names.includes(id)) continue;
+    (settings[id] = settings[id] || {})[setting] = val;
+  }
+  const errors = {};
+  for (const name of names) {
+    const validator = FORM_VALIDATORS[name];
+    if (!validator) continue;
+    const message = validator(String(value), settings[name] || {});
+    if (message) errors[name] = message;
+  }
+  return Object.keys(errors).length ? errors : null;
+}
+
+/**
+ * POST /:path/@submit-form
+ * Form submission endpoint (collective.volto.formsupport).
+ * Accepts { block_id, data: [{ field_id, label, value }], attachments, captcha }
+ *
+ * Records the submission so a test can assert on what the frontend actually
+ * sent, and reproduces the checks formsupport really performs, so a broken
+ * submission fails loudly here instead of silently succeeding:
+ *
+ *  - empty form data (no `data` entries and no attachments) -> 400, as
+ *    collective.volto.formsupport's post adapter does;
+ *  - the honeypot captcha -> 400 unless `captcha.value` is the empty string,
+ *    matching HoneypotSupport.verify;
+ *  - a `from` field whose value is not an address -> 400, matching
+ *    validate_email_fields.
+ *
+ *  - a `block_id` that resolves to no form block -> 400, matching
+ *    validate_form's `block_form_not_found_label`;
+ *  - a form with neither `send` nor `store` -> 400, matching `missing_action`
+ *    ("You need to set at least one form action between send and store"). This
+ *    one is easy to author by accident and impossible to notice until a visitor
+ *    tries to submit.
+ *
+ * The resolved block is also recorded as `block_found`, so a multi-form test can
+ * assert the id pointed at the form it meant.
+ */
 app.post('*/@submit-form', (req, res) => {
+  const contentPath = req.path.replace(/\/@submit-form$/, '') || '/';
+  const body = req.body || {};
+  const blockId = body.block_id;
+  const data = Array.isArray(body.data) ? body.data : [];
+  const attachments = body.attachments || {};
+
   if (process.env.DEBUG) {
-    console.log(`POST @submit-form: path=${req.path}`);
+    console.log(`POST @submit-form: path=${contentPath} block=${blockId}`);
+  }
+
+  const content = loadRawContentFromDisk(contentPath);
+  const block = content ? findFormBlock(content, blockId) : null;
+
+  if (!blockId) {
+    return res.status(400).json({ type: 'BadRequest', message: 'Missing block_id' });
+  }
+
+  if (!block) {
+    return res.status(400).json({
+      type: 'BadRequest',
+      message: `Block with @type "form" and id "${blockId}" not found in this context: ${contentPath}`,
+    });
+  }
+
+  if (!block.store && !block.send) {
+    return res.status(400).json({
+      type: 'BadRequest',
+      message:
+        'You need to set at least one form action between "send" and "store".',
+    });
+  }
+
+  if (data.length === 0 && Object.keys(attachments).length === 0) {
+    return res.status(400).json({ type: 'BadRequest', message: 'Empty form data.' });
+  }
+
+  // HoneypotSupport.verify has two branches, and only one of them is about the
+  // `captcha` object. A frontend that sends one (volto-form-block, and our
+  // Next.js action) is checked on its `value`; a frontend that does not — the
+  // Nuxt example here, for instance — falls back to looking for a FILLED
+  // honeypot field among the submitted data. An absent captcha is not by itself
+  // a rejection, and treating it as one fails every frontend that does not
+  // implement the token.
+  //
+  // The real fallback is `found_honeypot(form, required=True)`, which also
+  // rejects a submission MISSING the field. That rule depends on
+  // collective.honeypot's HONEYPOT_FIELD being configured in the environment —
+  // when it is unset the whole check short-circuits to "pass" — and there is no
+  // such environment here, so this models the "field is present and filled"
+  // half only.
+  if (block.captcha === 'honeypot') {
+    const captcha = body.captcha;
+    const reject = () =>
+      res.status(400).json({ type: 'BadRequest', message: 'Error submitting form.' });
+    if (captcha) {
+      if (typeof captcha.value !== 'string' || captcha.value !== '') return reject();
+    } else {
+      const honeypotId = (block.captcha_props || {}).id;
+      const trap = honeypotId
+        ? data.find((entry) => entry.field_id === honeypotId || entry.label === honeypotId)
+        : null;
+      if (trap && String(trap.value || '') !== '') return reject();
+    }
+  }
+
+  {
+    const emailFields = (block.subblocks || [])
+      .filter((f) => f && f.field_type === 'from')
+      .map((f) => f.field_id);
+    for (const entry of data) {
+      if (emailFields.includes(entry.field_id) && entry.value) {
+        if (!EMAIL_RE.test(String(entry.value))) {
+          return res.status(400).json({
+            type: 'BadRequest',
+            message: `Email not valid in "${entry.label || entry.field_id}" field.`,
+          });
+        }
+      }
+    }
+  }
+
+  // The authored answer rules. A field whose skip-logic condition is not met is
+  // not validated — @submit-form resolves the trigger field first and only
+  // validates the ones it decided to show.
+  {
+    const byId = new Map(
+      (block.subblocks || [])
+        .filter((f) => f && f.field_id)
+        .map((f) => [f.field_id, f]),
+    );
+    const answered = new Map(data.map((e) => [e.field_id, e.value]));
+    const errors = {};
+    for (const entry of data) {
+      const field = byId.get(entry.field_id);
+      if (!field) continue;
+      // Skip logic: the backend looks the trigger up by `id`, so a field
+      // stored without one makes the whole submission fail there. Mirror the
+      // lookup (not the crash) so a missing `id` shows up as a test failure.
+      const when = field.show_when_when;
+      if (when && when !== 'always') {
+        const trigger = (block.subblocks || []).find((f) => f && f.id === when);
+        if (!trigger) {
+          return res.status(400).json({
+            type: 'BadRequest',
+            message: `Field "${field.field_id}" is shown when "${when}", but no field has that id — @submit-form resolves the trigger by id, not field_id.`,
+          });
+        }
+        const target = String(answered.get(trigger.field_id) ?? '');
+        const shown =
+          field.show_when_is === 'value_is_not'
+            ? target !== (field.show_when_to ?? '')
+            : target === (field.show_when_to ?? '');
+        if (!shown) continue;
+      }
+      const fieldErrors = runFieldValidations(field, entry.value);
+      if (fieldErrors) errors[entry.field_id] = fieldErrors;
+    }
+    if (Object.keys(errors).length) {
+      return res.status(400).json({ error: { type: 'Invalid', errors } });
+    }
+  }
+
+  const key = submissionKey(contentPath, blockId);
+  const record = {
+    block_id: blockId,
+    block_found: Boolean(block),
+    data,
+    attachments,
+    captcha: body.captcha,
+    received: formSubmissions.get(key) ? formSubmissions.get(key).length : 0,
+  };
+  formSubmissions.set(key, [...(formSubmissions.get(key) || []), record]);
+
+  res.status(204).end();
+});
+
+/**
+ * GET /:path/@form-data?block_id=...
+ * Read back what was submitted — formsupport's own service, and how a test
+ * asserts that a form posted what it was supposed to. Without `block_id` every
+ * form on the page is returned.
+ */
+app.get('*/@form-data', (req, res) => {
+  const contentPath = req.path.replace(/\/@form-data$/, '') || '/';
+  const blockId = req.query.block_id;
+  const items = [];
+  for (const [key, records] of formSubmissions) {
+    const [path_, block] = key.split('::');
+    if (path_ !== contentPath) continue;
+    if (blockId && block !== blockId) continue;
+    items.push(...records);
+  }
+  res.json({ items, items_total: items.length });
+});
+
+/**
+ * DELETE /:path/@form-data
+ * Clear recorded submissions, so a test can start from a known state.
+ */
+app.delete('*/@form-data', (req, res) => {
+  const contentPath = req.path.replace(/\/@form-data$/, '') || '/';
+  for (const key of [...formSubmissions.keys()]) {
+    if (key.split('::')[0] === contentPath) formSubmissions.delete(key);
   }
   res.status(204).end();
 });
@@ -3044,4 +3384,4 @@ if (require.main === module) {
 }
 
 // Export for use by test frontend server or test harnesses
-module.exports = { app, server, contentDirMap, CONTENT_MOUNTS };
+module.exports = { app, server, contentDirMap, CONTENT_MOUNTS, formSubmissions };

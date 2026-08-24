@@ -1117,7 +1117,13 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         }
         if (!blockData || typeof blockData !== 'object') continue;
 
-        const blockType = blockData['@type']; // may be undefined for object_list items
+        // `@type` for a real block; for a TYPED object_list item (a form's
+        // `subblocks`, keyed by `field_id` and typed by `field_type`) the item
+        // has no `@type`, so fall back to the per-item type buildBlockPathMap
+        // already resolved from the container's `typeField`. Without this a form
+        // field (text / select / single_choice …) is skipped from coverage
+        // instead of being credited as its own registered block type.
+        const blockType = blockData['@type'] || entry.blockType;
         // Resolved schema for this entry — may be inline (object_list schema)
         // or come from blocksConfig[blockType].
         const schemaRef = entry._schemaRef;

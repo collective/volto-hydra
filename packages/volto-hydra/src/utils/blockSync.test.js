@@ -885,9 +885,14 @@ describe('fieldRules — multiselect surface (array of values)', () => {
     expect(run(undefined, { f: { gt: 0 } })).toBe(false);
   });
 
-  test('isSet — empty selection is unset', () => {
+  test('isSet / isNotSet — empty selection is unset', () => {
+    // Array widgets (multiselect, object_browser) leave `[]` behind when the
+    // last entry is removed rather than dropping the key, so a field the author
+    // has just cleared must read as unset — not still answered.
     expect(run(['image'], { f: { isSet: true } })).toBe(true);
     expect(run([], { f: { isSet: true } })).toBe(false);
+    expect(run([], { f: { isNotSet: true } })).toBe(true);
+    expect(run(['image'], { f: { isNotSet: true } })).toBe(false);
   });
 
   test('oneOf and regex throw on an array field', () => {
