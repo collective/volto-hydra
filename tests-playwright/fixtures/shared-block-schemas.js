@@ -412,7 +412,7 @@ export const sharedBlocksConfig = {
                                     'slate', 'image', 'separator', 'teaser', 'listing', 'slateTable',
                                     'hero', 'columns', 'slider', 'gridBlock', 'section',
                                     'contextNavigation', 'codeExample', 'toc', 'highlight', 'introduction',
-                                ],
+                                , 'accordion'],
                                 defaultBlockType: 'slate',
                             },
                         },

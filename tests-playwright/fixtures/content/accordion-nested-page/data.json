@@ -76,6 +76,76 @@
               "panel-2-grid"
             ]
           }
+        },
+        {
+          "@id": "acc-panel-outer",
+          "title": "Closed, holds another accordion",
+          "blocks": {
+            "inner-acc": {
+              "@type": "accordion",
+              "collapsed": false,
+              "filtering": false,
+              "non_exclusive": false,
+              "right_arrows": true,
+              "panels": [
+                {
+                  "@id": "inner-panel-open",
+                  "title": "Inner, open",
+                  "blocks": {
+                    "inner-slate-open": {
+                      "@type": "slate",
+                      "value": [
+                        {
+                          "type": "p",
+                          "children": [
+                            {
+                              "text": "Inner panel that starts open."
+                            }
+                          ]
+                        }
+                      ],
+                      "plaintext": "Inner panel that starts open."
+                    }
+                  },
+                  "blocks_layout": {
+                    "items": [
+                      "inner-slate-open"
+                    ]
+                  }
+                },
+                {
+                  "@id": "inner-panel-closed",
+                  "title": "Inner, closed",
+                  "blocks": {
+                    "deep-slate": {
+                      "@type": "slate",
+                      "value": [
+                        {
+                          "type": "p",
+                          "children": [
+                            {
+                              "text": "Two closed containers deep."
+                            }
+                          ]
+                        }
+                      ],
+                      "plaintext": "Two closed containers deep."
+                    }
+                  },
+                  "blocks_layout": {
+                    "items": [
+                      "deep-slate"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          "blocks_layout": {
+            "items": [
+              "inner-acc"
+            ]
+          }
         }
       ]
     }

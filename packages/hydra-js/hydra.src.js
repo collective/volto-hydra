@@ -147,6 +147,9 @@ function log(...args) {
  */
 const isValidNodeId = (id) => id && /^\d+(\.\d+)*$/.test(id);
 
+// How many nested closed containers a reveal will open before giving up.
+const MAX_REVEAL_DEPTH = 5;
+
 /**
  * Virtual block UID for page-level fields (title, description, preview_image, etc.)
  * Used to distinguish "page field selected" from "nothing selected" (null)
@@ -11192,17 +11195,34 @@ export class Bridge {
    * @param {string} targetUid - The UID of the block to make visible
    * @returns {boolean} True if a selector was clicked (block may now be visible)
    */
-  tryMakeBlockVisible(targetUid) {
+
+  tryMakeBlockVisible(targetUid, depth = 0) {
     log(`tryMakeBlockVisible: ${targetUid}`);
+    // Nested closed containers need one pass each. Bounded so a container that
+    // never opens can't spin.
+    if (depth > MAX_REVEAL_DEPTH) {
+      log(`tryMakeBlockVisible: giving up after ${depth} passes for ${targetUid}`);
+      this._navigatingToBlock = null;
+      return false;
+    }
     // Set flag to prevent handleBlockSelector from interfering
     this._navigatingToBlock = targetUid;
     // Word-list match (`~=`) lets a single trigger element expose many
     // descendants — `data-block-selector="uid-a uid-b uid-c"` matches
     // any listed uid. Used by collapsible containers like a
     // contextNavigation `<summary>` that carries every child's uid.
-    const directSelector = document.querySelector(
+    const directCandidate = document.querySelector(
       `[data-block-selector~="${targetUid}"]`,
     );
+    // A handle that is itself hidden — inside a container that is still closed —
+    // cannot be used yet: clicking it opens ITS container while the outer one
+    // stays shut, so the target never appears. Fall through to the ancestor walk
+    // and open from the outside in; this handle becomes usable on a later pass.
+    const directSelector =
+      directCandidate && !this.isElementHidden(directCandidate) ? directCandidate : null;
+    if (directCandidate && !directSelector) {
+      log(`tryMakeBlockVisible: handle for ${targetUid} is itself hidden, opening its ancestors first`);
+    }
     // Click the appropriate selector to navigate toward the target block.
     // For direct selectors (data-block-selector="{uid}"), one click suffices.
     // For +1/-1 selectors, we click once and may recurse if more steps are needed.
@@ -11219,20 +11239,55 @@ export class Bridge {
     // already in the DOM, and a block inside a closed container often isn't
     // rendered at all.
     let ancestorSelector = null;
+    let ancestorUid = null;
+    // Only ancestor passes count toward the depth bound. A +1/-1 walk recurses
+    // once per step and terminates on its own index arithmetic — counting those
+    // made a carousel with more than MAX_REVEAL_DEPTH slides give up partway.
+    let usedAncestor = false;
     if (!directSelector) {
+      // Collect every ancestor that published a handle, then use the OUTERMOST.
+      // Order matters when containers nest: an inner container's handle can
+      // itself be inside a closed outer one, and opening the inner first leaves
+      // the target hidden with nothing left to click. Opening from the outside
+      // in always makes progress.
       const seen = new Set([targetUid]);
+      const handles = [];
+      // `child` is what sits one step BELOW this ancestor on the way to the
+      // target — the thing that actually appears when this container opens.
+      let childUid = targetUid;
       let parentUid = this.blockPathMap?.[targetUid]?.parentId;
       while (parentUid && !seen.has(parentUid)) {
         seen.add(parentUid);
         const handle = document.querySelector(
           `[data-block-selector~="${parentUid}"]`,
         );
-        if (handle) {
-          log(`tryMakeBlockVisible: no handle for ${targetUid}, using ancestor ${parentUid}`);
-          ancestorSelector = handle;
-          break;
-        }
+        if (handle) handles.push({ uid: parentUid, handle, child: childUid });
+        childUid = parentUid;
         parentUid = this.blockPathMap?.[parentUid]?.parentId;
+      }
+      // Skip handles whose container is ALREADY open: on the second pass the
+      // outer one is open, and re-picking it would loop instead of descending
+      // to the handle that pass just made reachable.
+      const stillClosed = handles.filter(({ handle }) => {
+        if (handle.getAttribute('aria-expanded') === 'true') return false;
+        const details = handle.tagName === 'SUMMARY' ? handle.closest('details') : null;
+        if (details && details.open) return false;
+        return !this.isElementHidden(handle);
+      });
+      // NEAREST reachable ancestor, not the outermost. The reachability filter
+      // above already skips handles buried in a closed container, so the nearest
+      // survivor is the right one to click — and picking the outermost instead
+      // sent carousel reveals to a container far above the slider that owns the
+      // slide.
+      const outermost = stillClosed[0];
+      if (outermost) {
+        log(`tryMakeBlockVisible: no handle for ${targetUid}, using ancestor ${outermost.uid}`);
+        ancestorSelector = outermost.handle;
+        // Wait on the CHILD, not the container. A collapsed panel's own element
+        // is already visible — only its contents are hidden — so watching the
+        // container reported success on the first frame and recursed before
+        // anything had rendered.
+        ancestorUid = outermost.child;
       }
     }
 
@@ -11240,10 +11295,15 @@ export class Bridge {
       log(`tryMakeBlockVisible: found direct selector for ${targetUid}`);
       clickedSelector = directSelector;
     } else if (ancestorSelector) {
+      usedAncestor = true;
       // Opening the ancestor may expose the target directly, or reveal another
-      // closed container inside it — the caller re-checks visibility and calls
-      // again, so each call peels one layer.
+      // closed container inside it. Waiting on the ANCESTOR rather than the
+      // target is what lets the existing check recurse: once the ancestor is
+      // open we run again, and the handle that was buried inside it is now
+      // reachable. Waiting on the target instead just polled a hidden element
+      // until the timeout.
       clickedSelector = ancestorSelector;
+      nextUid = ancestorUid;
     } else {
       // No direct selector - try +1/-1 navigation
       log(`tryMakeBlockVisible: no direct selector, trying +1/-1 navigation`);
@@ -11376,7 +11436,7 @@ export class Bridge {
         }
         // Need more clicks - recurse
         log(`tryMakeBlockVisible: not at target yet, continuing navigation`);
-        this.tryMakeBlockVisible(targetUid);
+        this.tryMakeBlockVisible(targetUid, usedAncestor ? depth + 1 : depth);
         return;
       }
 

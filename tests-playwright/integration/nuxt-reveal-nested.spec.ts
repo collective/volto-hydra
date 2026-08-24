@@ -64,4 +64,25 @@ test.describe('Reveal a block nested under the handle', () => {
 
     await expect(nested).toBeVisible({ timeout: 5000 });
   });
+
+  test('selecting a block two closed containers deep opens both', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/accordion-nested-page');
+
+    const iframe = helper.getIframe();
+
+    // deep-slate sits in a closed panel of an accordion that is itself inside
+    // a closed panel — opening one layer is not enough to bring it into view.
+    const deep = iframe.locator('[data-block-uid="deep-slate"]').first();
+    await expect(deep).toBeAttached({ timeout: 15000 });
+    await expect(deep).toBeHidden();
+
+    await page.evaluate((uid) => {
+      const el = document.querySelector('iframe') as HTMLIFrameElement;
+      el.contentWindow!.postMessage({ type: 'SELECT_BLOCK', uid }, '*');
+    }, 'deep-slate');
+
+    await expect(deep).toBeVisible({ timeout: 8000 });
+  });
 });
