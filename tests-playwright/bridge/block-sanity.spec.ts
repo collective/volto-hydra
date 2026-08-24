@@ -159,7 +159,10 @@ test.describe('Block sanity (auto-discovered)', () => {
     // nearest ancestor that accepts the type). Fails as its own test rather
     // than blocking the suite.
     if (block.allowedBlocksViolation) {
-      test(`${block.blockType} block [${block.blockId}] is allowed in its container${src}`, ({}, testInfo) => {
+      // pagePath for the same reason the shape test carries it: one blockId can
+      // repeat across pages, and two such entries would collide into a duplicate
+      // title, which aborts the whole file before any test runs.
+      test(`${block.blockType} block [${block.blockId}] on ${block.pagePath} is allowed in its container${src}`, ({}, testInfo) => {
         test.skip(!belongsHere(testInfo.project.name), `discovered via ${block.frontend}`);
         throw new Error(
           `Block "${block.blockType}" [${block.blockId}] on ${block.pagePath} is placed in a ` +
