@@ -91,10 +91,15 @@ function getImageUrl(value) {
         const field = value.image_field;
         const scales = value.image_scales[field];
         if (scales?.[0]?.download) {
-            // Brain @id is often an absolute URL (matches apiOrigin); strip to
-            // relative so we don't double-prepend. External absolutes are kept.
-            const baseUrl = stripApiOrigin(value['@id'] || '');
-            return `${apiOrigin}${baseUrl}/${scales[0].download}`;
+            // A brain's @id comes back absolute from the API, so use it as the
+            // base as-is. Stripping it to a path and re-prefixing with apiOrigin
+            // silently produced an ORIGIN-LESS src whenever window._apiOrigin
+            // was unset — the browser then resolved it against the frontend,
+            // which 404s: "All images should have valid src and load
+            // successfully" for a listing thumbnail that is fine on the API.
+            const rawId = value['@id'] || '';
+            const baseUrl = /^https?:\/\//.test(rawId) ? rawId : `${apiOrigin}${rawId}`;
+            return `${baseUrl}/${scales[0].download}`;
         }
     }
 
