@@ -289,7 +289,7 @@
           "@id": "ref-text-schema-javascript-6ffd2e",
           "label": "Schema",
           "language": "javascript",
-          "code": "{\n  \"slate\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"value\": {\n          \"title\": \"Text\",\n          \"widget\": \"slate\"\n        }\n      }\n    }\n  }\n}"
+          "code": "{\n  \"slate\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"value\": {\n          \"title\": \"Text\",\n          \"widget\": \"slate\",\n          \"type\": \"array\"\n        }\n      }\n    }\n  }\n}"
         }
       ]
     },

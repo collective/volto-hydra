@@ -283,7 +283,7 @@ onMounted(() => {
                 page: {
                     schema: {
                         properties: {
-                            items: {
+                                                        items: {
                                 title: 'Blocks',
                                 allowedBlocks: [...new Set(['slate', 'image', 'separator', 'video', 'gridBlock', 'teaser', 'listing', 'summary', 'default', 'section', 'contextNavigation', ...pageLevelBlocks])],
                                 allowedTemplates: ['/_test_data/templates/test-layout'],

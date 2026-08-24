@@ -7,6 +7,15 @@ const hydraJsPath = resolve(__dirname, '../../packages/hydra-js')
 const helpersPath = resolve(__dirname, '../../packages/helpers')
 const fixturesPath = resolve(__dirname, '../../tests-playwright/fixtures')
 
+// The mock API and admin origins the test/edit profiles talk to. package.json's
+// dev:test already takes these ports from HYDRA_MOCK_API_PORT /
+// HYDRA_VOLTO_SSR_PORT, but the CSP below hardcoded 8888/3001 — so running the
+// example on any other port block (as a parent repo must, to avoid binding
+// hydra's defaults) had every API fetch blocked by CSP: no content, and a null
+// deref in onEditChange that reads as "the frontend never rendered".
+const MOCK_API_ORIGIN = `http://localhost:${process.env.HYDRA_MOCK_API_PORT || 8888}`;
+const ADMIN_ORIGIN = `http://localhost:${process.env.HYDRA_VOLTO_SSR_PORT || 3001}`;
+
 export default defineNuxtConfig({
   nitro: {
     preset: 'static',
@@ -65,8 +74,8 @@ export default defineNuxtConfig({
           security: {
             headers: { // Edit site can be put in an iframe
               contentSecurityPolicy: {
-                'img-src': ["'self'", "data:", 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com', 'http://localhost:3001', 'http://localhost:8888'],
-                'connect-src': ["'self'", "data:", 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com', 'http://localhost:3001', 'http://localhost:8888'],
+                'img-src': ["'self'", "data:", 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com', ADMIN_ORIGIN, MOCK_API_ORIGIN],
+                'connect-src': ["'self'", "data:", 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com', ADMIN_ORIGIN, MOCK_API_ORIGIN],
                 'frame-ancestors': ['*']
               },
               crossOriginResourcePolicy: "cross-origin",
@@ -112,8 +121,8 @@ export default defineNuxtConfig({
           security: {
             headers: {
               contentSecurityPolicy: {
-                'img-src': ["'self'", "data:", 'http://localhost:3001', 'http://localhost:8888', 'https://placehold.co'],
-                'connect-src': ["'self'", "data:", 'http://localhost:3001', 'http://localhost:8888'],
+                'img-src': ["'self'", "data:", ADMIN_ORIGIN, MOCK_API_ORIGIN, 'https://placehold.co'],
+                'connect-src': ["'self'", "data:", ADMIN_ORIGIN, MOCK_API_ORIGIN],
                 'frame-ancestors': ['*']
               },
               crossOriginResourcePolicy: "cross-origin",
@@ -126,8 +135,8 @@ export default defineNuxtConfig({
       runtimeConfig: {
         public: {
           image_alias: '',
-          backendBaseUrl: 'http://localhost:8888',
-          adminUrl: 'http://localhost:3001',
+          backendBaseUrl: MOCK_API_ORIGIN,
+          adminUrl: ADMIN_ORIGIN,
         }
       },
       image: {

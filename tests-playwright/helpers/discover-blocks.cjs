@@ -232,6 +232,84 @@ function variationOf(blockData) {
 }
 
 /**
+ * Is this document the template the block belongs to? A `templateId` is written
+ * either as the template's path or as `resolveuid/<uid>`, so match both.
+ *
+ * @param {Object} content - The page JSON the block was found in
+ * @param {string} templateId
+ * @returns {boolean}
+ */
+function isOwnDefinition(content, templateId) {
+  if (!templateId || typeof templateId !== 'string') return false;
+  const ids = new Set();
+  if (content?.['@id']) ids.add(new URL(content['@id'], 'http://x').pathname);
+  if (content?.UID) ids.add(`resolveuid/${content.UID}`);
+  if (ids.has(templateId)) return true;
+  return ids.has(new URL(templateId, 'http://x').pathname);
+}
+
+/**
+ * Can an author edit this instance, and what does it take? Only an editable
+ * instance is a valid subject for the sanity checks, which click a field and
+ * require it to become editable.
+ *
+ * A `readOnly` block stamped onto an ordinary page is a COPY of a template
+ * member: the author edits the template, not the copy, so it is not a subject.
+ * On the template's OWN document that same block IS the thing being authored —
+ * it unlocks there like any template member (the merge gives a definition's
+ * blocks a `templateInstanceId`), so it is a subject that carries the id to
+ * unlock with.
+ *
+ * `fixed` is not a criterion at all. Fixed means position-locked — the bridge
+ * uses isFixed to keep a block out of drag and edge-drag candidates — which is
+ * a different thing from uneditable, the question isBlockReadonly answers. A
+ * contentLayout is the clearest case: the page has exactly one and you switch
+ * which layout rather than dragging it about, yet its own fields are edited in
+ * the sidebar and its regions hold ordinary authored content.
+ *
+ * Definition pages used to be excluded outright, because ranking by richness
+ * picked `alert0` in /templates/site-announcement for globalAlert — and back
+ * then a definition could not be edited at all, so the subject was doomed:
+ * "locked by design". Definitions unlock now, so a definition is as good a
+ * subject as any other instance and richness alone decides. The exclusion also
+ * hid every block whose only home is a template, which is how `footer` came to
+ * report "no editable content example" while being the most-edited chrome on
+ * the site.
+ *
+ * The caller learns only WHETHER unlocking is needed, never with what id. An
+ * unlock id is a `templateInstanceId` — one APPLICATION of a template — and in
+ * the general case the merge mints it (`const instanceId = uuidGenerator()`), so
+ * it cannot be derived from stored content at all. Predicting it worked only for
+ * the deterministic cases (a forced layout's `instanceId === templateId`, a
+ * fixture storing its own, the stamp for definitions lacking one) and failed as
+ * "stayed locked" for every other. The spec reads the id off the bridge instead.
+ *
+ * @param {Object} content - The page JSON the block was found in
+ * @param {Object} blockData - The block's stored data
+ * @returns {{needsUnlock: boolean}|null} null when not a subject
+ */
+function editableInstance(content, blockData) {
+  const templateId = blockData?.templateId;
+  const onOwnDefinition = isOwnDefinition(content, templateId);
+  // Template CHROME (`fixed` or `readOnly`) as opposed to slot CONTENT (neither,
+  // and the author's own). A `fixed` member is re-inserted from the template on
+  // every render — "copy block content from a page block with the same slotId" —
+  // so the copy on an ordinary page gets a freshly minted uid each load and
+  // cannot be addressed by the id discovery read from stored content. The
+  // definition is where it is authored and where its id is stable.
+  //
+  // `fixed` alone is NOT chrome: a contentLayout is fixed with no templateId,
+  // position-locked rather than template-owned, and is edited in place.
+  if (templateId && blockData?.fixed === true && !onOwnDefinition) {
+    return null;
+  }
+  if (blockData?.readOnly === true) {
+    return onOwnDefinition ? { needsUnlock: true } : null;
+  }
+  return { needsUnlock: false };
+}
+
+/**
  * Score an example block by content richness, so when multiple pages
  * contain the same (blockType, variation) we keep the most interesting
  * example for testing. Heuristic:
@@ -879,6 +957,49 @@ async function loadOfflineBlockSyncApi(blocksConfig) {
     api.resolveEffectiveBlockSchema(blockId, formData, pathMap, enhanced, intl);
 }
 
+// Structural types: hydra's own plumbing, never a project's placement choice.
+const CONTAINMENT_EXEMPT_TYPES = new Set(['empty', 'column', 'title', 'description']);
+
+/**
+ * Rules the CONSUMING PROJECT passes in, saying where a block placed outside
+ * its container's allowedBlocks is deliberate rather than a mistake.
+ *
+ * `CONTAINMENT_EXEMPT_SLOTS` — comma-separated template slot ids. The case this
+ * exists for: a documentation site shows every component on its own doc page,
+ * inside a showcase slot of a page template. Chrome like `header`, or a layout
+ * like `contentLayout`, is in no ordinary region's allowedBlocks and must stay
+ * that way — otherwise the block chooser offers site chrome on every page — yet
+ * the doc page still has to show one. Only the project that authored the
+ * template knows which slot means "an example lives here", so hydra takes it as
+ * configuration instead of guessing.
+ */
+function readContainmentRules(env = process.env) {
+  return {
+    slots: (env.CONTAINMENT_EXEMPT_SLOTS || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  };
+}
+
+/**
+ * Is this block's placement exempt from the containment check?
+ *
+ * Exempt when: it is structural, template-placed or position-fixed; its
+ * container declares no allowed set, or declares one that includes the type;
+ * or it sits in a slot the project nominated (see readContainmentRules).
+ */
+function isContainmentExempt(entry, blockData, rules = { slots: [] }) {
+  if (entry.isTemplateInstance || entry.isFixed) return true;
+  if (CONTAINMENT_EXEMPT_TYPES.has(entry.blockType)) return true;
+  if (!Array.isArray(entry.allowedSiblingTypes) || entry.allowedSiblingTypes.length === 0) {
+    return true;
+  }
+  if (entry.allowedSiblingTypes.includes(entry.blockType)) return true;
+  const slotId = blockData && blockData.slotId;
+  return !!slotId && (rules.slots || []).includes(slotId);
+}
+
 async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, frontendKeys = []) {
   // Use hydra's canonical buildBlockPathMap to walk content — it knows
   // the schema-defined container fields (blocks_layout, object_list,
@@ -908,7 +1029,7 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   // chevron / drag walks it OUT to the nearest ancestor that accepts the type,
   // so it "escapes"). Surface each as a failing test, like the issues below.
   const allowedBlocksViolations = []; // {blockType, allowed, parentType, pagePath, blockId}
-  const CONTAINMENT_EXEMPT = new Set(['empty', 'column', 'title', 'description']);
+  const containmentRules = readContainmentRules();
   // Track block @types seen in content that aren't in blocksConfig — the
   // frontend's Block.vue falls through to a "Not implemented" placeholder
   // for these. Collect all occurrences so the report shows every page
@@ -1010,16 +1131,10 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         const schema = resolvedSchema || (blockType ? blocksConfig[blockType]?.blockSchema : null);
 
         // Containment check (see allowedBlocksViolations above): flag a block
-        // placed in a container that doesn't allow its @type. Skip template-
-        // placed / content-type-fixed blocks and exempt structural types.
+        // placed in a container that doesn't allow its @type.
         if (
           entry.blockType &&
-          !entry.isTemplateInstance &&
-          !entry.isFixed &&
-          !CONTAINMENT_EXEMPT.has(entry.blockType) &&
-          Array.isArray(entry.allowedSiblingTypes) &&
-          entry.allowedSiblingTypes.length > 0 &&
-          !entry.allowedSiblingTypes.includes(entry.blockType)
+          !isContainmentExempt(entry, blockData, containmentRules)
         ) {
           allowedBlocksViolations.push({
             blockType: entry.blockType,
@@ -1113,6 +1228,13 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         // (lowest score → catches degenerate cases like null slate values
         // that fall through to "Not implemented" rendering). Same render
         // test fires for each kind.
+        //
+        // Locked copies stamped onto ordinary pages are still walked above for
+        // shape/slate/containment validation, but are never the subject of the
+        // render + editing checks (see editableInstance).
+        const editable = editableInstance(content, blockData);
+        if (!editable) continue;
+
         for (const kind of ['rich', 'simple']) {
           const key = `${blockType}:${variation}:${kind}`;
           const existing = seen.get(key);
@@ -1132,6 +1254,9 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
             pagePath,
             blockData,
             isListing: blockType === 'listing',
+            // A locked block on its own definition page: the spec unlocks its
+            // template instance (id read from the bridge) before checking.
+            needsUnlock: editable.needsUnlock,
             _score: score,
           });
         }
@@ -1303,7 +1428,14 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
       if (!frontendKeySet.has(parentType)) continue;
       for (const subType of allowedBlocks) required.add(subType);
     }
-    const discoveredTypes = new Set(result.map((r) => r.blockType));
+    // Only entries that carry block data are real render cases. Issue entries
+    // (shape, slate, undeclared field, containment) name a blockType too, and
+    // counting those as coverage let a type with an unrelated failure hide the
+    // fact that it has no example at all — `form` and `search` both have
+    // schema-gap failures, and were silently exempted from needing one.
+    const discoveredTypes = new Set(
+      result.filter((r) => r.blockData !== undefined).map((r) => r.blockType),
+    );
     for (const blockType of required) {
       if (discoveredTypes.has(blockType)) continue;
       // A dynamic listing/grid item type has no stored authored instance, but a
@@ -1332,4 +1464,11 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   return result;
 }
 
-module.exports = { discoverBlocks, extractBlocks, buildObjectListFieldsMap, buildEmptyRegionCases };
+module.exports = {
+  discoverBlocks,
+  extractBlocks,
+  buildObjectListFieldsMap,
+  buildEmptyRegionCases,
+  isContainmentExempt,
+  readContainmentRules,
+};

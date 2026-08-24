@@ -137,6 +137,28 @@ is the end of a path (a region's children are separate blocks with their own
 This lets fixed parts of the page (headers), parent-block fields, and fields
 grouped inside an object all be edited in place, with one addressing model.
 
+### Where a page field comes from
+
+A `/fieldName` path resolves against the **content type's schema**, not against
+anything the frontend declares. The admin reads the schema for the content being
+edited and hands the bridge a field type per property (`View.jsx`
+`extractBlockFieldTypes`: *"page-level field types from content type schema …
+accessed via /fieldName"*). So `data-edit-text="/title"` works on any content
+type with a `title`, and `data-edit-text="/effective"` works on one that has an
+`effective` — no registration step.
+
+The corollary matters, because getting it wrong is silent: **do not add page
+metadata to `initBridge`'s `page.schema.properties`.** That schema lists the
+page's *blocks fields* (its regions), and the admin turns every entry in it into
+a region — `widget: 'blocks_layout'` is stamped on and an empty
+`blocks_layout[<name>]` minted. Declaring `title`/`effective` there gives the
+page phantom empty regions; page-level selection then lands on one of them, and
+`Cmd+A` selects one block where it should select all siblings.
+
+If a field is annotated but clicking it does nothing, the field is missing from
+the content type's schema — the annotation renders either way, since the DOM
+knows nothing about schemas.
+
 ## Readonly Regions
 
 Add `data-block-readonly` (or `<!-- hydra block-readonly -->` comment) to disable inline editing for all fields inside an element:

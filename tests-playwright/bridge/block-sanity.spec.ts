@@ -11,6 +11,11 @@
  * Env vars:
  *   DISCOVER_BLOCKS_API  - Plone API URL for discovery and content fetching
  *   MOCK_PARENT_URL      - URL of mock-parent.html (defaults to test-frontend port)
+ *   CONTAINMENT_EXEMPT_SLOTS
+ *                        - comma-separated template slot ids where a block may
+ *                          sit outside its container's allowedBlocks on purpose
+ *                          (e.g. a docs site's component showcase slot). See
+ *                          readContainmentRules in helpers/discover-blocks.cjs.
  *
  * Works against any Plone API — mock or remote.
  */
@@ -24,6 +29,7 @@ import { URLS } from '../ports';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { requireEnvironment } from '../helpers/preconditions';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 interface DiscoveredBlock {
   blockType: string;
@@ -42,6 +48,9 @@ interface DiscoveredBlock {
   field?: string;
   issues?: string[];
   noExample?: boolean;
+  // Set by discovery for a locked block found on its own template document.
+  // The instance to unlock is read from the bridge at runtime — see below.
+  needsUnlock?: boolean;
   allowedBlocksViolation?: boolean;
   parentType?: string;
   allowed?: string[];
@@ -76,12 +85,17 @@ discoveredBlocks = discoveredBlocks.filter(
 const SANITY_PROJECTS = new Set(['mock', 'nuxt', 'nextjs']);
 
 base.beforeEach(async ({}, testInfo) => {
-  if (discoveredBlocks.length === 0) {
-    testInfo.skip(true, 'No .discovered-blocks.json found — run with DISCOVER_BLOCKS_API=<url>');
-  }
+  // Scope BEFORE environment: a project this spec doesn't cover is a decision,
+  // and no CI change would make it run — so it skips even on CI. Discovery
+  // missing is the opposite, hence requireEnvironment below.
   if (!SANITY_PROJECTS.has(testInfo.project.name)) {
     testInfo.skip(true, `block-sanity only runs on mock/nuxt/nextjs (skipping ${testInfo.project.name})`);
   }
+  requireEnvironment(
+    testInfo,
+    discoveredBlocks.length > 0,
+    'no .discovered-blocks.json — discovery needs DISCOVER_BLOCKS_API=<mock api url> in this job',
+  );
 });
 
 const test = base.extend<{ helper: AdminUIHelper }>({
@@ -110,11 +124,14 @@ test.describe('Block sanity (auto-discovered)', () => {
     // A frontend-registered type with no content example — fails as its own
     // test (nothing to render) rather than blocking the suite.
     if (block.noExample) {
-      test(`${block.blockType} block has a content example to render`, () => {
+      test(`${block.blockType} block has an editable content example to render`, () => {
         throw new Error(
-          `Block @type "${block.blockType}" is registered in the frontend but no content ` +
+          `Block @type "${block.blockType}" is registered in the frontend but no EDITABLE content ` +
             `example exists to run its render test. Add a fixture (a page with a populated ` +
-            `instance), or mark the type restricted if it only belongs inside a parent container.`,
+            `instance), or mark the type restricted if it only belongs inside a parent container.\n\n` +
+            `Locked instances don't count: a /templates/* definition, or a block flagged ` +
+            `readOnly/fixed, cannot be edited by an author, so the editing checks would be ` +
+            `asserting the opposite of what that block is for.`,
         );
       });
       continue;
@@ -191,6 +208,64 @@ test.describe('Block sanity (auto-discovered)', () => {
       // races bridge init and flakily throws "blockPathMap not available".
       await helper.waitForBridgeConnected();
 
+      // Site chrome (a footer, a global announcement) is authored on its
+      // template's own document, where its blocks are locked until the template
+      // is unlocked — the gesture that says "this changes everywhere", and the
+      // one an author makes before editing it anywhere. Unlocking is a single
+      // message; the admin's toggle sends the same one.
+      //
+      // The instance id comes from the BRIDGE, not from discovery. It identifies
+      // one application of a template and the merge mints it
+      // (`const instanceId = uuidGenerator()`), so stored content cannot say what
+      // it will be; deriving it offline worked only for the deterministic cases
+      // and failed as "stayed locked" for the rest. Reading it here also makes
+      // "locked with nothing able to unlock it" a legible failure instead of a
+      // silent mismatch.
+      if (block.needsUnlock) {
+        const frame = page.frames().find((f) => f !== page.mainFrame())!;
+        const instanceId = await frame.evaluate((uid) => {
+          const bridge = (window as any).__hydraBridge;
+          let found: string | null = null;
+          const walk = (blocks: Record<string, any>) => {
+            for (const [id, b] of Object.entries(blocks || {})) {
+              if (!b || typeof b !== 'object') continue;
+              if (id === uid) found = b.templateInstanceId ?? null;
+              for (const [key, value] of Object.entries<any>(b)) {
+                if (key === 'blocks' && value && typeof value === 'object') walk(value);
+                else if (value && typeof value === 'object' && value.blocks) walk(value.blocks);
+              }
+            }
+          };
+          walk(bridge?.formData?.blocks || {});
+          return found;
+        }, block.blockId);
+
+        expect(
+          instanceId,
+          `${block.blockType} block "${block.blockId}" is readOnly with no templateInstanceId — ` +
+            `nothing can unlock it, so it is uneditable everywhere`,
+        ).toBeTruthy();
+
+        await page.evaluate((id) => {
+          (document.getElementById('previewIframe') as HTMLIFrameElement)
+            .contentWindow!.postMessage(
+              { type: 'TEMPLATE_EDIT_MODE', instanceIds: [id] },
+              '*',
+            );
+        }, instanceId);
+
+        await expect
+          .poll(
+            () =>
+              frame.evaluate(
+                (uid) => !(window as any).__hydraBridge?.isBlockReadonly(uid),
+                block.blockId,
+              ),
+            { message: `${block.blockType} stayed locked after unlocking instance ${instanceId}` },
+          )
+          .toBe(true);
+      }
+
       const iframe = helper.getIframe();
 
       await verifyBlockRendering(page, iframe, block.blockId, block.blockData, {
@@ -198,8 +273,11 @@ test.describe('Block sanity (auto-discovered)', () => {
         // Sub-block iteration uses the bridge's blockPathMap (canonical,
         // schema-resolved) rather than a shape heuristic on blockData.
         checkSubBlocks: true,
-        // Skip data-edit-text clicks for discovered content — we just want rendering + annotation checks
-        checkEditTextClicks: false,
+        // Click the block's first editable field and require that it actually
+        // becomes editable. Annotation presence alone is not the contract an
+        // author experiences: a component whose own JS reveals or rebuilds its
+        // DOM can carry every annotation and still be impossible to type into.
+        checkEditTextClicks: true,
       });
 
       // Accessibility pass (axe-core) over the WHOLE rendered fixture page —

@@ -91,10 +91,15 @@ function getImageUrl(value) {
         const field = value.image_field;
         const scales = value.image_scales[field];
         if (scales?.[0]?.download) {
-            // Brain @id is often an absolute URL (matches apiOrigin); strip to
-            // relative so we don't double-prepend. External absolutes are kept.
-            const baseUrl = stripApiOrigin(value['@id'] || '');
-            return `${apiOrigin}${baseUrl}/${scales[0].download}`;
+            // A brain's @id comes back absolute from the API, so use it as the
+            // base as-is. Stripping it to a path and re-prefixing with apiOrigin
+            // silently produced an ORIGIN-LESS src whenever window._apiOrigin
+            // was unset — the browser then resolved it against the frontend,
+            // which 404s: "All images should have valid src and load
+            // successfully" for a listing thumbnail that is fine on the API.
+            const rawId = value['@id'] || '';
+            const baseUrl = /^https?:\/\//.test(rawId) ? rawId : `${apiOrigin}${rawId}`;
+            return `${baseUrl}/${scales[0].download}`;
         }
     }
 
@@ -438,7 +443,17 @@ if (typeof document !== 'undefined') {
 }
 
 function renderSlateBlock(block) {
-    const value = block.value || [];
+    // An EMPTY slate block (no `value` at all — the state a just-added block is
+    // in) still has to render one node, or there is nothing carrying
+    // data-node-id for the bridge to sync a cursor to: clicking it raises
+    // "Selection sync failed - missing data-node-id" and the author cannot
+    // type. A real frontend gets this from the schema default
+    // ([{type:'p',children:[{text:''}]}]); this fixture has no defaults layer,
+    // so it seeds the same empty paragraph here, nodeId '0' like the first node
+    // of any slate value.
+    const value = (block.value && block.value.length)
+        ? block.value
+        : [{ type: 'p', nodeId: '0', children: [{ text: '' }] }];
     let html = '';
     value.forEach((node) => {
         // nodeId is required for edit mode (hydra.js adds it), but optional for view mode
@@ -739,7 +754,11 @@ function renderHeroBlockClean(block) {
     // Render subheading as textarea (preserve newlines)
     const subheadingHtml = subheading.replace(/\n/g, '<br>');
 
-    // Render description - still needs node IDs for slate editing
+    // Render description - still needs node IDs for slate editing.
+    // Data-driven, in edit mode too (issue #296): no data ⇒ no element. Reveal
+    // is the bridge's job — TOGGLE_OPTIONAL_FIELDS seeds a sentinel value so
+    // this very `description.length` rule fires — and it only works while the
+    // renderer keeps telling the truth about what the block holds.
     let descriptionHtml = '';
     description.forEach((node) => {
         const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
@@ -758,7 +777,13 @@ function renderHeroBlockClean(block) {
     });
 
     // Image - uses class instead of data-edit-media. Data-driven (issue #296):
-    // no image ⇒ no element, so the comment selector simply matches nothing.
+    // no image ⇒ no element, so the comment selector matches nothing.
+    //
+    // NOT a placeholder in edit mode. An empty field is easier to set with
+    // something to click, but "can clear image using X button overlay" asserts
+    // that clearing an image leaves NO annotated element behind — and a
+    // placeholder IS the leftover it looks for. Revealing an empty media field
+    // is the toolbar's job (issue #296), not the renderer's.
     const imageHtml = imageSrc
         ? `<img class="hero-image" src="${imageSrc}" alt="Hero image" style="max-width: 100%; height: auto; margin-bottom: 10px;" />`
         : '';
@@ -891,7 +916,11 @@ function renderSummaryItemBlock(block, blockUid) {
     const description = block.description || hrefObj?.description || '';
     const blockUidAttr = blockUid ? `data-block-uid="${blockUid}"` : '';
 
-    const imageSrc = block.image ? window._contentPath(getImageUrl(block.image)) : '';
+    // NOT _contentPath: that strips the API origin so a LINK stays same-origin
+    // for navigation (see href above). An image src must keep it — the bytes are
+    // served by the API, and stripping it made the browser resolve
+    // "/…/@@images/preview_image-800-….svg" against the FRONTEND, which 404s.
+    const imageSrc = block.image ? getImageUrl(block.image) : '';
 
     const imageHtml = imageSrc
         ? `<img data-edit-media="image" src="${imageSrc}" alt="" style="width: 80px; height: 60px; object-fit: cover; margin-right: 15px; border-radius: 4px;" />`
@@ -1047,8 +1076,13 @@ function renderHighlightBlock(block) {
         ? `<a href="${ctaLink || '#'}" data-edit-text="cta_title" data-edit-link="cta_link" style="display:inline-block;padding:10px 20px;background:#007eb1;color:white;text-decoration:none;border-radius:4px;">${ctaText}</a>`
         : '';
 
+    // The image is drawn as a CSS background, so nothing carried
+    // data-edit-media and highlight.image was uneditable everywhere it appeared.
+    // The bridge only needs an element with dimensions, not an <img> — the
+    // overlay covers the section, so annotate it. (Same fix as the nuxt
+    // example's highlight.)
     return `<section class="highlight-block" style="${bgStyle}padding:40px 20px;color:white;border-radius:8px;">
-        <div class="highlight-overlay" style="background:rgba(0,0,0,0.4);padding:30px;border-radius:8px;">
+        <div class="highlight-overlay" data-edit-media="image" style="background:rgba(0,0,0,0.4);padding:30px;border-radius:8px;">
             <h2 data-edit-text="title">${title}</h2>
             <div class="highlight-body">${descHtml}</div>
             ${ctaHtml}

@@ -75,7 +75,7 @@
                 {
                   "type": "link",
                   "data": {
-                    "url": "./server-rendered-frontends.md"
+                    "url": "/docs/server-rendered-frontends"
                   },
                   "children": [
                     {
@@ -271,7 +271,7 @@
             {
               "type": "link",
               "data": {
-                "url": "./server-rendered-frontends.md"
+                "url": "/docs/server-rendered-frontends"
               },
               "children": [
                 {
@@ -285,7 +285,7 @@
             {
               "type": "link",
               "data": {
-                "url": "./build-a-frontend.md#deployment-patterns"
+                "url": "/docs/build-a-frontend#deployment-patterns"
               },
               "children": [
                 {

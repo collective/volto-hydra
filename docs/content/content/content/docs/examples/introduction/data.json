@@ -72,7 +72,7 @@
           "@id": "ref-introduction-schema-javascript-e14a03",
           "label": "Schema",
           "language": "javascript",
-          "code": "{\n  \"introduction\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"value\": {\n          \"title\": \"Text\",\n          \"widget\": \"slate\"\n        }\n      }\n    }\n  }\n}"
+          "code": "{\n  \"introduction\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"value\": {\n          \"title\": \"Text\",\n          \"widget\": \"slate\",\n          \"type\": \"array\"\n        }\n      }\n    }\n  }\n}"
         }
       ]
     },

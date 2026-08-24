@@ -18,6 +18,7 @@ import { URLS } from '../ports';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { requireEnvironment } from '../helpers/preconditions';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Doc-example tests run on frontends that render blocks from fixture data.
@@ -28,16 +29,22 @@ base.beforeEach(async ({}, testInfo) => {
   if (project === 'mock' || project === 'nuxt') {
     testInfo.skip(true, `Doc-examples only run on doc-example frontends (not ${project})`);
   }
-  // Skip opt-in frontends if their server isn't running
+  // Opt-in frontends locally; started by the workflow on CI. Unreachable is a
+  // skip on a laptop running one project, and a FAILURE on CI — otherwise a
+  // dead frontend reports green having tested nothing.
   if (project === 'nextjs' || project === 'f7' || project === 'astro') {
     const url = getFrontendUrl(project);
     if (url) {
+      let reachable = false;
+      let detail = 'not reachable';
       try {
         const resp = await fetch(url, { signal: AbortSignal.timeout(2000) });
-        if (!resp.ok) testInfo.skip(true, `${project} server not running (${resp.status})`);
+        reachable = resp.ok;
+        if (!resp.ok) detail = `responded ${resp.status}`;
       } catch {
-        testInfo.skip(true, `${project} server not reachable`);
+        reachable = false;
       }
+      requireEnvironment(testInfo, reachable, `${project} server on ${url} ${detail}`);
     }
   }
 });

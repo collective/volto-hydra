@@ -371,6 +371,9 @@ const UnconnectedImageInput = (props) => {
   // No image - show picker UI
   const pickerContent = (
     <AddLinkForm
+      // Mounted because a block was selected, not because the author asked for
+      // this form — so it must not steal the caret from the preview iframe.
+      autoFocus={false}
       data={{ url: '' }}
       theme={{}}
       objectBrowserPickerType="image"

@@ -1,6 +1,12 @@
 // Test config: same as vite.config.js but without mkcert/https (which fails in CI/test)
 import path from 'path';
+import { fileURLToPath } from 'url';
 import vue from '@vitejs/plugin-vue';
+
+// `.mjs` because this config imports @vitejs/plugin-vue, which is ESM-only:
+// the package has no "type": "module", so a `.js` config is require()d and
+// vite fails to load it ('resolved to an ESM file'). ESM has no __dirname.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const SRC_DIR = path.resolve(__dirname, './src');
 const PUBLIC_DIR = path.resolve(__dirname, './public');

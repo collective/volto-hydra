@@ -26,7 +26,8 @@
             },
             "description": {
               "title": "Description",
-              "widget": "slate"
+              "widget": "slate",
+              "type": "array"
             }
           }
         },
@@ -72,7 +73,8 @@
           "properties": {
             "value": {
               "title": "Text",
-              "widget": "slate"
+              "widget": "slate",
+              "type": "array"
             }
           }
         }
@@ -301,7 +303,8 @@
                           "schema": {
                             "properties": {
                               "value": {
-                                "widget": "slate"
+                                "widget": "slate",
+                                "type": "array"
                               }
                             }
                           }
@@ -765,8 +768,13 @@
       "search": {
         "blockSchema": {
           "properties": {
+            "headline": {
+              "title": "Headline",
+              "type": "string"
+            },
             "facetsTitle": {
-              "title": "Facets Title"
+              "title": "Facets Title",
+              "type": "string"
             },
             "facets": {
               "title": "Facets",
@@ -1448,7 +1456,8 @@
           "properties": {
             "value": {
               "title": "Text",
-              "widget": "slate"
+              "widget": "slate",
+              "type": "array"
             }
           }
         }
@@ -1599,7 +1608,8 @@
             },
             "description": {
               "title": "Description",
-              "widget": "slate"
+              "widget": "slate",
+              "type": "array"
             },
             "image": {
               "title": "Background Image",

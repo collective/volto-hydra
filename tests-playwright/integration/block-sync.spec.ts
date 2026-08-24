@@ -93,10 +93,8 @@ test.describe('Block Sync - Listing Block Item Type', () => {
     const imageDefaultsFieldset = page.locator('#blockform-fieldset-inherited_fields');
     await expect(imageDefaultsFieldset).toBeVisible({ timeout: 5000 });
 
-    // Wait for Nuxt async re-rendering to settle after variation change
-    await helper.getStableBlockCount();
-
-    // Wait for teasers to disappear first (confirms variation change is taking effect)
+    // The variation change is confirmed by the teasers going away — assert
+    // that directly rather than waiting for the count to stop moving.
     await expect(teaserItems).toHaveCount(0, { timeout: 5000 });
 
     // Then wait for image blocks to appear
@@ -501,19 +499,28 @@ test.describe('Block Sync - Search Block with Listing Container', () => {
     const searchInputAfter = iframe.locator('[data-block-uid="search-block-1"] input[name="SearchableText"]');
     await expect(searchInputAfter).toHaveValue('accordion', { timeout: 10000 });
 
-    // Wait for block count to stabilize after reactive re-fetch
-    await helper.getStableBlockCount();
-
-    // Check filtered results
     const filteredResults = iframe.locator('[data-block-uid="search-block-1"] .search-results [data-block-uid]');
 
-    // Should have at least one result (accordion-test-page matches "accordion")
-    await expect(filteredResults.first()).toBeVisible({ timeout: 10000 });
-    const filteredCount = await filteredResults.count();
-    expect(filteredCount).toBeGreaterThan(0);
-
-    // Should have fewer results than initial (search filtered them)
-    expect(filteredCount).toBeLessThan(initialCount);
+    // Wait for the RESULT of the re-fetch, and wait for the WHOLE result in one
+    // step: filtered means fewer rows than before AND still some rows, since
+    // accordion-test-page matches. Polling only for "fewer" accepts the empty
+    // render the re-fetch passes through on its way to the filtered set — 0 is
+    // less than 6 — and the next line then failed on a state the poll had just
+    // approved. (`first()` being visible is no good either: the OLD rows
+    // satisfy it, which is how this once read a stale 6-of-6.)
+    await expect
+      .poll(
+        async () => {
+          const count = await filteredResults.count();
+          return count > 0 && count < initialCount ? 'filtered' : `count=${count}`;
+        },
+        {
+          timeout: 10000,
+          message:
+            `search for "accordion" never settled on a filtered set (started at ${initialCount})`,
+        },
+      )
+      .toBe('filtered');
   });
 
   test('search block filters results when user clicks facet checkbox', async ({ page }) => {

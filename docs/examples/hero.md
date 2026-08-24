@@ -33,7 +33,8 @@ This is a **custom** block — register it via `initBridge`.
         },
         "description": {
           "title": "Description",
-          "widget": "slate"
+          "widget": "slate",
+          "type": "array"
         }
       }
     },
@@ -86,27 +87,34 @@ This is a **custom** block — register it via `initBridge`.
 import { getImageUrl } from './utils.js';
 
 function HeroBlock({ block }) {
-  const heading = block.heading || '';
   const subheading = (block.subheading || '').replace(/\n/g, '<br>');
-  const buttonText = block.buttonText || '';
   const buttonLink = block.buttonLink?.[0]?.['@id'] || '';
   const imageSrc = getImageUrl(block.image);
 
+  // Data-driven: render a field only when it has data. No data ⇒ no element, so
+  // view markup stays clean. Hydra reveals an empty optional field for editing by
+  // seeding it, which makes these same checks true — no edit-mode branch needed.
   return (
     <div data-block-uid={block['@uid']} className="hero-block">
       {imageSrc && (
         <img data-edit-media="image" src={imageSrc} alt="Hero image" />
       )}
-      <h1 data-edit-text="heading">{heading}</h1>
-      <p data-edit-text="subheading" dangerouslySetInnerHTML={{ __html: subheading }} />
-      <div className="hero-description" data-edit-text="description">
-        {(block.description || []).map((node, i) => (
-          <SlateNode key={i} node={node} />
-        ))}
-      </div>
-      <a data-edit-text="buttonText" data-edit-link="buttonLink" href={buttonLink}>
-        {buttonText}
-      </a>
+      {block.heading && <h1 data-edit-text="heading">{block.heading}</h1>}
+      {block.subheading && (
+        <p data-edit-text="subheading" dangerouslySetInnerHTML={{ __html: subheading }} />
+      )}
+      {block.description && (
+        <div className="hero-description" data-edit-text="description">
+          {block.description.map((node, i) => (
+            <SlateNode key={i} node={node} />
+          ))}
+        </div>
+      )}
+      {(block.buttonText || block.buttonLink) && (
+        <a data-edit-text="buttonText" data-edit-link="buttonLink" href={buttonLink}>
+          {block.buttonText}
+        </a>
+      )}
     </div>
   );
 }
@@ -117,14 +125,18 @@ function HeroBlock({ block }) {
 <!-- file: examples/vue/HeroBlock.vue -->
 ```vue
 <template>
+  <!-- Data-driven: render a field only when it has data. No data ⇒ no element, so
+       view markup stays clean. Hydra reveals an empty optional field for editing by
+       seeding it, which makes these same checks true — no edit-mode branch needed. -->
   <div :data-block-uid="block['@uid']" class="hero-block">
     <img v-if="block.image" data-edit-media="image" :src="heroImageSrc" alt="Hero image" />
-    <h1 data-edit-text="heading">{{ block.heading }}</h1>
-    <p data-edit-text="subheading" v-html="subheadingHtml" />
-    <div class="hero-description" data-edit-text="description">
-      <SlateNode v-for="(node, i) in block.description || []" :key="i" :node="node" />
+    <h1 v-if="block.heading" data-edit-text="heading">{{ block.heading }}</h1>
+    <p v-if="block.subheading" data-edit-text="subheading" v-html="subheadingHtml" />
+    <div v-if="block.description" class="hero-description" data-edit-text="description">
+      <SlateNode v-for="(node, i) in block.description" :key="i" :node="node" />
     </div>
-    <a data-edit-text="buttonText" data-edit-link="buttonLink" :href="buttonLink">
+    <a v-if="block.buttonText || block.buttonLink"
+       data-edit-text="buttonText" data-edit-link="buttonLink" :href="buttonLink">
       {{ block.buttonText }}
     </a>
   </div>
@@ -154,20 +166,31 @@ const heroImageSrc = computed(() => getImageUrl(props.block.image));
   $: heroImageSrc = getImageUrl(block.image);
 </script>
 
+<!-- Data-driven: render a field only when it has data. No data ⇒ no element, so
+     view markup stays clean. Hydra reveals an empty optional field for editing by
+     seeding it, which makes these same checks true — no edit-mode branch needed. -->
 <div data-block-uid={block['@uid']} class="hero-block">
   {#if block.image}
     <img data-edit-media="image" src={heroImageSrc} alt="Hero image" />
   {/if}
-  <h1 data-edit-text="heading">{block.heading}</h1>
-  <p data-edit-text="subheading">{@html subheadingHtml}</p>
-  <div class="hero-description" data-edit-text="description">
-    {#each block.description || [] as node, i (i)}
-      <SlateNode {node} />
-    {/each}
-  </div>
-  <a data-edit-text="buttonText" data-edit-link="buttonLink" href={buttonLink}>
-    {block.buttonText}
-  </a>
+  {#if block.heading}
+    <h1 data-edit-text="heading">{block.heading}</h1>
+  {/if}
+  {#if block.subheading}
+    <p data-edit-text="subheading">{@html subheadingHtml}</p>
+  {/if}
+  {#if block.description}
+    <div class="hero-description" data-edit-text="description">
+      {#each block.description as node, i (i)}
+        <SlateNode {node} />
+      {/each}
+    </div>
+  {/if}
+  {#if block.buttonText || block.buttonLink}
+    <a data-edit-text="buttonText" data-edit-link="buttonLink" href={buttonLink}>
+      {block.buttonText}
+    </a>
+  {/if}
 </div>
 ```
 
