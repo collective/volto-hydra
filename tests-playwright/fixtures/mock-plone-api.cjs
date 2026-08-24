@@ -1615,10 +1615,7 @@ function collectSubjectValues() {
     if (!fs.existsSync(dataFile)) continue;
     try {
       const data = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
-      // Fixtures may store the Keywords index as lowercase `subjects` (Volto
-      // form) or capital `Subject` (Plone catalog name); accept either — the
-      // @querystring-search filter (selectionFields) already reads both.
-      for (const s of (data.subjects || data.Subject || [])) {
+      for (const s of (data.subjects || [])) {
         if (typeof s === 'string' && s) subjects.add(s);
       }
     } catch { /* ignore malformed data.json */ }
