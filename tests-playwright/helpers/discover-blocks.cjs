@@ -485,6 +485,17 @@ const UNDECLARED_EXEMPT = new Set([
   // Not sidebar-authored — a consumer (in-page nav) reads them; exempt like the
   // other serialisation/runtime fields above.
   '_linkableAnchors',
+  // hydra's own bookkeeping for copy-from-target (CUSTOM_FIELDS_KEY in
+  // utils/copyFromTarget.js): the list of fields an author has overridden, written
+  // by the editor at runtime. Declaring it as a schema property would offer the
+  // bookkeeping itself as an editable field.
+  '_customFields',
+  // Which field of the referenced content holds the image. Written by the
+  // serialiser alongside `image_scales` (already exempt above), not authored.
+  'image_field',
+  // volto-form-block stamps this to invalidate its cached render. A timestamp
+  // (e.g. 1710238630312) is not something an author writes in the sidebar.
+  'lastChange',
 ]);
 
 // Block-level slate STYLES a person can actually choose from the editor's style
