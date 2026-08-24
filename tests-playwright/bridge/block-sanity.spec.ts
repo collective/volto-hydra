@@ -246,22 +246,15 @@ test.describe('Block sanity (auto-discovered)', () => {
       // silent mismatch.
       if (block.needsUnlock) {
         const frame = page.frames().find((f) => f !== page.mainFrame())!;
-        const instanceId = await frame.evaluate((uid) => {
-          const bridge = (window as any).__hydraBridge;
-          let found: string | null = null;
-          const walk = (blocks: Record<string, any>) => {
-            for (const [id, b] of Object.entries(blocks || {})) {
-              if (!b || typeof b !== 'object') continue;
-              if (id === uid) found = b.templateInstanceId ?? null;
-              for (const [key, value] of Object.entries<any>(b)) {
-                if (key === 'blocks' && value && typeof value === 'object') walk(value);
-                else if (value && typeof value === 'object' && value.blocks) walk(value.blocks);
-              }
-            }
-          };
-          walk(bridge?.formData?.blocks || {});
-          return found;
-        }, block.blockId);
+        // Ask the bridge, don't walk the data. getBlockData resolves a uid
+        // through blockPathMap, which already covers nested blocks AND
+        // object_list items (a slide, an accordion panel) — the cases a
+        // hand-rolled walk over `blocks` dicts silently misses, reporting a
+        // template-bound item as having no templateInstanceId when it has one.
+        const instanceId = await frame.evaluate(
+          (uid) => (window as any).__hydraBridge?.getBlockData(uid)?.templateInstanceId ?? null,
+          block.blockId,
+        );
 
         expect(
           instanceId,

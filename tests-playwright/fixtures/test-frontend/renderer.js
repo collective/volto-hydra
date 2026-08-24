@@ -316,6 +316,9 @@ async function renderBlock(blockId, block) {
             wrapper.innerHTML = await renderAccordionBlock(block, blockId);
             break;
         // accordionPanel is rendered inline by renderAccordionBlock (object_list items)
+        case 'socialLinks':
+            wrapper.innerHTML = renderSocialLinksBlock(block);
+            break;
         case 'slateTable':
             wrapper.innerHTML = renderSlateTableBlock(block);
             break;
@@ -2124,6 +2127,26 @@ function renderSlideBlock(block) {
     html += `<h4 data-edit-text="title" style="margin: 0 0 8px 0;">${title}</h4>`;
     html += `<p data-edit-text="description" style="margin: 0; color: #666;">${description}</p>`;
 
+    return html;
+}
+
+/**
+ * Social links: one <a> per entry in `links`.
+ *
+ * Each link carries its OWN data-block-uid (the item's @id) so it can be
+ * selected, moved and edited as a sub-item — the same shape the Nuxt and
+ * Next.js examples render. The mock had no socialLinks case at all, so the
+ * links appeared nowhere and sub-item selection had nothing to attach to.
+ */
+function renderSocialLinksBlock(block) {
+    const links = block.links || [];
+    let html = '<span>Follow us:</span>';
+    for (const link of links) {
+        const uid = link['@id'];
+        html += `<a data-block-uid="${uid}" data-block-add="right" data-edit-link="url" ` +
+            `href="${escapeAttr(link.url || '')}" target="_blank" rel="noopener noreferrer">` +
+            `${escapeHtml(link.url || '')}</a>`;
+    }
     return html;
 }
 
