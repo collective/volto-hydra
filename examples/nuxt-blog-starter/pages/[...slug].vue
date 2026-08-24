@@ -283,24 +283,6 @@ onMounted(() => {
                 page: {
                     schema: {
                         properties: {
-                            // The PAGE's own metadata, annotated by blocks as
-                            // `/`-scoped names (`data-edit-text="/start"`, and the
-                            // dateField block's `/${block.dateField}`). They have
-                            // to be declared for the same reason a block's fields
-                            // do: getFieldType resolves a `/`-scoped name against
-                            // this schema, and an undeclared field is never made
-                            // contenteditable — the annotation renders, clicking
-                            // it does nothing. Same list the blocks above emit.
-                            title: { title: 'Title', type: 'string' },
-                            description: { title: 'Description', widget: 'textarea' },
-                            effective: { title: 'Publication date', type: 'string', widget: 'datetime' },
-                            created: { title: 'Created', type: 'string', widget: 'datetime' },
-                            modified: { title: 'Modified', type: 'string', widget: 'datetime' },
-                            start: { title: 'Start', type: 'string', widget: 'datetime' },
-                            end: { title: 'End', type: 'string', widget: 'datetime' },
-                            location: { title: 'Location', type: 'string' },
-                            contact_name: { title: 'Contact name', type: 'string' },
-                            contact_phone: { title: 'Contact phone', type: 'string' },
                             items: {
                                 title: 'Blocks',
                                 allowedBlocks: [...new Set(['slate', 'image', 'separator', 'video', 'gridBlock', 'teaser', 'listing', 'summary', 'default', 'section', 'contextNavigation', ...pageLevelBlocks])],
