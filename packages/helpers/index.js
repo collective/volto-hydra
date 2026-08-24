@@ -3319,8 +3319,18 @@ export function expandTemplatesSync(inputItems, options = {}) {
 
     // Use path-normalised comparison: block templateId may be a full URL
     // (e.g. from Plone's resolveuid) while allowedLayouts may be paths.
+    // Only a genuine forced SWITCH re-homes a page. A page-level blocks field
+    // always carries its allowedLayouts — that is the layout MENU, not an
+    // instruction — so re-homing on every render meant a page laid out with a
+    // template the current menu doesn't list (a content-type layout offered only
+    // on that type) was moved to allowedLayouts[0]: `null` by the menu's own
+    // convention, i.e. its layout REMOVED on load, fixed blocks and all, and
+    // persisted by the next save. The same distinction the multi-instance split
+    // already makes above: exactly one allowedLayout is a switch, a list is a
+    // re-render.
     if (
       isLayout &&
+      forcedSingleLayout &&
       !allowedLayouts.some((l) => templateIdsMatch(l, templateId))
     ) {
       templateId = allowedLayouts[0];

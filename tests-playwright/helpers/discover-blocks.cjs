@@ -232,31 +232,81 @@ function variationOf(blockData) {
 }
 
 /**
- * Can an author edit this instance? Only such an instance is a valid subject
- * for the sanity checks, which click a field and require it to become editable.
+ * Is this document the template the block belongs to? A `templateId` is written
+ * either as the template's path or as `resolveuid/<uid>`, so match both.
  *
- * Ranking candidates purely by content richness picked whatever happened to be
- * most populated, and for globalAlert that was `alert0` in
- * /templates/site-announcement — a template DEFINITION, whose blocks are the
- * locked originals every page inherits. Clicking one and asking "why is this
- * not editable" answers a question nobody asked: it is locked by design.
- *
- * Two kinds are excluded:
- *   - anything on a /templates/* page (the definitions themselves)
- *   - any block flagged readOnly/fixed (a locked member of a template instance
- *     stamped onto an ordinary page)
- *
- * Everything else — a doc page's examples, its narrative, a dev fixture — is a
- * fair subject. WHICH of them is picked stays the richness choice below; this
- * only rules out the ones that cannot be edited at all.
- *
- * @param {string} pagePath - Path of the page the instance was found on
- * @param {Object} blockData - The block's stored data
+ * @param {Object} content - The page JSON the block was found in
+ * @param {string} templateId
  * @returns {boolean}
  */
-function isEditableInstance(pagePath, blockData) {
-  if (pagePath.startsWith('/templates/')) return false;
-  return blockData?.readOnly !== true && blockData?.fixed !== true;
+function isOwnDefinition(content, templateId) {
+  if (!templateId || typeof templateId !== 'string') return false;
+  const ids = new Set();
+  if (content?.['@id']) ids.add(new URL(content['@id'], 'http://x').pathname);
+  if (content?.UID) ids.add(`resolveuid/${content.UID}`);
+  if (ids.has(templateId)) return true;
+  return ids.has(new URL(templateId, 'http://x').pathname);
+}
+
+/**
+ * Can an author edit this instance, and what does it take? Only an editable
+ * instance is a valid subject for the sanity checks, which click a field and
+ * require it to become editable.
+ *
+ * A `readOnly` block stamped onto an ordinary page is a COPY of a template
+ * member: the author edits the template, not the copy, so it is not a subject.
+ * On the template's OWN document that same block IS the thing being authored —
+ * it unlocks there like any template member (the merge gives a definition's
+ * blocks a `templateInstanceId`), so it is a subject that carries the id to
+ * unlock with.
+ *
+ * `fixed` is not a criterion at all. Fixed means position-locked — the bridge
+ * uses isFixed to keep a block out of drag and edge-drag candidates — which is
+ * a different thing from uneditable, the question isBlockReadonly answers. A
+ * contentLayout is the clearest case: the page has exactly one and you switch
+ * which layout rather than dragging it about, yet its own fields are edited in
+ * the sidebar and its regions hold ordinary authored content.
+ *
+ * Definition pages used to be excluded outright, because ranking by richness
+ * picked `alert0` in /templates/site-announcement for globalAlert — and back
+ * then a definition could not be edited at all, so the subject was doomed:
+ * "locked by design". Definitions unlock now, so a definition is as good a
+ * subject as any other instance and richness alone decides. The exclusion also
+ * hid every block whose only home is a template, which is how `footer` came to
+ * report "no editable content example" while being the most-edited chrome on
+ * the site.
+ *
+ * The caller learns only WHETHER unlocking is needed, never with what id. An
+ * unlock id is a `templateInstanceId` — one APPLICATION of a template — and in
+ * the general case the merge mints it (`const instanceId = uuidGenerator()`), so
+ * it cannot be derived from stored content at all. Predicting it worked only for
+ * the deterministic cases (a forced layout's `instanceId === templateId`, a
+ * fixture storing its own, the stamp for definitions lacking one) and failed as
+ * "stayed locked" for every other. The spec reads the id off the bridge instead.
+ *
+ * @param {Object} content - The page JSON the block was found in
+ * @param {Object} blockData - The block's stored data
+ * @returns {{needsUnlock: boolean}|null} null when not a subject
+ */
+function editableInstance(content, blockData) {
+  const templateId = blockData?.templateId;
+  const onOwnDefinition = isOwnDefinition(content, templateId);
+  // Template CHROME (`fixed` or `readOnly`) as opposed to slot CONTENT (neither,
+  // and the author's own). A `fixed` member is re-inserted from the template on
+  // every render — "copy block content from a page block with the same slotId" —
+  // so the copy on an ordinary page gets a freshly minted uid each load and
+  // cannot be addressed by the id discovery read from stored content. The
+  // definition is where it is authored and where its id is stable.
+  //
+  // `fixed` alone is NOT chrome: a contentLayout is fixed with no templateId,
+  // position-locked rather than template-owned, and is edited in place.
+  if (templateId && blockData?.fixed === true && !onOwnDefinition) {
+    return null;
+  }
+  if (blockData?.readOnly === true) {
+    return onOwnDefinition ? { needsUnlock: true } : null;
+  }
+  return { needsUnlock: false };
 }
 
 /**
@@ -1173,10 +1223,11 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         // that fall through to "Not implemented" rendering). Same render
         // test fires for each kind.
         //
-        // Locked instances are still walked above for shape/slate/containment
-        // validation, but are never the subject of the render + editing checks
-        // (see isEditableInstance).
-        if (!isEditableInstance(pagePath, blockData)) continue;
+        // Locked copies stamped onto ordinary pages are still walked above for
+        // shape/slate/containment validation, but are never the subject of the
+        // render + editing checks (see editableInstance).
+        const editable = editableInstance(content, blockData);
+        if (!editable) continue;
 
         for (const kind of ['rich', 'simple']) {
           const key = `${blockType}:${variation}:${kind}`;
@@ -1197,6 +1248,9 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
             pagePath,
             blockData,
             isListing: blockType === 'listing',
+            // A locked block on its own definition page: the spec unlocks its
+            // template instance (id read from the bridge) before checking.
+            needsUnlock: editable.needsUnlock,
             _score: score,
           });
         }

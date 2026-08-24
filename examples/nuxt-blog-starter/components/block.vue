@@ -250,8 +250,13 @@
             data-carousel-item
             :style="entry.slide.preview_image ? imageProps(entry.slide, true).class : ''"
             data-block-add="right">
-            <!-- Clickable overlay for preview_image editing -->
-            <div data-edit-media="preview_image" class="absolute inset-0 cursor-pointer" style="z-index: 1;"></div>
+            <!-- Clickable overlay for editing the slide's image. WHICH field that
+                 is depends on the slide: a teaser-ish slide carries
+                 preview_image, but a slide that is an image block carries `url`,
+                 and hardcoding preview_image left image slides with no edit
+                 target at all — uneditable wherever a slider held one. -->
+            <div :data-edit-media="entry.slide['@type'] === 'image' ? 'url' : 'preview_image'"
+                 class="absolute inset-0 cursor-pointer" style="z-index: 1;"></div>
             <div
               class="max-w-sm p-6 bg-slate-200/90 border border-gray-200 m-12 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 absolute"
               :class="{ 'right-0': entry.slide.flagAlign == 'right' }" style="z-index: 2;">

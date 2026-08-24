@@ -91,10 +91,15 @@ function getImageUrl(value) {
         const field = value.image_field;
         const scales = value.image_scales[field];
         if (scales?.[0]?.download) {
-            // Brain @id is often an absolute URL (matches apiOrigin); strip to
-            // relative so we don't double-prepend. External absolutes are kept.
-            const baseUrl = stripApiOrigin(value['@id'] || '');
-            return `${apiOrigin}${baseUrl}/${scales[0].download}`;
+            // A brain's @id comes back absolute from the API, so use it as the
+            // base as-is. Stripping it to a path and re-prefixing with apiOrigin
+            // silently produced an ORIGIN-LESS src whenever window._apiOrigin
+            // was unset — the browser then resolved it against the frontend,
+            // which 404s: "All images should have valid src and load
+            // successfully" for a listing thumbnail that is fine on the API.
+            const rawId = value['@id'] || '';
+            const baseUrl = /^https?:\/\//.test(rawId) ? rawId : `${apiOrigin}${rawId}`;
+            return `${baseUrl}/${scales[0].download}`;
         }
     }
 
@@ -911,7 +916,11 @@ function renderSummaryItemBlock(block, blockUid) {
     const description = block.description || hrefObj?.description || '';
     const blockUidAttr = blockUid ? `data-block-uid="${blockUid}"` : '';
 
-    const imageSrc = block.image ? window._contentPath(getImageUrl(block.image)) : '';
+    // NOT _contentPath: that strips the API origin so a LINK stays same-origin
+    // for navigation (see href above). An image src must keep it — the bytes are
+    // served by the API, and stripping it made the browser resolve
+    // "/…/@@images/preview_image-800-….svg" against the FRONTEND, which 404s.
+    const imageSrc = block.image ? getImageUrl(block.image) : '';
 
     const imageHtml = imageSrc
         ? `<img data-edit-media="image" src="${imageSrc}" alt="" style="width: 80px; height: 60px; object-fit: cover; margin-right: 15px; border-radius: 4px;" />`
@@ -1067,8 +1076,13 @@ function renderHighlightBlock(block) {
         ? `<a href="${ctaLink || '#'}" data-edit-text="cta_title" data-edit-link="cta_link" style="display:inline-block;padding:10px 20px;background:#007eb1;color:white;text-decoration:none;border-radius:4px;">${ctaText}</a>`
         : '';
 
+    // The image is drawn as a CSS background, so nothing carried
+    // data-edit-media and highlight.image was uneditable everywhere it appeared.
+    // The bridge only needs an element with dimensions, not an <img> — the
+    // overlay covers the section, so annotate it. (Same fix as the nuxt
+    // example's highlight.)
     return `<section class="highlight-block" style="${bgStyle}padding:40px 20px;color:white;border-radius:8px;">
-        <div class="highlight-overlay" style="background:rgba(0,0,0,0.4);padding:30px;border-radius:8px;">
+        <div class="highlight-overlay" data-edit-media="image" style="background:rgba(0,0,0,0.4);padding:30px;border-radius:8px;">
             <h2 data-edit-text="title">${title}</h2>
             <div class="highlight-body">${descHtml}</div>
             ${ctaHtml}

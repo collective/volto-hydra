@@ -945,6 +945,37 @@ export class AdminUIHelper {
   }
 
   /**
+   * Press Cmd+A once and wait for THAT escalation to land, identified by a label
+   * the new level carries in the sidebar's block path.
+   *
+   * Pressing and then polling the path rows for a few seconds measures the last
+   * link of a chain — admin dispatches, the bridge re-measures rects in the
+   * iframe, BLOCK_SELECTED comes back, React re-renders the rows — and gives the
+   * whole chain a fixed budget. On a loaded machine (a 2-core CI runner) the
+   * chain simply takes longer, so the budget expires while nothing is wrong.
+   * Worse, the press was fire-and-forget: with no wait between presses, the next
+   * Cmd+A can be handled against a stale selection, so the escalation lands on a
+   * different level than the test assumes — which is why these failed
+   * DETERMINISTICALLY under load rather than intermittently.
+   *
+   * Waiting on the label (not a duration, and not a bare count — two levels can
+   * share a count) means each press is synchronised with its own result.
+   *
+   * @param label - text the new level's path rows must contain
+   * @returns the number of path rows at the new level
+   */
+  async escalateSelection(label: string): Promise<number> {
+    const rows = this.page.locator('.selected-block-path');
+    await this.page.keyboard.press('ControlOrMeta+a');
+    await expect
+      .poll(async () => (await rows.allTextContents()).some((t) => t.includes(label)), {
+        message: `Cmd+A never escalated to a level containing "${label}"`,
+      })
+      .toBe(true);
+    return rows.count();
+  }
+
+  /**
    * Press Escape twice to navigate from text editing to parent block (or deselect).
    * First Escape: text mode → block mode. Second Escape: block mode → parent.
    * If already in block mode (not editing), only one Escape is needed.

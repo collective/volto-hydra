@@ -121,7 +121,8 @@
   </div>
 
   <script type="module">
-    import { buildBlockPathMap } from '/build-block-path-map.js';
+    import { buildBlockPathMap, buildIdFieldMap } from '/build-block-path-map.js';
+    import { mergeTemplatesIntoPage } from '/merge-templates.js';
 
     // Configure iframe frontend from ?frontend= URL param. The default is the
     // origin THIS page is served from — vite injects it (see vite.config.js), and
@@ -183,6 +184,22 @@
             items: { widget: 'blocks_layout' },
             title: { title: 'Title', type: 'string' },
             description: { title: 'Description', type: 'string' },
+            // …and the rest of the page's own fields, for the same reason. In
+            // the real admin these come from the CONTENT TYPE schema (View.jsx
+            // extractBlockFieldTypes: "page-level field types from content type
+            // schema … accessed via /fieldName"), so a Plone News Item just HAS
+            // `effective` and a dateField block can edit it. The mock parent
+            // stands in for the admin here, so it has to supply them itself —
+            // a frontend cannot, since its INIT `page` schema declares BLOCKS
+            // FIELDS and the admin turns every entry there into a region.
+            effective: { title: 'Publication date', type: 'string' },
+            created: { title: 'Created', type: 'string' },
+            modified: { title: 'Modified', type: 'string' },
+            start: { title: 'Start', type: 'string' },
+            end: { title: 'End', type: 'string' },
+            location: { title: 'Location', type: 'string' },
+            contact_name: { title: 'Contact name', type: 'string' },
+            contact_phone: { title: 'Contact phone', type: 'string' },
           },
         }),
       },
@@ -532,6 +549,35 @@
       mockFormData = defaultFormData;
     }
 
+    // --- Template / forced-layout merge (parity with the real admin) ---------
+    // View.jsx runs mergeTemplatesIntoPage before it posts INITIAL_DATA, with the
+    // comment "Always call mergeTemplatesIntoPage - it handles all cases". That is
+    // what stamps a forced layout's blocks onto the page and mints each one's
+    // templateInstanceId — the id template edit mode unlocks by.
+    //
+    // Skipping it here posted the raw API JSON, so a page with a forced region (a
+    // site footer, a global announcement) reached the bridge WITHOUT its chrome:
+    // the frontend still rendered the footer (frontends expand templates
+    // themselves), but the bridge had no block for it — nothing to resolve,
+    // select, or unlock. Every mock-parent test then asserted against a data model
+    // the real editor never has.
+    const templateCache = {};
+    async function loadTemplate(templateId) {
+      if (templateCache[templateId]) return templateCache[templateId];
+      // A templateId is a content path ('/templates/site-footer'), a resolveuid
+      // ref, or a full URL — normalise to a path on the API, as the test frontend
+      // does for its own expansion.
+      const url = templateId.startsWith('http')
+        ? new URL(templateId).pathname
+        : `/${templateId.replace(/^\//, '')}`;
+      const res = await fetch(`${apiOrigin}${url}`, { headers: { Accept: 'application/json' } });
+      if (!res.ok) {
+        throw new Error(`[MOCK_PARENT] template ${templateId} → ${res.status} ${res.statusText}`);
+      }
+      templateCache[templateId] = await res.json();
+      return templateCache[templateId];
+    }
+
     // Hardcoded responses are no longer needed - we use real Slate transformations
 
     // Message log
@@ -582,6 +628,49 @@
               mockBlocksConfig[blockType] = blockDef;
             }
           }
+
+          // The frontend's page schema (INIT `page`) declares the page's blocks
+          // fields and any layouts forced on them — the same input the admin
+          // passes as pageBlocksFields. A frontend that sends none has nothing to
+          // merge, so its page data is used exactly as fetched.
+          // The frontend's page schema when it sends one, otherwise the mock
+          // parent's own `_page` — the same default buildBlockPathMap already
+          // uses, so a frontend that declares no page schema still gets its
+          // `items` region merged (the admin reads its registered _page for
+          // exactly this reason).
+          const pageBlocksFields =
+            message.page?.schema?.properties || mockBlocksConfig._page.schema().properties;
+          if (message.page?.schema?.properties) {
+            // Adopt the frontend's page schema, exactly as the admin does: it is
+            // what tells buildBlockPathMap which regions exist (a property with
+            // widget 'blocks_layout' maps to formData.blocks_layout[<name>]), so
+            // without it the merged footer/announcement blocks land in the data
+            // but never in the path map — present on screen, unresolvable to the
+            // bridge. Merged per field so the baseline's own page metadata
+            // (title/description, annotated as `/title` and `/description`)
+            // survives a frontend that only declares its blocks fields.
+            const baseline = mockBlocksConfig._page.schema().properties;
+            const properties = { ...baseline };
+            for (const [field, def] of Object.entries(pageBlocksFields)) {
+              properties[field] = { ...baseline[field], ...def };
+            }
+            mockBlocksConfig._page = { schema: () => ({ properties }) };
+          }
+
+          // Merge UNCONDITIONALLY, exactly as View.jsx does ("Always call
+          // mergeTemplatesIntoPage — it handles all cases"). It is a no-op for a
+          // page with no templates, and gating it on the frontend sending a page
+          // schema would leave such a frontend's template definitions unstamped.
+          const { merged } = await mergeTemplatesIntoPage(mockFormData, {
+            loadTemplate,
+            preloadedTemplates: templateCache,
+            pageBlocksFields,
+            idFieldMap: buildIdFieldMap(mockBlocksConfig),
+            // Same as the admin's INITIAL_DATA merge: this document is being
+            // opened to edit, so it is never merged against its own template.
+            skipOwnTemplate: true,
+          });
+          mockFormData = merged;
 
           const blockPathMap = buildBlockPathMap(mockFormData, mockBlocksConfig);
 

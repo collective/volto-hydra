@@ -81,6 +81,10 @@ export default defineConfig({
       '/hydra.js': path.resolve(__dirname, '../../../packages/hydra-js/hydra.src.js'),
       '/helpers.js': path.resolve(__dirname, '../../../packages/helpers/index.js'),
       '/build-block-path-map.js': path.resolve(__dirname, '../../../packages/hydra-js/buildBlockPathMap.js'),
+      // The same merge the admin runs before it posts INITIAL_DATA (View.jsx),
+      // so the mock parent hands the bridge a page with its forced layouts and
+      // templates already stamped on — see mock-parent.html's INIT handler.
+      '/merge-templates.js': path.resolve(__dirname, '../../../packages/volto-hydra/src/utils/mergeTemplates.mjs'),
       '/shared-block-schemas.js': path.resolve(__dirname, '../shared-block-schemas.js'),
     },
   },

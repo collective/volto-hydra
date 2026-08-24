@@ -501,21 +501,26 @@ test.describe('Block Sync - Search Block with Listing Container', () => {
 
     const filteredResults = iframe.locator('[data-block-uid="search-block-1"] .search-results [data-block-uid]');
 
-    // Wait for the RESULT of the re-fetch — fewer rows than before — not for
-    // the DOM to go quiet. `first()` being visible is satisfied by the OLD rows
-    // still on screen, which is how this read a stale 6-of-6 and failed on the
-    // comparison below; polling the count retries until the new rows land and
-    // reports what it saw if they never do.
+    // Wait for the RESULT of the re-fetch, and wait for the WHOLE result in one
+    // step: filtered means fewer rows than before AND still some rows, since
+    // accordion-test-page matches. Polling only for "fewer" accepts the empty
+    // render the re-fetch passes through on its way to the filtered set — 0 is
+    // less than 6 — and the next line then failed on a state the poll had just
+    // approved. (`first()` being visible is no good either: the OLD rows
+    // satisfy it, which is how this once read a stale 6-of-6.)
     await expect
-      .poll(() => filteredResults.count(), {
-        timeout: 10000,
-        message:
-          `search for "accordion" never narrowed the results (started at ${initialCount})`,
-      })
-      .toBeLessThan(initialCount);
-
-    // …and it filtered rather than emptied: accordion-test-page matches.
-    expect(await filteredResults.count()).toBeGreaterThan(0);
+      .poll(
+        async () => {
+          const count = await filteredResults.count();
+          return count > 0 && count < initialCount ? 'filtered' : `count=${count}`;
+        },
+        {
+          timeout: 10000,
+          message:
+            `search for "accordion" never settled on a filtered set (started at ${initialCount})`,
+        },
+      )
+      .toBe('filtered');
   });
 
   test('search block filters results when user clicks facet checkbox', async ({ page }) => {

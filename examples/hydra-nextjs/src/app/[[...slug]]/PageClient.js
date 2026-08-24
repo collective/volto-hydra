@@ -12,6 +12,30 @@ const docBlocksConfig = Object.fromEntries(
   Object.values(docPageDefinitions).flatMap((page) => Object.entries(page.blocks)),
 );
 
+// socialLinks renders one <a data-block-uid> per entry in `links`, but the doc
+// bundle never declared the block, so buildBlockPathMap had no schema to descend
+// into: the links appeared on screen and were absent from the pathMap, i.e. they
+// could not be selected, edited, moved or navigated. Declared here (rather than
+// in block-definitions.json) because that file also drives the generated block
+// reference pages, and this is a gap in THIS example's config.
+docBlocksConfig.socialLinks = {
+  ...docBlocksConfig.socialLinks,
+  blockSchema: {
+    properties: {
+      links: {
+        title: 'Links',
+        widget: 'object_list',
+        idField: '@id',
+        schema: {
+          properties: {
+            url: { title: 'URL', widget: 'url' },
+          },
+        },
+      },
+    },
+  },
+};
+
 export default function PageClient({ initialData, apiUrl }) {
   const [data, setData] = useState(initialData);
   // The blocks below use this as the CONTENT path they belong to (a listing
@@ -24,7 +48,14 @@ export default function PageClient({ initialData, apiUrl }) {
       page: {
         schema: {
           properties: {
-            blocks_layout: { title: 'Content', allowedBlocks: ['slate', 'image', 'video', 'teaser', 'title', 'description', 'introduction', 'leadimage', 'dateField', 'hero', 'columns', 'gridBlock', 'accordion', 'slider', 'listing', 'search', 'slateTable', 'heading', 'separator', 'button', 'highlight', 'maps', 'toc', 'form', 'codeExample', 'eventMetadata', 'socialLinks'] },
+                        // The page's content region is `items` — the KEY inside the shared
+            // blocks_layout dict (formData.blocks_layout.items), which is what
+            // buildBlockPathMap and the template merge look up. Declaring it as
+            // `blocks_layout` meant they resolved blocks_layout.blocks_layout,
+            // found nothing, and skipped the region: no path map for the page's
+            // own blocks and no template merge, so definition blocks never got
+            // the instance id that makes them unlockable.
+            items: { title: 'Content', widget: 'blocks_layout', allowedBlocks: ['slate', 'image', 'video', 'teaser', 'title', 'description', 'introduction', 'leadimage', 'dateField', 'hero', 'columns', 'gridBlock', 'accordion', 'slider', 'listing', 'search', 'slateTable', 'heading', 'separator', 'button', 'highlight', 'maps', 'toc', 'form', 'codeExample', 'eventMetadata', 'socialLinks'] },
           },
         },
       },
