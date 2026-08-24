@@ -1082,25 +1082,14 @@ test.describe('Slider image positioning', () => {
 
 test.describe('Teaser starter UI and overwrite', () => {
   /**
-   * Add a teaser via the block chooser and return its locator.
-   *
-   * The starter UI is for a teaser whose required `href` is still empty, so
-   * these tests need one. That state is NOT kept in the stored fixture: an
-   * empty required field is content the schema calls invalid, and discovery
-   * rightly reports stored content that contradicts its own schema. A teaser
-   * is empty the moment an author adds it and full a moment later, so the
-   * honest place for that state is live in the editor, which is also where the
-   * feature runs.
+   * A teaser whose required `href` is still empty — the state the starter UI is
+   * for. Made here, never stored: content with an empty required field
+   * contradicts its own schema, and a teaser is empty only for the moment
+   * between adding it and filling it in.
    */
   async function addEmptyTeaser(page: any, helper: AdminUIHelper) {
-    const before = await helper.getBlockOrder();
-    await helper.clickBlockInIframe('block-1-uuid');
-    await helper.clickAddBlockButton();
-    await helper.selectBlockType('teaser');
-    await helper.waitForBlockCountToBe(before.length + 1);
-    const added = (await helper.getBlockOrder()).filter((id: string) => !before.includes(id));
-    expect(added, 'exactly one new block after adding a teaser').toHaveLength(1);
-    return helper.getIframe().locator(`[data-block-uid="${added[0]}"]`);
+    const uid = await helper.addBlockOnCanvas('block-1-uuid', 'teaser');
+    return helper.getIframe().locator(`[data-block-uid="${uid}"]`);
   }
 
   test('shows starter UI overlay for empty teaser href field', async ({ page }) => {

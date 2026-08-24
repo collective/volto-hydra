@@ -109,18 +109,12 @@ test.describe('Editor Guide screenshots', () => {
     await helper.login();
     await helper.navigateToEdit(SHOWCASE_PATH);
 
-    // Add an image block and snap it before a file is picked — the state an
-    // author sees the moment they insert one. It is NOT kept in the fixture:
-    // `url` is required, and stored content with an empty required field
-    // contradicts its own schema (block-sanity reports that, rightly).
-    const before = await helper.getBlockOrder();
-    await helper.clickBlockInIframe('empty-slate');
-    await helper.clickAddBlockButton();
-    await helper.selectBlockType('image');
-    await helper.waitForBlockCountToBe(before.length + 1);
-    const added = (await helper.getBlockOrder()).filter((id) => !before.includes(id));
-    await helper.clickBlockInIframe(added[0]);
-    await helper.waitForBlockSelectedInAdmin(added[0]);
+    // Snap an image block before a file is picked — the state an author sees
+    // the moment they insert one. NOT stored in the fixture: `url` is required,
+    // and stored content with an empty required field contradicts its schema.
+    const uid = await helper.addBlockOnCanvas('empty-slate', 'image');
+    await helper.clickBlockInIframe(uid);
+    await helper.waitForBlockSelectedInAdmin(uid);
 
     await snap(page, 'media-empty-placeholder');
   });

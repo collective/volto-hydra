@@ -186,9 +186,20 @@ export async function revealBlock(iframe: FrameLocator, blockUid: string): Promi
     .catch(() => false);
   if (rendered) return;
 
-  const opener = iframe.locator(`[data-block-selector~="${blockUid}"]`).first();
-  if ((await opener.count()) === 0) return;
-  await opener.click();
+  // hydra already knows how to do this: tryMakeBlockVisible clicks a direct
+  // data-block-selector, and failing that steps +1/-1 until it reaches the
+  // target. That is what the editor does on select, so the harness asks the
+  // bridge instead of re-deriving carousel navigation here — a second
+  // implementation would drift from the one users actually get.
+  const clicked = await iframe
+    .locator('body')
+    .evaluate(
+      (_el, uid) => (window as any).__hydraBridge?.tryMakeBlockVisible?.(uid) ?? false,
+      blockUid,
+    )
+    .catch(() => false);
+  if (!clicked) return;
+
   await expect(block).toBeVisible({ timeout: 5000 });
 }
 
@@ -860,6 +871,12 @@ export async function verifyBlockRendering(
   if (isFieldlessBlock && (await block.count()) === 0) {
     return; // metadata-projection block legitimately rendered nothing
   }
+  // A block can be rendered but off-stage — an inactive carousel slide, a
+  // closed tab. That is not a render failure: the editor reaches it by
+  // selecting it, and hydra's tryMakeBlockVisible steps the container until it
+  // shows. Ask for the same thing here before demanding visibility, or the
+  // check fails on content an author can reach perfectly well.
+  await revealBlock(iframe, blockId);
   await expect(block.first()).toBeVisible({ timeout: 15000 });
 
   // A data-block-uid may legitimately match several elements, in two shapes that

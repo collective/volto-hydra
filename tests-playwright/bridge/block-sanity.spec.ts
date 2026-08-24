@@ -246,6 +246,32 @@ test.describe('Block sanity (auto-discovered)', () => {
       // silent mismatch.
       if (block.needsUnlock) {
         const frame = page.frames().find((f) => f !== page.mainFrame())!;
+
+        // A block whose CONTENTS are generated is not authored inline, and
+        // unlocking its template instance must not make them editable: the
+        // expanded items of a listing reuse the block's own uid, so anything
+        // that unlocks the block unlocks the generated items with it. hydra
+        // therefore force-locks such blocks (expandListingBlocks registers
+        // every type that has a fetcher), and that lock outranks template edit
+        // mode by design.
+        //
+        // The frontend PUBLISHES that fact by registering the block readonly on
+        // the bridge — the same opt-in shape as data-block-selector for reveal.
+        // Reading it keeps this check free of "listing means X" knowledge: any
+        // block a frontend declares generated is authored through the sidebar,
+        // so "still locked" is the correct outcome, not a failure.
+        const generatedContents = await frame.evaluate((uid) => {
+          const registry = (window as any).__hydraBridge?._readonlyBlocks;
+          return registry ? [...registry].includes(uid) : false;
+        }, block.blockId);
+        if (generatedContents) {
+          test.info().annotations.push({
+            type: 'generated-contents',
+            description:
+              `${block.blockType} [${block.blockId}] is registered readonly by the frontend — ` +
+              `its items share the block uid, so it is authored in the sidebar, not inline.`,
+          });
+        }
         // Ask the bridge, don't walk the data. getBlockData resolves a uid
         // through blockPathMap, which already covers nested blocks AND
         // object_list items (a slide, an accordion panel) — the cases a
@@ -273,6 +299,7 @@ test.describe('Block sanity (auto-discovered)', () => {
         await expect
           .poll(
             () =>
+              generatedContents ||
               frame.evaluate(
                 (uid) => !(window as any).__hydraBridge?.isBlockReadonly(uid),
                 block.blockId,

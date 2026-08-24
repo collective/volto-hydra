@@ -3350,6 +3350,32 @@ export class AdminUIHelper {
   }
 
   /**
+   * Add a block on the canvas next to `anchorUid` and return the new block's uid.
+   *
+   * Selecting an anchor, pressing add, choosing a type, then diffing the block
+   * order to learn the new uid is the canvas add sequence — it was written out
+   * by hand in each spec that needed it. The uid is the part callers actually
+   * want and the part that is easy to get subtly wrong (a container add can
+   * introduce more than one block), so it is asserted here once.
+   *
+   * For adding INTO a container field from the sidebar, use addBlockViaSidebar.
+   *
+   * @param anchorUid - uid of the block to select before adding
+   * @param blockType - the @type to choose in the block chooser
+   * @returns the uid of the newly added block
+   */
+  async addBlockOnCanvas(anchorUid: string, blockType: string): Promise<string> {
+    const before = await this.getBlockOrder();
+    await this.clickBlockInIframe(anchorUid);
+    await this.clickAddBlockButton();
+    await this.selectBlockType(blockType);
+    await this.waitForBlockCountToBe(before.length + 1);
+    const added = (await this.getBlockOrder()).filter((id) => !before.includes(id));
+    expect(added, `exactly one new block after adding a ${blockType}`).toHaveLength(1);
+    return added[0];
+  }
+
+  /**
    * Click the Add Block button that appears below a selected block.
    * This should open the block chooser.
    */
