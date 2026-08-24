@@ -36,6 +36,54 @@ docBlocksConfig.socialLinks = {
   },
 };
 
+// The content-type metadata blocks. They project a field of the CONTENT item
+// (its title, description, lead image, a date, event details) rather than
+// holding their own content, and the docs pages use all of them — but the doc
+// bundle never declared them, so they rendered as "Not implemented Block"
+// (title alone appears in 102 places). Declared here for the same reason
+// socialLinks is: block-definitions.json also drives the generated block
+// reference pages, and this is a gap in THIS example's config.
+//
+// All are `restricted`: an author never inserts them from the chooser — a
+// content-type layout places them.
+const metadataBlock = (id, title, group, properties = {}, fieldsets = []) => ({
+  id,
+  title,
+  group,
+  restricted: true,
+  blockSchema: { fieldsets, properties, required: [] },
+});
+
+Object.assign(docBlocksConfig, {
+  title: metadataBlock('title', 'Title', 'text'),
+  description: metadataBlock('description', 'Description', 'text'),
+  leadimage: metadataBlock('leadimage', 'Lead image', 'media', {
+    align: { title: 'Alignment', widget: 'align' },
+  }),
+  dateField: metadataBlock(
+    'dateField',
+    'Date',
+    'text',
+    {
+      dateField: {
+        title: 'Field',
+        type: 'string',
+        factory: 'Choice',
+        choices: [
+          ['effective', 'Published'],
+          ['created', 'Created'],
+          ['modified', 'Modified'],
+        ],
+      },
+      showTime: { title: 'Show time', type: 'boolean' },
+    },
+    [{ id: 'default', title: 'Default', fields: ['dateField', 'showTime'] }],
+  ),
+  eventMetadata: metadataBlock('eventMetadata', 'Event metadata', 'text', {
+    required: { title: 'Required', type: 'boolean' },
+  }),
+});
+
 export default function PageClient({ initialData, apiUrl }) {
   const [data, setData] = useState(initialData);
   // The blocks below use this as the CONTENT path they belong to (a listing
