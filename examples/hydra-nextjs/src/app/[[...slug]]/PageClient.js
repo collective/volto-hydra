@@ -48,22 +48,7 @@ export default function PageClient({ initialData, apiUrl }) {
       page: {
         schema: {
           properties: {
-            // The PAGE's own metadata, annotated by blocks as `/`-scoped names
-            // (`data-edit-text="/start"`, the dateField block's
-            // `/${block.dateField}`). getFieldType resolves those against this
-            // schema, so an undeclared field is never made contenteditable — the
-            // annotation renders and clicking it does nothing.
-            title: { title: 'Title', type: 'string' },
-            description: { title: 'Description', type: 'string' },
-            effective: { title: 'Publication date', type: 'string' },
-            created: { title: 'Created', type: 'string' },
-            modified: { title: 'Modified', type: 'string' },
-            start: { title: 'Start', type: 'string' },
-            end: { title: 'End', type: 'string' },
-            location: { title: 'Location', type: 'string' },
-            contact_name: { title: 'Contact name', type: 'string' },
-            contact_phone: { title: 'Contact phone', type: 'string' },
-            // The page's content region is `items` — the KEY inside the shared
+                        // The page's content region is `items` — the KEY inside the shared
             // blocks_layout dict (formData.blocks_layout.items), which is what
             // buildBlockPathMap and the template merge look up. Declaring it as
             // `blocks_layout` meant they resolved blocks_layout.blocks_layout,

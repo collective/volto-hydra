@@ -184,6 +184,22 @@
             items: { widget: 'blocks_layout' },
             title: { title: 'Title', type: 'string' },
             description: { title: 'Description', type: 'string' },
+            // …and the rest of the page's own fields, for the same reason. In
+            // the real admin these come from the CONTENT TYPE schema (View.jsx
+            // extractBlockFieldTypes: "page-level field types from content type
+            // schema … accessed via /fieldName"), so a Plone News Item just HAS
+            // `effective` and a dateField block can edit it. The mock parent
+            // stands in for the admin here, so it has to supply them itself —
+            // a frontend cannot, since its INIT `page` schema declares BLOCKS
+            // FIELDS and the admin turns every entry there into a region.
+            effective: { title: 'Publication date', type: 'string' },
+            created: { title: 'Created', type: 'string' },
+            modified: { title: 'Modified', type: 'string' },
+            start: { title: 'Start', type: 'string' },
+            end: { title: 'End', type: 'string' },
+            location: { title: 'Location', type: 'string' },
+            contact_name: { title: 'Contact name', type: 'string' },
+            contact_phone: { title: 'Contact phone', type: 'string' },
           },
         }),
       },
