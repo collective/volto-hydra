@@ -1169,25 +1169,38 @@ function carouselPrev() {
 }
 
 // Navigate to a specific slide by its block UID (for indicator/direct selector clicks).
-function carouselGoTo(uid) {
-  // Find the flat index for this UID by checking sliderChildren + listing items
+//
+// The flat index depends on how many items each listing slide expanded to, and
+// trackItems fills those counts on nextTick — so a request that arrives before
+// a listing resolves counts it as 1 and lands short of the target. Remember the
+// request and re-apply it whenever the counts change, so selecting a slide that
+// sits after a listing settles on the right one instead of stopping wherever
+// the counts happened to be.
+const carouselTargetUid = ref(null);
+
+function flatIndexOf(uid) {
   let idx = 0;
   for (const entry of sliderChildren.value) {
-    if (entry.isListing) {
-      if (entry.slide['@uid'] === uid) {
-        carouselPosition.value = idx;
-        return;
-      }
-      idx += listingItemCounts[entry.slide['@uid']] || 1;
-    } else {
-      if (entry.slide['@uid'] === uid) {
-        carouselPosition.value = idx;
-        return;
-      }
-      idx++;
-    }
+    if (entry.slide['@uid'] === uid) return idx;
+    idx += entry.isListing ? listingItemCounts[entry.slide['@uid']] || 1 : 1;
   }
+  return null;
 }
+
+function applyCarouselTarget() {
+  const uid = carouselTargetUid.value;
+  if (!uid) return;
+  const idx = flatIndexOf(uid);
+  if (idx !== null) carouselPosition.value = idx;
+}
+
+function carouselGoTo(uid) {
+  carouselTargetUid.value = uid;
+  applyCarouselTarget();
+}
+
+// Counts arrive asynchronously; re-apply the pending target when they do.
+watch(listingItemCounts, applyCarouselTarget, { deep: true });
 
 // On mount: attach click handlers for next/prev buttons and indicators
 onMounted(() => {
