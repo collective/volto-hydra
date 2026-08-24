@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { chromium } from '@playwright/test';
 import { URLS } from './ports';
-import { FRONTEND_URLS } from './bridge/fixtures';
+import { FRONTEND_URLS, SANITY_PROJECTS } from './bridge/fixtures';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 const { discoverBlocks, buildEmptyRegionCases } = require('./helpers/discover-blocks.cjs');
@@ -109,8 +109,12 @@ async function globalSetup() {
     // identical set of cases. Named projects are considered first so a frontend
     // is tagged with its project name rather than the anonymous '(env)'.
     const normUrl = (u: string) => u.replace(/\/+$/, '');
+    // Only frontends block-sanity enforces. A frontend it skips yields cases
+    // that are generated and then skipped — pure cost, and for the docs
+    // frontends (which register a small registry, so most content reads as
+    // unregistered) it was ~1736 entries each, timing the job out.
     const candidates: Array<[string, string]> = [
-      ...Object.entries(FRONTEND_URLS),
+      ...Object.entries(FRONTEND_URLS).filter(([project]) => SANITY_PROJECTS.has(project)),
       ['mock', URLS.testFrontend],
     ];
     // '(env)' is last on purpose: it is the fallback name for a frontend no

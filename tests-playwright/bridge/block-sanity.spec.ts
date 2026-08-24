@@ -24,7 +24,7 @@ import { AdminUIHelper } from '../helpers/AdminUIHelper';
 import { verifyBlockRendering } from '../helpers/BlockVerificationHelper';
 import { fieldsNeverEditable } from '../helpers/field-coverage';
 import { axeCheckPage, formatViolations } from '../helpers/axe-sanity';
-import { getFrontendUrl } from './fixtures';
+import { getFrontendUrl, SANITY_PROJECTS } from './fixtures';
 import { URLS } from '../ports';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -82,7 +82,7 @@ discoveredBlocks = discoveredBlocks.filter(
 // own ground truth), Nuxt, and Next.js. Other example frontends (react,
 // svelte, vue, f7) intentionally skip block-sanity so missing block types or
 // in-flight renderer changes don't gate the suite.
-const SANITY_PROJECTS = new Set(['mock', 'nuxt', 'nextjs']);
+
 
 base.beforeEach(async ({}, testInfo) => {
   // Scope BEFORE environment: a project this spec doesn't cover is a decision,
