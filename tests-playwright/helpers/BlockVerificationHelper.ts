@@ -100,6 +100,26 @@ export async function checkDataEditTextClicks(
     // this helper about any particular component's markup.
     await revealBlock(iframe, blockUid);
 
+    // A field belongs to a block, and that is not always the block under test:
+    // a codeExample's `code` fields belong to its TABS, and only the active
+    // tab's is on screen. Revealing the outer block leaves the other three
+    // hidden, so clicking them lands nowhere. Reveal the field's OWN block —
+    // exactly what the editor does when an author selects it in the sidebar.
+    const fieldOwnerUid = await el.evaluate((node) => {
+      const handle = node.closest('[data-block-selector]');
+      const advertised = (handle?.getAttribute('data-block-selector') || '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+      if (advertised.length === 1 && !['+1', '-1'].includes(advertised[0]) && !advertised[0].includes(':')) {
+        return advertised[0];
+      }
+      return node.closest('[data-block-uid]')?.getAttribute('data-block-uid') ?? null;
+    });
+    if (fieldOwnerUid && fieldOwnerUid !== blockUid) {
+      await revealBlock(iframe, fieldOwnerUid);
+    }
+
     // Scroll the field to the MIDDLE of the viewport before clicking. Playwright
     // scrolls to the nearest edge, which on any site with a sticky header puts
     // the field underneath it — the click then lands on the header and the

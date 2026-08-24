@@ -2080,7 +2080,12 @@ function renderCodeExampleBlock(block, blockId) {
         html += '<div data-tab-bar style="display: flex; background: #16213e; border-bottom: 1px solid #334;">';
         tabs.forEach((tab) => {
             const tabId = tab['@id'];
-            html += `<button data-block-uid="${tabId}" data-linkable-allow style="padding: 8px 16px; color: #aaa; background: transparent; border: none; cursor: pointer; font-size: 13px;"><span data-edit-text="label">${tab.label || tab.language || 'Tab'}</span></button>`;
+            // The BUTTON represents the tab; the PANEL below is the tab. Carrying
+            // data-block-uid here too would tell the bridge the block is on screen
+            // whenever the bar is, so selecting an inactive tab would never reveal
+            // the code it holds. data-block-selector says "I represent this uid" —
+            // the label still edits the tab, and clicking switches to it.
+            html += `<button data-block-selector="${tabId}" data-linkable-allow style="padding: 8px 16px; color: #aaa; background: transparent; border: none; cursor: pointer; font-size: 13px;"><span data-edit-text="label">${tab.label || tab.language || 'Tab'}</span></button>`;
         });
         html += '</div>';
     }
@@ -2741,3 +2746,18 @@ if (document.readyState === 'loading') {
 if (typeof window !== 'undefined' && window.matchMedia) {
     window.matchMedia('(min-width: 768px)').addEventListener('change', syncCnavOpenState);
 }
+
+// Tab bars switch on click. The buttons were inert, so a tab other than the
+// first could never be shown — including when the bridge clicks the handle to
+// reveal a tab an author selected in the sidebar.
+document.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-tab-bar] button[data-block-selector]');
+    if (!button) return;
+    const uid = button.getAttribute('data-block-selector');
+    const bar = button.closest('[data-tab-bar]');
+    const container = bar?.parentElement;
+    if (!container) return;
+    for (const panel of container.querySelectorAll(':scope > [data-block-uid]')) {
+        panel.style.display = panel.getAttribute('data-block-uid') === uid ? 'block' : 'none';
+    }
+});

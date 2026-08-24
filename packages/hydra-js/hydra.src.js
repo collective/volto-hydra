@@ -772,9 +772,70 @@ export class Bridge {
    * @param {HTMLElement} blockElement - The block element to check ownership against
    * @returns {boolean} True if the field belongs directly to blockElement
    */
+  /**
+   * Which block does this element belong to?
+   *
+   * Normally the nearest `data-block-uid` ancestor. But a block can be drawn in
+   * two places — a tab's label lives in the tab bar while its code lives in a
+   * panel that is hidden, or not rendered at all, until that tab is chosen. The
+   * block itself is the panel: that is the thing that has to be on screen before
+   * it can be edited, and putting the uid on the always-visible button instead
+   * would tell the bridge the block is already visible when the half you want to
+   * edit is not.
+   *
+   * So the button carries `data-block-selector` — "I represent this uid" — and
+   * anything editable inside it edits that block, even though the uid element is
+   * elsewhere. Only a selector naming exactly ONE uid counts: `+1` / `-1` and
+   * `uid:direction` are navigation, and a word list belongs to a container
+   * advertising its children rather than standing in for one block.
+   *
+   * @param {HTMLElement} el - element to resolve (usually an editable field)
+   * @returns {string|undefined} the owning block's uid
+   */
+  owningBlockUid(el) {
+    if (!el) return undefined;
+    const blockEl = el.closest('[data-block-uid]');
+    const handle = el.closest('[data-block-selector]');
+    if (handle && (!blockEl || handle.contains(blockEl) === false)) {
+      const advertised = (handle.getAttribute('data-block-selector') || '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+      const single = advertised.length === 1 ? advertised[0] : null;
+      if (single && single !== '+1' && single !== '-1' && !single.includes(':')) {
+        // Prefer the handle only when it is NEARER than the uid element, i.e. the
+        // uid element is an ancestor of the handle (a container) rather than the
+        // block the field sits in.
+        if (!blockEl || blockEl.contains(handle)) return single;
+      }
+    }
+    return blockEl?.getAttribute('data-block-uid') ?? undefined;
+  }
+
   fieldBelongsToBlock(field, blockElement) {
-    const fieldBlockElement = field.closest('[data-block-uid]');
-    return fieldBlockElement === blockElement;
+    return this.owningBlockUid(field) === this.uidRepresentedBy(blockElement);
+  }
+
+  /**
+   * Which block does this ELEMENT stand for — the uid it carries, or the one it
+   * advertises. A tab's button has no data-block-uid (the uid belongs on the
+   * panel, so the bridge can see when the block is off screen), but it does
+   * carry data-block-selector naming that tab, and the label inside it is that
+   * tab's field. Comparing against data-block-uid alone dropped every field on
+   * such an element.
+   */
+  uidRepresentedBy(element) {
+    if (!element) return undefined;
+    const own = element.getAttribute?.('data-block-uid');
+    if (own) return own;
+    const advertised = (element.getAttribute?.('data-block-selector') || '')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (advertised.length !== 1) return undefined;
+    const single = advertised[0];
+    if (single === '+1' || single === '-1' || single.includes(':')) return undefined;
+    return single;
   }
 
   /**
@@ -795,6 +856,26 @@ export class Bridge {
     for (const field of allFields) {
       if (this.fieldBelongsToBlock(field, blockElement)) {
         result.push(field);
+      }
+    }
+    // A block can be drawn in two places: a tab's code sits in its panel while
+    // its label sits on the button that switches to it. The button stands in for
+    // the block (data-block-selector) rather than being it, so its fields live
+    // outside this subtree — collect them too, or the label is unreachable and
+    // clicking it does nothing.
+    const uid = blockElement.getAttribute('data-block-uid');
+    if (uid) {
+      for (const handle of document.querySelectorAll(
+        `[data-block-selector~="${uid}"]`,
+      )) {
+        if (handle.hasAttribute('data-edit-text') && !result.includes(handle)) {
+          result.push(handle);
+        }
+        for (const field of handle.querySelectorAll('[data-edit-text]')) {
+          if (this.owningBlockUid(field) === uid && !result.includes(field)) {
+            result.push(field);
+          }
+        }
       }
     }
     return result;
@@ -3138,7 +3219,27 @@ export class Bridge {
       log('getAllBlockElements: found', elements.length, 'elements for template instance');
       return elements;
     }
-    const elements = document.querySelectorAll(`[data-block-uid="${blockUid}"]`);
+    // A block can also be drawn by an element that STANDS IN for it: a tab's
+    // label lives on the button that reveals the tab, which carries
+    // data-block-selector rather than the uid (the uid belongs on the content,
+    // so the bridge can tell the block is off screen). Those elements hold real
+    // fields of this block, so every caller asking where a block is drawn needs
+    // them too — otherwise the label is collected nowhere and never becomes
+    // editable.
+    const own = [...document.querySelectorAll(`[data-block-uid="${blockUid}"]`)];
+    for (const handle of document.querySelectorAll(
+      `[data-block-selector~="${blockUid}"]`,
+    )) {
+      const advertised = (handle.getAttribute('data-block-selector') || '').trim().split(/\s+/);
+      // Only a stand-in — a selector naming exactly this uid. A container
+      // advertising a word list of children is not one of its children.
+      if (advertised.length === 1 && !own.some((el) => el.contains(handle))) {
+        own.push(handle);
+      } else if (advertised.length === 1 && !own.includes(handle)) {
+        own.push(handle);
+      }
+    }
+    const elements = own;
     if (elements.length === 0) {
       log('getAllBlockElements: no DOM elements for', blockUid, 'pathInfo:', pathInfo ? 'exists' : 'missing', 'isTemplateInstance:', pathInfo?.isTemplateInstance);
     }
@@ -4420,8 +4521,58 @@ export class Bridge {
         // heading nested inside the trigger). Revealing must not cost the author
         // inline editing, so record the clicked field BEFORE navigating — the
         // selectBlock that follows the reveal is what promotes it.
-        this.noteEditableFromSelectorClick(event, selector);
+        const promoted = this.noteEditableFromSelectorClick(event, selector);
         this.handleBlockSelector(selector, selectorElement);
+        if (promoted) {
+          // The trigger is a <button>, so the browser puts focus on IT, not on
+          // the contenteditable label inside it — the author clicked to type and
+          // the caret went to the button. The field only becomes editable once
+          // the block is selected, which happens after this click, so place the
+          // caret ourselves on the next frame.
+          const uid = selector.trim().split(/\s+/)[0];
+          // Selection — and with it contenteditable — arrives asynchronously,
+          // and a span cannot take focus before it is editable. Poll a few
+          // frames for the field to become editable rather than focusing into
+          // the void on the next tick.
+          let frames = 0;
+          const placeCaret = () => {
+            const blockElement = this.queryBlockElement(uid);
+            const field = blockElement
+              ? this.getEditableFieldByName(blockElement, this.focusedFieldName)
+              : null;
+            // Only for a field that lives OUTSIDE the block's own element — a
+            // true stand-in, like a tab's label on the button that reveals it.
+            // When the field is inside the block (an accordion summary that is
+            // both trigger and heading) the normal path already handles it, and
+            // stepping in spends savedClickPosition — which is consumed on
+            // first use, leaving the real restore with nothing and the caret at
+            // position 0.
+            if (field && blockElement?.contains(field)) return;
+            if (field?.getAttribute('contenteditable') === 'true') {
+              // Already in the field — including a caret the browser placed
+              // inside it — leave it exactly where the author clicked. Focusing
+              // again resets the caret to the start, which turned typing into
+              // "XSection navigation" instead of "Section Xnavigation".
+              const active = document.activeElement;
+              const alreadyThere = active === field || field.contains(active);
+              if (!alreadyThere) {
+                // restoreFocusFromSavedClick, not focus(): it puts the caret
+                // back where the click landed. Focusing the element first drops
+                // the caret at position 0, which turned typing into
+                // "XSection navigation" instead of "Section Xnavigation".
+                this.restoreFocusFromSavedClick(blockElement);
+              }
+              // Selection focuses the block's FIRST editable field, and that
+              // runs after this — for a tab that is the code, not the label the
+              // author clicked. Keep the caret where it was aimed until the
+              // selection cycle has settled.
+              if (frames++ < 30) requestAnimationFrame(placeCaret);
+              return;
+            }
+            if (frames++ < 30) requestAnimationFrame(placeCaret);
+          };
+          requestAnimationFrame(placeCaret);
+        }
         return;
       }
 
@@ -6231,7 +6382,14 @@ export class Bridge {
         container = container.parentNode;
       }
       const blockElement = container?.closest?.('[data-block-uid]');
-      const blockUid = blockElement?.getAttribute('data-block-uid') || null;
+      // owningBlockUid, not the nearest uid element: a field can live on an
+      // element standing in for its block (a tab's label sits on the button that
+      // reveals the tab). Resolving to the container AROUND it looks the field
+      // up in the wrong schema, comes back undefined, and warns that a
+      // perfectly well declared field is not registered.
+      const blockUid = (container ? this.owningBlockUid(container) : null)
+        || blockElement?.getAttribute('data-block-uid')
+        || null;
       const fieldName = container?.getAttribute?.('data-edit-text') || null;
 
       // Skip error for readonly blocks - they don't need selection sync
@@ -6362,10 +6520,15 @@ export class Bridge {
       if (blockElement.hasAttribute('data-edit-text')) {
         editableFields.push(blockElement);
       }
-      // Also check any children with data-edit-text
+      // Also check any children with data-edit-text, plus any that live on an
+      // element standing in for this block (a tab's label sits on the button
+      // that reveals it, outside the block's own subtree).
       blockElement.querySelectorAll('[data-edit-text]').forEach((el) => {
         editableFields.push(el);
       });
+      for (const field of this.getOwnEditableFields(blockElement)) {
+        if (!editableFields.includes(field)) editableFields.push(field);
+      }
     }
     log(`restoreContentEditableOnFields called from ${caller}: found ${editableFields.length} fields for block ${blockUid}`);
     editableFields.forEach((field) => {
@@ -8332,7 +8495,11 @@ export class Bridge {
     // Only when the reveal selects the very block that owns the field. A
     // carousel dot labelled with its slide's text points elsewhere; promoting
     // that field would put the caret in a block that is about to scroll away.
-    const ownerUid = field.closest('[data-block-uid]')?.getAttribute('data-block-uid');
+    // owningBlockUid, not the nearest uid element: a tab's label sits on the
+    // button that reveals it, so its nearest uid ancestor is the codeExample
+    // AROUND the tabs. Resolving that way made this bail, and clicking a tab
+    // label stopped putting the caret in it.
+    const ownerUid = this.owningBlockUid(field);
     if (ownerUid !== selector.trim().split(/\s+/)[0]) return;
 
     // Readonly blocks (listing items and friends) render query results, not
