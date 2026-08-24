@@ -54,12 +54,12 @@ export default function PageClient({ initialData, apiUrl }) {
             // schema, so an undeclared field is never made contenteditable — the
             // annotation renders and clicking it does nothing.
             title: { title: 'Title', type: 'string' },
-            description: { title: 'Description', widget: 'textarea' },
-            effective: { title: 'Publication date', type: 'string', widget: 'datetime' },
-            created: { title: 'Created', type: 'string', widget: 'datetime' },
-            modified: { title: 'Modified', type: 'string', widget: 'datetime' },
-            start: { title: 'Start', type: 'string', widget: 'datetime' },
-            end: { title: 'End', type: 'string', widget: 'datetime' },
+            description: { title: 'Description', type: 'string' },
+            effective: { title: 'Publication date', type: 'string' },
+            created: { title: 'Created', type: 'string' },
+            modified: { title: 'Modified', type: 'string' },
+            start: { title: 'Start', type: 'string' },
+            end: { title: 'End', type: 'string' },
             location: { title: 'Location', type: 'string' },
             contact_name: { title: 'Contact name', type: 'string' },
             contact_phone: { title: 'Contact phone', type: 'string' },

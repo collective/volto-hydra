@@ -283,6 +283,30 @@ onMounted(() => {
                 page: {
                     schema: {
                         properties: {
+                            // The PAGE's own metadata, annotated by blocks as
+                            // `/`-scoped names (`data-edit-text="/start"`, and the
+                            // dateField block's `/${block.dateField}`):
+                            // getFieldType resolves those against this schema, and
+                            // an undeclared field is never made contenteditable.
+                            //
+                            // Plain `type: 'string'`, deliberately. Declaring the
+                            // date fields with `widget: 'datetime'` took three
+                            // admin tests down with it — Cmd+A selected 1 block
+                            // instead of 3, a fieldRules field stopped hiding —
+                            // i.e. interactions stopped landing at all, the shape
+                            // of a sidebar that threw while rendering an unknown
+                            // widget. The mock test-frontend declares its page
+                            // metadata the same plain way.
+                            title: { title: 'Title', type: 'string' },
+                            description: { title: 'Description', type: 'string' },
+                            effective: { title: 'Publication date', type: 'string' },
+                            created: { title: 'Created', type: 'string' },
+                            modified: { title: 'Modified', type: 'string' },
+                            start: { title: 'Start', type: 'string' },
+                            end: { title: 'End', type: 'string' },
+                            location: { title: 'Location', type: 'string' },
+                            contact_name: { title: 'Contact name', type: 'string' },
+                            contact_phone: { title: 'Contact phone', type: 'string' },
                             items: {
                                 title: 'Blocks',
                                 allowedBlocks: [...new Set(['slate', 'image', 'separator', 'video', 'gridBlock', 'teaser', 'listing', 'summary', 'default', 'section', 'contextNavigation', ...pageLevelBlocks])],
