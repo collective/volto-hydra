@@ -1153,7 +1153,12 @@ function renderFormBlock(block) {
         if (fieldType === 'empty') {
             // A typed object_list item seeded as 'empty' (type in field_type, no @type).
             // Render a selectable placeholder; the admin supplies the '+' to pick its type.
-            html += `<span data-edit-text="placeholder" style="color:#999;">Empty field — pick a type</span>`;
+            // No data-edit-text: "Empty field — pick a type" is a hint the
+            // frontend writes, not content the author owns. No schema declares
+            // a `placeholder` field, so annotating it promised an edit that
+            // hydra correctly refuses — the same lie as a "Read More" label on
+            // a block with no button.
+            html += `<span style="color:#999;">Empty field — pick a type</span>`;
         } else if (fieldType === 'textarea') {
             html += `<textarea name="${fieldId}" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" rows="3"></textarea>`;
         } else if (fieldType === 'select') {
