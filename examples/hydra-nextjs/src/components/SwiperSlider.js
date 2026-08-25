@@ -24,7 +24,7 @@ export default function SwiperSlider({ slides, apiUrl, imageProps, getUrl }) {
     {/* Room for the pagination. Swiper draws its bullets in a strip positioned
         absolutely over the bottom of the slider, and the slide's own content
         runs to the bottom edge — so the bullets sit ON TOP of the last thing in
-        the slide, which is the "Read More" link. A visitor sees text under the
+        the slide, which is its link. A visitor sees text under the
         bullets; an author cannot click the link at all, because the bullets take
         the pointer events. Padding the container gives the strip its own space
         instead of borrowing the slide's. */}
@@ -61,13 +61,21 @@ export default function SwiperSlider({ slides, apiUrl, imageProps, getUrl }) {
             {slide.head_title && <div data-edit-text="head_title">{slide.head_title}</div>}
             {slide.title && <h2 data-edit-text="title">{slide.title}</h2>}
             {slide.description && <p data-edit-text="description">{slide.description}</p>}
-            {slide.href ? (
-              <a href={getUrl(slide.href, apiUrl)} data-edit-link="href" data-edit-text="buttonText">
-                {slide.buttonText || "Read More"}
-              </a>
-            ) : (
-              <a href="#" data-edit-link="href" data-edit-text="buttonText">
-                {slide.buttonText || "Read More"}
+            {/* The <a> hosts TWO fields, so it exists when either has data —
+                the same rule as every field above it. It used to render
+                unconditionally with a literal "Read More", which invented a
+                button on slides that have no button: an image slide is just
+                {url, alt}, and the image schema declares neither buttonText nor
+                href. Clicking that anchor could never start editing, because
+                there is no field behind it to edit (issue #296: no data ⇒ no
+                element). */}
+            {(slide.buttonText || slide.href) && (
+              <a
+                href={slide.href ? getUrl(slide.href, apiUrl) : "#"}
+                data-edit-link="href"
+                data-edit-text="buttonText"
+              >
+                {slide.buttonText}
               </a>
             )}
           </div>

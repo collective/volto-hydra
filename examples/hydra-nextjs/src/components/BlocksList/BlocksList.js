@@ -374,8 +374,13 @@ function ListingBlock({ id, block, data, apiUrl, contextPath }) {
   if (!items.length && !paging) return null;
   return (
     <>
-      {items.map((item) => (
-        <Block key={item["@uid"]} block={item} id={item["@uid"]} data={data} apiUrl={apiUrl} contextPath={contextPath} />
+      {/* Key by the item, not by the block. expandListingBlocks gives every
+          item the LISTING's uid — deliberately, so the bridge addresses them
+          all as that block — so @uid is the same string for all of them and
+          React duplicates or omits children. @id is the content each item is.
+          The uid still goes to `id`, which is what the bridge reads. */}
+      {items.map((item, index) => (
+        <Block key={item["@id"] ?? `${item["@uid"] ?? "item"}-${index}`} block={item} id={item["@uid"]} data={data} apiUrl={apiUrl} contextPath={contextPath} />
       ))}
       <Paging paging={paging} buildUrl={buildPagingUrl} onNavigate={handleNavigate} />
     </>
