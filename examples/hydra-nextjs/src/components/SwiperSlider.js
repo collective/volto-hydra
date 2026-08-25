@@ -35,12 +35,14 @@ export default function SwiperSlider({ slides, apiUrl, imageProps, getUrl }) {
       onSwiper={setSwiper}
       style={{ paddingBottom: "2rem" }}
     >
-      {/* Key by POSITION as well as uid. A listing slide expands into several
-          items that deliberately share the listing's uid — that is how the
-          bridge addresses them — so keying on uid alone gives React duplicate
-          keys and it omits or duplicates slides ("Non-unique keys may cause
-          children to be duplicated and/or omitted"). The rendered slide then
-          does not match what the editor is holding. */}
+      {/* Key by the item's OWN identity. expandListingBlocks stamps the
+          listing's blockId onto every item it expands — deliberately, so the
+          bridge can address them all as that block — so keying on @uid gives
+          React duplicate keys and it omits or duplicates children ("Non-unique
+          keys may cause children to be duplicated and/or omitted").
+          @id is the content each item actually is, which also survives
+          reordering and paging; position is only the fallback, since keying by
+          index re-mounts every slide whenever the order changes. */}
       {slides.map((slide, slideIndex) => {
         const mediaField = mediaFieldOf(slide);
         // Read the field, never the slide as a whole: imageProps falls back to
@@ -49,7 +51,7 @@ export default function SwiperSlider({ slides, apiUrl, imageProps, getUrl }) {
         const mediaValue = slide[mediaField];
         const mediaUrl = mediaValue ? imageProps(mediaValue, apiUrl).url : null;
         return (
-        <SwiperSlide key={`${slide["@uid"] ?? "slide"}-${slideIndex}`}>
+        <SwiperSlide key={slide["@id"] ?? `${slide["@uid"] ?? "slide"}-${slideIndex}`}>
           <div data-block-uid={slide["@uid"]} data-block-add="right">
             {mediaUrl ? (
               <img data-edit-media={mediaField} src={mediaUrl} alt="" style={{ width: "100%" }} />
@@ -85,7 +87,7 @@ export default function SwiperSlider({ slides, apiUrl, imageProps, getUrl }) {
       <button type="button" aria-label="Previous slide" data-block-selector="-1"
               onClick={() => swiper?.slidePrev()}>‹</button>
       {slides.map((slide, index) => (
-        <button key={`${slide["@uid"] ?? "slide"}-${index}`} type="button" aria-label={`Slide ${index + 1}`}
+        <button key={slide["@id"] ?? `${slide["@uid"] ?? "slide"}-${index}`} type="button" aria-label={`Slide ${index + 1}`}
                 data-block-selector={slide["@uid"]}
                 onClick={() => swiper?.slideTo(index)}>{index + 1}</button>
       ))}
