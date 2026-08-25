@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import SlateBlock, { SlateInline } from "@/components/SlateBlock";
 import CodeExampleBlock from "@/components/CodeExampleBlock/CodeExampleBlock";
 import { expandTemplatesSync, expandListingBlocks, ploneFetchItems, staticBlocks, contentPath } from "#utils/helpers";
+import { isEditMode } from "#utils/hydra";
 import SwiperSlider from "@/components/SwiperSlider";
 import { pageFromPath } from "#utils/paging";
 
@@ -460,6 +461,14 @@ function AccordionBlock({ id, block, data, apiUrl, contextPath }) {
 // ─── Form Block (with state tracking, validation, submit) ────────────────────
 
 function FormBlock({ id, block, data, apiUrl, contextPath }) {
+  // Editing is a browser fact — isEditMode() reads window.name / ?_edit, and the
+  // server has neither — so this stays false through the first render and
+  // matches the HTML the server sent. Flipping it after mount is what adds the
+  // stand-ins, which is why a visitor's page never contains one at all.
+  const [showHiddenFields, setShowHiddenFields] = useState(false);
+  useEffect(() => {
+    setShowHiddenFields(isEditMode());
+  }, []);
   const expand = useExpand();
   const formFields = expand(block.subblocks || [], null, "field_id");
 
@@ -705,15 +714,14 @@ function FormBlock({ id, block, data, apiUrl, contextPath }) {
               {field.field_type === "hidden" && (
                 <>
                   <input type="hidden" name={field.field_id} value={field.value || ""} />
-                  {/* See globals.css: a hidden field has no visual form, so the
-                      block had no size and the author had nothing to click. It
-                      stays hidden for visitors and shows itself — marked as
-                      hidden — while editing. CSS rather than a render branch,
-                      since edit mode is only known in the browser. */}
-                  <div className="hidden-field-standin">
+                  {/* A hidden field has no visual form, so the block had no
+                      size and the author had nothing to click. Shown — marked
+                      as hidden — only while editing, so a visitor's page
+                      carries no trace of it. */}
+                  {showHiddenFields && <div className="hidden-field-standin">
                     <span className="hidden-field-badge">Hidden</span>
                     <span data-edit-text="label">{field.label}</span>
-                  </div>
+                  </div>}
                 </>
               )}
             </div>

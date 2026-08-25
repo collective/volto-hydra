@@ -64,10 +64,9 @@ body {
 
 /* A hidden form field is still the author's to configure, but it has no visual
    form — the block had no size, so there was nothing on the page to click. It
-   stays hidden for visitors and shows itself, marked as hidden, while editing.
-   hydra sets data-hydra-edit-mode on the body. */
-.hidden-field-standin { display: none; }
-body[data-hydra-edit-mode] .hidden-field-standin {
+   is rendered only while editing (see FormBlock's showHiddenFields), so a
+   visitor's page carries no trace of it. */
+.hidden-field-standin {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -77,7 +76,7 @@ body[data-hydra-edit-mode] .hidden-field-standin {
   color: #4b5563;
   font-size: 0.875rem;
 }
-body[data-hydra-edit-mode] .hidden-field-badge {
+.hidden-field-badge {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-size: 0.6875rem;

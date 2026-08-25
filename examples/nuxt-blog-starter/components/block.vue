@@ -820,12 +820,10 @@
             <input type="hidden" :name="field.field_id" :value="field.value || ''" />
             <!-- A hidden field has no visual form, so the block had no size: the
                  author saw nothing on the page and had nothing to click, even
-                 though the field is theirs to configure. It stays hidden for
-                 visitors and shows itself — marked as hidden — while editing.
-                 CSS rather than v-if, because edit mode is only known in the
-                 browser and branching on it during render would not match the
-                 HTML the server sent. -->
-            <div class="hidden-field-standin">
+                 though the field is theirs to configure. Shown — marked as
+                 hidden — only while editing, so a visitor's page carries no
+                 trace of it. -->
+            <div v-if="showHiddenFields" class="hidden-field-standin">
               <span class="hidden-field-badge">Hidden</span>
               <span data-edit-text="label">{{ field.label }}</span>
             </div>
@@ -1178,6 +1176,15 @@ function slideClasses(index) {
 // that conflict with in-progress CSS transform transitions, causing slides to
 // animate to wrong positions. In visitor mode, transitions work fine.
 const useTransitions = !isEditMode();
+
+// Editing is a browser fact — isEditMode() reads window.name / ?_edit, and the
+// server has neither — so this stays false through the first render and matches
+// the HTML the server sent. Flipping it after mount is what adds the stand-in,
+// which is why a visitor's page never contains one at all.
+const showHiddenFields = ref(false);
+onMounted(() => {
+  showHiddenFields.value = isEditMode();
+});
 
 // Next/prev handlers — simple reactive position update, Vue handles the rest
 function carouselNext() {
@@ -1613,9 +1620,8 @@ const handleFormSubmit = async (event, formBlock) => {
 </script>
 
 <style>
-/* Only while editing: hydra sets data-hydra-edit-mode on the body. */
-.hidden-field-standin { display: none; }
-body[data-hydra-edit-mode] .hidden-field-standin {
+/* Rendered only while editing (see showHiddenFields). */
+.hidden-field-standin {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -1625,7 +1631,7 @@ body[data-hydra-edit-mode] .hidden-field-standin {
   color: #4b5563;
   font-size: 0.875rem;
 }
-body[data-hydra-edit-mode] .hidden-field-badge {
+.hidden-field-badge {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-size: 0.6875rem;
