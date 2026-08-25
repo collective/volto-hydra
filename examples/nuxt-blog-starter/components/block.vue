@@ -818,6 +818,17 @@
           <!-- Hidden -->
           <template v-else-if="field.field_type === 'hidden'">
             <input type="hidden" :name="field.field_id" :value="field.value || ''" />
+            <!-- A hidden field has no visual form, so the block had no size: the
+                 author saw nothing on the page and had nothing to click, even
+                 though the field is theirs to configure. It stays hidden for
+                 visitors and shows itself — marked as hidden — while editing.
+                 CSS rather than v-if, because edit mode is only known in the
+                 browser and branching on it during render would not match the
+                 HTML the server sent. -->
+            <div class="hidden-field-standin">
+              <span class="hidden-field-badge">Hidden</span>
+              <span data-edit-text="label">{{ field.label }}</span>
+            </div>
           </template>
         </div>
       </template>
@@ -1600,3 +1611,25 @@ const handleFormSubmit = async (event, formBlock) => {
 };
 
 </script>
+
+<style>
+/* Only while editing: hydra sets data-hydra-edit-mode on the body. */
+.hidden-field-standin { display: none; }
+body[data-hydra-edit-mode] .hidden-field-standin {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px dashed #9ca3af;
+  border-radius: 0.375rem;
+  color: #4b5563;
+  font-size: 0.875rem;
+}
+body[data-hydra-edit-mode] .hidden-field-badge {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #6b7280;
+}
+</style>

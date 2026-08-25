@@ -703,7 +703,18 @@ function FormBlock({ id, block, data, apiUrl, contextPath }) {
                 </div>
               )}
               {field.field_type === "hidden" && (
-                <input type="hidden" name={field.field_id} value={field.value || ""} />
+                <>
+                  <input type="hidden" name={field.field_id} value={field.value || ""} />
+                  {/* See globals.css: a hidden field has no visual form, so the
+                      block had no size and the author had nothing to click. It
+                      stays hidden for visitors and shows itself — marked as
+                      hidden — while editing. CSS rather than a render branch,
+                      since edit mode is only known in the browser. */}
+                  <div className="hidden-field-standin">
+                    <span className="hidden-field-badge">Hidden</span>
+                    <span data-edit-text="label">{field.label}</span>
+                  </div>
+                </>
               )}
             </div>
           ))}
