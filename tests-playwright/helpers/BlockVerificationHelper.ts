@@ -106,9 +106,17 @@ export async function checkDataEditTextClicks(
     if (owner && owner !== revealedOwner) {
       await revealBlock(iframe, owner);
       // Let the reveal settle before using the block. Revealing a tab or a
-      // carousel slide moves the DOM, and the carousel tests already settle
-      // this way — getStableBlockCount polls until the count stops changing.
-      await new AdminUIHelper(page).getStableBlockCount();
+      // carousel slide moves the DOM, so wait for the count to stop changing
+      // AND for the block itself to stop moving — clicking a slide still in
+      // transit lands where it used to be, which reads as "element is outside
+      // of the viewport" once Playwright has scrolled (a transform cannot be
+      // scrolled to).
+      const admin = new AdminUIHelper(page);
+      await admin.getStableBlockCount();
+      const ownerEl = iframe.locator(`[data-block-uid="${owner}"]`).first();
+      if (await ownerEl.count()) {
+        await admin.waitForPositionStable(ownerEl).catch(() => {});
+      }
       revealedOwner = owner;
     }
     if (!await el.isVisible()) continue;

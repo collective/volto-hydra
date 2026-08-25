@@ -4037,8 +4037,12 @@ export class AdminUIHelper {
   /**
    * Wait for an element's position to stabilize (stop moving).
    * Returns when the element has a valid bounding box and position hasn't changed for 2 checks.
+   *
+   * Public: revealing a block starts an animation too — a carousel slides, a
+   * panel opens — and anything that clicks or measures afterwards needs the
+   * same guarantee the drag auto-scroll needs.
    */
-  private async waitForPositionStable(element: Locator): Promise<void> {
+  async waitForPositionStable(element: Locator): Promise<void> {
     let lastY: number | null = null;
     await expect(async () => {
       const rect = await element.boundingBox();
