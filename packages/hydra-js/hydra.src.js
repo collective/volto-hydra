@@ -4559,6 +4559,7 @@ export class Bridge {
       }
     }
 
+
     // Update focusedFieldName and recreate toolbar if field changed
     if (fieldToFocus !== this.focusedFieldName) {
       log('Updating focusedFieldName from', this.focusedFieldName, 'to', fieldToFocus);
@@ -4636,51 +4637,16 @@ export class Bridge {
           // The trigger is a <button>, so the browser puts focus on IT, not on
           // the contenteditable label inside it — the author clicked to type and
           // the caret went to the button. The field only becomes editable once
-          // the block is selected, which happens after this click, so place the
-          // caret ourselves on the next frame.
+          // the block is selected, and that cannot happen until the panel this
+          // button reveals is actually on screen.
+          //
+          // So the caret is placed by the reveal, not on a clock of its own.
+          // This used to poll for 30 animation frames (~500-900ms) alongside
+          // waitForBlockVisibleAndSelect, which is entitled to take 2s: two
+          // clocks for one dependency, the shorter one owned by the code that
+          // depends on the longer one's outcome.
           const uid = selector.trim().split(/\s+/)[0];
-          // Selection — and with it contenteditable — arrives asynchronously,
-          // and a span cannot take focus before it is editable. Poll a few
-          // frames for the field to become editable rather than focusing into
-          // the void on the next tick.
-          let frames = 0;
-          const placeCaret = () => {
-            const blockElement = this.queryBlockElement(uid);
-            const field = blockElement
-              ? this.getEditableFieldByName(blockElement, this.focusedFieldName)
-              : null;
-            // Only for a field that lives OUTSIDE the block's own element — a
-            // true stand-in, like a tab's label on the button that reveals it.
-            // When the field is inside the block (an accordion summary that is
-            // both trigger and heading) the normal path already handles it, and
-            // stepping in spends savedClickPosition — which is consumed on
-            // first use, leaving the real restore with nothing and the caret at
-            // position 0.
-            if (field && blockElement?.contains(field)) return;
-            if (field?.getAttribute('contenteditable') === 'true') {
-              // Already in the field — including a caret the browser placed
-              // inside it — leave it exactly where the author clicked. Focusing
-              // again resets the caret to the start, which turned typing into
-              // "XSection navigation" instead of "Section Xnavigation".
-              const active = document.activeElement;
-              const alreadyThere = active === field || field.contains(active);
-              if (!alreadyThere) {
-                // restoreFocusFromSavedClick, not focus(): it puts the caret
-                // back where the click landed. Focusing the element first drops
-                // the caret at position 0, which turned typing into
-                // "XSection navigation" instead of "Section Xnavigation".
-                this.restoreFocusFromSavedClick(blockElement);
-              }
-              // Selection focuses the block's FIRST editable field, and that
-              // runs after this — for a tab that is the code, not the label the
-              // author clicked. Keep the caret where it was aimed until the
-              // selection cycle has settled.
-              if (frames++ < 30) requestAnimationFrame(placeCaret);
-              return;
-            }
-            if (frames++ < 30) requestAnimationFrame(placeCaret);
-          };
-          requestAnimationFrame(placeCaret);
+          this._pendingSelectorCaret = { uid, fieldName: this.focusedFieldName };
         }
         return;
       }
@@ -4852,7 +4818,7 @@ export class Bridge {
           this.getOwnEditableFields(blockElement).length > 0;
         const enterTextMode = hasOwnText && (!coarsePointer || alreadySelected);
         this.editMode = enterTextMode ? 'text' : 'block';
-        this.selectBlock(blockElement);
+        this.selectBlock(blockElement, { fromUserClick: true });
       } else {
         // No block - check for page-level fields
         const pageField = event.target.closest('[data-edit-media], [data-edit-link], [data-edit-text]');
@@ -8162,7 +8128,27 @@ export class Bridge {
 
     // Only scroll block into view when selecting a NEW block (not reselecting same block)
     // This prevents unwanted scroll-back when user has scrolled the selected block off screen
-    if (!isSelectingSameBlock && blockElement && !this.elementIsVisibleInViewport(blockElement)) {
+    //
+    // Two further reasons NOT to scroll:
+    //
+    // The author clicked it. They are looking at it and pointing at it, so
+    // moving the page is pure interference — and worse than cosmetic: the
+    // content slides out from under the pointer between the press and the next
+    // click, so the next click lands on whatever took its place. That is what
+    // broke editing a codeExample's tab labels — the click meant for a tab
+    // landed in the code panel.
+    //
+    // And `partiallyVisible`, because the strict test demands the WHOLE block
+    // fit inside the viewport (top >= 0 && bottom <= innerHeight). A block
+    // taller than the window can never satisfy that, so selecting it scrolled
+    // every single time, forever. Most real sections are taller than the window.
+    const cameFromUserClick = options.fromUserClick === true;
+    if (
+      !isSelectingSameBlock &&
+      blockElement &&
+      !cameFromUserClick &&
+      !this.elementIsVisibleInViewport(blockElement, true)
+    ) {
       this.scrollBlockIntoView(blockElement);
     }
 
@@ -8237,7 +8223,18 @@ export class Bridge {
     if (!isTemplateInstance) {
       const isReadonly = this.isBlockReadonly(blockUid);
       const hasEditableFields = !isReadonly && this.getOwnEditableFields(blockElement).length > 0;
-      if (!hasEditableFields) {
+      // "No editable fields" is true of a CONTAINER whose text all belongs to
+      // its children — a codeExample's labels and code live on its tabs, not on
+      // the wrapper. Focusing the wrapper then rips the caret out of the field
+      // the author is typing in: click a tab's label, and selection of the
+      // container that follows moves focus to a non-editable <div>, so the next
+      // keystroke goes nowhere. The focus grab is only here so keyboard events
+      // reach the iframe when there is nothing to type into — which is not the
+      // case when the caret is already in something editable inside this block.
+      const active = document.activeElement;
+      const caretAlreadyInside =
+        !!active && blockElement.contains(active) && active.isContentEditable;
+      if (!hasEditableFields && !caretAlreadyInside) {
         if (!blockElement.hasAttribute('tabindex')) {
           blockElement.setAttribute('tabindex', '-1');
         }
@@ -8967,6 +8964,41 @@ export class Bridge {
    * Wait for a specific block to become visible AND position stable, then select it.
    * Uses same stability check as the +1/-1 path to avoid selecting during animation.
    */
+  /**
+   * Put the caret back in the field the author clicked, once the reveal that
+   * click started has finished and the block is selected.
+   *
+   * Only for a field that lives OUTSIDE the block's own element — a tab's label
+   * sits on the button that reveals the panel, and the uid is on the panel. When
+   * the field is inside the block (an accordion summary that is both trigger and
+   * heading) selection already handles it, and stepping in here would spend
+   * savedClickPosition, which is consumed on first use — leaving the real
+   * restore with nothing and the caret at position 0.
+   */
+  restoreSelectorCaret(targetUid) {
+    const pending = this._pendingSelectorCaret;
+    if (!pending || pending.uid !== targetUid) return;
+    this._pendingSelectorCaret = null;
+
+    const blockElement = this.queryBlockElement(targetUid);
+    const field = blockElement
+      ? this.getEditableFieldByName(blockElement, pending.fieldName)
+      : null;
+    if (!field || blockElement.contains(field)) return;
+    if (field.getAttribute('contenteditable') !== 'true') return;
+
+    // Already in the field — including a caret the browser placed inside it —
+    // leave it exactly where the author clicked. Focusing again resets the caret
+    // to the start, which turned typing into "XSection navigation" instead of
+    // "Section Xnavigation".
+    const active = document.activeElement;
+    if (active === field || field.contains(active)) return;
+
+    // restoreFocusFromSavedClick, not focus(): it puts the caret back where the
+    // click landed, where focus() would drop it at position 0.
+    this.restoreFocusFromSavedClick(blockElement);
+  }
+
   waitForBlockVisibleAndSelect(targetUid, retries = 40, stableCount = 0, lastX = null) {
     const STABLE_THRESHOLD = 3;
     const POSITION_TOLERANCE = 2;
@@ -8985,7 +9017,8 @@ export class Bridge {
 
       if (stableCount >= STABLE_THRESHOLD) {
         log('handleBlockSelector: selecting (position stable)', targetUid);
-        this.selectBlock(targetElement);
+        this.selectBlock(targetElement, { fromUserClick: !!this._pendingSelectorCaret });
+        this.restoreSelectorCaret(targetUid);
         return;
       }
 
@@ -8994,7 +9027,8 @@ export class Bridge {
         setTimeout(() => this.waitForBlockVisibleAndSelect(targetUid, retries - 1, stableCount, x), 50);
       } else {
         log('handleBlockSelector: selecting (retries exhausted)', targetUid);
-        this.selectBlock(targetElement);
+        this.selectBlock(targetElement, { fromUserClick: !!this._pendingSelectorCaret });
+        this.restoreSelectorCaret(targetUid);
       }
     } else if (retries > 0) {
       setTimeout(() => this.waitForBlockVisibleAndSelect(targetUid, retries - 1, 0, null), 50);

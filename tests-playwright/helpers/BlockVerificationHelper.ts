@@ -158,6 +158,14 @@ export async function checkDataEditTextClicks(
     await el.evaluate((node) =>
       node.scrollIntoView({ block: 'center', inline: 'nearest' }),
     );
+    // Then let it come to rest. Scrolling is not instant, and selecting the
+    // previous field can move the page as well, so the element can still be
+    // travelling when the click is dispatched — the click then lands on
+    // whatever has slid into that spot. That is exactly how clicking a
+    // codeExample tab label ended up hitting the code panel underneath
+    // (activeElement=DIV), and it only showed up in the full suite, where a
+    // previous selection had something to scroll.
+    await new AdminUIHelper(page).waitForPositionStable(el).catch(() => {});
 
     await el.click();
     // The warning below is asserted ABSENT, so give the bridge its frame to
