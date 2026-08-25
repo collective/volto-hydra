@@ -4062,8 +4062,18 @@ export class Bridge {
               this.initialized = true;
 
               // Restore block selection if provided (e.g., after adding a new block)
-              if (e.data.selectedBlockUid) {
-                const blockUidToSelect = e.data.selectedBlockUid;
+              // A block carried across an in-page navigation wins over the
+              // admin's copy, which predates the click that caused the reload.
+              // Read it ONCE and always drop it: sessionStorage outlives the
+              // page, so a leftover entry would hijack selection on every
+              // later load and point at a block that isn't on the new page.
+              const carriedRaw = sessionStorage.getItem('hydra_in_page_nav_block');
+              sessionStorage.removeItem('hydra_in_page_nav_block');
+              const [carriedAt, carriedBlock] = (carriedRaw || '').split('|');
+              const carriedIsFresh =
+                !!carriedBlock && Date.now() - parseInt(carriedAt || '0', 10) < 5000;
+              if (e.data.selectedBlockUid || carriedIsFresh) {
+                const blockUidToSelect = carriedIsFresh ? carriedBlock : e.data.selectedBlockUid;
                 const bridge = this;
                 // Wait for element to appear AND position to stabilize before selecting
                 // This prevents race conditions during frontend re-render/animation
@@ -4660,6 +4670,19 @@ export class Bridge {
         setTimeout(() => { this._allowLinkNavigation = false; }, 100);
         // Store timestamp for in-page navigation - checked on reload to skip PATH_CHANGE
         sessionStorage.setItem('hydra_in_page_nav_time', String(Date.now()));
+        // ...and WHAT was selected. Applying a search facet reloads the page by
+        // design, and the author's selection should survive it. Relying on the
+        // admin to remember is a race: the navigation can beat the
+        // BLOCK_SELECTED it was told about, so it restores what it had before.
+        if (this.selectedBlockUid) {
+          // Carries its OWN timestamp: hydra_in_page_nav_time is consumed by the
+          // PATH_CHANGE branch earlier in the load, so borrowing it made this
+          // always look stale.
+          sessionStorage.setItem(
+            'hydra_in_page_nav_block',
+            `${Date.now()}|${this.selectedBlockUid}`,
+          );
+        }
       }
 
       const blockElement = event.target.closest('[data-block-uid]');

@@ -2279,7 +2279,7 @@ function renderFacetWidget(facet) {
         optionsHtml += options.map(opt =>
             `<option value="${opt.value}">${opt.title}</option>`
         ).join('');
-        return `<select class="facet-widget facet-select" data-field="${field}" style="width: 100%; padding: 4px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px;">
+        return `<select class="facet-widget facet-select" data-linkable-allow data-field="${field}" style="width: 100%; padding: 4px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px;">
             ${optionsHtml}
         </select>`;
     } else if (facetType === 'checkboxFacet') {
@@ -2291,7 +2291,7 @@ function renderFacetWidget(facet) {
         const checkboxesHtml = options.map(opt => {
             const isChecked = currentValues.includes(opt.value) ? 'checked' : '';
             return `<label style="display: block; margin-top: 4px;">
-                <input type="checkbox" class="facet-checkbox" data-field="${field}" value="${opt.value}" ${isChecked} />
+                <input type="checkbox" class="facet-checkbox" data-linkable-allow data-field="${field}" value="${opt.value}" ${isChecked} />
                 ${opt.title}
             </label>`;
         }).join('');
