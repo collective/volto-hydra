@@ -89,7 +89,11 @@ export default defineNuxtConfig({
           image_alias: '',
           // Override API URL for test builds (NUXT_TEST_BACKEND env var)
           backendBaseUrl: process.env.NUXT_TEST_BACKEND || 'https://hydra-api.pretagov.com',
-          adminUrl: process.env.NUXT_TEST_BACKEND ? 'http://localhost:3001' : 'https://hydra.pretagov.com',
+          // The admin's port is overridable like every other (ports.ts), and a
+          // literal 3001 pointed test builds at whatever else was on it.
+          adminUrl: process.env.NUXT_TEST_BACKEND
+            ? `http://localhost:${process.env.HYDRA_VOLTO_SSR_PORT || 3001}`
+            : 'https://hydra.pretagov.com',
         }
       },
       image: {
