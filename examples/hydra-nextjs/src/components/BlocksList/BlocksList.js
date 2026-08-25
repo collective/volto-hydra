@@ -1137,8 +1137,15 @@ function Block({ block, id, data, apiUrl, contextPath }) {
           <div className="teaser-content">
             {teaserTitle && (
               <a href={teaserHref} data-edit-link="href">
+                {/* head_title is a schema field like any other, so it needs the
+                    annotation that makes it editable. Rendering it bare put the
+                    author in the worst position: the kicker is right there on
+                    screen, visibly part of the teaser they are editing, and
+                    clicking it does nothing at all. */}
                 {block.head_title && (
-                  <div className="teaser-head-title">{block.head_title}</div>
+                  <div className="teaser-head-title" data-edit-text="head_title">
+                    {block.head_title}
+                  </div>
                 )}
                 <h2 className="teaser-title" data-edit-text="title">
                   {teaserTitle}
