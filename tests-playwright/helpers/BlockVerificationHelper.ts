@@ -9,6 +9,7 @@
  */
 import { expect } from '@playwright/test';
 import type { Page, FrameLocator, Locator } from '@playwright/test';
+import { AdminUIHelper } from './AdminUIHelper';
 import { recordSlateFieldContainer, recordFieldEditable } from './field-coverage';
 
 export interface SubBlock {
@@ -68,8 +69,48 @@ export async function checkDataEditTextClicks(
   const count = await editTextEls.count();
   if (count === 0) return;
 
-  for (let i = 0; i < count; i++) {
+  // Which block each field belongs to, resolved ONCE. A field can belong to a
+  // child of the block under test — a codeExample's code fields belong to its
+  // tabs — and reaching one means revealing that child, which for a tab means
+  // switching to it.
+  const owners = await editTextEls.evaluateAll((nodes) =>
+    nodes.map((node) => {
+      const handle = node.closest('[data-block-selector]');
+      const advertised = (handle?.getAttribute('data-block-selector') || '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+      const standIn =
+        advertised.length === 1 &&
+        advertised[0] !== '+1' &&
+        advertised[0] !== '-1' &&
+        !advertised[0].includes(':')
+          ? advertised[0]
+          : null;
+      return standIn || node.closest('[data-block-uid]')?.getAttribute('data-block-uid') || null;
+    }),
+  );
+
+  // Walk grouped by owner so each block is revealed ONCE and all of its fields
+  // are checked while it is on screen. Field order interleaves owners (every
+  // tab label, then every tab's code), so revealing per field switched tabs
+  // between a reveal and the click depending on it — and did it twice as often.
+  const order = [...Array(count).keys()].sort(
+    (a, b) => String(owners[a] ?? '').localeCompare(String(owners[b] ?? '')) || a - b,
+  );
+  let revealedOwner: string | null = null;
+
+  for (const i of order) {
     const el = editTextEls.nth(i);
+    const owner = owners[i];
+    if (owner && owner !== revealedOwner) {
+      await revealBlock(iframe, owner);
+      // Let the reveal settle before using the block. Revealing a tab or a
+      // carousel slide moves the DOM, and the carousel tests already settle
+      // this way — getStableBlockCount polls until the count stops changing.
+      await new AdminUIHelper(page).getStableBlockCount();
+      revealedOwner = owner;
+    }
     if (!await el.isVisible()) continue;
     // Only the fields this block OWNS. A container renders its children's
     // fields too, and those are the child block's contract, checked when the
@@ -100,25 +141,6 @@ export async function checkDataEditTextClicks(
     // this helper about any particular component's markup.
     await revealBlock(iframe, blockUid);
 
-    // A field belongs to a block, and that is not always the block under test:
-    // a codeExample's `code` fields belong to its TABS, and only the active
-    // tab's is on screen. Revealing the outer block leaves the other three
-    // hidden, so clicking them lands nowhere. Reveal the field's OWN block —
-    // exactly what the editor does when an author selects it in the sidebar.
-    const fieldOwnerUid = await el.evaluate((node) => {
-      const handle = node.closest('[data-block-selector]');
-      const advertised = (handle?.getAttribute('data-block-selector') || '')
-        .trim()
-        .split(/\s+/)
-        .filter(Boolean);
-      if (advertised.length === 1 && !['+1', '-1'].includes(advertised[0]) && !advertised[0].includes(':')) {
-        return advertised[0];
-      }
-      return node.closest('[data-block-uid]')?.getAttribute('data-block-uid') ?? null;
-    });
-    if (fieldOwnerUid && fieldOwnerUid !== blockUid) {
-      await revealBlock(iframe, fieldOwnerUid);
-    }
 
     // Scroll the field to the MIDDLE of the viewport before clicking. Playwright
     // scrolls to the nearest edge, which on any site with a sticky header puts
@@ -201,8 +223,17 @@ export async function checkDataEditTextClicks(
  */
 export async function revealBlock(iframe: FrameLocator, blockUid: string): Promise<void> {
   const block = iframe.locator(`[data-block-uid="${blockUid}"]`).first();
+  // Ask the bridge whether it considers the block visible — do not re-derive it.
+  // A carousel slide translated out of view still HAS client rects: it is laid
+  // out, just at x=-777 while its container starts at x=16. Checking rects
+  // concluded "already rendered", skipped the reveal, and left the click landing
+  // off-viewport. isElementHidden knows about off-screen translates.
   const rendered = await block
-    .evaluate((node) => node.getClientRects().length > 0)
+    .evaluate((node) => {
+      const bridge = (window as any).__hydraBridge;
+      if (bridge?.isElementHidden) return !bridge.isElementHidden(node);
+      return node.getClientRects().length > 0;
+    })
     .catch(() => false);
   if (rendered) return;
 
@@ -221,6 +252,7 @@ export async function revealBlock(iframe: FrameLocator, blockUid: string): Promi
   if (!clicked) return;
 
   await expect(block).toBeVisible({ timeout: 5000 });
+
 }
 
 /**
