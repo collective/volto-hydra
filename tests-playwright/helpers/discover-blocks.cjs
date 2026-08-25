@@ -1163,7 +1163,16 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         // already resolved from the container's `typeField`. Without this a form
         // field (text / select / single_choice …) is skipped from coverage
         // instead of being credited as its own registered block type.
-        const blockType = blockData['@type'] || entry.blockType;
+        // A TYPED object_list item (a form's `subblocks`, keyed by `field_id`
+        // and typed by `field_type`) has no `@type`, so fall back to the type
+        // buildBlockPathMap resolved from the container's `typeField` —
+        // otherwise a form field (text / select / single_choice …) is skipped
+        // from coverage instead of being credited as its own block type.
+        // UNTYPED items (table rows/cells) only get a virtual `parent:field`
+        // display label, which no blocksConfig can ever register; counting one
+        // as a block type reports every table as an unregistered `table:rows`.
+        const blockType =
+          blockData['@type'] || (entry.isVirtualBlockType ? undefined : entry.blockType);
         // Resolved schema for this entry — may be inline (object_list schema)
         // or come from blocksConfig[blockType].
         const schemaRef = entry._schemaRef;

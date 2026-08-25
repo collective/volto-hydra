@@ -837,6 +837,12 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         region: fieldName, // The container field (region) — same concept as blocks fields
         blockType: itemBlockType, // Real type (from typeField) or virtual type (from parent:field)
         isObjectListItem: true,
+        // `parent:field` is a SIDEBAR DISPLAY name, not a block type: nothing
+        // registers it in blocksConfig and nothing renders it. Flag it so
+        // consumers that treat `blockType` as a real `@type` (coverage
+        // discovery) can tell the two apart — an untyped object_list item
+        // (a table row/cell) only ever gets this label.
+        ...(itemBlockType === virtualType && { isVirtualBlockType: true }),
         idField,
         ...(typeField && { typeField }), // Only set if typed object_list
         // A region-level `@type` RULE: a `when`-based fieldRule whose `set` is a
