@@ -126,7 +126,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
-        storageState: 'tests-playwright/fixtures/storage-nuxt.json',
+        storageState: 'tests-playwright/.generated/storage-nuxt.json',
       },
     },
     {
@@ -135,7 +135,7 @@ export default defineConfig({
       use: {
         ...devices['Desktop Firefox'],
         viewport: { width: 1280, height: 720 },
-        storageState: 'tests-playwright/fixtures/storage-nuxt.json',
+        storageState: 'tests-playwright/.generated/storage-nuxt.json',
       },
     },
     // React Vite frontend (port 3004)
@@ -146,7 +146,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
-        storageState: 'tests-playwright/fixtures/storage-react.json',
+        storageState: 'tests-playwright/.generated/storage-react.json',
       },
     },
     // Svelte Vite frontend (port 3005)
@@ -157,7 +157,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
-        storageState: 'tests-playwright/fixtures/storage-svelte.json',
+        storageState: 'tests-playwright/.generated/storage-svelte.json',
       },
     },
     // Vue Vite frontend (port 3006)
@@ -168,7 +168,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
-        storageState: 'tests-playwright/fixtures/storage-vue.json',
+        storageState: 'tests-playwright/.generated/storage-vue.json',
       },
     },
     // Astro SSR frontend (port 3009)
@@ -179,7 +179,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
-        storageState: 'tests-playwright/fixtures/storage-svelte.json',
+        storageState: 'tests-playwright/.generated/storage-svelte.json',
       },
     },
 
@@ -235,7 +235,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
-        storageState: 'tests-playwright/fixtures/storage-nuxt.json',
+        storageState: 'tests-playwright/.generated/storage-nuxt.json',
       },
       testIgnore: [
         /nuxt-.*\.spec\.ts/, // Skip nuxt-specific tests (they set their own cookie)
@@ -262,7 +262,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
-        storageState: 'tests-playwright/fixtures/storage-nextjs.json',
+        storageState: 'tests-playwright/.generated/storage-nextjs.json',
       },
       testIgnore: [
         /nuxt-.*\.spec\.ts/,
@@ -275,7 +275,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
-        storageState: 'tests-playwright/fixtures/storage-f7.json',
+        storageState: 'tests-playwright/.generated/storage-f7.json',
       },
       testIgnore: [
         /nuxt-.*\.spec\.ts/,
@@ -299,7 +299,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         viewport: { width: 1440, height: 900 },
         permissions: ['clipboard-read', 'clipboard-write'],
-        storageState: 'tests-playwright/fixtures/storage-nuxt.json',
+        storageState: 'tests-playwright/.generated/storage-nuxt.json',
       },
     },
     // Homepage hero demo video — manual / on-demand.
@@ -314,7 +314,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
-        storageState: 'tests-playwright/fixtures/storage-nuxt.json',
+        storageState: 'tests-playwright/.generated/storage-nuxt.json',
         video: {
           mode: 'on',
           size: { width: 1280, height: 720 },

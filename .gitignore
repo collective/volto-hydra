@@ -49,3 +49,6 @@ packages/hydra-js/hydra.js.map
 docs/examples/_images/
 *.mp4
 *.webm
+
+# Storage states are generated per-run from ports.ts (see global-setup)
+tests-playwright/.generated/

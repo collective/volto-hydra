@@ -17,7 +17,7 @@ import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 // Nuxt-specific: uses Nuxt iframe which has full form block implementation
 test.use({
-  storageState: 'tests-playwright/fixtures/storage-nuxt.json',
+  storageState: 'tests-playwright/.generated/storage-nuxt.json',
 });
 
 test.describe('Form Block', () => {

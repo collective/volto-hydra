@@ -7,7 +7,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { chromium } from '@playwright/test';
-import { URLS } from './ports';
+import { PORTS, URLS } from './ports';
 import { FRONTEND_URLS, SANITY_PROJECTS } from './bridge/fixtures';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -58,7 +58,61 @@ async function reachable(url: string): Promise<boolean> {
   }
 }
 
+/**
+ * Which frontend each storageState points the editor at.
+ *
+ * The editor reads the iframe URL from a cookie NAMED for the Volto SSR port
+ * (`iframe_url_<port>`), so a storageState pins two ports at once: the admin's
+ * in the name and the frontend's in the value. These used to be checked in with
+ * 3001/3003/... baked into the JSON, which quietly cancelled the env overrides
+ * ports.ts documents — set HYDRA_VOLTO_SSR_PORT and the cookie kept the old
+ * name, so the editor never learned which frontend to load and the bridge sat
+ * at "Not Connected", initBridge never called. Running on the default ports was
+ * the only thing that worked, which means sharing them with whatever else is
+ * already on 3001/8888 and, with reuseExistingServer, silently adopting a
+ * stale Volto from another session.
+ *
+ * Generating them from PORTS restores the override, so a run can take a private
+ * set of ports and leave anyone else's hydra alone.
+ */
+const STORAGE_FRONTENDS: Record<string, string> = {
+  nuxt: URLS.nuxt,
+  react: URLS.reactDoc,
+  svelte: URLS.svelteDoc,
+  vue: URLS.vueDoc,
+  nextjs: URLS.nextjs,
+  // F7 is hash-routed: the editor needs the `#!` or it loads the app shell
+  // without a route.
+  f7: `${URLS.f7}/#!`,
+};
+
+export const GENERATED_DIR = path.resolve(__dirname, '.generated');
+
+function writeStorageStates(): void {
+  fs.mkdirSync(GENERATED_DIR, { recursive: true });
+  for (const [name, frontendUrl] of Object.entries(STORAGE_FRONTENDS)) {
+    const state = {
+      cookies: [
+        {
+          name: `iframe_url_${PORTS.voltoSsr}`,
+          value: frontendUrl,
+          domain: 'localhost',
+          path: '/',
+        },
+      ],
+      origins: [],
+    };
+    fs.writeFileSync(
+      path.join(GENERATED_DIR, `storage-${name}.json`),
+      JSON.stringify(state, null, 2),
+    );
+  }
+}
+
 async function globalSetup() {
+  // Before anything else: the storageStates have to name the ports THIS run uses.
+  writeStorageStates();
+
   // Run block discovery if configured (before health checks — SKIP_VOLTO_CHECK
   // causes early return but discovery still needs to run for bridge tests)
   const discoverApi = process.env.DISCOVER_BLOCKS_API;
