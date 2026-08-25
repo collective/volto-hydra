@@ -490,6 +490,13 @@ const UNDECLARED_EXEMPT = new Set([
   // by the editor at runtime. Declaring it as a schema property would offer the
   // bookkeeping itself as an editable field.
   '_customFields',
+  // collective.volto.formsupport regenerates `validationSettings` on every GET
+  // of a form block — it is the catalogue of settable validators the sidebar
+  // builds its "Rule settings" widget FROM, so it is a property of the response,
+  // not of what is stored. The undeclared-field check asks "is a stored field
+  // missing from the schema", and for this one the premise does not hold:
+  // declaring it would offer the catalogue itself as an editable field.
+  'validationSettings',
   // Which field of the referenced content holds the image. Written by the
   // serialiser alongside `image_scales` (already exempt above), not authored.
   'image_field',

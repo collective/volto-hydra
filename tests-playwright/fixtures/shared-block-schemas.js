@@ -370,9 +370,20 @@ export const sharedBlocksConfig = {
         // parentControlled config, so nothing is hidden by default.
         blockSchema: {
             title: 'Slide',
-            fieldsets: [{ id: 'default', title: 'Default', fields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'hideButton'] }],
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'href', 'hideButton', 'flagAlign'] }],
             properties: {
                 head_title: { title: 'Kicker', type: 'string' },
+                // The slide's own link target, and which side its caption sits
+                // on. Both are stored by the fixtures and read by the example
+                // frontends (nuxt keys its card position off flagAlign), so an
+                // author could see them on screen but not reach them.
+                href: { title: 'Link', widget: 'object_browser', mode: 'link' },
+                flagAlign: {
+                    title: 'Caption Alignment',
+                    widget: 'select',
+                    choices: [['left', 'Left'], ['right', 'Right']],
+                    default: 'left',
+                },
                 title: { title: 'Title', type: 'string' },
                 description: { title: 'Description', type: 'string', widget: 'textarea' },
                 preview_image: { title: 'Image Override', widget: 'object_browser', mode: 'image', allowExternals: true },
@@ -1282,6 +1293,9 @@ export const sharedBlocksConfig = {
                 label: { title: 'Label', type: 'string' },
                 description: { title: 'Description', type: 'string' },
                 value: { title: 'Value for field', type: 'string' },
+                // What the field submits when nothing sets it — the whole point
+                // of a hidden field, and it was the one thing not declared.
+                default_value: { title: 'Default value', type: 'string' },
             },
         },
     },
@@ -1460,7 +1474,13 @@ export const sharedBlocksConfig = {
       title: 'Empty',
       group: 'common',
       restricted: true,
-      blockSchema: { fieldsets: [], properties: {}, required: [] },
+      // An empty field is a spacer in a form, but it still carries a label —
+      // the fixtures store one, so a bare properties map made it uneditable.
+      blockSchema: {
+        fieldsets: [{ id: 'default', title: 'Default', fields: ['label'] }],
+        properties: { label: { title: 'Label', type: 'string' } },
+        required: [],
+      },
     },
 
     // Highlight block: banner with title, slate description, image, CTA
