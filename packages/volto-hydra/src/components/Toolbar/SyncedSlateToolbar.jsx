@@ -1244,9 +1244,14 @@ const SyncedSlateToolbar = ({
   const isBlockVisible = blockBottomInPage > toolbarIframeRect.top && blockTopInPage < iframeBottom;
 
   // Use shared calculation (same as iframe drag handle in hydra.js)
+  // Stand-in passed through so the toolbar clears a field that represents the
+  // block from somewhere else (a tab's label). The rule itself lives in
+  // calculateDragHandlePosition, shared with the iframe's drag handle — they
+  // are asserted to stay aligned.
   const { top: toolbarTop, left: toolbarLeft } = calculateDragHandlePosition(
     blockUI.rect,
-    { top: toolbarIframeRect.top, left: toolbarIframeRect.left }
+    { top: toolbarIframeRect.top, left: toolbarIframeRect.left },
+    blockUI.standInRect,
   );
 
   // Update hydraData with toolbar position for LinkEditor positioning

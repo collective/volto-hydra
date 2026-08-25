@@ -3257,6 +3257,9 @@ const Iframe = (props) => {
             setBlockUI({
               blockUid: blockUids[0],
               rect: event.data.rect,
+              // Where a stand-in for this block sits (a tab's label on its trigger), so
+              // chrome can be placed clear of a field the author needs to click.
+              standInRect: event.data.standInRect,
               focusedFieldName: null,
               addDirection: 'bottom',
               editableFields: {},
@@ -3338,6 +3341,9 @@ const Iframe = (props) => {
             return {
               blockUid: event.data.blockUid,
               rect: event.data.rect,
+              // Where a stand-in for this block sits (a tab's label on its trigger), so
+              // chrome can be placed clear of a field the author needs to click.
+              standInRect: event.data.standInRect,
               focusedFieldName: event.data.focusedFieldName, // Track which editable field is focused
               focusedFieldRect: event.data.focusedFieldRect, // Rect of focused field for underline positioning
               focusedLinkableField: event.data.focusedLinkableField, // Track which linkable field is focused

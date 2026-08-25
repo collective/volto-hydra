@@ -34,4 +34,36 @@ test.describe('Tab reveal', () => {
 
     await expect(pyCode).toBeVisible({ timeout: 5000 });
   });
+
+  test('the toolbar does not cover the tab label it belongs to', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/code-example-test-page');
+
+    const iframe = helper.getIframe();
+    const label = iframe.locator('[data-block-selector="tab-js"] [data-edit-text="label"]');
+    await expect(label).toBeVisible({ timeout: 15000 });
+
+    await helper.clickBlockInIframe('tab-js');
+    await helper.waitForBlockSelectedInAdmin('tab-js');
+
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+
+    // The label lives on the trigger ABOVE the panel, and the toolbar is placed
+    // above the block — so without accounting for the stand-in it lands exactly
+    // on the label, and the author cannot click the field they want to rename.
+    const [labelBox, toolbarBox] = await Promise.all([
+      label.boundingBox(),
+      toolbar.boundingBox(),
+    ]);
+    expect(labelBox, 'label should have a box').not.toBeNull();
+    expect(toolbarBox, 'toolbar should have a box').not.toBeNull();
+    const overlaps =
+      labelBox!.x < toolbarBox!.x + toolbarBox!.width &&
+      labelBox!.x + labelBox!.width > toolbarBox!.x &&
+      labelBox!.y < toolbarBox!.y + toolbarBox!.height &&
+      labelBox!.y + labelBox!.height > toolbarBox!.y;
+    expect(overlaps, 'toolbar must not sit on top of the editable label').toBe(false);
+  });
 });

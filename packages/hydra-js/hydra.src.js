@@ -3205,7 +3205,30 @@ export class Bridge {
    * @param {string} blockUid - The block UID to find elements for
    * @returns {Array} All elements for the block (array, not NodeList, for template instances)
    */
-  getAllBlockElements(blockUid) {
+  /**
+   * Bounding box of the elements that stand in for a block without being it —
+   * a tab's label on its trigger. Null when the block has none, which is every
+   * block that is drawn in one place.
+   */
+  getStandInRect(blockUid) {
+    if (!blockUid || blockUid === PAGE_BLOCK_UID) return null;
+    const all = this.getAllBlockElements(blockUid);
+    const own = new Set(this.getAllBlockElements(blockUid, { includeStandIns: false }));
+    const standIns = all.filter((el) => !own.has(el));
+    if (!standIns.length) return null;
+    const box = this.getBoundingBoxForElements(standIns);
+    return box
+      ? { top: box.top, left: box.left, width: box.width, height: box.height }
+      : null;
+  }
+
+  getAllBlockElements(blockUid, options = {}) {
+    // includeStandIns: false asks for only the elements that ARE the block.
+    // Chrome (outline, toolbar) measures the block's box, and a stand-in sits
+    // somewhere else entirely — a tab's label is up in the tab bar while its
+    // panel is below, so the union of the two drew the outline around the whole
+    // tab strip ("Outline box not around block").
+    const includeStandIns = options.includeStandIns !== false;
     // Check if this is a template instance (virtual container)
     // Template instances don't have DOM elements - their children do
     const pathInfo = this.blockPathMap?.[blockUid];
@@ -3231,13 +3254,19 @@ export class Bridge {
       `[data-block-selector~="${blockUid}"]`,
     )) {
       const advertised = (handle.getAttribute('data-block-selector') || '').trim().split(/\s+/);
-      // Only a stand-in — a selector naming exactly this uid. A container
-      // advertising a word list of children is not one of its children.
-      if (advertised.length === 1 && !own.some((el) => el.contains(handle))) {
-        own.push(handle);
-      } else if (advertised.length === 1 && !own.includes(handle)) {
-        own.push(handle);
-      }
+      if (!includeStandIns) continue;
+      if (advertised.length !== 1 || own.includes(handle)) continue;
+      // Advertising a uid makes something a TRIGGER, not part of the block: a
+      // carousel dot names the slide it scrolls to and holds none of its
+      // content. Only an element that carries the block's own editable content
+      // stands in for it — a tab button holding its label. Counting every
+      // trigger as an element of the block broke plain selection and +1/-1
+      // navigation, which resolve through this.
+      const carriesContent =
+        handle.hasAttribute('data-edit-text') ||
+        handle.hasAttribute('data-edit-media') ||
+        !!handle.querySelector('[data-edit-text], [data-edit-media]');
+      if (carriesContent) own.push(handle);
     }
     const elements = own;
     if (elements.length === 0) {
@@ -3408,8 +3437,12 @@ export class Bridge {
     // For multi-selection, gather elements from ALL selected blocks for combined rect
     const multiBlockUids = options.isMultipleSelection ? (options.blockUids || []) : [];
     const allElements = multiBlockUids.length > 1
-      ? multiBlockUids.flatMap(uid => [...this.getAllBlockElements(uid)])
-      : (blockUid !== PAGE_BLOCK_UID ? this.getAllBlockElements(blockUid) : []);
+      ? multiBlockUids.flatMap(uid => [
+          ...this.getAllBlockElements(uid, { includeStandIns: false }),
+        ])
+      : (blockUid !== PAGE_BLOCK_UID
+          ? this.getAllBlockElements(blockUid, { includeStandIns: false })
+          : []);
 
     // Use first element for field detection if no element was passed
     const elementForFields = blockElement || allElements[0] || null;
@@ -3457,7 +3490,11 @@ export class Bridge {
     // This ensures alignment with Volto toolbar which uses this rect
     const dragHandle = document.querySelector('.volto-hydra-drag-button');
     if (dragHandle && blockUid && blockUid !== PAGE_BLOCK_UID) {
-      const handlePos = calculateDragHandlePosition(rect);
+      const handlePos = calculateDragHandlePosition(
+        rect,
+        { top: 0, left: 0 },
+        this.getStandInRect(blockUid),
+      );
       dragHandle.style.left = `${handlePos.left}px`;
       dragHandle.style.top = `${handlePos.top}px`;
       dragHandle.style.display = 'block';
@@ -3486,6 +3523,12 @@ export class Bridge {
       type: 'BLOCK_SELECTED',
       src,
       blockUid,
+      // Where the block IS (outline) stays tight to its own elements. A
+      // stand-in — a tab's label on the button that reveals it — is somewhere
+      // else, and the toolbar must not be placed on top of it: that is a field
+      // the author clicks to edit. Sent separately so chrome can avoid it
+      // without the outline swallowing the whole tab strip.
+      standInRect: this.getStandInRect(blockUid),
       rect: {
         top: rect.top,
         left: rect.left,
@@ -9528,7 +9571,11 @@ export class Bridge {
       }
 
       // Get all elements for this block (multi-element blocks like listings)
-      const allElements = this.getAllBlockElements(this.selectedBlockUid);
+      // Chrome measures the block itself; a stand-in is handled by the
+      // placement helper below, not by widening the rect.
+      const allElements = this.getAllBlockElements(this.selectedBlockUid, {
+        includeStandIns: false,
+      });
       if (allElements.length === 0) {
         dragButton.style.display = 'none';
         return;
@@ -9551,8 +9598,15 @@ export class Bridge {
         return;
       }
 
-      // Position using shared calculation (same as Volto toolbar)
-      const handlePos = calculateDragHandlePosition(rect);
+      // Position using shared calculation (same as Volto toolbar) — including
+      // the stand-in, or a reposition on scroll would drop the handle back onto
+      // the block while the toolbar stayed clear of the label, and the two are
+      // asserted to align.
+      const handlePos = calculateDragHandlePosition(
+        rect,
+        { top: 0, left: 0 },
+        this.getStandInRect(this.selectedBlockUid),
+      );
 
       dragButton.style.right = 'auto';
       dragButton.style.left = `${handlePos.left}px`;
@@ -13940,15 +13994,29 @@ export function getAuthHeaders() {
  * Calculate drag handle/toolbar position for a block.
  * Used by both iframe drag handle and Volto toolbar to ensure alignment.
  *
+ * Chrome must also clear a STAND-IN — an element that represents the block
+ * without being it, such as a tab's label on the button that reveals it. That
+ * element usually sits above the block, and placing the handle against the
+ * block alone drops it on top of a field the author needs to click. Both
+ * callers pass it, so the rule lives here rather than being written out twice
+ * and drifting: the iframe handle and the admin toolbar are asserted to align.
+ *
  * @param {Object} blockRect - Block's bounding rect {top, left}
  * @param {Object} viewportOffset - Viewport offset {top, left}
  *        For iframe: {top: 0, left: 0}
  *        For parent: iframe.getBoundingClientRect()
+ * @param {Object} [standInRect] - Bounding rect of the block's stand-in, if any
  * @returns {Object} {top, left} position
  */
-export function calculateDragHandlePosition(blockRect, viewportOffset = { top: 0, left: 0 }) {
+export function calculateDragHandlePosition(
+  blockRect,
+  viewportOffset = { top: 0, left: 0 },
+  standInRect = null,
+) {
   const HANDLE_OFFSET_TOP = 40;
-  const top = Math.max(viewportOffset.top, viewportOffset.top + blockRect.top - HANDLE_OFFSET_TOP);
+  const effectiveTop =
+    standInRect && standInRect.top < blockRect.top ? standInRect.top : blockRect.top;
+  const top = Math.max(viewportOffset.top, viewportOffset.top + effectiveTop - HANDLE_OFFSET_TOP);
   const left = viewportOffset.left + blockRect.left;
   return { top, left };
 }
