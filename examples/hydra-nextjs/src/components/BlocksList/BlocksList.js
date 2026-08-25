@@ -1272,6 +1272,40 @@ function Block({ block, id, data, apiUrl, contextPath }) {
       return <SearchBlock id={id} block={block} data={data} apiUrl={apiUrl} contextPath={contextPath} />;
 
     // ── Slate Table ──
+    case "objectBlocks": {
+      // Fields grouped under a widget:'object' (#245). The headline (slate) and
+      // href (link) live directly on block.content; the body is a blocks_layout
+      // region nested at content.blocks_layout.body over content.blocks. Field
+      // paths use the `content/...` object-descent form, so the annotations name
+      // the path hydra writes back to — not a flat field name.
+      const content = block.content || {};
+      const body = expand(content.blocks_layout?.body || [], content.blocks || {});
+      return (
+        <div data-block-uid={id} className="object-blocks-block">
+          {/* A div, not a heading: slate renders <p>, and a <p> inside an <h3>
+              is invalid — the browser relocates it, server and client disagree,
+              and React drops the subtree ("Expected server HTML to contain a
+              matching <p> in <div>"), taking the nested blocks with it. Vue
+              tolerates the same markup, which is why only this frontend broke. */}
+          {(content.headline || []).length > 0 && (
+            <div className="ob-headline" data-edit-text="content/headline">
+              <SlateNodes value={content.headline} />
+            </div>
+          )}
+          {content.href !== undefined && (
+            <a data-edit-link="content/href" href={content.href || "#"}>
+              Object link
+            </a>
+          )}
+          <div className="object-blocks-body">
+            {body.map((item) => (
+              <Block key={item["@uid"]} block={item} id={item["@uid"]} data={data} apiUrl={apiUrl} contextPath={contextPath} />
+            ))}
+          </div>
+        </div>
+      );
+    }
+
     case "slateTable": {
       const rows = expand(block.table?.rows || [], null, "key");
       return (
