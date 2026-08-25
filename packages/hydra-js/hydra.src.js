@@ -8143,12 +8143,19 @@ export class Bridge {
     // taller than the window can never satisfy that, so selecting it scrolled
     // every single time, forever. Most real sections are taller than the window.
     const cameFromUserClick = options.fromUserClick === true;
-    if (
-      !isSelectingSameBlock &&
-      blockElement &&
-      !cameFromUserClick &&
-      !this.elementIsVisibleInViewport(blockElement, true)
-    ) {
+    // `partiallyVisible` ONLY for a block that cannot satisfy the strict test:
+    // taller than the window, so top >= 0 && bottom <= innerHeight is never
+    // true and selecting it scrolled every single time. For anything that does
+    // fit, keep demanding it fits — dropping to "partially visible" everywhere
+    // left blocks half off screen where callers reasonably expect a selected
+    // block to be shown in full (it broke container-edge-drag, which aims at a
+    // sibling's live box after selecting its neighbour).
+    const blockTallerThanViewport =
+      !!blockElement && blockElement.getBoundingClientRect().height > window.innerHeight;
+    const visibleEnough =
+      !!blockElement &&
+      this.elementIsVisibleInViewport(blockElement, blockTallerThanViewport);
+    if (!isSelectingSameBlock && blockElement && !cameFromUserClick && !visibleEnough) {
       this.scrollBlockIntoView(blockElement);
     }
 
