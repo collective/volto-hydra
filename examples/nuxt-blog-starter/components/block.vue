@@ -260,7 +260,15 @@
             <div
               class="max-w-sm p-6 bg-slate-200/90 border border-gray-200 m-12 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 absolute"
               :class="{ 'right-0': entry.slide.flagAlign == 'right' }" style="z-index: 2;">
-              <div data-edit-text="head_title">{{ entry.slide.head_title }}</div>
+              <!-- Annotate the field only when the slide has it. A slider holds
+                   blocks, and they disagree about their fields: an `image` slide
+                   is {url, alt} and its schema declares no head_title at all, so
+                   annotating one unconditionally advertised a field that does not
+                   exist. Hydra rightly refuses to make it editable, and the author
+                   is left with a "Click to edit" placeholder that never does.
+                   (Issue #296: no data ⇒ no element. The mock frontend's slide
+                   renderer already guards this the same way.) -->
+              <div v-if="entry.slide.head_title" data-edit-text="head_title">{{ entry.slide.head_title }}</div>
               <h5 :id="`heading-${entry.slide['@uid']}`"
                 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white" data-edit-text="title">
                 {{ entry.slide.title }}</h5>
@@ -269,11 +277,17 @@
               <NuxtLink v-if="entry.slide.href" :to="getUrl(entry.slide.href[0])" data-edit-text="buttonText" data-edit-link="href"
                 class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
                 :aria-describedby="`heading-${entry.slide['@uid']}`">
-                {{ entry.slide.buttonText || 'Read More' }}</NuxtLink>
-              <a v-else href="#" data-edit-text="buttonText" data-edit-link="href"
+                {{ entry.slide.buttonText }}</NuxtLink>
+              <!-- Same rule as head_title above. Without a href there is still a
+                   button worth showing if it has a label, but a slide with
+                   neither gets no <a> at all — an image slide has no buttonText
+                   in its schema either, so the annotation was another promise of
+                   editing that could not be kept. The literal 'Read More' hid
+                   this by making an empty field look full. -->
+              <a v-else-if="entry.slide.buttonText" href="#" data-edit-text="buttonText" data-edit-link="href"
                 class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
                 :aria-describedby="`heading-${entry.slide['@uid']}`">
-                {{ entry.slide.buttonText || 'Read More' }}</a>
+                {{ entry.slide.buttonText }}</a>
             </div>
           </div>
         </template>
