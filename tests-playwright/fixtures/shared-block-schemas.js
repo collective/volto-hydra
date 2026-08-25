@@ -1418,8 +1418,14 @@ export const sharedBlocksConfig = {
       title: 'Event metadata',
       group: 'text',
       restricted: true,
-      blockSchema: { fieldsets: [], properties: {
-                required: { title: 'Required', type: 'boolean' },}, required: [] },
+      // No fields of its own: this block PROJECTS the content item's fields
+      // (an Event's location, contact_name), which is why the sidebar shows the
+      // page form when it is selected. Declaring a property here fills the
+      // sidebar with that instead, and the Event's own fields disappear.
+      //
+      // `required` appears on the docs copy of an event beside fixed/slotId/
+      // templateId — template machinery, not something an author edits.
+      blockSchema: { fieldsets: [], properties: {}, required: [] },
     },
     socialLinks: {
       id: 'socialLinks',

@@ -496,6 +496,11 @@ const UNDECLARED_EXEMPT = new Set([
   // volto-form-block stamps this to invalidate its cached render. A timestamp
   // (e.g. 1710238630312) is not something an author writes in the sidebar.
   'lastChange',
+  // Marks a template member as one the template requires, alongside
+  // fixed/slotId/templateId. Not a field: declaring it as one filled the
+  // sidebar for a metadata block that has no fields of its own, hiding the
+  // content item's fields it exists to project.
+  'required',
 ]);
 
 // Block-level slate STYLES a person can actually choose from the editor's style
