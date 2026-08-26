@@ -109,6 +109,12 @@ if (process.env.SKIP_CONTENT_VALIDATION !== 'true') {
 // Format: { sessionId: { '/path': content, ... } }
 const sessionContent = {};
 
+// Paths deleted within a session. Disk content can't actually be removed (it
+// is shared by every session and reloaded by the watcher), so a DELETE records
+// a tombstone here and getContent treats the path as gone for that session
+// only. Format: { sessionId: Set<'/path'> }
+const sessionDeletions = {};
+
 // Map URL paths to source directories (for loading content from disk)
 const contentDirMap = {};
 
@@ -1335,6 +1341,11 @@ setupContentWatchers();
  * @param {string} sessionId - Session ID for session-specific uploads
  */
 function getContent(urlPath, sessionId, expandList = []) {
+  // A path deleted in this session is gone for this session, even if disk
+  // content still backs it.
+  if (sessionId && sessionDeletions[sessionId]?.has(urlPath)) {
+    return null;
+  }
   // Check session-specific storage first (for content created in this session).
   if (sessionId && sessionContent[sessionId]) {
     const store = sessionContent[sessionId];
@@ -1446,6 +1457,38 @@ app.post('/@logout', (req, res) => {
   }
   // Return 204 No Content on successful logout (Plone behavior)
   res.status(204).send();
+});
+
+/**
+ * DELETE /:path (content removal)
+ *
+ * Drops session-created content outright and tombstones disk-backed content
+ * so it reads as gone for the calling session. Plone answers 204 with no body.
+ */
+app.delete('/*', (req, res, next) => {
+  // Special endpoints (e.g. */@lock) have their own handlers.
+  if (req.path.startsWith('/@') || req.path.includes('/@')) {
+    return next();
+  }
+
+  const sessionId = getSessionId(req);
+  const urlPath = req.path.replace(/\/$/, '') || '/';
+
+  if (getContent(urlPath, sessionId) === null) {
+    return res.status(404).json({
+      error: { type: 'NotFound', message: `No such resource: ${urlPath}` },
+    });
+  }
+
+  if (sessionContent[sessionId]) {
+    delete sessionContent[sessionId][urlPath];
+  }
+  if (!sessionDeletions[sessionId]) {
+    sessionDeletions[sessionId] = new Set();
+  }
+  sessionDeletions[sessionId].add(urlPath);
+
+  return res.status(204).send();
 });
 
 /**

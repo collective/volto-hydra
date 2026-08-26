@@ -26,8 +26,23 @@ export interface Target {
   adapter: HydraAdapter;
 }
 
+/**
+ * Explicit registry rather than a computed import: vite cannot statically
+ * analyse `import(`./${name}.ts`)` against its own directory, and an unknown
+ * TARGET should fail with a list of what exists rather than a module-not-found.
+ */
+const TARGETS: Record<string, () => Promise<{ default: Target }>> = {
+  plone: () => import('./plone'),
+};
+
 export async function resolveTarget(): Promise<Target> {
   const name = process.env.TARGET ?? 'plone';
-  const mod = await import(`./${name}.ts`);
-  return mod.default as Target;
+  const load = TARGETS[name];
+  if (!load) {
+    throw new Error(
+      `Unknown TARGET '${name}'. Available: ${Object.keys(TARGETS).join(', ')}`,
+    );
+  }
+  const mod = await load();
+  return mod.default;
 }
