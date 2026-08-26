@@ -28,6 +28,12 @@ export interface Target {
    * PHP's execution limits allow.
    */
   vocabularySize: number;
+  /**
+   * A named image scale this CMS actually produces. Plone ships preview/large;
+   * WordPress ships thumbnail/medium/large. The contract cares that a named
+   * scale resolves to a fetchable image, not that every CMS agrees on names.
+   */
+  imageScale: string;
   /** Boot the backing CMS (or mock) and seed it. */
   start(): Promise<void>;
   stop(): Promise<void>;

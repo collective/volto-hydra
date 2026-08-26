@@ -540,15 +540,18 @@ export class WordPressAdapter extends BaseAdapter {
             status: 404,
           });
         }
+        // WordPress only generates a named size when the original is larger
+        // than it, so a small image legitimately has none. The original is
+        // always a valid rendition, so fall back to it rather than failing a
+        // request the CMS can actually satisfy.
         const sizes = media.media_details?.sizes ?? {};
         const size = sizes[args.scale] ?? sizes.full;
-        if (!size) {
-          throw new AdapterError(
-            `No scale '${args.scale}' on media ${media.id}`,
-            { code: 'NOT_FOUND', status: 404 },
-          );
-        }
-        return size.source_url;
+        if (size?.source_url) return size.source_url;
+        if (media.source_url) return media.source_url;
+        throw new AdapterError(
+          `Media ${media.id} has no retrievable image URL`,
+          { code: 'NOT_FOUND', status: 404 },
+        );
       }
 
       case 'reference.resolve': {

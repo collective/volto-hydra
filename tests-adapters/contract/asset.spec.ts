@@ -52,7 +52,7 @@ describe('asset.imageUrl', () => {
     const url: string = await target.adapter.dispatch('asset.imageUrl', {
       path: doc.path,
       field: 'image',
-      scale: 'preview',
+      scale: target.imageScale,
     });
 
     // Absolute: the admin renders this in an <img>, and it has no way to

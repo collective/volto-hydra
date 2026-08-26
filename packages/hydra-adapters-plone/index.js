@@ -1,5 +1,26 @@
 import { BaseAdapter, AdapterError } from '@volto-hydra/hydra-adapters-core';
 
+/**
+ * Decode base64url without Node's Buffer.
+ *
+ * Adapters run in the BROWSER — that is the whole point of the inversion, so
+ * credentials stay on the frontend's origin. Buffer is a Node global and does
+ * not exist there; using it made whoami() throw, which failed adapter
+ * registration silently and left the editor waiting for an ADAPTER_READY that
+ * never came. atob is available in browsers and in Node 16+.
+ */
+function decodeBase64Url(segment) {
+  const padded = segment
+    .replace(/-/g, '+')
+    .replace(/_/g, '/')
+    .padEnd(Math.ceil(segment.length / 4) * 4, '=');
+  const binary = atob(padded);
+  // Percent-decoding round trip so multi-byte UTF-8 survives.
+  return decodeURIComponent(
+    Array.from(binary, (c) => `%${c.charCodeAt(0).toString(16).padStart(2, '0')}`).join(''),
+  );
+}
+
 /** Plone serves its REST API under a ++api++ traversal prefix. */
 const API_PREFIX = '/++api++';
 
@@ -7,7 +28,7 @@ const API_PREFIX = '/++api++';
 const STATE_MAP = { published: 'published', private: 'draft' };
 
 export class PloneAdapter extends BaseAdapter {
-  constructor({ cmsBaseUrl, authToken } = {}) {
+  constructor({ cmsBaseUrl, authToken, getAuthToken } = {}) {
     super({
       name: 'plone',
       capabilities: [
@@ -27,6 +48,15 @@ export class PloneAdapter extends BaseAdapter {
     // In a browser the session rides on a cookie and this stays null. Node
     // callers (the contract suite) hand one in explicitly.
     this.authToken = authToken ?? null;
+    // Resolved per request, not captured once: a frontend often has no token
+    // at the moment it constructs the adapter (it arrives via URL param or
+    // sessionStorage during bootstrap), and a stale null there silently
+    // downgrades every later call to cookie auth.
+    this.getAuthToken = getAuthToken ?? null;
+  }
+
+  resolveToken() {
+    return this.getAuthToken ? this.getAuthToken() : this.authToken;
   }
 
   async init(ctx) {
@@ -42,16 +72,15 @@ export class PloneAdapter extends BaseAdapter {
   }
 
   async fetchJson(path, { method = 'GET', body, headers = {} } = {}) {
-    const auth = this.authToken
-      ? { Authorization: `Bearer ${this.authToken}` }
-      : {};
+    const token = this.resolveToken();
+    const auth = token ? { Authorization: `Bearer ${token}` } : {};
     const res = await fetch(this.url(path), {
       method,
       // With an explicit bearer token we must NOT send credentials: a
       // wildcard Access-Control-Allow-Origin (which is what a dev CMS
       // typically sends) makes the browser reject a credentialled
       // cross-origin request outright. Cookie auth is the same-origin case.
-      credentials: this.authToken ? 'omit' : 'include',
+      credentials: token ? 'omit' : 'include',
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
@@ -127,13 +156,11 @@ export class PloneAdapter extends BaseAdapter {
    * what Volto itself does.
    */
   subjectFromToken() {
-    if (!this.authToken) return null;
-    const parts = this.authToken.split('.');
+    const token = this.resolveToken();
+    if (!token) return null;
+    const parts = token.split('.');
     if (parts.length !== 3) return null;
-    const payload = JSON.parse(
-      Buffer.from(parts[1], 'base64').toString('utf8'),
-    );
-    return payload.sub ?? null;
+    return JSON.parse(decodeBase64Url(parts[1])).sub ?? null;
   }
 
   toUser(raw) {

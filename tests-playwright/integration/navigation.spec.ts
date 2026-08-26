@@ -705,11 +705,19 @@ test.describe('Page Creation', () => {
     await page.locator(tc.submenuItem).click();
     await page.waitForURL(new RegExp(`\\/add\\?type=${tc.typeId}`), { timeout: 10000 });
 
-    // Fill Title and save. Add shadow forces `visual = false` so the form
-    // renders the flat schema input (a real <input> for title), not
-    // Volto's in-page visual block editor.
-    const titleField = page.locator('#field-title input, input[name="title"]').first();
-    await expect(titleField).toBeVisible({ timeout: 5000 });
+    // Fill Title and save. The Add route is visual now (Hydra's iframe, not
+    // Volto's in-page block editor — Hydra's Form replaced BlocksForm in that
+    // branch with <Iframe>), so page metadata lives in the sidebar rather than
+    // in a flat form. Add HAS to render the iframe: with the backend inversion
+    // on, that iframe hosts the adapter that answers getSchema, and a route
+    // without one deadlocks.
+    await helper.waitForSidebarOpen();
+    // The sidebar opens on the Blocks tab; page metadata lives behind the
+    // "Page" tab.
+    await page.getByRole('button', { name: 'Page', exact: true }).click();
+    const sidebar = page.locator('#sidebar-properties');
+    const titleField = sidebar.locator('input[id="field-title"]').first();
+    await expect(titleField).toBeVisible({ timeout: 15000 });
     await titleField.fill(tc.titleFieldFill);
     await page.locator('#toolbar-save, button:has-text("Save")').click();
 

@@ -461,7 +461,9 @@
                     window.bridge = initBridge({
                         adapter: new PloneAdapter({
                             cmsBaseUrl: window._apiOrigin,
-                            authToken: getAccessToken(),
+                            // Resolved per request: the token arrives during
+                            // bootstrap, after this adapter is constructed.
+                            getAuthToken: () => getAccessToken(),
                         }),
                         cmsBaseUrl: window._apiOrigin,
                         page: {
