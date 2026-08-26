@@ -76,7 +76,14 @@ async function assertPortFree(): Promise<void> {
 
 const target: Target = {
   name: 'plone',
-  capabilities: ['content', 'search-fulltext', 'vocabulary', 'schema', 'asset'],
+  capabilities: [
+    'content',
+    'search-fulltext',
+    'search-filter',
+    'vocabulary',
+    'schema',
+    'asset',
+  ],
   types: { folder: 'Document', page: 'Document', image: 'Image' },
   vocabularies: { categories: 'hydra.test.categories' },
   adapter,

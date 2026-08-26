@@ -12,7 +12,12 @@ export class PloneAdapter extends BaseAdapter {
       name: 'plone',
       capabilities: [
         'content',
+        // Plone's catalog answers both free-text queries and structured
+        // path/type filters, so both are real here. Adapters over CMSes with
+        // only one (Drupal without search_api, Strapi) must advertise only
+        // the one they have.
         'search-fulltext',
+        'search-filter',
         'vocabulary',
         'schema',
         'asset',
