@@ -18,6 +18,14 @@ const needsAstro = projectArg?.includes('astro');
 // Example frontends — opt-in only (not started unless explicitly requested)
 const needsNextjs = projectArg?.includes('nextjs');
 const needsF7 = projectArg?.includes('f7');
+// The bridge-mock project runs the admin with the backend inversion on. It is
+// an env var rather than a test fixture because the Api helper is constructed
+// by Volto's start-client before any test code runs.
+//
+// NOTE: the Volto webServer entries below use reuseExistingServer, so a server
+// already running WITHOUT this flag will be reused as-is. Run bridge-mock
+// against a freshly started server, or the transparency proof is vacuous.
+const useBridgeBackend = projectArg?.includes('bridge') ? 'true' : 'false';
 
 /**
  * Playwright Test configuration for Volto Hydra tests.
@@ -242,6 +250,23 @@ export default defineConfig({
         /multifield.*\.spec\.ts/, // Skip multifield tests (hero block not in Nuxt)
       ],
     },
+    // Same specs as admin-mock, but with the backend inversion switched on:
+    // every CMS call travels admin -> bridge -> iframe adapter instead of
+    // being fetched directly. A pass count identical to admin-mock is the
+    // evidence that the bridge is a faithful shim; any divergence is a real
+    // defect in the inversion, not a test to adjust.
+    {
+      name: 'bridge-mock',
+      testDir: 'tests-playwright/integration',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+      },
+      testIgnore: [
+        /nuxt-.*\.spec\.ts/,
+      ],
+    },
     // Nuxt-specific tests (nuxt-*.spec.ts) - set their own iframe_url cookie
     {
       name: 'nuxt-specific',
@@ -378,6 +403,7 @@ export default defineConfig({
               URLS.vueDoc, URLS.nextjs, URLS.f7, URLS.astroDoc,
             ].join(','),
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
+            RAZZLE_USE_BRIDGE_BACKEND: useBridgeBackend,
           },
         }
       : {
@@ -404,6 +430,7 @@ export default defineConfig({
               URLS.vueDoc, URLS.nextjs, URLS.f7, URLS.astroDoc,
             ].join(','),
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
+            RAZZLE_USE_BRIDGE_BACKEND: useBridgeBackend,
             // Prevent parcel from trying to access TTY (fixes segfault in background process)
             CI: process.env.CI || 'true',
           },

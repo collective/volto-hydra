@@ -79,13 +79,13 @@ Also note: `hydra-js` uses a **flat** module layout (`conversionMap.js`,
 
 ## Prerequisite: worktree bootstrap
 
-- [ ] **Step 1: Confirm `core/` is populated**
+- [x] **Step 1: Confirm `core/` is populated**
 
 Run: `ls core/packages/volto/src/helpers/Api/Api.js`
 Expected: the path exists. If not, run `make install` first (clones Volto 19.1.1
 into `core/`, ~940 MB, several minutes).
 
-- [ ] **Step 2: Confirm the baseline is green**
+- [x] **Step 2: Confirm the baseline is green**
 
 Run: `pnpm test 2>&1 | tee /tmp/baseline-vitest.log`
 Run: `cd packages/hydra-js && pnpm test 2>&1 | tee /tmp/baseline-jest.log && cd ../..`
@@ -104,7 +104,7 @@ If the baseline is red, STOP and report to the human before writing code.
 - Create: `packages/hydra-types/package.json`
 - Create: `packages/hydra-types/index.d.ts`
 
-- [ ] **Step 1: Create the package manifest**
+- [x] **Step 1: Create the package manifest**
 
 ```json
 {
@@ -117,7 +117,7 @@ If the baseline is red, STOP and report to the human before writing code.
 }
 ```
 
-- [ ] **Step 2: Write the canonical shapes**
+- [x] **Step 2: Write the canonical shapes**
 
 ```ts
 export type Capability =
@@ -184,13 +184,13 @@ export interface AdapterContext {
 }
 ```
 
-- [ ] **Step 3: Register in the workspace**
+- [x] **Step 3: Register in the workspace**
 
 Run: `pnpm install`
 Expected: `@volto-hydra/hydra-types` appears in the workspace. `packages/*` is
 already globbed by `pnpm-workspace.yaml`, so no config change is needed.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add packages/hydra-types
@@ -208,7 +208,7 @@ git commit -m "feat(hydra-types): canonical shapes for the adapter contract"
 `hydra-js` runs jest with `testEnvironment: 'node'`, `transform: {}` (native ESM),
 `testMatch: ['**/*.test.js']`. Write plain ESM; no babel.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 import { BridgeRPC } from './bridgeRpc.js';
@@ -243,12 +243,12 @@ test('ignores a response with an unknown requestId', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `cd packages/hydra-js && npx jest bridgeRpc 2>&1 | tee /tmp/rpc-red.log`
 Expected: FAIL — `Cannot find module './bridgeRpc.js'`
 
-- [ ] **Step 3: Write the minimal implementation**
+- [x] **Step 3: Write the minimal implementation**
 
 ```js
 /**
@@ -289,12 +289,12 @@ export class BridgeRPC {
 }
 ```
 
-- [ ] **Step 4: Run it and watch it pass**
+- [x] **Step 4: Run it and watch it pass**
 
 Run: `cd packages/hydra-js && npx jest bridgeRpc 2>&1 | tee /tmp/rpc-green.log`
 Expected: PASS, 2 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/hydra-js/bridgeRpc.js packages/hydra-js/bridgeRpc.test.js
@@ -311,7 +311,7 @@ An unanswered request must reject rather than hang the admin UI forever.
 - Modify: `packages/hydra-js/bridgeRpc.js`
 - Test: `packages/hydra-js/bridgeRpc.test.js`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```js
 test('rejects when no response arrives before the timeout', async () => {
@@ -347,13 +347,13 @@ test('asset.upload gets a longer default timeout than content.get', () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `cd packages/hydra-js && npx jest bridgeRpc 2>&1 | tee /tmp/rpc-timeout-red.log`
 Expected: FAIL — `rpc.timeoutFor is not a function`, and the timeout test hangs
 the promise rather than rejecting.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add to `BridgeRPC`:
 
@@ -389,12 +389,12 @@ and change `request` to:
 
 and in `handleMessage`, before resolving: `clearTimeout(entry.timer);`
 
-- [ ] **Step 4: Run and watch them pass**
+- [x] **Step 4: Run and watch them pass**
 
 Run: `cd packages/hydra-js && npx jest bridgeRpc 2>&1 | tee /tmp/rpc-timeout-green.log`
 Expected: PASS, 5 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/hydra-js/bridgeRpc.js packages/hydra-js/bridgeRpc.test.js
@@ -412,7 +412,7 @@ git commit -m "feat(bridge): per-intent RPC timeouts"
 `raw: true` marks a response that must skip canonical normalization. In M2 it is
 set by the Plone `http` passthrough; `plonify()` (M3) consumes it.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```js
 test('rejects with a structured error when ok is false', async () => {
@@ -457,12 +457,12 @@ five methods for no behavioural gain. If M3 shows this racing under concurrent
 requests, promote it to a `{ result, raw }` tuple then, with a test that fails
 first.
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `cd packages/hydra-js && npx jest bridgeRpc 2>&1 | tee /tmp/rpc-error-red.log`
 Expected: FAIL — the error case resolves with `undefined` instead of rejecting.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Replace `handleMessage` with:
 
@@ -488,12 +488,12 @@ Replace `handleMessage` with:
   }
 ```
 
-- [ ] **Step 4: Run and watch them pass**
+- [x] **Step 4: Run and watch them pass**
 
 Run: `cd packages/hydra-js && npx jest bridgeRpc 2>&1 | tee /tmp/rpc-error-green.log`
 Expected: PASS, 7 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/hydra-js/bridgeRpc.js packages/hydra-js/bridgeRpc.test.js
@@ -510,7 +510,7 @@ The iframe half: receive `BACKEND_REQUEST`, dispatch to the adapter, reply.
 - Modify: `packages/hydra-js/bridgeRpc.js`
 - Test: `packages/hydra-js/bridgeRpc.test.js`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```js
 const fakeAdapter = {
@@ -561,12 +561,12 @@ test('replies NO_ADAPTER when nothing is registered', async () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `cd packages/hydra-js && npx jest bridgeRpc 2>&1 | tee /tmp/rpc-serve-red.log`
 Expected: FAIL — `rpc.serve is not a function`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```js
   serve(adapter) {
@@ -608,17 +608,17 @@ and at the top of `handleMessage`:
     if (msg?.type === 'BACKEND_REQUEST') return this.handleRequest(msg);
 ```
 
-- [ ] **Step 4: Run and watch them pass**
+- [x] **Step 4: Run and watch them pass**
 
 Run: `cd packages/hydra-js && npx jest bridgeRpc 2>&1 | tee /tmp/rpc-serve-green.log`
 Expected: PASS, 10 tests.
 
-- [ ] **Step 5: Run the whole hydra-js suite for regressions**
+- [x] **Step 5: Run the whole hydra-js suite for regressions**
 
 Run: `cd packages/hydra-js && pnpm test 2>&1 | tee /tmp/hydra-js-after-rpc.log`
 Expected: same pass count as `/tmp/baseline-jest.log` plus 10.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/hydra-js/bridgeRpc.js packages/hydra-js/bridgeRpc.test.js
@@ -632,7 +632,7 @@ git commit -m "feat(bridge): serve BACKEND_REQUEST from a registered adapter"
 **Files:**
 - Modify: `packages/hydra-js/package.json`
 
-- [ ] **Step 1: Add the export subpath**
+- [x] **Step 1: Add the export subpath**
 
 Change `exports` to:
 
@@ -643,7 +643,7 @@ Change `exports` to:
   }
 ```
 
-- [ ] **Step 2: Verify it resolves from volto-hydra**
+- [x] **Step 2: Verify it resolves from volto-hydra**
 
 `packages/volto-hydra/package.json` already declares
 `"@volto-hydra/hydra-js": "workspace:*"`, so no dependency change is needed.
@@ -651,7 +651,7 @@ Change `exports` to:
 Run: `node -e "import('@volto-hydra/hydra-js/bridgeRpc').then(m => console.log(Object.keys(m)))"` from `packages/volto-hydra`
 Expected: `[ 'BridgeRPC' ]`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add packages/hydra-js/package.json
@@ -670,7 +670,7 @@ git commit -m "chore(hydra-js): export bridgeRpc subpath"
 Reuse `packages/hydra-js/jest.config.js` as the template for this package's jest
 config (node env, `transform: {}`, ESM).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```js
 import { BaseAdapter, AdapterError } from './baseAdapter.js';
@@ -711,12 +711,12 @@ test('rejects an unsupported intent with NOT_IMPLEMENTED', async () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `cd packages/hydra-adapters-core && npx jest 2>&1 | tee /tmp/base-red.log`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```js
 export class AdapterError extends Error {
@@ -781,12 +781,12 @@ export class BaseAdapter {
 }
 ```
 
-- [ ] **Step 4: Run and watch them pass**
+- [x] **Step 4: Run and watch them pass**
 
 Run: `cd packages/hydra-adapters-core && npx jest 2>&1 | tee /tmp/base-green.log`
 Expected: PASS, 4 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/hydra-adapters-core
@@ -803,7 +803,7 @@ git commit -m "feat(adapters-core): BaseAdapter with retry-on-401"
 `initBridge(adminOriginOrOptions, options)` already accepts an options object
 (`options.adminOrigin` handled at :13232), so `adapter` slots in beside it.
 
-- [ ] **Step 1: Wire a `BridgeRPC` into `Bridge`**
+- [x] **Step 1: Wire a `BridgeRPC` into `Bridge`**
 
 In the `Bridge` constructor (after `this.adminOrigin = adminOrigin;` at :176):
 
@@ -815,7 +815,7 @@ In the `Bridge` constructor (after `this.adminOrigin = adminOrigin;` at :176):
 
 Import at the top of the file: `import { BridgeRPC } from './bridgeRpc.js';`
 
-- [ ] **Step 2: Register the adapter and announce readiness**
+- [x] **Step 2: Register the adapter and announce readiness**
 
 In `initBridge`, after the bridge is constructed and `adminOrigin` resolved:
 
@@ -850,7 +850,7 @@ In `initBridge`, after the bridge is constructed and `adminOrigin` resolved:
 
 Define `export const BRIDGE_PROTOCOL_VERSION = 1;` in `bridgeRpc.js` and import it.
 
-- [ ] **Step 3: Route incoming RPC messages**
+- [x] **Step 3: Route incoming RPC messages**
 
 Find the existing `window.addEventListener('message', …)` registration used for
 the real-time data handler (`this.realTimeDataHandler`, registered at :4280) and
@@ -863,7 +863,7 @@ add, as the first thing in that handler:
       }
 ```
 
-- [ ] **Step 4: Verify nothing regressed**
+- [x] **Step 4: Verify nothing regressed**
 
 Run: `cd packages/hydra-js && pnpm test 2>&1 | tee /tmp/hydra-js-after-init.log`
 Expected: same count as `/tmp/hydra-js-after-rpc.log`.
@@ -871,7 +871,7 @@ Expected: same count as `/tmp/hydra-js-after-rpc.log`.
 Run: `cd packages/hydra-js && pnpm build`
 Expected: `hydra.js` rebuilds with no esbuild errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/hydra-js/hydra.src.js packages/hydra-js/bridgeRpc.js
@@ -888,7 +888,7 @@ git commit -m "feat(bridge): register an adapter at initBridge and announce ADAP
 Reuse the existing `iframeOriginRef` for targeted `postMessage` — do not
 introduce a second origin-tracking mechanism.
 
-- [ ] **Step 1: Construct the admin-side RPC**
+- [x] **Step 1: Construct the admin-side RPC**
 
 ```js
 import { BridgeRPC } from '@volto-hydra/hydra-js/bridgeRpc';
@@ -902,7 +902,7 @@ if (!rpcRef.current) {
 }
 ```
 
-- [ ] **Step 2: Feed responses in and expose the client**
+- [x] **Step 2: Feed responses in and expose the client**
 
 In the existing message listener, before the other `switch`/`if` handling:
 
@@ -936,12 +936,12 @@ Volto's store:
 by Volto's `start-client.jsx` before any React tree exists, so there is no
 context or store to read from at that point. Keep it to this one handle.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `pnpm test 2>&1 | tee /tmp/vitest-after-view.log`
 Expected: same count as `/tmp/baseline-vitest.log`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add packages/volto-hydra/src/components/Iframe/View.jsx
@@ -961,7 +961,7 @@ Volto's `Api` exposes `['get','post','put','patch','del']`, each called as
 (`core/packages/volto/src/helpers/Api/Api.js:53`). `BridgeApi` must match that
 surface exactly.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```js
 import { describe, it, expect, vi } from 'vitest';
@@ -1005,12 +1005,12 @@ describe('BridgeApi', () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `pnpm vitest run packages/volto-hydra/src/bridge 2>&1 | tee /tmp/bridgeapi-red.log`
 Expected: FAIL — cannot resolve `./BridgeApi`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```js
 const METHODS = ['get', 'post', 'put', 'patch', 'del'];
@@ -1035,12 +1035,12 @@ export class BridgeApi {
 }
 ```
 
-- [ ] **Step 4: Run and watch them pass**
+- [x] **Step 4: Run and watch them pass**
 
 Run: `pnpm vitest run packages/volto-hydra/src/bridge 2>&1 | tee /tmp/bridgeapi-green.log`
 Expected: PASS, 4 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/volto-hydra/src/bridge/BridgeApi.js packages/volto-hydra/src/bridge/BridgeApi.test.js
@@ -1056,7 +1056,7 @@ git commit -m "feat(bridge): BridgeApi transport matching Volto's Api surface"
 
 This is the switch. It must be inert by default.
 
-- [ ] **Step 1: Write the shadow**
+- [x] **Step 1: Write the shadow**
 
 ```js
 /**
@@ -1100,7 +1100,7 @@ customization mechanism maps `src/customizations/volto/<path>` onto
 its import style exactly — in particular how it imports the module it shadows
 without creating a cycle.
 
-- [ ] **Step 2: Add the flag, defaulted off**
+- [x] **Step 2: Add the flag, defaulted off**
 
 In the addon's `applyConfig` (`packages/volto-hydra/src/index.js`):
 
@@ -1108,7 +1108,7 @@ In the addon's `applyConfig` (`packages/volto-hydra/src/index.js`):
   config.settings.useBridgeBackend = false;
 ```
 
-- [ ] **Step 3: Verify the default path is untouched**
+- [x] **Step 3: Verify the default path is untouched**
 
 Run: `pnpm test 2>&1 | tee /tmp/vitest-after-shadow.log`
 Expected: same count as `/tmp/baseline-vitest.log`.
@@ -1116,7 +1116,7 @@ Expected: same count as `/tmp/baseline-vitest.log`.
 Run: `pnpm exec playwright test --project=admin-mock 2>&1 | tee /tmp/pw-flag-off.log`
 Expected: same pass count as before this task. With the flag off, nothing changed.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add packages/volto-hydra/src/customizations/volto/helpers/Api/Api.js packages/volto-hydra/src/index.js
@@ -1149,7 +1149,7 @@ The existing mock Plone API is started by
 (default 8888) with `CONTENT_MOUNTS` naming the content directories — see the
 `start:mock-api` script in `package.json` for the exact invocation.
 
-- [ ] **Step 1: Create the vitest project**
+- [x] **Step 1: Create the vitest project**
 
 ```js
 // vitest.adapters.config.mjs
@@ -1170,13 +1170,13 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 2: Add the script**
+- [x] **Step 2: Add the script**
 
 ```json
 "test:contract": "vitest run --config vitest.adapters.config.mjs"
 ```
 
-- [ ] **Step 3: Write the target interface**
+- [x] **Step 3: Write the target interface**
 
 ```ts
 // tests-adapters/targets/index.ts
@@ -1201,7 +1201,7 @@ export async function resolveTarget(): Promise<Target> {
 }
 ```
 
-- [ ] **Step 4: Write the Plone target**
+- [x] **Step 4: Write the Plone target**
 
 It spawns the existing mock API as a child process and points the Plone adapter
 at it. Nothing new is mocked — this reuses `mock-api-server.cjs` verbatim.
@@ -1271,12 +1271,12 @@ endpoint yet. Read `getSessionId()` and `setSessionContent()` (around
 resets unnecessary, delete the `seed()` body and say so in a comment — do not
 leave a call to an endpoint that does nothing.
 
-- [ ] **Step 5: Verify the harness boots with no tests**
+- [x] **Step 5: Verify the harness boots with no tests**
 
 Run: `pnpm test:contract 2>&1 | tee /tmp/contract-boot.log`
 Expected: "No test files found" — the config resolves and nothing crashes.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add vitest.adapters.config.mjs tests-adapters/targets package.json
@@ -1294,7 +1294,7 @@ git commit -m "test(contract): vitest project and Plone target harness"
 This is the single source of truth every target projects into its CMS. Every
 contract assertion refers to this, never to per-CMS literals.
 
-- [ ] **Step 1: Define the seed**
+- [x] **Step 1: Define the seed**
 
 ```json
 {
@@ -1327,21 +1327,21 @@ contract assertion refers to this, never to per-CMS literals.
 make the autocomplete performance assertion meaningful. Generate it at seed time;
 do not commit 10 000 JSON objects.
 
-- [ ] **Step 2: Project it for the Plone mock**
+- [x] **Step 2: Project it for the Plone mock**
 
 Write the generator that turns `seed.json` into the on-disk content tree the
 mock serves. Match the layout of the existing
 `tests-playwright/fixtures/content/` directory — read it first and follow it
 exactly rather than inventing a new one.
 
-- [ ] **Step 3: Verify the mock serves the seed**
+- [x] **Step 3: Verify the mock serves the seed**
 
 Run in one shell: `PORT=8899 CONTENT_MOUNTS='/:tests-adapters/fixtures/content' node tests-playwright/fixtures/mock-api-server.cjs`
 Run in another: `curl -s localhost:8899/news/first-post | python3 -m json.tool | head -20`
 Expected: a Plone-shaped document with `@id`, `title: "First Post"`, and a
 `blocks` object containing `b1`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tests-adapters/fixtures
@@ -1360,7 +1360,7 @@ git commit -m "test(contract): canonical seed content set"
 This is the first real contract file. Write the assertions against `seed.json`,
 watch them fail, then build the Plone adapter until they pass.
 
-- [ ] **Step 1: Write the failing spec**
+- [x] **Step 1: Write the failing spec**
 
 ```ts
 import { beforeAll, afterAll, beforeEach, describe, it, expect } from 'vitest';
@@ -1441,12 +1441,12 @@ describe('content.create / content.delete', () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch it fail**
+- [x] **Step 2: Run and watch it fail**
 
 Run: `pnpm test:contract 2>&1 | tee /tmp/contract-crud-red.log`
 Expected: FAIL — `@volto-hydra/hydra-adapters-plone` cannot be resolved.
 
-- [ ] **Step 3: Implement the Plone adapter's content intents**
+- [x] **Step 3: Implement the Plone adapter's content intents**
 
 Create the package (mirror `packages/hydra-adapters-core/package.json`), then:
 
@@ -1559,7 +1559,7 @@ export class PloneAdapter extends BaseAdapter {
 export default PloneAdapter;
 ```
 
-- [ ] **Step 4: Run and watch it pass**
+- [x] **Step 4: Run and watch it pass**
 
 Run: `pnpm test:contract 2>&1 | tee /tmp/contract-crud-green.log`
 Expected: PASS, 7 tests.
@@ -1568,7 +1568,7 @@ If `content.create` returns a path the mock doesn't normalize the way the spec
 expects, fix the **adapter's** `toPath`, not the assertion — the assertion
 encodes the contract.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests-adapters/contract/content-crud.spec.ts packages/hydra-adapters-plone
@@ -1584,35 +1584,35 @@ Each follows the identical five-step shape as Task 14 — write the spec against
 commit. They are listed compactly because the shape does not vary; expand each
 into full steps when you reach it.
 
-- [ ] **Task 15: `search.spec.ts`** — `search`, `navigation.get`, `breadcrumbs.get`,
+- [x] **Task 15: `search.spec.ts`** — `search`, `navigation.get`, `breadcrumbs.get`,
   `tree.list`. Assert: full-text search for "First" returns `/news/first-post`;
   `total` is a number; batching keys present when the result set exceeds a page;
   `tree.list({ parent: '/news' })` returns both seeded children;
   `breadcrumbs.get('/news/first-post')` returns Home → News → First Post in order.
   Plone intents map to `@search`, `@navigation`, `@breadcrumbs`.
 
-- [ ] **Task 16: `schema.spec.ts`** — `types.list`, `types.getSchema`. Assert:
+- [x] **Task 16: `schema.spec.ts`** — `types.list`, `types.getSchema`. Assert:
   `types.list` includes `page` and `folder`; `getSchema('page')` returns
   `{ fieldsets, properties, required }` with `title` in `properties` and a
   `fieldsets[0].fields` array containing it. Plone maps to `@types`.
 
-- [ ] **Task 17: `vocabulary.spec.ts`** — `vocabulary.get`. Assert: the shape is
+- [x] **Task 17: `vocabulary.spec.ts`** — `vocabulary.get`. Assert: the shape is
   `{ items: [{ token, title }], total }`; a `?title=Category 4242` filter narrows
   the result; **and the 10 000-term filtered lookup completes under 1 s**, which
   is the assertion the large seed exists for.
 
-- [ ] **Task 18: `asset.spec.ts`** — `asset.upload`, `asset.imageUrl`. Assert: an
+- [x] **Task 18: `asset.spec.ts`** — `asset.upload`, `asset.imageUrl`. Assert: an
   upload returns a Document whose `type` is an image type; `asset.imageUrl(field,
   'preview')` returns an absolute URL that responds 200 with an `image/*`
   content-type.
 
-- [ ] **Task 19: `auth.spec.ts`** — `auth.whoami`. Assert: returns a canonical
+- [x] **Task 19: `auth.spec.ts`** — `auth.whoami`. Assert: returns a canonical
   `User` with `username` and a `roles` array; a call made with a deliberately
   invalidated session raises `UNAUTHORIZED`/401 and the adapter emits
   `auth-required` exactly once (reuse the `BaseAdapter` retry semantics proven in
   Task 7).
 
-- [ ] **Task 20: `capabilities.spec.ts`** — the anti-false-advertising check. For
+- [x] **Task 20: `capabilities.spec.ts`** — the anti-false-advertising check. For
   every capability the target advertises, exercise its representative intent and
   assert it resolves. For every capability it does **not** advertise, assert the
   representative intent rejects with `NOT_IMPLEMENTED`/501. This is what stops an
@@ -1628,12 +1628,12 @@ byte-identically. This task produces the evidence.
 **Files:**
 - Modify: `playwright.config.ts` (add a `bridge-mock` project)
 
-- [ ] **Step 1: Record the baseline**
+- [x] **Step 1: Record the baseline**
 
 Run: `pnpm exec playwright test --project=admin-mock 2>&1 | tee /tmp/pw-baseline.log`
 Record the pass/fail counts.
 
-- [ ] **Step 2: Add a flag-on project**
+- [x] **Step 2: Add a flag-on project**
 
 Duplicate the `admin-mock` project as `bridge-mock`, identical except that the
 Volto server is started with the bridge flag on. The flag is read from
@@ -1646,12 +1646,12 @@ Volto server is started with the bridge flag on. The flag is read from
 
 and set `RAZZLE_USE_BRIDGE_BACKEND: 'true'` in the new project's webServer env.
 
-- [ ] **Step 3: Run it**
+- [x] **Step 3: Run it**
 
 Run: `pnpm exec playwright test --project=bridge-mock 2>&1 | tee /tmp/pw-bridge.log`
 Expected: **identical** pass/fail counts to `/tmp/pw-baseline.log`.
 
-- [ ] **Step 4: Diff the two and record the result**
+- [x] **Step 4: Diff the two and record the result**
 
 Run: `diff <(grep -E '^\s+[0-9]+ (passed|failed)' /tmp/pw-baseline.log) <(grep -E '^\s+[0-9]+ (passed|failed)' /tmp/pw-bridge.log)`
 Expected: no output.
@@ -1660,7 +1660,7 @@ Any divergence is a real defect in the inversion — investigate it with
 @superpowers:systematic-debugging before proceeding. Do not adjust the test to
 make the counts match.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add playwright.config.ts packages/volto-hydra/src/index.js
@@ -1679,3 +1679,71 @@ git commit -m "test(bridge): transparency proof — Plone suite green with the b
 
 Once M2 is green, the contract suite is trustworthy and M3 (WordPress) can be
 planned against it.
+
+---
+
+# Execution log
+
+Executed 2026-08-26 in the `cms-adapters` worktree. Tasks 1-20 complete; Task
+21 (transparency proof) is the last step.
+
+## Corrections to this plan, found while executing it
+
+1. **`npx jest` needs `NODE_OPTIONS='--experimental-vm-modules'`.** The plan's
+   run commands omitted it; `pnpm test` in `packages/hydra-js` supplies it.
+2. **`jest` is not a global under native ESM.** Only `test`/`expect` are
+   injected; fake timers need `import { jest } from '@jest/globals'`.
+3. **`window.__hydraBridge` was already taken.** hydra-js stores the Bridge
+   instance there (`hydra.src.js:13256`). The admin-side RPC handle is
+   `window.__hydraBridgeRpc`.
+4. **The Api shadow is a copy, not a wrapper.** Volto's customization aliasing
+   rewrites `@plone/volto/helpers/Api/Api` for every importer *including the
+   shadow itself*, so `import OriginalApi from` that specifier is a cycle. The
+   file is copied and tagged with `HYDRA:` comments, matching the sibling Url
+   shadow. `storeExtenders` was evaluated as an alternative seam and rejected:
+   it can transform the middleware stack but cannot reach the api helper that
+   `start-client.jsx` closes over.
+5. **RPC gets its own message listener**, not a branch inside
+   `realTimeDataHandler` — that handler runs hot during typing and carries
+   edit-mode guards irrelevant to RPC.
+6. **The contract suite refuses to reuse a server it did not start.** A stale
+   mock on the port answers `/health` and then serves unknown content, so the
+   target fails loudly instead.
+
+## Contract findings
+
+Two assertions were wrong rather than the code:
+
+- **Create does not fix the slug.** The first draft required `/news/temp` from
+  `title: 'Temp'`. Plone slugifies; WordPress assigns `post_name`; Drupal uses
+  a path alias. The contract now fixes where the document lands and that the
+  returned path is addressable, not how the id is derived.
+- **Breadcrumbs exclude the site root.** Plone has a root document to point
+  at; WordPress and Drupal do not, so a root entry could not mean the same
+  thing across adapters. The adapter normalises it away.
+
+`capabilities.spec.ts` found a real bug on its first run: the Plone adapter
+advertised `search-fulltext` but not `search-filter`, while `tree.list` worked.
+
+## Mock gaps closed
+
+Each of these made an intent untestable, and each is a place the mock had
+drifted from real Plone:
+
+| Gap | Fix |
+| --- | --- |
+| No DELETE handler at all | Session content dropped; disk content tombstoned per-session |
+| `@types/{name}` fabricated a schema for any name | 404s unless the type has a schema file or is addable |
+| `localhost:8888` hardcoded in 14 response payloads | Uses the live `PORT`, so a second instance advertises its own URLs |
+| Uploaded image bytes never stored | Kept per-session so `@@images` serves back the scale URLs the upload advertised |
+| No way to simulate expiry | `Bearer EXPIRED_TOKEN` 401s at the middleware |
+| Vocabularies were three hardcoded terms | Opt-in generated vocabularies (`VOCAB_SPEC`) with server-side title filter and batching |
+
+## Results
+
+| Suite | Before | After |
+| --- | --- | --- |
+| `pnpm test` (vitest) | 349 / 32 files | 354 / 33 files |
+| `packages/hydra-js` (jest) | 233 / 37 suites | 243 / 38 suites |
+| `pnpm test:api` (mock) | 38 | 38 |
+| `pnpm test:contract` | — | 44 / 8 files |

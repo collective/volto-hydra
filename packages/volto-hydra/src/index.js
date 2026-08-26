@@ -76,6 +76,13 @@ import { applyBlockDefaults } from '@plone/volto/helpers';
 import { setInjectedVoltoConfig } from './utils/injectedVoltoConfig';
 
 const applyConfig = (config) => {
+  // Route every CMS call over the bridge to the frontend's adapter instead of
+  // fetching directly from the admin. Off unless explicitly enabled: with it
+  // off the customized Api helper falls through to stock superagent, so the
+  // whole inversion is inert.
+  config.settings.useBridgeBackend =
+    process.env.RAZZLE_USE_BRIDGE_BACKEND === 'true';
+
   // Inject the Volto-config-derived values the pure block-path / schema utils
   // need, so those modules carry NO static `@plone/volto/registry` import and can
   // be loaded (bare Node) by block-sanity's offline discovery. Lazy getters so a
