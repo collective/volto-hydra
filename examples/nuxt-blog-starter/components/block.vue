@@ -260,7 +260,15 @@
             <div
               class="max-w-sm p-6 bg-slate-200/90 border border-gray-200 m-12 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 absolute"
               :class="{ 'right-0': entry.slide.flagAlign == 'right' }" style="z-index: 2;">
-              <div data-edit-text="head_title">{{ entry.slide.head_title }}</div>
+              <!-- Annotate the field only when the slide has it. A slider holds
+                   blocks, and they disagree about their fields: an `image` slide
+                   is {url, alt} and its schema declares no head_title at all, so
+                   annotating one unconditionally advertised a field that does not
+                   exist. Hydra rightly refuses to make it editable, and the author
+                   is left with a "Click to edit" placeholder that never does.
+                   (Issue #296: no data ⇒ no element. The mock frontend's slide
+                   renderer already guards this the same way.) -->
+              <div v-if="entry.slide.head_title" data-edit-text="head_title">{{ entry.slide.head_title }}</div>
               <h5 :id="`heading-${entry.slide['@uid']}`"
                 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white" data-edit-text="title">
                 {{ entry.slide.title }}</h5>
@@ -269,11 +277,17 @@
               <NuxtLink v-if="entry.slide.href" :to="getUrl(entry.slide.href[0])" data-edit-text="buttonText" data-edit-link="href"
                 class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
                 :aria-describedby="`heading-${entry.slide['@uid']}`">
-                {{ entry.slide.buttonText || 'Read More' }}</NuxtLink>
-              <a v-else href="#" data-edit-text="buttonText" data-edit-link="href"
+                {{ entry.slide.buttonText }}</NuxtLink>
+              <!-- Same rule as head_title above. Without a href there is still a
+                   button worth showing if it has a label, but a slide with
+                   neither gets no <a> at all — an image slide has no buttonText
+                   in its schema either, so the annotation was another promise of
+                   editing that could not be kept. The literal 'Read More' hid
+                   this by making an empty field look full. -->
+              <a v-else-if="entry.slide.buttonText" href="#" data-edit-text="buttonText" data-edit-link="href"
                 class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
                 :aria-describedby="`heading-${entry.slide['@uid']}`">
-                {{ entry.slide.buttonText || 'Read More' }}</a>
+                {{ entry.slide.buttonText }}</a>
             </div>
           </div>
         </template>
@@ -804,6 +818,15 @@
           <!-- Hidden -->
           <template v-else-if="field.field_type === 'hidden'">
             <input type="hidden" :name="field.field_id" :value="field.value || ''" />
+            <!-- A hidden field has no visual form, so the block had no size: the
+                 author saw nothing on the page and had nothing to click, even
+                 though the field is theirs to configure. Shown — marked as
+                 hidden — only while editing, so a visitor's page carries no
+                 trace of it. -->
+            <div v-if="showHiddenFields" class="hidden-field-standin">
+              <span class="hidden-field-badge">Hidden</span>
+              <span data-edit-text="label">{{ field.label }}</span>
+            </div>
           </template>
         </div>
       </template>
@@ -1154,6 +1177,15 @@ function slideClasses(index) {
 // animate to wrong positions. In visitor mode, transitions work fine.
 const useTransitions = !isEditMode();
 
+// Editing is a browser fact — isEditMode() reads window.name / ?_edit, and the
+// server has neither — so this stays false through the first render and matches
+// the HTML the server sent. Flipping it after mount is what adds the stand-in,
+// which is why a visitor's page never contains one at all.
+const showHiddenFields = ref(false);
+onMounted(() => {
+  showHiddenFields.value = isEditMode();
+});
+
 // Next/prev handlers — simple reactive position update, Vue handles the rest
 function carouselNext() {
   const total = totalSlides.value;
@@ -1169,25 +1201,38 @@ function carouselPrev() {
 }
 
 // Navigate to a specific slide by its block UID (for indicator/direct selector clicks).
-function carouselGoTo(uid) {
-  // Find the flat index for this UID by checking sliderChildren + listing items
+//
+// The flat index depends on how many items each listing slide expanded to, and
+// trackItems fills those counts on nextTick — so a request that arrives before
+// a listing resolves counts it as 1 and lands short of the target. Remember the
+// request and re-apply it whenever the counts change, so selecting a slide that
+// sits after a listing settles on the right one instead of stopping wherever
+// the counts happened to be.
+const carouselTargetUid = ref(null);
+
+function flatIndexOf(uid) {
   let idx = 0;
   for (const entry of sliderChildren.value) {
-    if (entry.isListing) {
-      if (entry.slide['@uid'] === uid) {
-        carouselPosition.value = idx;
-        return;
-      }
-      idx += listingItemCounts[entry.slide['@uid']] || 1;
-    } else {
-      if (entry.slide['@uid'] === uid) {
-        carouselPosition.value = idx;
-        return;
-      }
-      idx++;
-    }
+    if (entry.slide['@uid'] === uid) return idx;
+    idx += entry.isListing ? listingItemCounts[entry.slide['@uid']] || 1 : 1;
   }
+  return null;
 }
+
+function applyCarouselTarget() {
+  const uid = carouselTargetUid.value;
+  if (!uid) return;
+  const idx = flatIndexOf(uid);
+  if (idx !== null) carouselPosition.value = idx;
+}
+
+function carouselGoTo(uid) {
+  carouselTargetUid.value = uid;
+  applyCarouselTarget();
+}
+
+// Counts arrive asynchronously; re-apply the pending target when they do.
+watch(listingItemCounts, applyCarouselTarget, { deep: true });
 
 // On mount: attach click handlers for next/prev buttons and indicators
 onMounted(() => {
@@ -1573,3 +1618,24 @@ const handleFormSubmit = async (event, formBlock) => {
 };
 
 </script>
+
+<style>
+/* Rendered only while editing (see showHiddenFields). */
+.hidden-field-standin {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px dashed #9ca3af;
+  border-radius: 0.375rem;
+  color: #4b5563;
+  font-size: 0.875rem;
+}
+.hidden-field-badge {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #6b7280;
+}
+</style>

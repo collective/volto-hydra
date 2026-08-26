@@ -420,7 +420,7 @@ function validateSlateNode(node, pathStr, issues) {
  *
  * Schema-independent; runs against raw API data.
  */
-function collectSlateIssues(blockData, pagePath, blockId, out, blockType) {
+function collectSlateIssues(blockData, pagePath, blockId, out, blockType, inTableCell = false) {
   if (!blockData || typeof blockData !== 'object') return;
   for (const [key, value] of Object.entries(blockData)) {
     if (key.startsWith('@') || key === 'blocks' || key === 'blocks_layout') continue;
@@ -432,7 +432,7 @@ function collectSlateIssues(blockData, pagePath, blockId, out, blockType) {
     if (!looksSlate) continue;
 
     const issues = [];
-    if (value.length > 1) {
+    if (value.length > 1 && !inTableCell) {
       // Advice differs by where the field lives, but both are invalid stored data.
       const advice =
         blockType === 'slate'
@@ -485,6 +485,29 @@ const UNDECLARED_EXEMPT = new Set([
   // Not sidebar-authored — a consumer (in-page nav) reads them; exempt like the
   // other serialisation/runtime fields above.
   '_linkableAnchors',
+  // hydra's own bookkeeping for copy-from-target (CUSTOM_FIELDS_KEY in
+  // utils/copyFromTarget.js): the list of fields an author has overridden, written
+  // by the editor at runtime. Declaring it as a schema property would offer the
+  // bookkeeping itself as an editable field.
+  '_customFields',
+  // collective.volto.formsupport regenerates `validationSettings` on every GET
+  // of a form block — it is the catalogue of settable validators the sidebar
+  // builds its "Rule settings" widget FROM, so it is a property of the response,
+  // not of what is stored. The undeclared-field check asks "is a stored field
+  // missing from the schema", and for this one the premise does not hold:
+  // declaring it would offer the catalogue itself as an editable field.
+  'validationSettings',
+  // Which field of the referenced content holds the image. Written by the
+  // serialiser alongside `image_scales` (already exempt above), not authored.
+  'image_field',
+  // volto-form-block stamps this to invalidate its cached render. A timestamp
+  // (e.g. 1710238630312) is not something an author writes in the sidebar.
+  'lastChange',
+  // Marks a template member as one the template requires, alongside
+  // fixed/slotId/templateId. Not a field: declaring it as one filled the
+  // sidebar for a metadata block that has no fields of its own, hiding the
+  // content item's fields it exists to project.
+  'required',
 ]);
 
 // Block-level slate STYLES a person can actually choose from the editor's style
@@ -973,12 +996,32 @@ const CONTAINMENT_EXEMPT_TYPES = new Set(['empty', 'column', 'title', 'descripti
  * template knows which slot means "an example lives here", so hydra takes it as
  * configuration instead of guessing.
  */
+// Pages that are test APPARATUS, not authored content. Their placements are
+// not a project's choice to get wrong, so the containment check does not apply.
+//
+// dnd-convert-page is the whole synthetic conversion graph: convSource and the
+// conv containers sit at page level because a drag source has to exist
+// somewhere to be dragged FROM, and they are `restricted` because you should
+// never be offered "convAlien" in a real block chooser. Both are correct, and
+// together they read as a containment violation — the page's allowed set is the
+// non-restricted types. Un-restricting them to satisfy this check breaks 28
+// tests: the option-counting those specs assert on ("one option -> auto-convert,
+// two -> chooser") flows from that same flag.
+const APPARATUS_PAGES = new Set(['/_test_data/dnd-convert-page']);
+
 function readContainmentRules(env = process.env) {
   return {
     slots: (env.CONTAINMENT_EXEMPT_SLOTS || '')
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),
+    pages: [
+      ...APPARATUS_PAGES,
+      ...(env.CONTAINMENT_EXEMPT_PAGES || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ],
   };
 }
 
@@ -987,9 +1030,11 @@ function readContainmentRules(env = process.env) {
  *
  * Exempt when: it is structural, template-placed or position-fixed; its
  * container declares no allowed set, or declares one that includes the type;
- * or it sits in a slot the project nominated (see readContainmentRules).
+ * or it sits in a slot, or on an apparatus page, the project nominated
+ * (see readContainmentRules).
  */
-function isContainmentExempt(entry, blockData, rules = { slots: [] }) {
+function isContainmentExempt(entry, blockData, rules = { slots: [] }, pagePath = null) {
+  if (pagePath && (rules.pages || []).includes(pagePath)) return true;
   if (entry.isTemplateInstance || entry.isFixed) return true;
   if (CONTAINMENT_EXEMPT_TYPES.has(entry.blockType)) return true;
   if (!Array.isArray(entry.allowedSiblingTypes) || entry.allowedSiblingTypes.length === 0) {
@@ -1045,6 +1090,8 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   // Plone content types appear as @type on the page root (Document, etc.)
   // — skip these, they're not blocks.
   const PAGE_TYPES = new Set(['Document', 'Folder', 'Plone Site', 'News Item', 'Event']);
+
+
   const objectListFields = buildObjectListFieldsMap(blocksConfig);
   const allowedBlocksList = buildAllowedBlocksList(blocksConfig);
 
@@ -1123,7 +1170,16 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         // already resolved from the container's `typeField`. Without this a form
         // field (text / select / single_choice …) is skipped from coverage
         // instead of being credited as its own registered block type.
-        const blockType = blockData['@type'] || entry.blockType;
+        // A TYPED object_list item (a form's `subblocks`, keyed by `field_id`
+        // and typed by `field_type`) has no `@type`, so fall back to the type
+        // buildBlockPathMap resolved from the container's `typeField` —
+        // otherwise a form field (text / select / single_choice …) is skipped
+        // from coverage instead of being credited as its own block type.
+        // UNTYPED items (table rows/cells) only get a virtual `parent:field`
+        // display label, which no blocksConfig can ever register; counting one
+        // as a block type reports every table as an unregistered `table:rows`.
+        const blockType =
+          blockData['@type'] || (entry.isVirtualBlockType ? undefined : entry.blockType);
         // Resolved schema for this entry — may be inline (object_list schema)
         // or come from blocksConfig[blockType].
         const schemaRef = entry._schemaRef;
@@ -1134,7 +1190,7 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         // placed in a container that doesn't allow its @type.
         if (
           entry.blockType &&
-          !isContainmentExempt(entry, blockData, containmentRules)
+          !isContainmentExempt(entry, blockData, containmentRules, pagePath)
         ) {
           allowedBlocksViolations.push({
             blockType: entry.blockType,
@@ -1145,7 +1201,16 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
           });
         }
 
-        collectSlateIssues(blockData, pagePath, blockId, slateIssues, blockType);
+        // A slateTable cell is addressable, so it arrives here as its own
+        // entry. Its path runs through `cells`, which is the signal: the editor
+        // FLATTENS a multi-node cell value on load rather than splitting it
+        // (container-blocks.spec: splitting corrupts the row and loops until
+        // "Maximum update depth exceeded"), and table-multinode-page holds a
+        // [h2, p] cell precisely to keep that behaviour honest.
+        collectSlateIssues(
+          blockData, pagePath, blockId, slateIssues, blockType,
+          Array.isArray(entry.path) && entry.path.includes('cells'),
+        );
         // Effective (dynamic) required set from Hydra's REAL resolver — fieldRules
         // + hideParentOwnedFields applied, so a conditionally-hidden field (a
         // card's `image` when its grid disables the image element) is correctly
@@ -1436,8 +1501,37 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
     const discoveredTypes = new Set(
       result.filter((r) => r.blockData !== undefined).map((r) => r.blockType),
     );
+    // An object_list sub-item IS an example of its own type, even though its
+    // render test is anchored on the parent and therefore carries the parent's
+    // blockType (kind: 'sub:<type>'). Counting only `blockType` reported "no
+    // content example" for every form field type while form-test-page plainly
+    // contained a text, a textarea, a select, a single_choice, a checkbox and a
+    // from. Turning that into a failure would have asked maintainers to add
+    // fixtures that already exist.
+    // Sub-item examples live inside a parent, so they never appear in `result`
+    // under their own blockType. `allCovered` is the schema-driven record of
+    // which sub-types a selected example contains, from the same container
+    // helpers (buildAllowedBlocksList + subTypesInField).
+    //
+    // Not a second buildBlockPathMap call: it populates a module-level schema
+    // cache keyed by blockType alone, so schemas leak into any later walk with
+    // a different registry. Keying that cache by registry fixes the leak and
+    // breaks the editor — block-sync's inherited_fields fieldset stops
+    // rendering — so it stays as it is.
+    for (const key of allCovered) discoveredTypes.add(key.split('|')[2]);
+    for (const r of seen.values()) {
+      if (typeof r.kind === 'string' && r.kind.startsWith('sub:')) {
+        discoveredTypes.add(r.kind.slice(4));
+      }
+    }
     for (const blockType of required) {
       if (discoveredTypes.has(blockType)) continue;
+      // `default` is a sentinel, not an item type: the item-type pass above
+      // deliberately skips the literal value ('itemType !== "default"'), so a
+      // listing naming it can never register coverage. Demanding an example for
+      // it would contradict a rule this file already states — and no fixture
+      // could satisfy it, because nothing ever carries @type "default".
+      if (blockType === 'default') continue;
       // A dynamic listing/grid item type has no stored authored instance, but a
       // stored listing/grid that VALIDLY names it renders it on a real page.
       // Emit its render test anchored on that page against the container's uid:

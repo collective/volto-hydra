@@ -147,6 +147,9 @@ function log(...args) {
  */
 const isValidNodeId = (id) => id && /^\d+(\.\d+)*$/.test(id);
 
+// How many nested closed containers a reveal will open before giving up.
+const MAX_REVEAL_DEPTH = 5;
+
 /**
  * Virtual block UID for page-level fields (title, description, preview_image, etc.)
  * Used to distinguish "page field selected" from "nothing selected" (null)
@@ -769,9 +772,70 @@ export class Bridge {
    * @param {HTMLElement} blockElement - The block element to check ownership against
    * @returns {boolean} True if the field belongs directly to blockElement
    */
+  /**
+   * Which block does this element belong to?
+   *
+   * Normally the nearest `data-block-uid` ancestor. But a block can be drawn in
+   * two places — a tab's label lives in the tab bar while its code lives in a
+   * panel that is hidden, or not rendered at all, until that tab is chosen. The
+   * block itself is the panel: that is the thing that has to be on screen before
+   * it can be edited, and putting the uid on the always-visible button instead
+   * would tell the bridge the block is already visible when the half you want to
+   * edit is not.
+   *
+   * So the button carries `data-block-selector` — "I represent this uid" — and
+   * anything editable inside it edits that block, even though the uid element is
+   * elsewhere. Only a selector naming exactly ONE uid counts: `+1` / `-1` and
+   * `uid:direction` are navigation, and a word list belongs to a container
+   * advertising its children rather than standing in for one block.
+   *
+   * @param {HTMLElement} el - element to resolve (usually an editable field)
+   * @returns {string|undefined} the owning block's uid
+   */
+  owningBlockUid(el) {
+    if (!el) return undefined;
+    const blockEl = el.closest('[data-block-uid]');
+    const handle = el.closest('[data-block-selector]');
+    if (handle && (!blockEl || handle.contains(blockEl) === false)) {
+      const advertised = (handle.getAttribute('data-block-selector') || '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+      const single = advertised.length === 1 ? advertised[0] : null;
+      if (single && single !== '+1' && single !== '-1' && !single.includes(':')) {
+        // Prefer the handle only when it is NEARER than the uid element, i.e. the
+        // uid element is an ancestor of the handle (a container) rather than the
+        // block the field sits in.
+        if (!blockEl || blockEl.contains(handle)) return single;
+      }
+    }
+    return blockEl?.getAttribute('data-block-uid') ?? undefined;
+  }
+
   fieldBelongsToBlock(field, blockElement) {
-    const fieldBlockElement = field.closest('[data-block-uid]');
-    return fieldBlockElement === blockElement;
+    return this.owningBlockUid(field) === this.uidRepresentedBy(blockElement);
+  }
+
+  /**
+   * Which block does this ELEMENT stand for — the uid it carries, or the one it
+   * advertises. A tab's button has no data-block-uid (the uid belongs on the
+   * panel, so the bridge can see when the block is off screen), but it does
+   * carry data-block-selector naming that tab, and the label inside it is that
+   * tab's field. Comparing against data-block-uid alone dropped every field on
+   * such an element.
+   */
+  uidRepresentedBy(element) {
+    if (!element) return undefined;
+    const own = element.getAttribute?.('data-block-uid');
+    if (own) return own;
+    const advertised = (element.getAttribute?.('data-block-selector') || '')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (advertised.length !== 1) return undefined;
+    const single = advertised[0];
+    if (single === '+1' || single === '-1' || single.includes(':')) return undefined;
+    return single;
   }
 
   /**
@@ -792,6 +856,26 @@ export class Bridge {
     for (const field of allFields) {
       if (this.fieldBelongsToBlock(field, blockElement)) {
         result.push(field);
+      }
+    }
+    // A block can be drawn in two places: a tab's code sits in its panel while
+    // its label sits on the button that switches to it. The button stands in for
+    // the block (data-block-selector) rather than being it, so its fields live
+    // outside this subtree — collect them too, or the label is unreachable and
+    // clicking it does nothing.
+    const uid = blockElement.getAttribute('data-block-uid');
+    if (uid) {
+      for (const handle of document.querySelectorAll(
+        `[data-block-selector~="${uid}"]`,
+      )) {
+        if (handle.hasAttribute('data-edit-text') && !result.includes(handle)) {
+          result.push(handle);
+        }
+        for (const field of handle.querySelectorAll('[data-edit-text]')) {
+          if (this.owningBlockUid(field) === uid && !result.includes(field)) {
+            result.push(field);
+          }
+        }
       }
     }
     return result;
@@ -3121,7 +3205,30 @@ export class Bridge {
    * @param {string} blockUid - The block UID to find elements for
    * @returns {Array} All elements for the block (array, not NodeList, for template instances)
    */
-  getAllBlockElements(blockUid) {
+  /**
+   * Bounding box of the elements that stand in for a block without being it —
+   * a tab's label on its trigger. Null when the block has none, which is every
+   * block that is drawn in one place.
+   */
+  getStandInRect(blockUid) {
+    if (!blockUid || blockUid === PAGE_BLOCK_UID) return null;
+    const all = this.getAllBlockElements(blockUid);
+    const own = new Set(this.getAllBlockElements(blockUid, { includeStandIns: false }));
+    const standIns = all.filter((el) => !own.has(el));
+    if (!standIns.length) return null;
+    const box = this.getBoundingBoxForElements(standIns);
+    return box
+      ? { top: box.top, left: box.left, width: box.width, height: box.height }
+      : null;
+  }
+
+  getAllBlockElements(blockUid, options = {}) {
+    // includeStandIns: false asks for only the elements that ARE the block.
+    // Chrome (outline, toolbar) measures the block's box, and a stand-in sits
+    // somewhere else entirely — a tab's label is up in the tab bar while its
+    // panel is below, so the union of the two drew the outline around the whole
+    // tab strip ("Outline box not around block").
+    const includeStandIns = options.includeStandIns !== false;
     // Check if this is a template instance (virtual container)
     // Template instances don't have DOM elements - their children do
     const pathInfo = this.blockPathMap?.[blockUid];
@@ -3135,7 +3242,33 @@ export class Bridge {
       log('getAllBlockElements: found', elements.length, 'elements for template instance');
       return elements;
     }
-    const elements = document.querySelectorAll(`[data-block-uid="${blockUid}"]`);
+    // A block can also be drawn by an element that STANDS IN for it: a tab's
+    // label lives on the button that reveals the tab, which carries
+    // data-block-selector rather than the uid (the uid belongs on the content,
+    // so the bridge can tell the block is off screen). Those elements hold real
+    // fields of this block, so every caller asking where a block is drawn needs
+    // them too — otherwise the label is collected nowhere and never becomes
+    // editable.
+    const own = [...document.querySelectorAll(`[data-block-uid="${blockUid}"]`)];
+    for (const handle of document.querySelectorAll(
+      `[data-block-selector~="${blockUid}"]`,
+    )) {
+      const advertised = (handle.getAttribute('data-block-selector') || '').trim().split(/\s+/);
+      if (!includeStandIns) continue;
+      if (advertised.length !== 1 || own.includes(handle)) continue;
+      // Advertising a uid makes something a TRIGGER, not part of the block: a
+      // carousel dot names the slide it scrolls to and holds none of its
+      // content. Only an element that carries the block's own editable content
+      // stands in for it — a tab button holding its label. Counting every
+      // trigger as an element of the block broke plain selection and +1/-1
+      // navigation, which resolve through this.
+      const carriesContent =
+        handle.hasAttribute('data-edit-text') ||
+        handle.hasAttribute('data-edit-media') ||
+        !!handle.querySelector('[data-edit-text], [data-edit-media]');
+      if (carriesContent) own.push(handle);
+    }
+    const elements = own;
     if (elements.length === 0) {
       log('getAllBlockElements: no DOM elements for', blockUid, 'pathInfo:', pathInfo ? 'exists' : 'missing', 'isTemplateInstance:', pathInfo?.isTemplateInstance);
     }
@@ -3304,8 +3437,12 @@ export class Bridge {
     // For multi-selection, gather elements from ALL selected blocks for combined rect
     const multiBlockUids = options.isMultipleSelection ? (options.blockUids || []) : [];
     const allElements = multiBlockUids.length > 1
-      ? multiBlockUids.flatMap(uid => [...this.getAllBlockElements(uid)])
-      : (blockUid !== PAGE_BLOCK_UID ? this.getAllBlockElements(blockUid) : []);
+      ? multiBlockUids.flatMap(uid => [
+          ...this.getAllBlockElements(uid, { includeStandIns: false }),
+        ])
+      : (blockUid !== PAGE_BLOCK_UID
+          ? this.getAllBlockElements(blockUid, { includeStandIns: false })
+          : []);
 
     // Use first element for field detection if no element was passed
     const elementForFields = blockElement || allElements[0] || null;
@@ -3353,7 +3490,11 @@ export class Bridge {
     // This ensures alignment with Volto toolbar which uses this rect
     const dragHandle = document.querySelector('.volto-hydra-drag-button');
     if (dragHandle && blockUid && blockUid !== PAGE_BLOCK_UID) {
-      const handlePos = calculateDragHandlePosition(rect);
+      const handlePos = calculateDragHandlePosition(
+        rect,
+        { top: 0, left: 0 },
+        this.getStandInRect(blockUid),
+      );
       dragHandle.style.left = `${handlePos.left}px`;
       dragHandle.style.top = `${handlePos.top}px`;
       dragHandle.style.display = 'block';
@@ -3382,6 +3523,12 @@ export class Bridge {
       type: 'BLOCK_SELECTED',
       src,
       blockUid,
+      // Where the block IS (outline) stays tight to its own elements. A
+      // stand-in — a tab's label on the button that reveals it — is somewhere
+      // else, and the toolbar must not be placed on top of it: that is a field
+      // the author clicks to edit. Sent separately so chrome can avoid it
+      // without the outline swallowing the whole tab strip.
+      standInRect: this.getStandInRect(blockUid),
       rect: {
         top: rect.top,
         left: rect.left,
@@ -3828,6 +3975,57 @@ export class Bridge {
           return '';
         });
 
+        // INITIAL_DATA is the ONLY acknowledgement of INIT, and INIT used to be
+        // posted exactly once. A message posted before the admin has mounted its
+        // listener is simply gone — the iframe then sits there fully loaded and
+        // completely inert, and the only thing hydra did about it was paint a
+        // "Not Connected" diagnostic five seconds later. Reloading was the user's
+        // only recovery. Waiting on the acknowledgement and re-posting until it
+        // comes turns that dead editor into a slow one.
+        //
+        // Backs off rather than spinning: a lost INIT is recovered in a quarter
+        // of a second, and an admin that is genuinely absent is given up on
+        // after ~7.75s instead of being asked forever.
+        this._retryInitUntilAcknowledged = (initMessage) => {
+          const delays = [250, 500, 1000, 2000, 4000];
+          let attempt = 0;
+          const again = () => {
+            if (this.initialized || attempt >= delays.length) {
+              if (!this.initialized) {
+                // Out of attempts with no acknowledgement. THIS is the moment
+                // the diagnostic is entitled to speak — a handshake that has
+                // actually failed, not a clock that ran out while it was still
+                // in progress.
+                this._initHandshakeGaveUp = true;
+                _showBridgeDiagnostic({
+                  windowName: window.name,
+                  hasHydraName: window.name.startsWith('hydra-edit:'),
+                  inIframe: window.self !== window.top,
+                  adminOrigin: this.adminOrigin || null,
+                  bridgeCreated: true,
+                  bridgeInitialized: false,
+                });
+              }
+              return;
+            }
+            this._initRetryTimer = setTimeout(() => {
+              if (this.initialized) return;
+              log(`INIT not acknowledged, retrying (attempt ${attempt + 1})`);
+              window.parent.postMessage(initMessage, this.adminOrigin);
+              attempt += 1;
+              again();
+            }, delays[attempt]);
+          };
+          again();
+        };
+
+        this._stopInitRetries = () => {
+          if (this._initRetryTimer) {
+            clearTimeout(this._initRetryTimer);
+            this._initRetryTimer = null;
+          }
+        };
+
         // Send single INIT message with config - admin merges config before responding
         // This ensures blockPathMap is built with complete schema knowledge
         // Include current path so admin can navigate if iframe URL differs (e.g., after client-side nav)
@@ -3885,6 +4083,7 @@ export class Bridge {
             initMessage.voltoConfig = options.voltoConfig;
           }
           window.parent.postMessage(initMessage, this.adminOrigin);
+          this._retryInitUntilAcknowledged(initMessage);
         }
 
         const receiveInitialData = (e) => {
@@ -3913,10 +4112,24 @@ export class Bridge {
 
               // Mark bridge as initialized — block selection is now allowed
               this.initialized = true;
+              // The handshake is acknowledged: stop retrying, and take down any
+              // diagnostic that was raised while we were still trying.
+              this._stopInitRetries();
+              _removeBridgeDiagnostic();
 
               // Restore block selection if provided (e.g., after adding a new block)
-              if (e.data.selectedBlockUid) {
-                const blockUidToSelect = e.data.selectedBlockUid;
+              // A block carried across an in-page navigation wins over the
+              // admin's copy, which predates the click that caused the reload.
+              // Read it ONCE and always drop it: sessionStorage outlives the
+              // page, so a leftover entry would hijack selection on every
+              // later load and point at a block that isn't on the new page.
+              const carriedRaw = sessionStorage.getItem('hydra_in_page_nav_block');
+              sessionStorage.removeItem('hydra_in_page_nav_block');
+              const [carriedAt, carriedBlock] = (carriedRaw || '').split('|');
+              const carriedIsFresh =
+                !!carriedBlock && Date.now() - parseInt(carriedAt || '0', 10) < 5000;
+              if (e.data.selectedBlockUid || carriedIsFresh) {
+                const blockUidToSelect = carriedIsFresh ? carriedBlock : e.data.selectedBlockUid;
                 const bridge = this;
                 // Wait for element to appear AND position to stabilize before selecting
                 // This prevents race conditions during frontend re-render/animation
@@ -4346,6 +4559,7 @@ export class Bridge {
       }
     }
 
+
     // Update focusedFieldName and recreate toolbar if field changed
     if (fieldToFocus !== this.focusedFieldName) {
       log('Updating focusedFieldName from', this.focusedFieldName, 'to', fieldToFocus);
@@ -4417,8 +4631,23 @@ export class Bridge {
         // heading nested inside the trigger). Revealing must not cost the author
         // inline editing, so record the clicked field BEFORE navigating — the
         // selectBlock that follows the reveal is what promotes it.
-        this.noteEditableFromSelectorClick(event, selector);
+        const promoted = this.noteEditableFromSelectorClick(event, selector);
         this.handleBlockSelector(selector, selectorElement);
+        if (promoted) {
+          // The trigger is a <button>, so the browser puts focus on IT, not on
+          // the contenteditable label inside it — the author clicked to type and
+          // the caret went to the button. The field only becomes editable once
+          // the block is selected, and that cannot happen until the panel this
+          // button reveals is actually on screen.
+          //
+          // So the caret is placed by the reveal, not on a clock of its own.
+          // This used to poll for 30 animation frames (~500-900ms) alongside
+          // waitForBlockVisibleAndSelect, which is entitled to take 2s: two
+          // clocks for one dependency, the shorter one owned by the code that
+          // depends on the longer one's outcome.
+          const uid = selector.trim().split(/\s+/)[0];
+          this._pendingSelectorCaret = { uid, fieldName: this.focusedFieldName };
+        }
         return;
       }
 
@@ -4463,6 +4692,19 @@ export class Bridge {
         setTimeout(() => { this._allowLinkNavigation = false; }, 100);
         // Store timestamp for in-page navigation - checked on reload to skip PATH_CHANGE
         sessionStorage.setItem('hydra_in_page_nav_time', String(Date.now()));
+        // ...and WHAT was selected. Applying a search facet reloads the page by
+        // design, and the author's selection should survive it. Relying on the
+        // admin to remember is a race: the navigation can beat the
+        // BLOCK_SELECTED it was told about, so it restores what it had before.
+        if (this.selectedBlockUid) {
+          // Carries its OWN timestamp: hydra_in_page_nav_time is consumed by the
+          // PATH_CHANGE branch earlier in the load, so borrowing it made this
+          // always look stale.
+          sessionStorage.setItem(
+            'hydra_in_page_nav_block',
+            `${Date.now()}|${this.selectedBlockUid}`,
+          );
+        }
       }
 
       const blockElement = event.target.closest('[data-block-uid]');
@@ -4576,7 +4818,7 @@ export class Bridge {
           this.getOwnEditableFields(blockElement).length > 0;
         const enterTextMode = hasOwnText && (!coarsePointer || alreadySelected);
         this.editMode = enterTextMode ? 'text' : 'block';
-        this.selectBlock(blockElement);
+        this.selectBlock(blockElement, { fromUserClick: true });
       } else {
         // No block - check for page-level fields
         const pageField = event.target.closest('[data-edit-media], [data-edit-link], [data-edit-text]');
@@ -6228,7 +6470,14 @@ export class Bridge {
         container = container.parentNode;
       }
       const blockElement = container?.closest?.('[data-block-uid]');
-      const blockUid = blockElement?.getAttribute('data-block-uid') || null;
+      // owningBlockUid, not the nearest uid element: a field can live on an
+      // element standing in for its block (a tab's label sits on the button that
+      // reveals the tab). Resolving to the container AROUND it looks the field
+      // up in the wrong schema, comes back undefined, and warns that a
+      // perfectly well declared field is not registered.
+      const blockUid = (container ? this.owningBlockUid(container) : null)
+        || blockElement?.getAttribute('data-block-uid')
+        || null;
       const fieldName = container?.getAttribute?.('data-edit-text') || null;
 
       // Skip error for readonly blocks - they don't need selection sync
@@ -6359,10 +6608,15 @@ export class Bridge {
       if (blockElement.hasAttribute('data-edit-text')) {
         editableFields.push(blockElement);
       }
-      // Also check any children with data-edit-text
+      // Also check any children with data-edit-text, plus any that live on an
+      // element standing in for this block (a tab's label sits on the button
+      // that reveals it, outside the block's own subtree).
       blockElement.querySelectorAll('[data-edit-text]').forEach((el) => {
         editableFields.push(el);
       });
+      for (const field of this.getOwnEditableFields(blockElement)) {
+        if (!editableFields.includes(field)) editableFields.push(field);
+      }
     }
     log(`restoreContentEditableOnFields called from ${caller}: found ${editableFields.length} fields for block ${blockUid}`);
     editableFields.forEach((field) => {
@@ -7874,7 +8128,47 @@ export class Bridge {
 
     // Only scroll block into view when selecting a NEW block (not reselecting same block)
     // This prevents unwanted scroll-back when user has scrolled the selected block off screen
-    if (!isSelectingSameBlock && blockElement && !this.elementIsVisibleInViewport(blockElement)) {
+    //
+    // Two further reasons NOT to scroll:
+    //
+    // The author clicked it. They are looking at it and pointing at it, so
+    // moving the page is pure interference — and worse than cosmetic: the
+    // content slides out from under the pointer between the press and the next
+    // click, so the next click lands on whatever took its place. That is what
+    // broke editing a codeExample's tab labels — the click meant for a tab
+    // landed in the code panel.
+    //
+    // And `partiallyVisible`, because the strict test demands the WHOLE block
+    // fit inside the viewport (top >= 0 && bottom <= innerHeight). A block
+    // taller than the window can never satisfy that, so selecting it scrolled
+    // every single time, forever. Most real sections are taller than the window.
+    const cameFromUserClick = options.fromUserClick === true;
+    // `partiallyVisible` ONLY for a block that cannot satisfy the strict test:
+    // taller than the window, so top >= 0 && bottom <= innerHeight is never
+    // true and selecting it scrolled every single time. For anything that does
+    // fit, keep demanding it fits — dropping to "partially visible" everywhere
+    // left blocks half off screen where callers reasonably expect a selected
+    // block to be shown in full (it broke container-edge-drag, which aims at a
+    // sibling's live box after selecting its neighbour).
+    const blockTallerThanViewport =
+      !!blockElement && blockElement.getBoundingClientRect().height > window.innerHeight;
+    const visibleEnough =
+      !!blockElement &&
+      this.elementIsVisibleInViewport(blockElement, blockTallerThanViewport);
+    // The chrome an author just summoned has to be reachable. Toolbar, chevrons
+    // and add-buttons all hang off the block's TOP edge, which for a tall block
+    // is usually above the viewport — so "don't scroll, they clicked it" left
+    // the quanta toolbar rendered off screen and its move chevrons unclickable.
+    // Anchor visible means there is room for the toolbar above the block's top.
+    const anchorRect = blockElement?.getBoundingClientRect();
+    const toolbarAnchorVisible =
+      !!anchorRect &&
+      anchorRect.top >= Bridge.TOOLBAR_ANCHOR_MARGIN &&
+      anchorRect.top < window.innerHeight;
+    // Suppress the jump only when the author can already see the chrome.
+    const suppressForUserClick = cameFromUserClick && toolbarAnchorVisible;
+    const needsScroll = !visibleEnough || !toolbarAnchorVisible;
+    if (!isSelectingSameBlock && blockElement && needsScroll && !suppressForUserClick) {
       this.scrollBlockIntoView(blockElement);
     }
 
@@ -7949,7 +8243,18 @@ export class Bridge {
     if (!isTemplateInstance) {
       const isReadonly = this.isBlockReadonly(blockUid);
       const hasEditableFields = !isReadonly && this.getOwnEditableFields(blockElement).length > 0;
-      if (!hasEditableFields) {
+      // "No editable fields" is true of a CONTAINER whose text all belongs to
+      // its children — a codeExample's labels and code live on its tabs, not on
+      // the wrapper. Focusing the wrapper then rips the caret out of the field
+      // the author is typing in: click a tab's label, and selection of the
+      // container that follows moves focus to a non-editable <div>, so the next
+      // keystroke goes nowhere. The focus grab is only here so keyboard events
+      // reach the iframe when there is nothing to type into — which is not the
+      // case when the caret is already in something editable inside this block.
+      const active = document.activeElement;
+      const caretAlreadyInside =
+        !!active && blockElement.contains(active) && active.isContentEditable;
+      if (!hasEditableFields && !caretAlreadyInside) {
         if (!blockElement.hasAttribute('tabindex')) {
           blockElement.setAttribute('tabindex', '-1');
         }
@@ -8329,7 +8634,11 @@ export class Bridge {
     // Only when the reveal selects the very block that owns the field. A
     // carousel dot labelled with its slide's text points elsewhere; promoting
     // that field would put the caret in a block that is about to scroll away.
-    const ownerUid = field.closest('[data-block-uid]')?.getAttribute('data-block-uid');
+    // owningBlockUid, not the nearest uid element: a tab's label sits on the
+    // button that reveals it, so its nearest uid ancestor is the codeExample
+    // AROUND the tabs. Resolving that way made this bail, and clicking a tab
+    // label stopped putting the caret in it.
+    const ownerUid = this.owningBlockUid(field);
     if (ownerUid !== selector.trim().split(/\s+/)[0]) return;
 
     // Readonly blocks (listing items and friends) render query results, not
@@ -8675,6 +8984,41 @@ export class Bridge {
    * Wait for a specific block to become visible AND position stable, then select it.
    * Uses same stability check as the +1/-1 path to avoid selecting during animation.
    */
+  /**
+   * Put the caret back in the field the author clicked, once the reveal that
+   * click started has finished and the block is selected.
+   *
+   * Only for a field that lives OUTSIDE the block's own element — a tab's label
+   * sits on the button that reveals the panel, and the uid is on the panel. When
+   * the field is inside the block (an accordion summary that is both trigger and
+   * heading) selection already handles it, and stepping in here would spend
+   * savedClickPosition, which is consumed on first use — leaving the real
+   * restore with nothing and the caret at position 0.
+   */
+  restoreSelectorCaret(targetUid) {
+    const pending = this._pendingSelectorCaret;
+    if (!pending || pending.uid !== targetUid) return;
+    this._pendingSelectorCaret = null;
+
+    const blockElement = this.queryBlockElement(targetUid);
+    const field = blockElement
+      ? this.getEditableFieldByName(blockElement, pending.fieldName)
+      : null;
+    if (!field || blockElement.contains(field)) return;
+    if (field.getAttribute('contenteditable') !== 'true') return;
+
+    // Already in the field — including a caret the browser placed inside it —
+    // leave it exactly where the author clicked. Focusing again resets the caret
+    // to the start, which turned typing into "XSection navigation" instead of
+    // "Section Xnavigation".
+    const active = document.activeElement;
+    if (active === field || field.contains(active)) return;
+
+    // restoreFocusFromSavedClick, not focus(): it puts the caret back where the
+    // click landed, where focus() would drop it at position 0.
+    this.restoreFocusFromSavedClick(blockElement);
+  }
+
   waitForBlockVisibleAndSelect(targetUid, retries = 40, stableCount = 0, lastX = null) {
     const STABLE_THRESHOLD = 3;
     const POSITION_TOLERANCE = 2;
@@ -8693,7 +9037,8 @@ export class Bridge {
 
       if (stableCount >= STABLE_THRESHOLD) {
         log('handleBlockSelector: selecting (position stable)', targetUid);
-        this.selectBlock(targetElement);
+        this.selectBlock(targetElement, { fromUserClick: !!this._pendingSelectorCaret });
+        this.restoreSelectorCaret(targetUid);
         return;
       }
 
@@ -8702,7 +9047,8 @@ export class Bridge {
         setTimeout(() => this.waitForBlockVisibleAndSelect(targetUid, retries - 1, stableCount, x), 50);
       } else {
         log('handleBlockSelector: selecting (retries exhausted)', targetUid);
-        this.selectBlock(targetElement);
+        this.selectBlock(targetElement, { fromUserClick: !!this._pendingSelectorCaret });
+        this.restoreSelectorCaret(targetUid);
       }
     } else if (retries > 0) {
       setTimeout(() => this.waitForBlockVisibleAndSelect(targetUid, retries - 1, 0, null), 50);
@@ -9358,7 +9704,11 @@ export class Bridge {
       }
 
       // Get all elements for this block (multi-element blocks like listings)
-      const allElements = this.getAllBlockElements(this.selectedBlockUid);
+      // Chrome measures the block itself; a stand-in is handled by the
+      // placement helper below, not by widening the rect.
+      const allElements = this.getAllBlockElements(this.selectedBlockUid, {
+        includeStandIns: false,
+      });
       if (allElements.length === 0) {
         dragButton.style.display = 'none';
         return;
@@ -9381,8 +9731,15 @@ export class Bridge {
         return;
       }
 
-      // Position using shared calculation (same as Volto toolbar)
-      const handlePos = calculateDragHandlePosition(rect);
+      // Position using shared calculation (same as Volto toolbar) — including
+      // the stand-in, or a reposition on scroll would drop the handle back onto
+      // the block while the toolbar stayed clear of the label, and the two are
+      // asserted to align.
+      const handlePos = calculateDragHandlePosition(
+        rect,
+        { top: 0, left: 0 },
+        this.getStandInRect(this.selectedBlockUid),
+      );
 
       dragButton.style.right = 'auto';
       dragButton.style.left = `${handlePos.left}px`;
@@ -10648,6 +11005,10 @@ export class Bridge {
    * @param {number} options.toolbarMargin - Space to reserve at top (default 50)
    * @param {number} options.bottomMargin - Space to reserve at bottom (default 50)
    */
+  // Same reservation scrollBlockIntoView keeps for the toolbar, so the two
+  // agree on what "the toolbar fits above this block" means.
+  static get TOOLBAR_ANCHOR_MARGIN() { return 50; }
+
   scrollBlockIntoView(el, { toolbarMargin = 50, bottomMargin = 50 } = {}) {
     const scrollRect = el.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
@@ -11192,26 +11553,115 @@ export class Bridge {
    * @param {string} targetUid - The UID of the block to make visible
    * @returns {boolean} True if a selector was clicked (block may now be visible)
    */
-  tryMakeBlockVisible(targetUid) {
+
+  tryMakeBlockVisible(targetUid, depth = 0) {
     log(`tryMakeBlockVisible: ${targetUid}`);
+    // Nested closed containers need one pass each. Bounded so a container that
+    // never opens can't spin.
+    if (depth > MAX_REVEAL_DEPTH) {
+      log(`tryMakeBlockVisible: giving up after ${depth} passes for ${targetUid}`);
+      this._navigatingToBlock = null;
+      return false;
+    }
     // Set flag to prevent handleBlockSelector from interfering
     this._navigatingToBlock = targetUid;
     // Word-list match (`~=`) lets a single trigger element expose many
     // descendants — `data-block-selector="uid-a uid-b uid-c"` matches
     // any listed uid. Used by collapsible containers like a
     // contextNavigation `<summary>` that carries every child's uid.
-    const directSelector = document.querySelector(
+    const directCandidate = document.querySelector(
       `[data-block-selector~="${targetUid}"]`,
     );
+    // A handle that is itself hidden — inside a container that is still closed —
+    // cannot be used yet: clicking it opens ITS container while the outer one
+    // stays shut, so the target never appears. Fall through to the ancestor walk
+    // and open from the outside in; this handle becomes usable on a later pass.
+    const directSelector =
+      directCandidate && !this.isElementHidden(directCandidate) ? directCandidate : null;
+    if (directCandidate && !directSelector) {
+      log(`tryMakeBlockVisible: handle for ${targetUid} is itself hidden, opening its ancestors first`);
+    }
     // Click the appropriate selector to navigate toward the target block.
     // For direct selectors (data-block-selector="{uid}"), one click suffices.
     // For +1/-1 selectors, we click once and may recurse if more steps are needed.
     let clickedSelector = null;
     let nextUid = targetUid; // UID we expect to become visible after one click
 
+    // Nothing published a handle for this uid: ask its ANCESTORS. A container
+    // that can reveal its contents publishes one handle carrying its own uid;
+    // making every frontend also enumerate each descendant duplicates what
+    // blockPathMap already knows, and a descendant it forgets is simply
+    // unreachable. Walk up and use the nearest ancestor that published one.
+    //
+    // The +1/-1 path below can't cover this case: it needs the target element
+    // already in the DOM, and a block inside a closed container often isn't
+    // rendered at all.
+    let ancestorSelector = null;
+    let ancestorUid = null;
+    // Only ancestor passes count toward the depth bound. A +1/-1 walk recurses
+    // once per step and terminates on its own index arithmetic — counting those
+    // made a carousel with more than MAX_REVEAL_DEPTH slides give up partway.
+    let usedAncestor = false;
+    if (!directSelector) {
+      // Collect every ancestor that published a handle, then use the OUTERMOST.
+      // Order matters when containers nest: an inner container's handle can
+      // itself be inside a closed outer one, and opening the inner first leaves
+      // the target hidden with nothing left to click. Opening from the outside
+      // in always makes progress.
+      const seen = new Set([targetUid]);
+      const handles = [];
+      // `child` is what sits one step BELOW this ancestor on the way to the
+      // target — the thing that actually appears when this container opens.
+      let childUid = targetUid;
+      let parentUid = this.blockPathMap?.[targetUid]?.parentId;
+      while (parentUid && !seen.has(parentUid)) {
+        seen.add(parentUid);
+        const handle = document.querySelector(
+          `[data-block-selector~="${parentUid}"]`,
+        );
+        if (handle) handles.push({ uid: parentUid, handle, child: childUid });
+        childUid = parentUid;
+        parentUid = this.blockPathMap?.[parentUid]?.parentId;
+      }
+      // Skip handles whose container is ALREADY open: on the second pass the
+      // outer one is open, and re-picking it would loop instead of descending
+      // to the handle that pass just made reachable.
+      const stillClosed = handles.filter(({ handle }) => {
+        if (handle.getAttribute('aria-expanded') === 'true') return false;
+        const details = handle.tagName === 'SUMMARY' ? handle.closest('details') : null;
+        if (details && details.open) return false;
+        return !this.isElementHidden(handle);
+      });
+      // NEAREST reachable ancestor, not the outermost. The reachability filter
+      // above already skips handles buried in a closed container, so the nearest
+      // survivor is the right one to click — and picking the outermost instead
+      // sent carousel reveals to a container far above the slider that owns the
+      // slide.
+      const outermost = stillClosed[0];
+      if (outermost) {
+        log(`tryMakeBlockVisible: no handle for ${targetUid}, using ancestor ${outermost.uid}`);
+        ancestorSelector = outermost.handle;
+        // Wait on the CHILD, not the container. A collapsed panel's own element
+        // is already visible — only its contents are hidden — so watching the
+        // container reported success on the first frame and recursed before
+        // anything had rendered.
+        ancestorUid = outermost.child;
+      }
+    }
+
     if (directSelector) {
       log(`tryMakeBlockVisible: found direct selector for ${targetUid}`);
       clickedSelector = directSelector;
+    } else if (ancestorSelector) {
+      usedAncestor = true;
+      // Opening the ancestor may expose the target directly, or reveal another
+      // closed container inside it. Waiting on the ANCESTOR rather than the
+      // target is what lets the existing check recurse: once the ancestor is
+      // open we run again, and the handle that was buried inside it is now
+      // reachable. Waiting on the target instead just polled a hidden element
+      // until the timeout.
+      clickedSelector = ancestorSelector;
+      nextUid = ancestorUid;
     } else {
       // No direct selector - try +1/-1 navigation
       log(`tryMakeBlockVisible: no direct selector, trying +1/-1 navigation`);
@@ -11344,7 +11794,7 @@ export class Bridge {
         }
         // Need more clicks - recurse
         log(`tryMakeBlockVisible: not at target yet, continuing navigation`);
-        this.tryMakeBlockVisible(targetUid);
+        this.tryMakeBlockVisible(targetUid, usedAncestor ? depth + 1 : depth);
         return;
       }
 
@@ -13440,6 +13890,18 @@ let _diagnosticShown = false;
  * Automatically called when hydra.js detects it's in an iframe with edit signals
  * but the bridge doesn't initialize within a timeout.
  */
+/**
+ * Take down a diagnostic that has been overtaken by events. A bridge that
+ * connects late is a slow bridge, not a broken one, and leaving a red
+ * "Not Connected" panel over a working editor is its own bug.
+ */
+function _removeBridgeDiagnostic() {
+  _diagnosticShown = false;
+  if (typeof document === 'undefined') return;
+  const existing = document.getElementById('hydra-bridge-diagnostic');
+  if (existing) existing.remove();
+}
+
 function _showBridgeDiagnostic(info) {
   if (_diagnosticShown) return;
   if (typeof document === 'undefined') return;
@@ -13499,7 +13961,14 @@ if (typeof window !== 'undefined' && window.self !== window.top) {
     // Check after page load + 5 seconds — enough time for bridge to connect
     const _checkConnection = () => {
       setTimeout(() => {
-        if (!bridgeInstance || !bridgeInstance.initialized) {
+        // Only the "initBridge was never called" case is left to a timer, and
+        // only because there is no event for something that never happens. A
+        // bridge that HAS been created is mid-handshake: it retries INIT and
+        // reports for itself when it runs out of attempts, so the clock must
+        // not pre-empt it.
+        const stillHandshaking =
+          bridgeInstance && !bridgeInstance.initialized && !bridgeInstance._initHandshakeGaveUp;
+        if (!stillHandshaking && (!bridgeInstance || !bridgeInstance.initialized)) {
           _showBridgeDiagnostic({
             windowName: window.name,
             hasHydraName: _isEditMode,
@@ -13681,15 +14150,29 @@ export function getAuthHeaders() {
  * Calculate drag handle/toolbar position for a block.
  * Used by both iframe drag handle and Volto toolbar to ensure alignment.
  *
+ * Chrome must also clear a STAND-IN — an element that represents the block
+ * without being it, such as a tab's label on the button that reveals it. That
+ * element usually sits above the block, and placing the handle against the
+ * block alone drops it on top of a field the author needs to click. Both
+ * callers pass it, so the rule lives here rather than being written out twice
+ * and drifting: the iframe handle and the admin toolbar are asserted to align.
+ *
  * @param {Object} blockRect - Block's bounding rect {top, left}
  * @param {Object} viewportOffset - Viewport offset {top, left}
  *        For iframe: {top: 0, left: 0}
  *        For parent: iframe.getBoundingClientRect()
+ * @param {Object} [standInRect] - Bounding rect of the block's stand-in, if any
  * @returns {Object} {top, left} position
  */
-export function calculateDragHandlePosition(blockRect, viewportOffset = { top: 0, left: 0 }) {
+export function calculateDragHandlePosition(
+  blockRect,
+  viewportOffset = { top: 0, left: 0 },
+  standInRect = null,
+) {
   const HANDLE_OFFSET_TOP = 40;
-  const top = Math.max(viewportOffset.top, viewportOffset.top + blockRect.top - HANDLE_OFFSET_TOP);
+  const effectiveTop =
+    standInRect && standInRect.top < blockRect.top ? standInRect.top : blockRect.top;
+  const top = Math.max(viewportOffset.top, viewportOffset.top + effectiveTop - HANDLE_OFFSET_TOP);
   const left = viewportOffset.left + blockRect.left;
   return { top, left };
 }

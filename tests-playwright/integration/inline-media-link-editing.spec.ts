@@ -1081,15 +1081,23 @@ test.describe('Slider image positioning', () => {
 });
 
 test.describe('Teaser starter UI and overwrite', () => {
+  /**
+   * A teaser whose required `href` is still empty — the state the starter UI is
+   * for. Made here, never stored: content with an empty required field
+   * contradicts its own schema, and a teaser is empty only for the moment
+   * between adding it and filling it in.
+   */
+  async function addEmptyTeaser(page: any, helper: AdminUIHelper) {
+    const uid = await helper.addBlockOnCanvas('block-1-uuid', 'teaser');
+    return helper.getIframe().locator(`[data-block-uid="${uid}"]`);
+  }
+
   test('shows starter UI overlay for empty teaser href field', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    const iframe = helper.getIframe();
-
-    // Find and click the empty teaser block
-    const emptyTeaser = iframe.locator('[data-block-uid="block-6-empty-teaser"]');
+    const emptyTeaser = await addEmptyTeaser(page, helper);
     await expect(emptyTeaser).toBeVisible({ timeout: 10000 });
     await emptyTeaser.click();
 
@@ -1221,10 +1229,7 @@ test.describe('Teaser starter UI and overwrite', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    const iframe = helper.getIframe();
-
-    // Click the empty teaser (scroll into view first)
-    const emptyTeaser = iframe.locator('[data-block-uid="block-6-empty-teaser"]');
+    const emptyTeaser = await addEmptyTeaser(page, helper);
     await expect(emptyTeaser).toBeVisible({ timeout: 10000 });
     await emptyTeaser.scrollIntoViewIfNeeded();
     await expect(emptyTeaser).toBeInViewport();

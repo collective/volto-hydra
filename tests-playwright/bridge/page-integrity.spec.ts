@@ -28,7 +28,11 @@ const discoveredPath = path.resolve(__dirname, '../../.discovered-blocks.json');
 let uniquePages: string[] = [];
 if (fs.existsSync(discoveredPath)) {
   const all: DiscoveredBlock[] = JSON.parse(fs.readFileSync(discoveredPath, 'utf-8'));
-  uniquePages = Array.from(new Set(all.map((b) => b.pagePath)));
+  // Some findings are about a TYPE, not a page — a registered block with no
+  // content example has nothing to point at, so it carries no pagePath. Without
+  // this filter they became a test literally named "undefined" that navigated to
+  // `<frontend>undefined`, failing for a reason unrelated to any page.
+  uniquePages = Array.from(new Set(all.map((b) => b.pagePath).filter(Boolean)));
 }
 
 test.describe('Page integrity (auto-discovered)', () => {

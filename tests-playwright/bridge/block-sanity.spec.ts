@@ -24,7 +24,7 @@ import { AdminUIHelper } from '../helpers/AdminUIHelper';
 import { verifyBlockRendering } from '../helpers/BlockVerificationHelper';
 import { fieldsNeverEditable } from '../helpers/field-coverage';
 import { axeCheckPage, formatViolations } from '../helpers/axe-sanity';
-import { getFrontendUrl } from './fixtures';
+import { getFrontendUrl, SANITY_PROJECTS } from './fixtures';
 import { URLS } from '../ports';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -82,7 +82,7 @@ discoveredBlocks = discoveredBlocks.filter(
 // own ground truth), Nuxt, and Next.js. Other example frontends (react,
 // svelte, vue, f7) intentionally skip block-sanity so missing block types or
 // in-flight renderer changes don't gate the suite.
-const SANITY_PROJECTS = new Set(['mock', 'nuxt', 'nextjs']);
+
 
 base.beforeEach(async ({}, testInfo) => {
   // Scope BEFORE environment: a project this spec doesn't cover is a decision,
@@ -107,11 +107,28 @@ const test = base.extend<{ helper: AdminUIHelper }>({
 
 test.describe('Block sanity (auto-discovered)', () => {
   for (const block of discoveredBlocks) {
+    // Run each discovered case only on the frontend it came from. Discovery is
+    // per-frontend because they do not register the same blocks — one found via
+    // nextjs must not be asserted against f7, which never claimed it.
+    // Playwright collects this file once for all projects, so the cases are all
+    // generated and the foreign ones skip at run time (the idiom dnd-convert
+    // already uses for its mock-only conversion blocks).
+    const belongsHere = (name: string) =>
+      !block.frontend || block.frontend === name
+      || block.frontend === '(env)' || block.frontend === 'mock';
+    // Discovery runs once per frontend, so the SAME block surfaces once per
+    // frontend that registered it. Playwright rejects a file with two identical
+    // titles — it aborts the whole run before a single test executes — so every
+    // generated title carries its source frontend. It is also the honest label:
+    // these are separate measurements, not one shared result.
+    const src = block.frontend ? ` @${block.frontend}` : '';
+
     // A block @type used in content but not registered in the frontend's
     // blocksConfig fails as its own test (it renders as "Not implemented
     // Block") rather than blocking the whole suite.
     if (block.unregistered) {
-      test(`${block.blockType} block @type is registered in the frontend`, () => {
+      test(`${block.blockType} block @type is registered in the frontend${src}`, ({}, testInfo) => {
+        test.skip(!belongsHere(testInfo.project.name), `discovered via ${block.frontend}`);
         throw new Error(
           `Block @type "${block.blockType}" is used in content (${block.occurrenceCount} ` +
             `occurrence(s), e.g. ${block.pagePath}) but is not registered in the frontend's ` +
@@ -124,7 +141,8 @@ test.describe('Block sanity (auto-discovered)', () => {
     // A frontend-registered type with no content example — fails as its own
     // test (nothing to render) rather than blocking the suite.
     if (block.noExample) {
-      test(`${block.blockType} block has an editable content example to render`, () => {
+      test(`${block.blockType} block has an editable content example to render${src}`, ({}, testInfo) => {
+        test.skip(!belongsHere(testInfo.project.name), `discovered via ${block.frontend}`);
         throw new Error(
           `Block @type "${block.blockType}" is registered in the frontend but no EDITABLE content ` +
             `example exists to run its render test. Add a fixture (a page with a populated ` +
@@ -141,7 +159,11 @@ test.describe('Block sanity (auto-discovered)', () => {
     // nearest ancestor that accepts the type). Fails as its own test rather
     // than blocking the suite.
     if (block.allowedBlocksViolation) {
-      test(`${block.blockType} block [${block.blockId}] is allowed in its container`, () => {
+      // pagePath for the same reason the shape test carries it: one blockId can
+      // repeat across pages, and two such entries would collide into a duplicate
+      // title, which aborts the whole file before any test runs.
+      test(`${block.blockType} block [${block.blockId}] on ${block.pagePath} is allowed in its container${src}`, ({}, testInfo) => {
+        test.skip(!belongsHere(testInfo.project.name), `discovered via ${block.frontend}`);
         throw new Error(
           `Block "${block.blockType}" [${block.blockId}] on ${block.pagePath} is placed in a ` +
             `${block.parentType} container that doesn't allow its @type ` +
@@ -161,7 +183,7 @@ test.describe('Block sanity (auto-discovered)', () => {
       // can have per-field shape/slate issues — without them, two entries would
       // collide into a "duplicate test title" error and abort the whole run.
       const where = `${block.pagePath || '?'}${block.field ? `.${block.field}` : ''}`;
-      test(`${block.blockType} block [${block.blockId}] on ${where} has valid ${kind}`, () => {
+      test(`${block.blockType} block [${block.blockId}] on ${where} has valid ${kind}${src}`, () => {
         throw new Error(
           `Block "${block.blockType}" [${block.blockId}] on ${block.pagePath}` +
             (block.field ? ` field "${block.field}"` : '') +
@@ -175,7 +197,7 @@ test.describe('Block sanity (auto-discovered)', () => {
     // test per (blockType, field) so each missing field is reported once. It
     // can't be edited in the sidebar until the schema declares it.
     if (block.undeclaredField) {
-      test(`${block.blockType} block declares field "${block.field}" in its schema`, () => {
+      test(`${block.blockType} block declares field "${block.field}" in its schema${src}`, () => {
         throw new Error(
           `Block "${block.blockType}" stores field "${block.field}" (e.g. on ` +
             `${block.pagePath}) but its schema does not declare it — the field can't be ` +
@@ -189,7 +211,8 @@ test.describe('Block sanity (auto-discovered)', () => {
       : '';
     const labelKind = block.kind ? ` [${block.kind}]` : '';
     const label = `${block.blockType}${labelVariation}${labelKind}`;
-    test(`${label} block renders and has edit annotations`, async ({ page, helper }, testInfo) => {
+    test(`${label} block renders and has edit annotations${src}`, async ({ page, helper }, testInfo) => {
+      test.skip(!belongsHere(testInfo.project.name), `discovered via ${block.frontend}`);
       const frontendUrl = process.env.FRONTEND_URL || getFrontendUrl(testInfo.project.name);
       const frontend = frontendUrl ? `&frontend=${encodeURIComponent(frontendUrl)}` : '';
 
@@ -223,22 +246,41 @@ test.describe('Block sanity (auto-discovered)', () => {
       // silent mismatch.
       if (block.needsUnlock) {
         const frame = page.frames().find((f) => f !== page.mainFrame())!;
-        const instanceId = await frame.evaluate((uid) => {
-          const bridge = (window as any).__hydraBridge;
-          let found: string | null = null;
-          const walk = (blocks: Record<string, any>) => {
-            for (const [id, b] of Object.entries(blocks || {})) {
-              if (!b || typeof b !== 'object') continue;
-              if (id === uid) found = b.templateInstanceId ?? null;
-              for (const [key, value] of Object.entries<any>(b)) {
-                if (key === 'blocks' && value && typeof value === 'object') walk(value);
-                else if (value && typeof value === 'object' && value.blocks) walk(value.blocks);
-              }
-            }
-          };
-          walk(bridge?.formData?.blocks || {});
-          return found;
+
+        // A block whose CONTENTS are generated is not authored inline, and
+        // unlocking its template instance must not make them editable: the
+        // expanded items of a listing reuse the block's own uid, so anything
+        // that unlocks the block unlocks the generated items with it. hydra
+        // therefore force-locks such blocks (expandListingBlocks registers
+        // every type that has a fetcher), and that lock outranks template edit
+        // mode by design.
+        //
+        // The frontend PUBLISHES that fact by registering the block readonly on
+        // the bridge — the same opt-in shape as data-block-selector for reveal.
+        // Reading it keeps this check free of "listing means X" knowledge: any
+        // block a frontend declares generated is authored through the sidebar,
+        // so "still locked" is the correct outcome, not a failure.
+        const generatedContents = await frame.evaluate((uid) => {
+          const registry = (window as any).__hydraBridge?._readonlyBlocks;
+          return registry ? [...registry].includes(uid) : false;
         }, block.blockId);
+        if (generatedContents) {
+          test.info().annotations.push({
+            type: 'generated-contents',
+            description:
+              `${block.blockType} [${block.blockId}] is registered readonly by the frontend — ` +
+              `its items share the block uid, so it is authored in the sidebar, not inline.`,
+          });
+        }
+        // Ask the bridge, don't walk the data. getBlockData resolves a uid
+        // through blockPathMap, which already covers nested blocks AND
+        // object_list items (a slide, an accordion panel) — the cases a
+        // hand-rolled walk over `blocks` dicts silently misses, reporting a
+        // template-bound item as having no templateInstanceId when it has one.
+        const instanceId = await frame.evaluate(
+          (uid) => (window as any).__hydraBridge?.getBlockData(uid)?.templateInstanceId ?? null,
+          block.blockId,
+        );
 
         expect(
           instanceId,
@@ -257,6 +299,7 @@ test.describe('Block sanity (auto-discovered)', () => {
         await expect
           .poll(
             () =>
+              generatedContents ||
               frame.evaluate(
                 (uid) => !(window as any).__hydraBridge?.isBlockReadonly(uid),
                 block.blockId,

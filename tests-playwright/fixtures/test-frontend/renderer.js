@@ -316,6 +316,9 @@ async function renderBlock(blockId, block) {
             wrapper.innerHTML = await renderAccordionBlock(block, blockId);
             break;
         // accordionPanel is rendered inline by renderAccordionBlock (object_list items)
+        case 'socialLinks':
+            wrapper.innerHTML = renderSocialLinksBlock(block);
+            break;
         case 'slateTable':
             wrapper.innerHTML = renderSlateTableBlock(block);
             break;
@@ -1150,7 +1153,12 @@ function renderFormBlock(block) {
         if (fieldType === 'empty') {
             // A typed object_list item seeded as 'empty' (type in field_type, no @type).
             // Render a selectable placeholder; the admin supplies the '+' to pick its type.
-            html += `<span data-edit-text="placeholder" style="color:#999;">Empty field — pick a type</span>`;
+            // No data-edit-text: "Empty field — pick a type" is a hint the
+            // frontend writes, not content the author owns. No schema declares
+            // a `placeholder` field, so annotating it promised an edit that
+            // hydra correctly refuses — the same lie as a "Read More" label on
+            // a block with no button.
+            html += `<span style="color:#999;">Empty field — pick a type</span>`;
         } else if (fieldType === 'textarea') {
             html += `<textarea name="${fieldId}" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" rows="3"></textarea>`;
         } else if (fieldType === 'select') {
@@ -2077,7 +2085,12 @@ function renderCodeExampleBlock(block, blockId) {
         html += '<div data-tab-bar style="display: flex; background: #16213e; border-bottom: 1px solid #334;">';
         tabs.forEach((tab) => {
             const tabId = tab['@id'];
-            html += `<button data-block-uid="${tabId}" data-linkable-allow style="padding: 8px 16px; color: #aaa; background: transparent; border: none; cursor: pointer; font-size: 13px;"><span data-edit-text="label">${tab.label || tab.language || 'Tab'}</span></button>`;
+            // The BUTTON represents the tab; the PANEL below is the tab. Carrying
+            // data-block-uid here too would tell the bridge the block is on screen
+            // whenever the bar is, so selecting an inactive tab would never reveal
+            // the code it holds. data-block-selector says "I represent this uid" —
+            // the label still edits the tab, and clicking switches to it.
+            html += `<button data-block-selector="${tabId}" data-linkable-allow style="padding: 8px 16px; color: #aaa; background: transparent; border: none; cursor: pointer; font-size: 13px;"><span data-edit-text="label">${tab.label || tab.language || 'Tab'}</span></button>`;
         });
         html += '</div>';
     }
@@ -2124,6 +2137,26 @@ function renderSlideBlock(block) {
     html += `<h4 data-edit-text="title" style="margin: 0 0 8px 0;">${title}</h4>`;
     html += `<p data-edit-text="description" style="margin: 0; color: #666;">${description}</p>`;
 
+    return html;
+}
+
+/**
+ * Social links: one <a> per entry in `links`.
+ *
+ * Each link carries its OWN data-block-uid (the item's @id) so it can be
+ * selected, moved and edited as a sub-item — the same shape the Nuxt and
+ * Next.js examples render. The mock had no socialLinks case at all, so the
+ * links appeared nowhere and sub-item selection had nothing to attach to.
+ */
+function renderSocialLinksBlock(block) {
+    const links = block.links || [];
+    let html = '<span>Follow us:</span>';
+    for (const link of links) {
+        const uid = link['@id'];
+        html += `<a data-block-uid="${uid}" data-block-add="right" data-edit-link="url" ` +
+            `href="${escapeAttr(link.url || '')}" target="_blank" rel="noopener noreferrer">` +
+            `${escapeHtml(link.url || '')}</a>`;
+    }
     return html;
 }
 
@@ -2177,24 +2210,32 @@ async function renderAccordionPanelBlock(block, blockId) {
     for (const childBlock of expandedItems) {
         if (!childBlock) continue;
         const uid = childBlock['@uid'];
-        html += `<div data-block-uid="${uid}" data-block-add="bottom">`;
+        let inner;
         switch (childBlock['@type']) {
             case 'slate':
-                html += renderNestedSlateBlock(childBlock);
+                inner = renderNestedSlateBlock(childBlock);
                 break;
             case 'image':
-                html += renderImageBlock(childBlock);
+                inner = renderImageBlock(childBlock);
                 break;
             case 'teaser':
-                html += renderTeaserBlock(childBlock, null);
+                inner = renderTeaserBlock(childBlock, null);
                 break;
             case 'summary':
-                html += renderSummaryItemBlock(childBlock, null);
+                inner = renderSummaryItemBlock(childBlock, null);
                 break;
-            default:
-                html += renderNestedSlateBlock(childBlock);
+            default: {
+                // Anything else — including CONTAINERS — goes through the normal
+                // renderer so nested blocks render as they do anywhere else. The
+                // old default treated an unknown type as a slate, so a grid in a
+                // panel produced no children at all and its blocks existed
+                // nowhere in the DOM.
+                const el = await renderBlock(uid, childBlock);
+                if (el) html += el.outerHTML;
+                continue;
+            }
         }
-        html += '</div>';
+        html += `<div data-block-uid="${uid}" data-block-add="bottom">${inner}</div>`;
     }
 
     html += '</div>';
@@ -2243,7 +2284,7 @@ function renderFacetWidget(facet) {
         optionsHtml += options.map(opt =>
             `<option value="${opt.value}">${opt.title}</option>`
         ).join('');
-        return `<select class="facet-widget facet-select" data-field="${field}" style="width: 100%; padding: 4px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px;">
+        return `<select class="facet-widget facet-select" data-linkable-allow data-field="${field}" style="width: 100%; padding: 4px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px;">
             ${optionsHtml}
         </select>`;
     } else if (facetType === 'checkboxFacet') {
@@ -2255,7 +2296,7 @@ function renderFacetWidget(facet) {
         const checkboxesHtml = options.map(opt => {
             const isChecked = currentValues.includes(opt.value) ? 'checked' : '';
             return `<label style="display: block; margin-top: 4px;">
-                <input type="checkbox" class="facet-checkbox" data-field="${field}" value="${opt.value}" ${isChecked} />
+                <input type="checkbox" class="facet-checkbox" data-linkable-allow data-field="${field}" value="${opt.value}" ${isChecked} />
                 ${opt.title}
             </label>`;
         }).join('');
@@ -2710,3 +2751,18 @@ if (document.readyState === 'loading') {
 if (typeof window !== 'undefined' && window.matchMedia) {
     window.matchMedia('(min-width: 768px)').addEventListener('change', syncCnavOpenState);
 }
+
+// Tab bars switch on click. The buttons were inert, so a tab other than the
+// first could never be shown — including when the bridge clicks the handle to
+// reveal a tab an author selected in the sidebar.
+document.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-tab-bar] button[data-block-selector]');
+    if (!button) return;
+    const uid = button.getAttribute('data-block-selector');
+    const bar = button.closest('[data-tab-bar]');
+    const container = bar?.parentElement;
+    if (!container) return;
+    for (const panel of container.querySelectorAll(':scope > [data-block-uid]')) {
+        panel.style.display = panel.getAttribute('data-block-uid') === uid ? 'block' : 'none';
+    }
+});

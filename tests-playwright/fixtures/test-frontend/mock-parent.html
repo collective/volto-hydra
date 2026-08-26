@@ -369,7 +369,11 @@
 
     // Default inline form data for existing mock parent tests
     const defaultFormData = {
-      '@id': 'http://localhost:8888/_test_data/test-page',
+      // Same rule as apiOrigin above: the API port is overridable, so a literal
+      // 8888 here handed the frontend a page whose own @id pointed at a dead
+      // server on any overridden run — INIT never completed and discovery
+      // reported "returned no schemas".
+      '@id': `${apiOrigin}/_test_data/test-page`,
       '@type': 'Document',
       title: 'Mock Test Page',
       blocks: {

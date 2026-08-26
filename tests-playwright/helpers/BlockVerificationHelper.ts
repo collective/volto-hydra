@@ -9,6 +9,7 @@
  */
 import { expect } from '@playwright/test';
 import type { Page, FrameLocator, Locator } from '@playwright/test';
+import { AdminUIHelper } from './AdminUIHelper';
 import { recordSlateFieldContainer, recordFieldEditable } from './field-coverage';
 
 export interface SubBlock {
@@ -68,8 +69,56 @@ export async function checkDataEditTextClicks(
   const count = await editTextEls.count();
   if (count === 0) return;
 
-  for (let i = 0; i < count; i++) {
+  // Which block each field belongs to, resolved ONCE. A field can belong to a
+  // child of the block under test — a codeExample's code fields belong to its
+  // tabs — and reaching one means revealing that child, which for a tab means
+  // switching to it.
+  const owners = await editTextEls.evaluateAll((nodes) =>
+    nodes.map((node) => {
+      const handle = node.closest('[data-block-selector]');
+      const advertised = (handle?.getAttribute('data-block-selector') || '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+      const standIn =
+        advertised.length === 1 &&
+        advertised[0] !== '+1' &&
+        advertised[0] !== '-1' &&
+        !advertised[0].includes(':')
+          ? advertised[0]
+          : null;
+      return standIn || node.closest('[data-block-uid]')?.getAttribute('data-block-uid') || null;
+    }),
+  );
+
+  // Walk grouped by owner so each block is revealed ONCE and all of its fields
+  // are checked while it is on screen. Field order interleaves owners (every
+  // tab label, then every tab's code), so revealing per field switched tabs
+  // between a reveal and the click depending on it — and did it twice as often.
+  const order = [...Array(count).keys()].sort(
+    (a, b) => String(owners[a] ?? '').localeCompare(String(owners[b] ?? '')) || a - b,
+  );
+  let revealedOwner: string | null = null;
+
+  for (const i of order) {
     const el = editTextEls.nth(i);
+    const owner = owners[i];
+    if (owner && owner !== revealedOwner) {
+      await revealBlock(iframe, owner);
+      // Let the reveal settle before using the block. Revealing a tab or a
+      // carousel slide moves the DOM, so wait for the count to stop changing
+      // AND for the block itself to stop moving — clicking a slide still in
+      // transit lands where it used to be, which reads as "element is outside
+      // of the viewport" once Playwright has scrolled (a transform cannot be
+      // scrolled to).
+      const admin = new AdminUIHelper(page);
+      await admin.getStableBlockCount();
+      const ownerEl = iframe.locator(`[data-block-uid="${owner}"]`).first();
+      if (await ownerEl.count()) {
+        await admin.waitForPositionStable(ownerEl).catch(() => {});
+      }
+      revealedOwner = owner;
+    }
     if (!await el.isVisible()) continue;
     // Only the fields this block OWNS. A container renders its children's
     // fields too, and those are the child block's contract, checked when the
@@ -100,6 +149,7 @@ export async function checkDataEditTextClicks(
     // this helper about any particular component's markup.
     await revealBlock(iframe, blockUid);
 
+
     // Scroll the field to the MIDDLE of the viewport before clicking. Playwright
     // scrolls to the nearest edge, which on any site with a sticky header puts
     // the field underneath it — the click then lands on the header and the
@@ -108,6 +158,14 @@ export async function checkDataEditTextClicks(
     await el.evaluate((node) =>
       node.scrollIntoView({ block: 'center', inline: 'nearest' }),
     );
+    // Then let it come to rest. Scrolling is not instant, and selecting the
+    // previous field can move the page as well, so the element can still be
+    // travelling when the click is dispatched — the click then lands on
+    // whatever has slid into that spot. That is exactly how clicking a
+    // codeExample tab label ended up hitting the code panel underneath
+    // (activeElement=DIV), and it only showed up in the full suite, where a
+    // previous selection had something to scroll.
+    await new AdminUIHelper(page).waitForPositionStable(el).catch(() => {});
 
     await el.click();
     // The warning below is asserted ABSENT, so give the bridge its frame to
@@ -181,15 +239,36 @@ export async function checkDataEditTextClicks(
  */
 export async function revealBlock(iframe: FrameLocator, blockUid: string): Promise<void> {
   const block = iframe.locator(`[data-block-uid="${blockUid}"]`).first();
+  // Ask the bridge whether it considers the block visible — do not re-derive it.
+  // A carousel slide translated out of view still HAS client rects: it is laid
+  // out, just at x=-777 while its container starts at x=16. Checking rects
+  // concluded "already rendered", skipped the reveal, and left the click landing
+  // off-viewport. isElementHidden knows about off-screen translates.
   const rendered = await block
-    .evaluate((node) => node.getClientRects().length > 0)
+    .evaluate((node) => {
+      const bridge = (window as any).__hydraBridge;
+      if (bridge?.isElementHidden) return !bridge.isElementHidden(node);
+      return node.getClientRects().length > 0;
+    })
     .catch(() => false);
   if (rendered) return;
 
-  const opener = iframe.locator(`[data-block-selector~="${blockUid}"]`).first();
-  if ((await opener.count()) === 0) return;
-  await opener.click();
+  // hydra already knows how to do this: tryMakeBlockVisible clicks a direct
+  // data-block-selector, and failing that steps +1/-1 until it reaches the
+  // target. That is what the editor does on select, so the harness asks the
+  // bridge instead of re-deriving carousel navigation here — a second
+  // implementation would drift from the one users actually get.
+  const clicked = await iframe
+    .locator('body')
+    .evaluate(
+      (_el, uid) => (window as any).__hydraBridge?.tryMakeBlockVisible?.(uid) ?? false,
+      blockUid,
+    )
+    .catch(() => false);
+  if (!clicked) return;
+
   await expect(block).toBeVisible({ timeout: 5000 });
+
 }
 
 /**
@@ -860,6 +939,12 @@ export async function verifyBlockRendering(
   if (isFieldlessBlock && (await block.count()) === 0) {
     return; // metadata-projection block legitimately rendered nothing
   }
+  // A block can be rendered but off-stage — an inactive carousel slide, a
+  // closed tab. That is not a render failure: the editor reaches it by
+  // selecting it, and hydra's tryMakeBlockVisible steps the container until it
+  // shows. Ask for the same thing here before demanding visibility, or the
+  // check fails on content an author can reach perfectly well.
+  await revealBlock(iframe, blockId);
   await expect(block.first()).toBeVisible({ timeout: 15000 });
 
   // A data-block-uid may legitimately match several elements, in two shapes that

@@ -315,10 +315,12 @@ export const sharedBlocksConfig = {
                 {
                     id: 'default',
                     title: 'Default',
-                    fields: ['slides', 'variation', 'autoplayEnabled', 'autoplayDelay', 'autoplayJump'],
+                    fields: ['slides', 'variation', 'autoplayEnabled', 'autoplayDelay', 'autoplayJump', 'headline', 'headlineTag'],
                 },
             ],
             properties: {
+                headline: { title: 'Headline', type: 'string' },
+                headlineTag: { title: 'Headline tag', widget: 'select', choices: [['h1','h1'],['h2','h2'],['h3','h3'],['h4','h4'],['h5','h5'],['h6','h6']] },
                 slides: {
                     title: 'Slides',
                     widget: 'object_list',
@@ -368,9 +370,20 @@ export const sharedBlocksConfig = {
         // parentControlled config, so nothing is hidden by default.
         blockSchema: {
             title: 'Slide',
-            fieldsets: [{ id: 'default', title: 'Default', fields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'hideButton'] }],
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'href', 'hideButton', 'flagAlign'] }],
             properties: {
                 head_title: { title: 'Kicker', type: 'string' },
+                // The slide's own link target, and which side its caption sits
+                // on. Both are stored by the fixtures and read by the example
+                // frontends (nuxt keys its card position off flagAlign), so an
+                // author could see them on screen but not reach them.
+                href: { title: 'Link', widget: 'object_browser', mode: 'link' },
+                flagAlign: {
+                    title: 'Caption Alignment',
+                    widget: 'select',
+                    choices: [['left', 'Left'], ['right', 'Right']],
+                    default: 'left',
+                },
                 title: { title: 'Title', type: 'string' },
                 description: { title: 'Description', type: 'string', widget: 'textarea' },
                 preview_image: { title: 'Image Override', widget: 'object_browser', mode: 'image', allowExternals: true },
@@ -388,6 +401,10 @@ export const sharedBlocksConfig = {
         group: 'common',
         blockSchema: {
             properties: {
+                collapsed: { title: 'Collapsed', type: 'boolean' },
+                filtering: { title: 'Filtering', type: 'boolean' },
+                non_exclusive: { title: 'Allow multiple open', type: 'boolean' },
+                right_arrows: { title: 'Arrows on the right', type: 'boolean' },
                 panels: {
                     title: 'Panels',
                     widget: 'object_list',
@@ -406,7 +423,7 @@ export const sharedBlocksConfig = {
                                     'slate', 'image', 'separator', 'teaser', 'listing', 'slateTable',
                                     'hero', 'columns', 'slider', 'gridBlock', 'section',
                                     'contextNavigation', 'codeExample', 'toc', 'highlight', 'introduction',
-                                ],
+                                , 'accordion'],
                                 defaultBlockType: 'slate',
                             },
                         },
@@ -480,6 +497,24 @@ export const sharedBlocksConfig = {
         group: 'common',
         blockSchema: {
             properties: {
+                variation: { title: 'Variation' },
+                query: { title: 'Query', widget: 'querystring' },
+                listingBodyTemplate: { title: 'Results template' },
+                showSearchInput: { title: 'Show search input', type: 'boolean' },
+                showSortOn: { title: 'Show sort on', type: 'boolean' },
+                showTotalResults: { title: 'Show total results', type: 'boolean' },
+                sortOnOptions: { title: 'Sort on options', type: 'array' },
+                facets: {
+                  // Typed sub-items: each facet's `type` names its own block type,
+                  // so the item is edited with THAT type's schema (the same shape
+                  // slider.slides uses). A site can register another facet type and
+                  // list it here without touching this schema.
+                  title: 'Facets',
+                  widget: 'object_list',
+                  typeField: 'type',
+                  allowedBlocks: ['checkboxFacet', 'selectFacet', 'daterangeFacet', 'toggleFacet'],
+                  defaultBlockType: 'checkboxFacet',
+                },
                 headline: { title: 'Headline', type: 'string' },
                 title: { title: 'Title', type: 'string' },
                 facetsTitle: { title: 'Facets title', type: 'string' },
@@ -491,7 +526,9 @@ export const sharedBlocksConfig = {
         title: 'Heading',
         group: 'common',
         blockSchema: {
-            properties: { heading: { title: 'Heading', type: 'string' } },
+            properties: {
+                alignment: { title: 'Alignment', widget: 'align' },
+                tag: { title: 'Tag', widget: 'select', choices: [['h1','h1'],['h2','h2'],['h3','h3'],['h4','h4'],['h5','h5'],['h6','h6']] }, heading: { title: 'Heading', type: 'string' } },
         },
     },
     // slateTable has inline-editable cells, so it MUST declare its nested
@@ -555,7 +592,14 @@ export const sharedBlocksConfig = {
             required: [],
         },
     },
-    video: { id: 'video', title: 'Video', group: 'common', blockSchema: { properties: {} } },
+    video: { id: 'video', title: 'Video', group: 'common', blockSchema: { properties: {
+        url: { title: 'Video URL', widget: 'url' },
+        preview_image: { title: 'Preview image URL', widget: 'url' },
+        align: { title: 'Alignment', widget: 'align' },
+        autoplay: { title: 'Autoplay', type: 'boolean' },
+        controls: { title: 'Show controls', type: 'boolean' },
+        loop: { title: 'Loop', type: 'boolean' },
+        muted: { title: 'Muted', type: 'boolean' },} } },
     // Code example block: tabbed code display with syntax highlighting
     codeExample: {
         id: 'codeExample',
@@ -636,8 +680,13 @@ export const sharedBlocksConfig = {
     listing: {
         id: 'listing',
         blockSchema: {
-            fieldsets: [{ id: 'default', title: 'Default', fields: ['variation', 'fieldMapping'] }],
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['variation', 'fieldMapping', 'headline', 'headlineTag', 'querystring'] }],
             properties: {
+                fieldMapping: { title: 'Field mapping' },
+                headline: { title: 'Headline', type: 'string' },
+                headlineTag: { title: 'Headline tag', widget: 'select', choices: [['h1','h1'],['h2','h2'],['h3','h3'],['h4','h4'],['h5','h5'],['h6','h6']] },
+                querystring: { title: 'Search criteria', widget: 'querystring' },
+                query: { title: 'Query', widget: 'querystring' },
                 variation: {
                     title: 'Item Type',
                     widget: 'blockTypeSelect',
@@ -764,9 +813,10 @@ export const sharedBlocksConfig = {
         blockSchema: {
             title: 'Table of Contents',
             fieldsets: [
-                { id: 'default', title: 'Default', fields: ['title', 'hide_title', 'ordered', 'levels'] },
+                { id: 'default', title: 'Default', fields: ['title', 'hide_title', 'ordered', 'levels', 'variation'] },
             ],
             properties: {
+                variation: { title: 'Variation' },
                 title: { title: 'Title', type: 'string' },
                 hide_title: { title: 'Hide title', type: 'boolean' },
                 ordered: { title: 'Ordered', type: 'boolean' },
@@ -789,8 +839,10 @@ export const sharedBlocksConfig = {
         // that accepts the type. Keep gridBlock (no nesting) and hero out of it.
         allowedBlocks: ['slate', 'image', 'listing', 'teaser'],
         blockSchema: {
-            fieldsets: [{ id: 'default', title: 'Default', fields: ['items', 'variation'] }],
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['items', 'variation', 'headline', 'headlineTag'] }],
             properties: {
+                headline: { title: 'Headline', type: 'string' },
+                headlineTag: { title: 'Headline tag', widget: 'select', choices: [['h1','h1'],['h2','h2'],['h3','h3'],['h4','h4'],['h5','h5'],['h6','h6']] },
                 items: {
                     widget: 'blocks_layout',
                     itemTypeField: 'variation',  // sync trigger
@@ -820,6 +872,12 @@ export const sharedBlocksConfig = {
     // for teasers via inheritSchemaFrom.parentControlled.teaser.
     teaser: {
         id: 'teaser',
+        // A listing renders each result as this type, so it must declare how a
+        // result's fields land on it — that mapping is also what makes it
+        // selectable in the Item Type widget (filterConvertibleFrom: '@default').
+        fieldMappings: {
+            '@default': { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'preview_image' },
+        },
         title: 'Teaser',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>',
         group: 'common',
@@ -888,10 +946,15 @@ export const sharedBlocksConfig = {
         // fieldRules, which travels as data.
         blockSchema: {
             fieldsets: [
-                { id: 'default', title: 'Default', fields: ['url', 'alt', 'align', 'size'] },
+                { id: 'default', title: 'Default', fields: ['url', 'alt', 'align', 'size', 'title', 'description', 'credit', 'copyright_and_sources', 'allow_image_download'] },
                 { id: 'link_settings', title: 'Link settings', fields: ['href', 'openLinkInNewTab'] },
             ],
             properties: {
+                title: { title: 'Title' },
+                description: { title: 'Description', widget: 'textarea' },
+                credit: { title: 'Credit' },
+                copyright_and_sources: { title: 'Copyright and sources' },
+                allow_image_download: { title: 'Allow image download', type: 'boolean' },
                 url: { title: 'Image', widget: 'image' },
                 alt: { title: 'Alt text' },
                 align: { title: 'Alignment', widget: 'align', default: 'center' },
@@ -947,6 +1010,7 @@ export const sharedBlocksConfig = {
                 },
             ],
             properties: {
+                send_email: { title: 'Send email', type: 'boolean' },
                 title: {
                     title: 'Title',
                     type: 'string',
@@ -1229,6 +1293,9 @@ export const sharedBlocksConfig = {
                 label: { title: 'Label', type: 'string' },
                 description: { title: 'Description', type: 'string' },
                 value: { title: 'Value for field', type: 'string' },
+                // What the field submits when nothing sets it — the whole point
+                // of a hidden field, and it was the one thing not declared.
+                default_value: { title: 'Default value', type: 'string' },
             },
         },
     },
@@ -1308,6 +1375,114 @@ export const sharedBlocksConfig = {
             },
         },
     },
+    // Page-metadata and content-type blocks. These RENDER in every example
+    // frontend (block.vue branches for each) but were never declared, so
+    // discovery reported them as "used in content but not registered — it
+    // renders as Not implemented Block", which was wrong: they render fine.
+    //
+    // Their editable content is the PAGE's fields, not the block's — the
+    // annotations are page-field paths (/title, /description, /start) — so the
+    // block schemas are legitimately empty. `restricted` keeps them out of the
+    // page block chooser, which is where they would make no sense: a page has
+    // one title.
+    title: {
+      id: 'title',
+      title: 'Title',
+      group: 'text',
+      restricted: true,
+      blockSchema: { fieldsets: [], properties: {}, required: [] },
+    },
+    description: {
+      id: 'description',
+      title: 'Description',
+      group: 'text',
+      restricted: true,
+      blockSchema: { fieldsets: [], properties: {}, required: [] },
+    },
+    leadimage: {
+      id: 'leadimage',
+      title: 'Lead image',
+      group: 'media',
+      restricted: true,
+      blockSchema: { fieldsets: [], properties: {
+          align: { title: 'Alignment', widget: 'align' },}, required: [] },
+    },
+    // Which page date field to show — the block's own setting.
+    dateField: {
+      id: 'dateField',
+      title: 'Date',
+      group: 'text',
+      restricted: true,
+      blockSchema: {
+        fieldsets: [{ id: 'default', title: 'Default', fields: ['dateField', 'showTime'] }],
+        properties: {
+            showTime: { title: 'Show time', type: 'boolean' },
+          dateField: {
+            title: 'Field',
+            type: 'string',
+            factory: 'Choice',
+            choices: [['effective', 'Published'], ['created', 'Created'], ['modified', 'Modified']],
+          },
+        },
+        required: [],
+      },
+    },
+    eventMetadata: {
+      id: 'eventMetadata',
+      title: 'Event metadata',
+      group: 'text',
+      restricted: true,
+      // No fields of its own: this block PROJECTS the content item's fields
+      // (an Event's location, contact_name), which is why the sidebar shows the
+      // page form when it is selected. Declaring a property here fills the
+      // sidebar with that instead, and the Event's own fields disappear.
+      //
+      // `required` appears on the docs copy of an event beside fixed/slotId/
+      // templateId — template machinery, not something an author edits.
+      blockSchema: { fieldsets: [], properties: {}, required: [] },
+    },
+    socialLinks: {
+      id: 'socialLinks',
+      title: 'Social links',
+      group: 'common',
+      // Matches the declaration the Next.js example ships (PageClient.js): the
+      // links are an object_list keyed by `@id`, and each item's `url` is a
+      // plain string, not a link object. Without idField the items cannot be
+      // addressed by their stored id, so they never become selectable
+      // sub-items — the block renders but nothing inside it can be edited.
+      blockSchema: {
+        fieldsets: [{ id: 'default', title: 'Default', fields: ['links'] }],
+        properties: {
+          links: {
+            title: 'Links',
+            widget: 'object_list',
+            idField: '@id',
+            schema: {
+              fieldsets: [{ id: 'default', title: 'Default', fields: ['url'] }],
+              properties: { url: { title: 'URL', widget: 'url' } },
+              required: [],
+            },
+          },
+        },
+        required: [],
+      },
+    },
+    // The placeholder a container seeds into an empty region. Registered so it
+    // is not reported as unimplemented; it has nothing to edit.
+    empty: {
+      id: 'empty',
+      title: 'Empty',
+      group: 'common',
+      restricted: true,
+      // An empty field is a spacer in a form, but it still carries a label —
+      // the fixtures store one, so a bare properties map made it uneditable.
+      blockSchema: {
+        fieldsets: [{ id: 'default', title: 'Default', fields: ['label'] }],
+        properties: { label: { title: 'Label', type: 'string' } },
+        required: [],
+      },
+    },
+
     // Highlight block: banner with title, slate description, image, CTA
     highlight: {
         id: 'highlight',
@@ -1344,8 +1519,8 @@ export const sharedBlocksConfig = {
     // Edge direction: `X.fieldMappings[Y]` = "X can be built FROM Y" (Y → X).
     convSource: {
         id: 'convSource',
-        restricted: true,
         title: 'Conv Source',
+        restricted: true,
         group: 'common',
         fieldMappings: {}, // present (truthy) so it's a valid conversion source
         blockSchema: {
@@ -1382,8 +1557,8 @@ export const sharedBlocksConfig = {
     // restricted container that doesn't list it rejects it outright.
     convAlien: {
         id: 'convAlien',
-        restricted: true,
         title: 'Conv Alien',
+        restricted: true,
         group: 'common',
         blockSchema: {
             fieldsets: [{ id: 'default', title: 'Default', fields: ['title'] }],
@@ -1395,8 +1570,8 @@ export const sharedBlocksConfig = {
     // convGroupDst, carrying its children. Exercises convertContainerBlock on drop.
     convGroupSrc: {
         id: 'convGroupSrc',
-        restricted: true,
         title: 'Conv Group Src',
+        restricted: true,
         group: 'common',
         fieldMappings: {}, // valid conversion source
         blockSchema: {
@@ -1424,8 +1599,8 @@ export const sharedBlocksConfig = {
     // Restricted to convGroupDst → a dropped convGroupSrc auto-converts to it.
     convGroupBox: {
         id: 'convGroupBox',
-        restricted: true,
         title: 'Conv Group Box',
+        restricted: true,
         group: 'common',
         blockSchema: {
             fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
@@ -1438,8 +1613,8 @@ export const sharedBlocksConfig = {
     // Container restricted to a SINGLE convert-target → convSource drops auto-convert.
     convBox: {
         id: 'convBox',
-        restricted: true,
         title: 'Convert Box',
+        restricted: true,
         group: 'common',
         blockSchema: {
             fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
@@ -1452,8 +1627,8 @@ export const sharedBlocksConfig = {
     // Container restricted to TWO convert-targets → convSource drop opens the chooser.
     convBoxMulti: {
         id: 'convBoxMulti',
-        restricted: true,
         title: 'Convert Box (multi)',
+        restricted: true,
         group: 'common',
         blockSchema: {
             fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
@@ -1462,6 +1637,67 @@ export const sharedBlocksConfig = {
                     widget: 'blocks_layout',
                     allowedBlocks: ['convTargetA', 'convTargetB'],
                 },
+            },
+            required: [],
+        },
+    },
+
+    // Search facet types. Copied from docs/examples/block-definitions.json, which
+    // is what the docs example frontends load — these four lived only there, so
+    // any frontend using THIS registry reported them as unregistered.
+    checkboxFacet: {
+        id: 'checkboxFacet',
+        title: 'Checkboxes',
+        restricted: true,
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'field', 'multiple', 'hidden'] }],
+            properties: {
+            title: { title: 'Label' },
+            field: { title: 'Field', widget: 'select_querystring_field' },
+            hidden: { title: 'Hide facet?', type: 'boolean', default: false },
+                multiple: { title: 'Multiple choices?', type: 'boolean', default: false },
+            },
+            required: [],
+        },
+    },
+    selectFacet: {
+        id: 'selectFacet',
+        title: 'Select',
+        restricted: true,
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'field', 'hidden'] }],
+            properties: {
+            title: { title: 'Label' },
+            field: { title: 'Field', widget: 'select_querystring_field' },
+            hidden: { title: 'Hide facet?', type: 'boolean', default: false },
+            },
+            required: [],
+        },
+    },
+    daterangeFacet: {
+        id: 'daterangeFacet',
+        title: 'Date range',
+        restricted: true,
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'field', 'hidden'] }],
+            properties: {
+            title: { title: 'Label' },
+            field: { title: 'Field', widget: 'select_querystring_field' },
+            hidden: { title: 'Hide facet?', type: 'boolean', default: false },
+            },
+            required: [],
+        },
+    },
+    toggleFacet: {
+        id: 'toggleFacet',
+        title: 'Toggle',
+        restricted: true,
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'field', 'hidden'] }],
+            properties: {
+            title: { title: 'Label' },
+            field: { title: 'Field', widget: 'select_querystring_field' },
+            hidden: { title: 'Hide facet?', type: 'boolean', default: false },
             },
             required: [],
         },

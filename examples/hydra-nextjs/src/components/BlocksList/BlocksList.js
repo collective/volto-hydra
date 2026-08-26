@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import SlateBlock, { SlateInline } from "@/components/SlateBlock";
 import CodeExampleBlock from "@/components/CodeExampleBlock/CodeExampleBlock";
 import { expandTemplatesSync, expandListingBlocks, ploneFetchItems, staticBlocks, contentPath } from "#utils/helpers";
+import { isEditMode } from "#utils/hydra";
 import SwiperSlider from "@/components/SwiperSlider";
 import { pageFromPath } from "#utils/paging";
 
@@ -374,8 +375,13 @@ function ListingBlock({ id, block, data, apiUrl, contextPath }) {
   if (!items.length && !paging) return null;
   return (
     <>
-      {items.map((item) => (
-        <Block key={item["@uid"]} block={item} id={item["@uid"]} data={data} apiUrl={apiUrl} contextPath={contextPath} />
+      {/* Key by the item, not by the block. expandListingBlocks gives every
+          item the LISTING's uid — deliberately, so the bridge addresses them
+          all as that block — so @uid is the same string for all of them and
+          React duplicates or omits children. @id is the content each item is.
+          The uid still goes to `id`, which is what the bridge reads. */}
+      {items.map((item, index) => (
+        <Block key={item["@id"] ?? `${item["@uid"] ?? "item"}-${index}`} block={item} id={item["@uid"]} data={data} apiUrl={apiUrl} contextPath={contextPath} />
       ))}
       <Paging paging={paging} buildUrl={buildPagingUrl} onNavigate={handleNavigate} />
     </>
@@ -455,6 +461,14 @@ function AccordionBlock({ id, block, data, apiUrl, contextPath }) {
 // ─── Form Block (with state tracking, validation, submit) ────────────────────
 
 function FormBlock({ id, block, data, apiUrl, contextPath }) {
+  // Editing is a browser fact — isEditMode() reads window.name / ?_edit, and the
+  // server has neither — so this stays false through the first render and
+  // matches the HTML the server sent. Flipping it after mount is what adds the
+  // stand-ins, which is why a visitor's page never contains one at all.
+  const [showHiddenFields, setShowHiddenFields] = useState(false);
+  useEffect(() => {
+    setShowHiddenFields(isEditMode());
+  }, []);
   const expand = useExpand();
   const formFields = expand(block.subblocks || [], null, "field_id");
 
@@ -698,7 +712,17 @@ function FormBlock({ id, block, data, apiUrl, contextPath }) {
                 </div>
               )}
               {field.field_type === "hidden" && (
-                <input type="hidden" name={field.field_id} value={field.value || ""} />
+                <>
+                  <input type="hidden" name={field.field_id} value={field.value || ""} />
+                  {/* A hidden field has no visual form, so the block had no
+                      size and the author had nothing to click. Shown — marked
+                      as hidden — only while editing, so a visitor's page
+                      carries no trace of it. */}
+                  {showHiddenFields && <div className="hidden-field-standin">
+                    <span className="hidden-field-badge">Hidden</span>
+                    <span data-edit-text="label">{field.label}</span>
+                  </div>}
+                </>
               )}
             </div>
           ))}
@@ -1132,8 +1156,15 @@ function Block({ block, id, data, apiUrl, contextPath }) {
           <div className="teaser-content">
             {teaserTitle && (
               <a href={teaserHref} data-edit-link="href">
+                {/* head_title is a schema field like any other, so it needs the
+                    annotation that makes it editable. Rendering it bare put the
+                    author in the worst position: the kicker is right there on
+                    screen, visibly part of the teaser they are editing, and
+                    clicking it does nothing at all. */}
                 {block.head_title && (
-                  <div className="teaser-head-title">{block.head_title}</div>
+                  <div className="teaser-head-title" data-edit-text="head_title">
+                    {block.head_title}
+                  </div>
                 )}
                 <h2 className="teaser-title" data-edit-text="title">
                   {teaserTitle}
@@ -1272,6 +1303,40 @@ function Block({ block, id, data, apiUrl, contextPath }) {
       return <SearchBlock id={id} block={block} data={data} apiUrl={apiUrl} contextPath={contextPath} />;
 
     // ── Slate Table ──
+    case "objectBlocks": {
+      // Fields grouped under a widget:'object' (#245). The headline (slate) and
+      // href (link) live directly on block.content; the body is a blocks_layout
+      // region nested at content.blocks_layout.body over content.blocks. Field
+      // paths use the `content/...` object-descent form, so the annotations name
+      // the path hydra writes back to — not a flat field name.
+      const content = block.content || {};
+      const body = expand(content.blocks_layout?.body || [], content.blocks || {});
+      return (
+        <div data-block-uid={id} className="object-blocks-block">
+          {/* A div, not a heading: slate renders <p>, and a <p> inside an <h3>
+              is invalid — the browser relocates it, server and client disagree,
+              and React drops the subtree ("Expected server HTML to contain a
+              matching <p> in <div>"), taking the nested blocks with it. Vue
+              tolerates the same markup, which is why only this frontend broke. */}
+          {(content.headline || []).length > 0 && (
+            <div className="ob-headline" data-edit-text="content/headline">
+              <SlateNodes value={content.headline} />
+            </div>
+          )}
+          {content.href !== undefined && (
+            <a data-edit-link="content/href" href={content.href || "#"}>
+              Object link
+            </a>
+          )}
+          <div className="object-blocks-body">
+            {body.map((item) => (
+              <Block key={item["@uid"]} block={item} id={item["@uid"]} data={data} apiUrl={apiUrl} contextPath={contextPath} />
+            ))}
+          </div>
+        </div>
+      );
+    }
+
     case "slateTable": {
       const rows = expand(block.table?.rows || [], null, "key");
       return (

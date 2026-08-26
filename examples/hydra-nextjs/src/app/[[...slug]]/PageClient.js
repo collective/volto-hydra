@@ -8,33 +8,20 @@ import BlocksList from "@/components/BlocksList";
 // see e.g. highlight.description as a slate widget — without this the
 // bridge skips assigning data-node-id to slate field nodes.
 import docPageDefinitions from "../../../../../docs/examples/block-definitions.json";
-const docBlocksConfig = Object.fromEntries(
-  Object.values(docPageDefinitions).flatMap((page) => Object.entries(page.blocks)),
-);
-
-// socialLinks renders one <a data-block-uid> per entry in `links`, but the doc
-// bundle never declared the block, so buildBlockPathMap had no schema to descend
-// into: the links appeared on screen and were absent from the pathMap, i.e. they
-// could not be selected, edited, moved or navigated. Declared here (rather than
-// in block-definitions.json) because that file also drives the generated block
-// reference pages, and this is a gap in THIS example's config.
-docBlocksConfig.socialLinks = {
-  ...docBlocksConfig.socialLinks,
-  blockSchema: {
-    properties: {
-      links: {
-        title: 'Links',
-        widget: 'object_list',
-        idField: '@id',
-        schema: {
-          properties: {
-            url: { title: 'URL', widget: 'url' },
-          },
-        },
-      },
-    },
-  },
+import { sharedBlocksConfig } from "@test-fixtures/shared-block-schemas.js";
+const docBlocksConfig = {
+  ...Object.fromEntries(
+    Object.values(docPageDefinitions).flatMap((page) => Object.entries(page.blocks)),
+  ),
+  // One registry for every frontend. The doc bundle stays underneath because it
+  // is what generates the block reference pages, but the schemas a frontend
+  // publishes at INIT come from the shared file — the Nuxt example and the mock
+  // test frontend read the same one. Building a separate registry here is why
+  // title, description, leadimage, dateField and eventMetadata rendered as
+  // "Not implemented Block" in this example while working everywhere else.
+  ...sharedBlocksConfig,
 };
+
 
 export default function PageClient({ initialData, apiUrl }) {
   const [data, setData] = useState(initialData);
