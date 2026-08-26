@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { BridgeRPC } from './bridgeRpc.js';
 
 test('resolves a request when the matching response arrives', async () => {
@@ -27,4 +28,41 @@ test('ignores a response with an unknown requestId', () => {
   expect(() =>
     rpc.handleMessage({ type: 'BACKEND_RESPONSE', requestId: 'nope', ok: true }),
   ).not.toThrow();
+});
+
+test('rejects when no response arrives before the timeout', async () => {
+  jest.useFakeTimers();
+  const rpc = new BridgeRPC({ send: () => {} });
+  const promise = rpc.request('content.get', {}, { timeoutMs: 1000 });
+  const assertion = expect(promise).rejects.toMatchObject({
+    code: 'TIMEOUT',
+    intent: 'content.get',
+  });
+  jest.advanceTimersByTime(1001);
+  await assertion;
+  jest.useRealTimers();
+});
+
+test('clears the timer when a response arrives', async () => {
+  jest.useFakeTimers();
+  const sent = [];
+  const rpc = new BridgeRPC({ send: (m) => sent.push(m) });
+  const promise = rpc.request('content.get', {}, { timeoutMs: 1000 });
+  rpc.handleMessage({
+    type: 'BACKEND_RESPONSE',
+    requestId: sent[0].requestId,
+    ok: true,
+    result: 1,
+  });
+  await expect(promise).resolves.toBe(1);
+  expect(rpc.pending.size).toBe(0);
+  jest.advanceTimersByTime(5000); // must not throw an unhandled rejection
+  jest.useRealTimers();
+});
+
+test('asset.upload gets a longer default timeout than content.get', () => {
+  const rpc = new BridgeRPC({ send: () => {} });
+  expect(rpc.timeoutFor('asset.upload')).toBeGreaterThan(
+    rpc.timeoutFor('content.get'),
+  );
 });
