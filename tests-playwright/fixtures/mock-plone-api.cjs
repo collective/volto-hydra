@@ -2655,6 +2655,25 @@ app.post('*/@querystring-search', (req, res) => {
  */
 app.get('*/@search', (req, res) => {
   const searchPath = req.path.replace('/@search', '');
+
+  // UID lookup — the index behind resolveuid. Real Plone's catalog answers
+  // this and reflects unsaved-elsewhere edits made in the same session, so it
+  // must read through getContent (session first) rather than straight off
+  // disk, or a renamed document keeps reporting its old title.
+  if (req.query.UID) {
+    const uidPath = uidToPathMap[req.query.UID];
+    const found = uidPath
+      ? getContent(uidPath, getSessionId(req))
+      : null;
+    return res.json({
+      '@id': `http://localhost:${PORT}${searchPath}/@search`,
+      items: found
+        ? [formatSearchItem(found, `http://localhost:${PORT}`)]
+        : [],
+      items_total: found ? 1 : 0,
+    });
+  }
+
   const pathDepth = req.query['path.depth'];
   const pathQuery = req.query['path.query'];
   const searchableText = req.query['SearchableText'];

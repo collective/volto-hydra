@@ -16,5 +16,7 @@ export default defineConfig({
     hookTimeout: 60_000,
     // Targets bind fixed ports, so files must not race each other for them.
     fileParallelism: false,
+    // Boots WordPress once for the whole run; a no-op for the Plone target.
+    globalSetup: ['./tests-adapters/global-setup.ts'],
   },
 });

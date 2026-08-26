@@ -43,6 +43,14 @@ export type Intent =
   | 'asset.upload'
   | 'asset.imageUrl'
   | 'auth.whoami'
+  /**
+   * Turn a stable document id into something renderable, and back. Links
+   * between documents MUST be stored by id, never by path: a path changes when
+   * the target is renamed or moved and every link to it dies silently. Plone
+   * solved this with resolveuid; WordPress has no native equivalent, so its
+   * adapter has to supply one.
+   */
+  | 'reference.resolve'
   /** Lifecycle position, available transitions and effective permissions. */
   | 'state.get'
   | 'state.transition'
@@ -84,6 +92,19 @@ export interface SearchResult {
   items: Document[];
   total: number;
   batching?: { next?: string; prev?: string };
+}
+
+/**
+ * A stored pointer from one document to another.
+ *
+ * `id` is the contract; `path` and `url` are conveniences valid only at the
+ * moment of resolution and must never be persisted in their place.
+ */
+export interface Reference {
+  id: string;
+  path: string;
+  url: string;
+  title: string;
 }
 
 export interface Vocabulary {

@@ -22,14 +22,69 @@ it fail for real reasons, and work backwards.
 1. log in     blueprint seeds a logged-in WP cookie   → Flow A: no login UI at all
 2. create     toolbar Add → content.create           → the post exists in WP
 3. edit       drag a block, type into it             → content.update
-4. verify     reload                                 → blocks survive in post_content
-5. publish    state.transition draft → publish       → the combined panel
-6. confirm    fetch the public URL ANONYMOUSLY       → the block's text is on the page
+4. link       select text, open the object browser, pick another page
+                                                     → search / tree.list, then
+                                                       store the target's ID
+5. verify     reload                                 → blocks survive in post_content
+6. rename     rename the LINK TARGET                 → the link still resolves
+7. publish    state.transition draft → publish       → the combined panel
+8. confirm    ANONYMOUSLY: REST says status=publish, AND the FRONTEND renders
+                the text and a working link
 ```
 
-Step 6 is what makes it real. It leaves Hydra entirely and asks WordPress, as a
-reader with no session, whether the thing was actually published. None of the 44
-contract assertions can lie their way past that.
+Steps 4 and 6 are the first in the journey to involve a *relationship* between
+two documents, and relationships are where path-addressing breaks. A link
+stored as a path dies the moment an editor renames the target — silently, with
+no error anywhere, discovered by a reader hitting a 404.
+
+So links are stored by `Document.id`, which is the stable handle, and resolved
+through `reference.resolve` at render time. Each CMS supplies its own
+indirection:
+
+| CMS | Native mechanism |
+| --- | --- |
+| Plone | `resolveuid/<UID>` — the catalog resolves UID to the current path |
+| WordPress | none; the post id is stable but the permalink is not, so the adapter is the indirection |
+| Drupal | `entity:node/<uuid>` link URIs |
+
+Step 6 is what makes the link step real rather than decorative: rename the
+target, then assert the link still resolves. `reference.spec.ts` pins exactly
+this at the contract level and is green against Plone.
+
+Step 6 is what makes it real: it leaves Hydra entirely and asks, with no
+session, whether the thing was actually published. None of the 44 contract
+assertions can lie their way past that.
+
+**Do not assert on WordPress's own public page.** Verified against real
+WordPress 2026-08-26: `content.rendered` for a published page carrying our
+block comment is the empty string, because `wp:hydra-blocks/document` is not a
+registered block and WordPress renders nothing for it. That is by design — in a
+headless setup the reader-facing surface is the frontend, not WP's theme. So
+step 6 has two halves: anonymous REST proves the CMS state really changed, and
+an anonymous fetch of the FRONTEND proves a reader can see the content.
+
+## Verified against real WordPress (2026-08-26)
+
+Established by hand before writing any code, so the target is not built on
+assumptions:
+
+| Claim | Result |
+| --- | --- |
+| `@wp-playground/cli` boots real WP, no Docker | PHP 8.3, WP latest, ~40s, 6 workers |
+| Block comment survives a write/read round trip | **byte-for-byte identical** via `context=edit` |
+| Publish via REST | `POST {status:'publish'}` works |
+| Anonymous REST read of a published page | works, reports `status: publish` |
+| WP renders the unknown block on its own page | **no** — `content.rendered` is `''` |
+| Cookie auth alone is enough for REST | **no** — `users/me` returns nothing |
+| Nonce source | `GET /wp-admin/admin-ajax.php?action=rest-nonce` |
+
+Two operational notes that cost time to discover:
+
+- **No pretty permalinks.** Use `/?rest_route=/wp/v2/...`, not `/wp-json/...`,
+  which 302s.
+- **`--login` auto-logs-in every fresh session**, so a naive "anonymous" fetch
+  is not anonymous. Send `Cookie: playground_auto_login_already_happened=1`
+  with no auth cookies to stay genuinely logged out.
 
 **Why the journey and not only slices.** Six isolated specs localise failures
 well but never exercise ordering, and every defect found in M1/M2 was an

@@ -306,6 +306,28 @@ export class PloneAdapter extends BaseAdapter {
         };
       }
 
+      case 'reference.resolve': {
+        // Plone's own answer to this is resolveuid: store the UID, look up the
+        // current path at render time. The catalog is the index that makes it
+        // cheap.
+        const raw = await this.fetchJson(
+          `/@search?UID=${encodeURIComponent(args.id)}`,
+        );
+        const hit = (raw.items ?? [])[0];
+        if (!hit) {
+          throw new AdapterError(`No document with id ${args.id}`, {
+            code: 'NOT_FOUND',
+            status: 404,
+          });
+        }
+        return {
+          id: args.id,
+          path: this.toPath(hit['@id']),
+          url: hit['@id'],
+          title: hit.title,
+        };
+      }
+
       case 'search': {
         const params = new URLSearchParams();
         if (args.query) params.set('SearchableText', args.query);
