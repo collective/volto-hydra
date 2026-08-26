@@ -11,6 +11,7 @@ import { validateAndLog, validateTemplatePlaceholders } from '../../utils/formDa
 import { toast } from 'react-toastify';
 import { getIframeUrlCookieName } from '../../utils/cookieNames';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
+import { BridgeRPC } from '@volto-hydra/hydra-js/bridgeRpc';
 import {
   isSlateFieldType,
   formDataContentEqual,
@@ -842,6 +843,20 @@ const Iframe = (props) => {
   }, [selectedBlock]);
 
   const iframeOriginRef = useRef(null); // Store actual iframe origin from received messages
+  // Backend RPC client. The frontend's adapter answers these over the bridge;
+  // the admin holds no CMS credentials and makes no direct CMS request.
+  const rpcRef = useRef(null);
+  if (!rpcRef.current) {
+    rpcRef.current = new BridgeRPC({
+      send: (msg) =>
+        document
+          .getElementById('previewIframe')
+          ?.contentWindow?.postMessage(msg, iframeOriginRef.current),
+    });
+  }
+  // What the frontend's adapter told us it is and can do (ADAPTER_READY).
+  // Null until the handshake completes; UI affordances gate on it.
+  const [adapterInfo, setAdapterInfo] = useState(null);
   // Note: iframePath is stored in module-level persistedIframePath to survive component remounts
   const inlineEditCounterRef = useRef(0); // Count INLINE_EDIT_DATA messages from iframe
   const processedInlineEditCounterRef = useRef(0); // Count how many we've seen come back through Redux
@@ -2084,6 +2099,17 @@ const Iframe = (props) => {
     }
   }, [pendingDelete]);
 
+  // The Api shadow is constructed by Volto's start-client before any React
+  // tree exists, so there is no context or store for it to read. One window
+  // handle is the seam. Named ...Rpc because hydra-js already owns
+  // window.__hydraBridge (the Bridge instance) inside the iframe.
+  useEffect(() => {
+    window.__hydraBridgeRpc = rpcRef.current;
+    return () => {
+      delete window.__hydraBridgeRpc;
+    };
+  }, []);
+
   useEffect(() => {
     const initialUrlOrigin = iframeSrc && new URL(iframeSrc).origin;
     const messageHandler = (event) => {
@@ -2095,6 +2121,24 @@ const Iframe = (props) => {
         iframeOriginRef.current = event.origin;
       }
       const { type } = event.data;
+
+      // Backend RPC and the adapter handshake are handled before anything
+      // else: they carry no form data and must not fall through the
+      // edit-sequence bookkeeping below.
+      if (type === 'BACKEND_RESPONSE') {
+        rpcRef.current.handleMessage(event.data);
+        return;
+      }
+      if (type === 'ADAPTER_READY') {
+        setAdapterInfo({
+          name: event.data.name,
+          capabilities: event.data.capabilities,
+          protocolVersion: event.data.protocolVersion,
+          cmsBaseUrl: event.data.cmsBaseUrl,
+          user: event.data.user,
+        });
+        return;
+      }
 
       // Save pre-message sequence for echo detection (used by INLINE_EDIT_DATA).
       const preMessageSeq = editSequenceRef.current;
