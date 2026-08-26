@@ -327,12 +327,48 @@ know works.
 6. **Adapter / Hydra version skew.** Handled by the handshake, but the contract
    suite must pin a protocol version rather than tracking `main`.
 
+## 8a. Permissions and state are one model, and they are in scope
+
+**Amended 2026-08-26.** This spec originally deferred workflow and sharing.
+That was wrong, for a reason that only became obvious when the end-to-end
+journey was written down: *log in, create a page, edit it, publish it*. A
+deliverable that cannot publish is not the product, and a headline test that
+stops at "saved as draft" never proves content reaches a reader.
+
+`hydra-plan.md` already models this correctly and this spec simply adopts it.
+Plone presents workflow (a state machine) and sharing (per-content roles) as two
+UIs, but they answer one question — who can do what, when. Modelling them
+separately forces every adapter to invent the mapping twice, and most CMSes do
+not have two concepts to map:
+
+| CMS | `state` | `transitions` | `shareEntries` |
+| --- | --- | --- | --- |
+| Plone | `@workflow.state` | `@workflow.transitions` | from `@sharing` |
+| WordPress | `post.status` | draft ↔ publish ↔ private ↔ future | usually null |
+| Drupal | `moderation_state` | from configured workflow | null in core |
+
+So WordPress's entire publish story is one field, `status` — the expense was
+never WordPress, it was Plone's transition machinery and the generic UI.
+
+Canonical shape: `PermissionsAndState` in `packages/hydra-types`. Intents:
+`state.get`, `state.transition`, `permissions.update`. Capabilities: `state`,
+`per-content-permissions`, `hierarchical-permissions`.
+
+**One combined panel**, not two. The unification is in the data and the
+capability story; the panel may still visually separate "what state am I in and
+where can I go" from "who has access", so it stays familiar to Plone users. Each
+half hides when its capability is absent — and `capabilities.spec.ts` already
+makes a false claim a test failure rather than a UI that lies.
+
 ## 9. Out of scope
 
-Unchanged from `hydra-plan.md`: workflow/sharing/history UI, comments, relations,
-content rules, native Gutenberg block round-tripping, multilingual, cursor
-search, SSR for the editor route, autosave. Strapi and Wagtail adapters are
-deferred — the contract is designed to admit them, but nothing here builds them.
+Unchanged from `hydra-plan.md`: history diff, comments, relations, content
+rules, native Gutenberg block round-tripping, multilingual, cursor search, SSR
+for the editor route, autosave. Strapi and Wagtail adapters are deferred — the
+contract is designed to admit them, but nothing here builds them.
+
+**No longer out of scope:** workflow and sharing, now unified as
+Permissions & State — see §8a.
 
 ## 10. Workflow constraints
 

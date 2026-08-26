@@ -16,7 +16,12 @@ export type Capability =
   | 'vocabulary'
   | 'schema'
   | 'asset'
-  | 'workflow'
+  /** Has lifecycle states and transitions at all. */
+  | 'state'
+  /** Supports per-document principal grants (Plone yes, Strapi no). */
+  | 'per-content-permissions'
+  /** Supports inherit-from-parent / break-inheritance. Plone-only in practice. */
+  | 'hierarchical-permissions'
   | 'versioning'
   | 'sharing'
   | 'comments';
@@ -38,6 +43,10 @@ export type Intent =
   | 'asset.upload'
   | 'asset.imageUrl'
   | 'auth.whoami'
+  /** Lifecycle position, available transitions and effective permissions. */
+  | 'state.get'
+  | 'state.transition'
+  | 'permissions.update'
   | 'http';
 
 export interface Document {
@@ -80,6 +89,43 @@ export interface SearchResult {
 export interface Vocabulary {
   items: Array<{ token: string; title: string }>;
   total: number;
+}
+
+/**
+ * Workflow and sharing unified.
+ *
+ * Plone keeps them as separate UIs, but they answer one question: who can do
+ * what, when. Modelling them separately would force every adapter to invent a
+ * mapping twice, and most CMSes do not have two concepts to map. Each CMS
+ * lights up the parts it supports; capabilities gate the rest.
+ */
+export interface PermissionsAndState {
+  /** Lifecycle position. Always present. */
+  state: { name: string; label: string };
+  /**
+   * Transitions available to the current user right now. The Publish / Submit
+   * / Reject buttons render from this — there is no separate workflow concept.
+   */
+  transitions: Array<{ id: string; label: string; targetState: string }>;
+  /** What the current user may do. UI gates visible/enabled controls on this. */
+  effective: {
+    canEdit: boolean;
+    canPublish: boolean;
+    canDelete: boolean;
+    canShare: boolean;
+    canComment: boolean;
+  };
+  /**
+   * Per-document principal grants. Only adapters advertising
+   * `per-content-permissions` return this; others return null and the sharing
+   * half of the panel hides. `inherited` is always false unless the adapter
+   * also advertises `hierarchical-permissions`.
+   */
+  shareEntries?: Array<{
+    principal: { type: 'user' | 'group' | 'role'; id: string; label: string };
+    permissions: Array<'read' | 'edit' | 'publish' | 'delete'>;
+    inherited: boolean;
+  }> | null;
 }
 
 export interface AdapterContext {
