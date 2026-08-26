@@ -28,6 +28,7 @@ import {
   resolveFieldPath as resolveFieldPathHelper,
 } from '@volto-hydra/helpers';
 import { expelAllowedTypes, findOnlyEmptyChildUid } from './containerOps.js';
+import { BridgeRPC, BRIDGE_PROTOCOL_VERSION } from './bridgeRpc.js';
 import { acceptableAt } from './conversionMap.js';
 import { collectLinkableAnchors } from './linkableAnchors.js';
 
@@ -174,6 +175,22 @@ export class Bridge {
    */
   constructor(adminOrigin, options = {}) {
     this.adminOrigin = adminOrigin;
+    // Backend RPC rides the same postMessage channel but gets its own
+    // listener rather than a branch inside realTimeDataHandler: that handler
+    // runs hot during typing, and RPC traffic is rare, uncorrelated, and must
+    // not be affected by the edit-mode guards there.
+    this.rpc = new BridgeRPC({
+      send: (msg) => window.parent.postMessage(msg, this.adminOrigin),
+    });
+    if (typeof window !== 'undefined') {
+      this.rpcHandler = (event) => {
+        const type = event.data?.type;
+        if (type !== 'BACKEND_REQUEST' && type !== 'BACKEND_RESPONSE') return;
+        if (this.adminOrigin && event.origin !== this.adminOrigin) return;
+        this.rpc.handleMessage(event.data);
+      };
+      window.addEventListener('message', this.rpcHandler);
+    }
     if (options.debug) debugEnabled = true;
     this.token = null;
     this.navigationHandler = null; // Handler for navigation events
@@ -13217,6 +13234,55 @@ if (typeof window !== 'undefined' && window.self !== window.top) {
  * @param {Object} [options] - Options (if first param is adminOrigin)
  * @returns {Bridge} The bridge instance
  */
+/**
+ * Wire a frontend-supplied adapter into the bridge and tell the admin what it
+ * can do.
+ *
+ * The adapter runs on the frontend's origin with the frontend's credentials —
+ * the admin never sees them. ADAPTER_READY is what unlocks the editor chrome,
+ * so it is sent once the adapter's own init() has settled.
+ */
+function registerAdapter(bridge, options, adminOrigin) {
+  const cmsBaseUrl = options.cmsBaseUrl ?? window.location.origin;
+  const adapter = options.adapter;
+
+  bridge.rpc.serve(adapter);
+
+  const emit = (event, payload) =>
+    window.parent.postMessage(
+      {
+        type: event === 'auth-required' ? 'AUTH_REQUIRED' : 'AUTH_STATE',
+        ...payload,
+      },
+      adminOrigin,
+    );
+
+  return Promise.resolve(adapter.init({ cmsBaseUrl, emit }))
+    .then(() => adapter.whoami())
+    .then((user) => {
+      window.parent.postMessage(
+        {
+          type: 'ADAPTER_READY',
+          name: adapter.name,
+          capabilities: adapter.capabilities,
+          cmsBaseUrl,
+          protocolVersion: BRIDGE_PROTOCOL_VERSION,
+          user,
+        },
+        adminOrigin,
+      );
+    })
+    .catch((err) => {
+      // A failed handshake must surface as an auth challenge, not a blank
+      // editor: the admin has no other signal that the adapter never came up.
+      log('Adapter registration failed:', err);
+      emit('auth-required', {
+        reason: 'adapter-init-failed',
+        message: err?.message,
+      });
+    });
+}
+
 export function initBridge(adminOriginOrOptions, options = {}) {
   let adminOrigin;
 
@@ -13257,6 +13323,9 @@ export function initBridge(adminOriginOrOptions, options = {}) {
     // Store on window to survive module hot-reload
     if (typeof window !== 'undefined') {
       window.__hydraBridge = bridgeInstance;
+    }
+    if (options.adapter) {
+      registerAdapter(bridgeInstance, options, adminOrigin);
     }
   } else {
     // Bridge already exists - check if URL changed (e.g., after SPA navigation + remount)
