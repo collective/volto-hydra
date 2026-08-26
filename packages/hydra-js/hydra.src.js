@@ -13260,17 +13260,15 @@ function registerAdapter(bridge, options, adminOrigin) {
   return Promise.resolve(adapter.init({ cmsBaseUrl, emit }))
     .then(() => adapter.whoami())
     .then((user) => {
-      window.parent.postMessage(
-        {
-          type: 'ADAPTER_READY',
-          name: adapter.name,
-          capabilities: adapter.capabilities,
-          cmsBaseUrl,
-          protocolVersion: BRIDGE_PROTOCOL_VERSION,
-          user,
-        },
-        adminOrigin,
-      );
+      bridge.adapterReadyMessage = {
+        type: 'ADAPTER_READY',
+        name: adapter.name,
+        capabilities: adapter.capabilities,
+        cmsBaseUrl,
+        protocolVersion: BRIDGE_PROTOCOL_VERSION,
+        user,
+      };
+      window.parent.postMessage(bridge.adapterReadyMessage, adminOrigin);
     })
     .catch((err) => {
       // A failed handshake must surface as an auth challenge, not a blank
@@ -13329,6 +13327,19 @@ export function initBridge(adminOriginOrOptions, options = {}) {
     }
   } else {
     // Bridge already exists - check if URL changed (e.g., after SPA navigation + remount)
+    //
+    // The admin re-gates its RPC client on PATH_CHANGE because a new document
+    // usually means a new adapter. On an SPA navigation the adapter is still
+    // very much alive, so replay the announcement instead of re-running init()
+    // and whoami() — otherwise the admin holds every request forever.
+    if (options.adapter && bridgeInstance.adapterReadyMessage) {
+      window.parent.postMessage(
+        bridgeInstance.adapterReadyMessage,
+        bridgeInstance.adminOrigin,
+      );
+    } else if (options.adapter) {
+      registerAdapter(bridgeInstance, options, bridgeInstance.adminOrigin);
+    }
     const currentPath = window.location.pathname;
     // Update pathToApiPath if provided in new options
     if (options.pathToApiPath) {

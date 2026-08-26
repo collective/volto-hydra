@@ -22,10 +22,36 @@ export class BridgeRPC {
    * @param {Object} opts
    * @param {(msg: object) => void} opts.send - transport (postMessage wrapper)
    */
-  constructor({ send }) {
+  /**
+   * @param {Object} opts
+   * @param {(msg: object) => void} opts.send - transport (postMessage wrapper)
+   * @param {boolean} [opts.gated] - hold requests until an adapter is serving.
+   *   The admin side sets this: the inversion makes it depend on the iframe to
+   *   fetch the very content the iframe needs in order to render, so a request
+   *   sent while the iframe is between documents is dropped on the floor and
+   *   the editor deadlocks until the request times out. The iframe side is
+   *   ungated — it only ever answers.
+   */
+  constructor({ send, gated = false }) {
     this.send = send;
     this.pending = new Map();
     this.nextId = 0;
+    this.gated = gated;
+    this.ready = !gated;
+    this.queue = [];
+  }
+
+  /** An adapter has announced itself; release anything held. */
+  markReady() {
+    this.ready = true;
+    const queued = this.queue;
+    this.queue = [];
+    for (const dispatch of queued) dispatch();
+  }
+
+  /** The iframe is navigating; whatever was serving us is gone. */
+  markNotReady() {
+    if (this.gated) this.ready = false;
   }
 
   timeoutFor(intent) {
@@ -35,26 +61,35 @@ export class BridgeRPC {
   request(intent, args, { timeoutMs } = {}) {
     const requestId = `rpc-${++this.nextId}`;
     const ms = timeoutMs ?? this.timeoutFor(intent);
-    const promise = new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(requestId);
-        const err = new Error(
-          `Bridge request '${intent}' timed out after ${ms}ms`,
-        );
-        err.code = 'TIMEOUT';
-        err.intent = intent;
-        reject(err);
-      }, ms);
-      this.pending.set(requestId, { resolve, reject, timer });
+
+    return new Promise((resolve, reject) => {
+      // The timeout clock starts when the request actually goes out, not when
+      // it is created: time spent waiting for the iframe is not the CMS being
+      // slow, and charging it to the request's budget would fail calls that
+      // were never given a chance to run.
+      const dispatch = () => {
+        const timer = setTimeout(() => {
+          this.pending.delete(requestId);
+          const err = new Error(
+            `Bridge request '${intent}' timed out after ${ms}ms`,
+          );
+          err.code = 'TIMEOUT';
+          err.intent = intent;
+          reject(err);
+        }, ms);
+        this.pending.set(requestId, { resolve, reject, timer });
+        this.send({
+          type: 'BACKEND_REQUEST',
+          requestId,
+          intent,
+          args,
+          meta: { timeoutMs: ms },
+        });
+      };
+
+      if (this.ready) dispatch();
+      else this.queue.push(dispatch);
     });
-    this.send({
-      type: 'BACKEND_REQUEST',
-      requestId,
-      intent,
-      args,
-      meta: { timeoutMs: ms },
-    });
-    return promise;
   }
 
   /** Register the adapter this side answers BACKEND_REQUEST with. */

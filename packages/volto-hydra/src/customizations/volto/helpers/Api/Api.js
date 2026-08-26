@@ -63,25 +63,29 @@ class Api {
   constructor(req) {
     // HYDRA: inside a Hydra bridge session every CMS call is answered by the
     // frontend's adapter, so the admin holds no credentials and issues no
-    // direct request. Three conditions must ALL hold:
+    // direct request.
     //
-    //   1. the feature is switched on
-    //   2. we are on the client — SSR constructs `new Api(req)` with a request
-    //      object, the client constructs `new Api()` without one, and there is
-    //      no iframe at render time anyway
-    //   3. the iframe view has mounted and published its RPC client
-    //
-    // Any of them failing falls through to the stock superagent path below, so
-    // a half-configured or pre-handshake state degrades to today's behaviour
-    // rather than breaking.
-    if (
-      config.settings.useBridgeBackend &&
-      !req &&
-      typeof window !== 'undefined' &&
-      window.__hydraBridgeRpc
-    ) {
-      return new BridgeApi(window.__hydraBridgeRpc);
-    }
+    // The choice is made PER CALL, not here in the constructor. Volto builds
+    // exactly one Api in start-client at boot and the store middleware closes
+    // over it for the life of the app, whereas the iframe view publishes its
+    // RPC client only when it mounts. A constructor-time check would therefore
+    // always run before the bridge exists and silently fall through to
+    // superagent forever — the failure mode is invisible, because everything
+    // still works, just not over the bridge.
+    const bridgeApis = new WeakMap();
+    const bridgeFor = () => {
+      if (
+        !config.settings.useBridgeBackend ||
+        req || // SSR: no iframe exists at render time
+        typeof window === 'undefined' ||
+        !window.__hydraBridgeRpc
+      ) {
+        return null;
+      }
+      const rpc = window.__hydraBridgeRpc;
+      if (!bridgeApis.has(rpc)) bridgeApis.set(rpc, new BridgeApi(rpc));
+      return bridgeApis.get(rpc);
+    };
 
     const cookies = new Cookies();
 
@@ -97,6 +101,12 @@ class Api {
           attach = [],
         } = {},
       ) => {
+        // HYDRA: bridge if one is live right now, stock superagent otherwise.
+        const bridge = bridgeFor();
+        if (bridge) {
+          return bridge[method](path, { params, data, type, headers, attach });
+        }
+
         let request;
         let promise = new Promise((resolve, reject) => {
           request = superagent[method](formatUrl(path));

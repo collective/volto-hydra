@@ -159,3 +159,88 @@ test('replies NO_ADAPTER when nothing is registered', async () => {
   });
   expect(sent[0].error.code).toBe('NO_ADAPTER');
 });
+
+describe('readiness gate', () => {
+  test('holds requests until an adapter is serving', async () => {
+    const sent = [];
+    const rpc = new BridgeRPC({ send: (m) => sent.push(m), gated: true });
+
+    const promise = rpc.request('content.get', { path: '/a' });
+
+    // Nothing may go out yet: the iframe that would answer it has not
+    // announced an adapter, so the message would be dropped on the floor.
+    expect(sent).toHaveLength(0);
+
+    rpc.markReady();
+    expect(sent).toHaveLength(1);
+    expect(sent[0].intent).toBe('content.get');
+
+    rpc.handleMessage({
+      type: 'BACKEND_RESPONSE',
+      requestId: sent[0].requestId,
+      ok: true,
+      result: 'ok',
+    });
+    await expect(promise).resolves.toBe('ok');
+  });
+
+  test('re-gates when the iframe navigates away', async () => {
+    const sent = [];
+    const rpc = new BridgeRPC({ send: (m) => sent.push(m), gated: true });
+    rpc.markReady();
+
+    // Held so an eventual timeout has a handler and cannot crash the runner.
+    const a = rpc.request('content.get', { path: '/a' }).catch(() => {});
+    expect(sent).toHaveLength(1);
+
+    // A full iframe page load tears down the adapter that was serving us.
+    rpc.markNotReady();
+    const b = rpc.request('content.get', { path: '/b' }).catch(() => {});
+    expect(sent).toHaveLength(1);
+
+    rpc.markReady();
+    expect(sent).toHaveLength(2);
+    expect(sent[1].args).toEqual({ path: '/b' });
+
+    // Settle both so no timer outlives the test.
+    for (const msg of sent) {
+      rpc.handleMessage({
+        type: 'BACKEND_RESPONSE',
+        requestId: msg.requestId,
+        ok: true,
+        result: null,
+      });
+    }
+    await Promise.all([a, b]);
+  });
+
+  test('does not start the timeout clock while a request is queued', async () => {
+    jest.useFakeTimers();
+    const sent = [];
+    const rpc = new BridgeRPC({ send: (m) => sent.push(m), gated: true });
+
+    const promise = rpc.request('content.get', {}, { timeoutMs: 1000 });
+    const settled = promise.catch((err) => err);
+    // Waiting for the iframe must not consume the request's own budget.
+    jest.advanceTimersByTime(5000);
+    expect(sent).toHaveLength(0);
+    void settled;
+
+    rpc.markReady();
+    rpc.handleMessage({
+      type: 'BACKEND_RESPONSE',
+      requestId: sent[0].requestId,
+      ok: true,
+      result: 1,
+    });
+    await expect(promise).resolves.toBe(1);
+    jest.useRealTimers();
+  });
+
+  test('ungated by default, so the iframe side is unaffected', () => {
+    const sent = [];
+    const rpc = new BridgeRPC({ send: (m) => sent.push(m) });
+    rpc.request('content.get', {});
+    expect(sent).toHaveLength(1);
+  });
+});

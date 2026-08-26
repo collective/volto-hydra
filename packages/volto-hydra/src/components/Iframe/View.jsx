@@ -848,6 +848,11 @@ const Iframe = (props) => {
   const rpcRef = useRef(null);
   if (!rpcRef.current) {
     rpcRef.current = new BridgeRPC({
+      // Gated: the admin now depends on the iframe's adapter to fetch the very
+      // content the iframe needs in order to render. A request sent while the
+      // iframe is between documents has nobody to answer it, and the editor
+      // sits blank until that request times out.
+      gated: true,
       send: (msg) =>
         document
           .getElementById('previewIframe')
@@ -2130,6 +2135,7 @@ const Iframe = (props) => {
         return;
       }
       if (type === 'ADAPTER_READY') {
+        rpcRef.current.markReady();
         setAdapterInfo({
           name: event.data.name,
           capabilities: event.data.capabilities,
@@ -2156,6 +2162,9 @@ const Iframe = (props) => {
 
       switch (type) {
         case 'PATH_CHANGE': { // PATH change from the iframe (SPA navigation)
+          // A new document means a new adapter registration is coming; hold
+          // requests until it announces itself.
+          rpcRef.current.markNotReady();
           // Check if this is in-page navigation (e.g., paging) - just resend form data
           if (event.data.inPage) {
             log('PATH_CHANGE: in-page navigation (paging), resending form data');
