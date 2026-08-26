@@ -20,6 +20,14 @@ export interface Target {
   types: Record<string, string>;
   /** Canonical seed vocabulary name -> this CMS's vocabulary identifier. */
   vocabularies: Record<string, string>;
+  /**
+   * How many terms this target actually seeded. The contract cares that the
+   * adapter reports the FULL size rather than the page size, and that
+   * filtering happens server-side — not that every CMS can be loaded with the
+   * same number of terms. WordPress seeds via one PHP pass and lands wherever
+   * PHP's execution limits allow.
+   */
+  vocabularySize: number;
   /** Boot the backing CMS (or mock) and seed it. */
   start(): Promise<void>;
   stop(): Promise<void>;

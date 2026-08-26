@@ -29,9 +29,14 @@ describe('asset.upload', () => {
       data: PNG_1X1,
     });
 
+    // Deliberately NOT asserting the asset lands under parentPath: Plone
+    // stores an Image as content in the tree, WordPress puts every attachment
+    // in one flat media library with no parent. What the contract fixes is
+    // that an upload yields an addressable, correctly typed document.
     expect(doc.type).toBe(target.types.image);
-    expect(doc.path.startsWith('/news/')).toBe(true);
     expect(typeof doc.id).toBe('string');
+    expect(doc.id.length).toBeGreaterThan(0);
+    expect(doc.path.startsWith('/')).toBe(true);
   });
 });
 

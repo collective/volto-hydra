@@ -80,9 +80,13 @@ export function parseBlocks(content) {
   }
   const json = content.slice(start + `<!-- ${BLOCK_MARKER} `.length, end).trim();
   const parsed = JSON.parse(json);
+  // PHP's json_encode cannot tell an empty map from an empty list, so a
+  // document whose blocks were emptied comes back as [] rather than {}.
+  // Everything downstream indexes blocks by id, so coerce it back.
+  const asMap = (v) => (Array.isArray(v) && v.length === 0 ? {} : v);
   const legacy = (content.slice(0, start) + content.slice(end + 4)).trim();
   return {
-    blocks: parsed.blocks ?? {},
+    blocks: asMap(parsed.blocks) ?? {},
     blocksLayout: parsed.blocksLayout ?? { items: [] },
     legacy,
   };
@@ -95,6 +99,9 @@ export class WordPressAdapter extends BaseAdapter {
       capabilities: [
         'content',
         'search-fulltext',
+        // WordPress filters by parent, type and status server-side; tree.list
+        // relies on it, so claiming otherwise would be false advertising.
+        'search-filter',
         'vocabulary',
         'schema',
         'asset',
@@ -173,6 +180,9 @@ export class WordPressAdapter extends BaseAdapter {
         status: res.status,
       });
     }
+    // X-WP-Total carries the unpaginated count; without it a caller cannot
+    // tell "25 results" from "25 of 10000".
+    this.lastTotal = Number(res.headers.get('X-WP-Total') ?? '0');
     const text = await res.text();
     return text.length === 0 ? null : JSON.parse(text);
   }
@@ -374,6 +384,171 @@ export class WordPressAdapter extends BaseAdapter {
           email: me.email,
           roles: me.roles ?? [],
         };
+      }
+
+      case 'search': {
+        const posts = await this.fetchJson(`/wp/v2/${this.postType}`, {
+          params: {
+            search: args.query ?? '',
+            status: 'any',
+            context: 'edit',
+            per_page: String(args.limit ?? 25),
+          },
+        });
+        const total = this.lastTotal;
+        const items = [];
+        for (const post of posts) {
+          items.push(
+            this.toDocument(post, this.pathFor(post, await this.ancestryOf(post))),
+          );
+        }
+        return { items, total };
+      }
+
+      case 'tree.list': {
+        const parentId =
+          args.parent === '/' ? 0 : await this.resolvePath(args.parent);
+        const posts = await this.fetchJson(`/wp/v2/${this.postType}`, {
+          params: {
+            parent: String(parentId),
+            status: 'any',
+            context: 'edit',
+            per_page: '100',
+          },
+        });
+        const parentSegments =
+          args.parent === '/' ? [] : args.parent.split('/').filter(Boolean);
+        return {
+          items: posts.map((p) => this.toDocument(p, this.pathFor(p, parentSegments))),
+          total: this.lastTotal,
+        };
+      }
+
+      case 'breadcrumbs.get': {
+        const id = await this.resolvePath(args.path);
+        const post = await this.fetchJson(`/wp/v2/${this.postType}/${id}`, {
+          params: { context: 'edit' },
+        });
+        const ancestry = await this.ancestryOf(post);
+        // Canonical breadcrumbs are the ancestors below the root, root-first,
+        // including the document itself — matching the Plone adapter.
+        const items = [];
+        for (let i = 0; i < ancestry.length; i++) {
+          const path = `/${ancestry.slice(0, i + 1).join('/')}`;
+          const ancestorId = await this.resolvePath(path);
+          const ancestor = await this.fetchJson(
+            `/wp/v2/${this.postType}/${ancestorId}`,
+            { params: { context: 'edit' } },
+          );
+          items.push(this.toDocument(ancestor, path));
+        }
+        items.push(this.toDocument(post, args.path));
+        return { items };
+      }
+
+      case 'navigation.get': {
+        const posts = await this.fetchJson(`/wp/v2/${this.postType}`, {
+          params: { parent: '0', status: 'any', context: 'edit', per_page: '100' },
+        });
+        return {
+          items: posts.map((p) => this.toDocument(p, `/${p.slug}`)),
+        };
+      }
+
+      case 'vocabulary.get': {
+        const params = {
+          per_page: String(args.limit ?? 25),
+          // WordPress filters terms server-side; pulling 10k back to filter
+          // here would make type-ahead unusable.
+          ...(args.title ? { search: args.title } : {}),
+        };
+        const terms = await this.fetchJson(
+          `/wp/v2/${encodeURIComponent(args.name)}`,
+          { params },
+        );
+        return {
+          items: terms.map((t) => ({ token: t.slug, title: t.name })),
+          total: this.lastTotal,
+        };
+      }
+
+      case 'types.getSchema': {
+        // The type endpoint describes the post type, not its fields; the field
+        // schema comes from an OPTIONS request on the collection.
+        const type = await this.fetchJson(`/wp/v2/types/${args.type}`);
+        const res = await fetch(this.url(`/wp/v2/${type.rest_base}`), {
+          method: 'OPTIONS',
+          credentials: 'include',
+          headers: this.nonce ? { 'X-WP-Nonce': this.nonce } : {},
+        });
+        const described = await res.json();
+        const properties = described.schema?.properties ?? {};
+        return {
+          properties,
+          fieldsets: [
+            { id: 'default', title: 'Default', fields: Object.keys(properties) },
+          ],
+          required: Object.entries(properties)
+            .filter(([, v]) => v.required === true)
+            .map(([k]) => k),
+        };
+      }
+
+      case 'asset.upload': {
+        const binary = Uint8Array.from(atob(args.data), (c) => c.charCodeAt(0));
+        const res = await fetch(this.url('/wp/v2/media'), {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            ...(this.nonce ? { 'X-WP-Nonce': this.nonce } : {}),
+            'Content-Type': args.contentType,
+            'Content-Disposition': `attachment; filename="${args.filename}"`,
+          },
+          body: binary,
+        });
+        if (!res.ok) {
+          throw new AdapterError(`Upload failed: ${res.status}`, {
+            code: 'UPLOAD_FAILED',
+            status: res.status,
+          });
+        }
+        const media = await res.json();
+        return {
+          id: String(media.id),
+          path: `/${media.slug}`,
+          type: media.type,
+          title: media.title?.rendered ?? args.filename,
+          blocks: {},
+          blocksLayout: { items: [] },
+          fields: { link: media.source_url },
+          state: 'published',
+          _adapter: { raw: media },
+        };
+      }
+
+      case 'asset.imageUrl': {
+        // Callers address assets by path, like any other document. WordPress
+        // media is flat, so the path is just the attachment slug.
+        const slug = (args.path ?? '').replace(/^\//, '');
+        const matches = await this.fetchJson('/wp/v2/media', {
+          params: { slug, context: 'edit' },
+        });
+        const media = matches?.[0];
+        if (!media) {
+          throw new AdapterError(`No media at ${args.path}`, {
+            code: 'NOT_FOUND',
+            status: 404,
+          });
+        }
+        const sizes = media.media_details?.sizes ?? {};
+        const size = sizes[args.scale] ?? sizes.full;
+        if (!size) {
+          throw new AdapterError(
+            `No scale '${args.scale}' on media ${media.id}`,
+            { code: 'NOT_FOUND', status: 404 },
+          );
+        }
+        return size.source_url;
       }
 
       case 'reference.resolve': {

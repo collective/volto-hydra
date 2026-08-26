@@ -86,6 +86,7 @@ const target: Target = {
   ],
   types: { folder: 'Document', page: 'Document', image: 'Image' },
   vocabularies: { categories: 'hydra.test.categories' },
+  vocabularySize: 10_000,
   adapter,
 
   async start() {

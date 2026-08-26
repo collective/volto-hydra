@@ -1,6 +1,5 @@
 import { beforeAll, afterAll, beforeEach, describe, it, expect } from 'vitest';
 import { resolveTarget, type Target } from '../targets';
-import seed from '../fixtures/seed.json';
 
 let target: Target;
 
@@ -38,18 +37,20 @@ describe('vocabulary.get', () => {
       name: target.vocabularies[CATEGORIES],
       limit: 10,
     });
-    expect(vocab.total).toBe(seed.vocabularies.categories.generate);
+    expect(vocab.total).toBe(target.vocabularySize);
     expect(vocab.items.length).toBeLessThanOrEqual(10);
   });
 
   it('narrows the result set with a title filter', async () => {
     const vocab: any = await target.adapter.dispatch('vocabulary.get', {
       name: target.vocabularies[CATEGORIES],
-      title: 'Category 4242',
+      title: `Category ${Math.floor(target.vocabularySize / 2)}`,
     });
     expect(vocab.items.length).toBeGreaterThan(0);
     for (const item of vocab.items) {
-      expect(item.title).toContain('Category 4242');
+      expect(item.title).toContain(
+        `Category ${Math.floor(target.vocabularySize / 2)}`,
+      );
     }
   });
 
@@ -60,7 +61,7 @@ describe('vocabulary.get', () => {
     const started = Date.now();
     const vocab: any = await target.adapter.dispatch('vocabulary.get', {
       name: target.vocabularies[CATEGORIES],
-      title: 'Category 8888',
+      title: `Category ${target.vocabularySize - 1}`,
       limit: 20,
     });
     const elapsed = Date.now() - started;

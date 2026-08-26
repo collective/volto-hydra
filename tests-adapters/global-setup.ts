@@ -36,7 +36,18 @@ export async function setup(): Promise<void> {
 
   wp = spawn(
     'pnpm',
-    ['dlx', '@wp-playground/cli@latest', 'server', '--port', String(PORT), '--login'],
+    [
+      'dlx',
+      '@wp-playground/cli@latest',
+      'server',
+      '--port',
+      String(PORT),
+      '--login',
+      // Bulk-seeds the vocabulary in one PHP pass; 10k REST posts would
+      // dominate the run time.
+      '--blueprint',
+      'tests-adapters/fixtures/wp-blueprint.json',
+    ],
     { stdio: 'pipe' },
   );
   wp.stderr?.on('data', (d) => process.stderr.write(`[wp] ${d}`));

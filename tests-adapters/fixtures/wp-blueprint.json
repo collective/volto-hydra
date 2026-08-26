@@ -1,0 +1,11 @@
+{
+  "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+  "landingPage": "/",
+  "login": true,
+  "steps": [
+    {
+      "step": "runPHP",
+      "code": "<?php\nrequire_once '/wordpress/wp-load.php';\n// Bulk-create the seed vocabulary in ONE request. Creating 10000\n// terms over the REST API would be 10000 round trips; the contract's\n// type-ahead latency assertion needs a vocabulary big enough that\n// fetch-everything-and-filter-in-memory is visibly wrong.\nfor ($i = 0; $i < 10000; $i++) {\n  wp_insert_term('Category ' . $i, 'category', array('slug' => 'cat-' . $i));\n}\necho 'seeded';\n"
+    }
+  ]
+}

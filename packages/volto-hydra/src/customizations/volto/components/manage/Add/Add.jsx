@@ -274,249 +274,271 @@ class Add extends Component {
    * @returns {string} Markup for the component.
    */
   render() {
-    if (this.props.schemaRequest.loaded) {
-      // HYDRA: force the flat (non-visual) Add form. Hydra owns block editing
-      // through the bridge/iframe; Volto's in-page visual mode would compete
-      // for control of selection and rendering.
-      const visual = false;
-      const blocksFieldname = getBlocksFieldname(this.props.schema.properties);
-      const blocksLayoutFieldname = getBlocksLayoutFieldname(
-        this.props.schema.properties,
-      );
-      const translationObject = this.props.location?.state?.translationObject;
-      const translateTo = translationObject
-        ? langmap?.[this.props.location?.state?.language]?.nativeName ||
-          this.props.location?.state?.language
-        : null;
+    // HYDRA: render the form shell — and therefore the iframe inside it —
+    // WITHOUT waiting for the schema.
+    //
+    // With the backend inversion on, getSchema travels over the bridge to the
+    // frontend's adapter, and that adapter lives in the iframe that Form
+    // renders. Gating this render on schemaRequest.loaded therefore deadlocks:
+    // the schema request waits for an adapter that only exists inside the
+    // component the schema request is blocking. Volto's stock Add returns
+    // <div /> here, which is exactly the empty <main> that symptom presents as.
+    //
+    // An empty schema renders an empty field set for one paint; the fields
+    // appear as soon as the request it just unblocked comes back.
+    const schema = this.props.schemaRequest.loaded
+      ? this.props.schema
+      : { properties: {}, fieldsets: [], required: [], title: this.props.type };
 
-      // Get initial blocks from local config, if any
-      let initialBlocks, initialBlocksLayout;
-      const initialContentTypeBlocks =
-        config.blocks?.initialBlocks[this.props.type];
-      if (initialContentTypeBlocks) {
-        if (typeof initialContentTypeBlocks?.[0] === 'string') {
-          // Simple (legacy) default blocks definition
-          [initialBlocks, initialBlocksLayout] = getSimpleDefaultBlocks(
-            initialContentTypeBlocks,
-          );
-        } else {
-          [initialBlocks, initialBlocksLayout] = getDefaultBlocks(
-            initialContentTypeBlocks,
-          );
-        }
-      }
+    // HYDRA: use the visual branch, which in THIS fork means Hydra's iframe.
+    //
+    // This was `false`, guarding against Volto's in-page block editor competing
+    // with the bridge for selection and rendering. That guard is stale:
+    // Hydra's customized Form replaced BlocksForm in the visual branch with
+    // <Iframe> (see Form.jsx, "BlocksForm removed - Hydra uses Iframe for
+    // block editing"), so `visual` now selects Hydra's own editor, not Volto's.
+    //
+    // Keeping it false meant the Add route rendered NO iframe at all — and so
+    // hosted no adapter. Harmless while the admin fetched directly; a hard
+    // deadlock once getSchema travels over the bridge to an adapter that only
+    // exists inside an iframe this route never rendered.
+    const visual = true;
+    const blocksFieldname = getBlocksFieldname(schema.properties);
+    const blocksLayoutFieldname = getBlocksLayoutFieldname(
+      schema.properties,
+    );
+    const translationObject = this.props.location?.state?.translationObject;
+    const translateTo = translationObject
+      ? langmap?.[this.props.location?.state?.language]?.nativeName ||
+        this.props.location?.state?.language
+      : null;
 
-      // Lookup initialBlocks and initialBlocksLayout within schema, if any
-      const schemaBlocks =
-        this.props.schema.properties[blocksFieldname]?.default;
-      const schemaBlocksLayout =
-        this.props.schema.properties[blocksLayoutFieldname]?.default?.items;
-
-      if (!isEmpty(schemaBlocksLayout) && !isEmpty(schemaBlocks)) {
-        initialBlocks = {};
-        initialBlocksLayout = [];
-        schemaBlocksLayout.forEach((value) => {
-          if (!isEmpty(schemaBlocks[value])) {
-            let newUid = uuid();
-            initialBlocksLayout.push(newUid);
-            initialBlocks[newUid] = schemaBlocks[value];
-            initialBlocks[newUid].block = newUid;
-
-            // Layout ID - keep a reference to the original block id within layout
-            initialBlocks[newUid]['@layout'] = value;
-          }
-        });
-      }
-
-      //copy blocks from translationObject
-      if (translationObject && blocksFieldname && blocksLayoutFieldname) {
-        initialBlocks = {};
-        initialBlocksLayout = [];
-        const originalBlocks = JSON.parse(
-          JSON.stringify(translationObject[blocksFieldname]),
+    // Get initial blocks from local config, if any
+    let initialBlocks, initialBlocksLayout;
+    const initialContentTypeBlocks =
+      config.blocks?.initialBlocks[this.props.type];
+    if (initialContentTypeBlocks) {
+      if (typeof initialContentTypeBlocks?.[0] === 'string') {
+        // Simple (legacy) default blocks definition
+        [initialBlocks, initialBlocksLayout] = getSimpleDefaultBlocks(
+          initialContentTypeBlocks,
         );
-        const originalBlocksLayout =
-          translationObject[blocksLayoutFieldname].items;
-
-        originalBlocksLayout.forEach((value) => {
-          if (!isEmpty(originalBlocks[value])) {
-            let newUid = uuid();
-            initialBlocksLayout.push(newUid);
-            initialBlocks[newUid] = originalBlocks[value];
-            initialBlocks[newUid].block = newUid;
-
-            // Layout ID - keep a reference to the original block id within layout
-            initialBlocks[newUid]['@canonical'] = value;
-          }
-        });
+      } else {
+        [initialBlocks, initialBlocksLayout] = getDefaultBlocks(
+          initialContentTypeBlocks,
+        );
       }
-
-      const lifData = () => {
-        const data = {};
-        if (translationObject) {
-          getLanguageIndependentFields(this.props.schema).forEach(
-            (lif) => (data[lif] = translationObject[lif]),
-          );
-        }
-        return data;
-      };
-
-      const pageAdd = (
-        <div id="page-add">
-          <Helmet
-            title={this.props.intl.formatMessage(messages.add, {
-              type: this.props?.schema?.title || this.props.type,
-            })}
-          />
-          <Form
-            ref={this.form}
-            key="translated-or-new-content-form"
-            navRoot={
-              this.props.content?.['@components']?.navroot?.navroot || {}
-            }
-            schema={this.props.schema}
-            type={this.props.type}
-            formData={
-              this.props.location?.state?.initialFormData || {
-                ...(blocksFieldname && {
-                  [blocksFieldname]:
-                    initialBlocks ||
-                    this.props.schema.properties[blocksFieldname]?.default,
-                }),
-                ...(blocksLayoutFieldname && {
-                  [blocksLayoutFieldname]: {
-                    items:
-                      initialBlocksLayout ||
-                      this.props.schema.properties[blocksLayoutFieldname]
-                        ?.default?.items,
-                  },
-                }),
-                // Copy the Language Independent Fields values from the to-be translated content
-                // into the default values of the translated content Add form.
-                ...lifData(),
-                parent: {
-                  '@id': this.props.content?.['@id'] || '',
-                },
-              }
-            }
-            requestError={this.state.error}
-            onSubmit={this.onSubmit}
-            hideActions
-            pathname={this.props.pathname}
-            visual={visual}
-            title={
-              this.props?.schema?.title
-                ? this.props.intl.formatMessage(messages.add, {
-                    type: this.props.schema.title,
-                  })
-                : null
-            }
-            loading={this.props.createRequest.loading}
-            isFormSelected={this.state.formSelected === 'addForm'}
-            onSelectForm={() => {
-              this.setState({ formSelected: 'addForm' });
-            }}
-            global
-            // Properties to pass to the BlocksForm to match the View ones
-            history={this.props.history}
-            location={this.props.location}
-            token={this.props.token}
-          />
-          {this.state.isClient &&
-            createPortal(
-              <Toolbar
-                pathname={this.props.pathname}
-                hideDefaultViewButtons
-                inner={
-                  <>
-                    <Button
-                      id="toolbar-save"
-                      className="save"
-                      aria-label={this.props.intl.formatMessage(messages.save)}
-                      onClick={() => this.form.current.onSubmit()}
-                      loading={this.props.createRequest.loading}
-                      disabled={this.props.createRequest.loading}
-                    >
-                      <Icon
-                        name={saveSVG}
-                        className="circled"
-                        size="30px"
-                        title={this.props.intl.formatMessage(messages.save)}
-                      />
-                    </Button>
-                    <Button
-                      className="cancel"
-                      onClick={() => this.onCancel()}
-                      type="button"
-                    >
-                      <Icon
-                        name={clearSVG}
-                        className="circled"
-                        aria-label={this.props.intl.formatMessage(
-                          messages.cancel,
-                        )}
-                        size="30px"
-                        title={this.props.intl.formatMessage(messages.cancel)}
-                      />
-                    </Button>
-                  </>
-                }
-              />,
-              document.getElementById('toolbar'),
-            )}
-          {visual &&
-            this.state.isClient &&
-            createPortal(<Sidebar />, document.getElementById('sidebar'))}
-        </div>
-      );
-
-      return translationObject ? (
-        <>
-          <BodyClass className="babel-view" />
-          <Grid
-            celled="internally"
-            stackable
-            columns={2}
-            id="page-add-translation"
-          >
-            <Grid.Column className="source-object">
-              <TranslationObject
-                translationObject={translationObject}
-                schema={this.props.schema}
-                pathname={this.props.pathname}
-                visual={visual}
-                isFormSelected={
-                  this.state.formSelected === 'translationObjectForm'
-                }
-                onSelectForm={() => {
-                  this.setState({
-                    formSelected: 'translationObjectForm',
-                  });
-                }}
-              />
-            </Grid.Column>
-            <Grid.Column>
-              <div className="new-translation">
-                <Menu pointing secondary attached tabular>
-                  <Menu.Item
-                    name={translateTo?.toUpperCase() || ''}
-                    active={true}
-                  >
-                    {`${this.props.intl.formatMessage(messages.translateTo, {
-                      lang: translateTo || '',
-                    })}`}
-                  </Menu.Item>
-                </Menu>
-                {pageAdd}
-              </div>
-            </Grid.Column>
-          </Grid>
-        </>
-      ) : (
-        pageAdd
-      );
     }
-    return <div />;
+
+    // Lookup initialBlocks and initialBlocksLayout within schema, if any
+    const schemaBlocks =
+      schema.properties[blocksFieldname]?.default;
+    const schemaBlocksLayout =
+      schema.properties[blocksLayoutFieldname]?.default?.items;
+
+    if (!isEmpty(schemaBlocksLayout) && !isEmpty(schemaBlocks)) {
+      initialBlocks = {};
+      initialBlocksLayout = [];
+      schemaBlocksLayout.forEach((value) => {
+        if (!isEmpty(schemaBlocks[value])) {
+          let newUid = uuid();
+          initialBlocksLayout.push(newUid);
+          initialBlocks[newUid] = schemaBlocks[value];
+          initialBlocks[newUid].block = newUid;
+
+          // Layout ID - keep a reference to the original block id within layout
+          initialBlocks[newUid]['@layout'] = value;
+        }
+      });
+    }
+
+    //copy blocks from translationObject
+    if (translationObject && blocksFieldname && blocksLayoutFieldname) {
+      initialBlocks = {};
+      initialBlocksLayout = [];
+      const originalBlocks = JSON.parse(
+        JSON.stringify(translationObject[blocksFieldname]),
+      );
+      const originalBlocksLayout =
+        translationObject[blocksLayoutFieldname].items;
+
+      originalBlocksLayout.forEach((value) => {
+        if (!isEmpty(originalBlocks[value])) {
+          let newUid = uuid();
+          initialBlocksLayout.push(newUid);
+          initialBlocks[newUid] = originalBlocks[value];
+          initialBlocks[newUid].block = newUid;
+
+          // Layout ID - keep a reference to the original block id within layout
+          initialBlocks[newUid]['@canonical'] = value;
+        }
+      });
+    }
+
+    const lifData = () => {
+      const data = {};
+      if (translationObject) {
+        getLanguageIndependentFields(schema).forEach(
+          (lif) => (data[lif] = translationObject[lif]),
+        );
+      }
+      return data;
+    };
+
+    const pageAdd = (
+      <div id="page-add">
+        <Helmet
+          title={this.props.intl.formatMessage(messages.add, {
+            type: this.props?.schema?.title || this.props.type,
+          })}
+        />
+        <Form
+          ref={this.form}
+          key="translated-or-new-content-form"
+          navRoot={
+            this.props.content?.['@components']?.navroot?.navroot || {}
+          }
+          schema={schema}
+          type={this.props.type}
+          formData={
+            this.props.location?.state?.initialFormData || {
+              ...(blocksFieldname && {
+                [blocksFieldname]:
+                  initialBlocks ||
+                  schema.properties[blocksFieldname]?.default,
+              }),
+              ...(blocksLayoutFieldname && {
+                [blocksLayoutFieldname]: {
+                  items:
+                    initialBlocksLayout ||
+                    schema.properties[blocksLayoutFieldname]
+                      ?.default?.items,
+                },
+              }),
+              // Copy the Language Independent Fields values from the to-be translated content
+              // into the default values of the translated content Add form.
+              ...lifData(),
+              parent: {
+                '@id': this.props.content?.['@id'] || '',
+              },
+            }
+          }
+          requestError={this.state.error}
+          onSubmit={this.onSubmit}
+          hideActions
+          pathname={this.props.pathname}
+          visual={visual}
+          title={
+            this.props?.schema?.title
+              ? this.props.intl.formatMessage(messages.add, {
+                  type: schema.title,
+                })
+              : null
+          }
+          loading={this.props.createRequest.loading}
+          isFormSelected={this.state.formSelected === 'addForm'}
+          onSelectForm={() => {
+            this.setState({ formSelected: 'addForm' });
+          }}
+          global
+          // Properties to pass to the BlocksForm to match the View ones
+          history={this.props.history}
+          location={this.props.location}
+          token={this.props.token}
+        />
+        {this.state.isClient &&
+          createPortal(
+            <Toolbar
+              pathname={this.props.pathname}
+              hideDefaultViewButtons
+              inner={
+                <>
+                  <Button
+                    id="toolbar-save"
+                    className="save"
+                    aria-label={this.props.intl.formatMessage(messages.save)}
+                    onClick={() => this.form.current.onSubmit()}
+                    loading={this.props.createRequest.loading}
+                    disabled={this.props.createRequest.loading}
+                  >
+                    <Icon
+                      name={saveSVG}
+                      className="circled"
+                      size="30px"
+                      title={this.props.intl.formatMessage(messages.save)}
+                    />
+                  </Button>
+                  <Button
+                    className="cancel"
+                    onClick={() => this.onCancel()}
+                    type="button"
+                  >
+                    <Icon
+                      name={clearSVG}
+                      className="circled"
+                      aria-label={this.props.intl.formatMessage(
+                        messages.cancel,
+                      )}
+                      size="30px"
+                      title={this.props.intl.formatMessage(messages.cancel)}
+                    />
+                  </Button>
+                </>
+              }
+            />,
+            document.getElementById('toolbar'),
+          )}
+        {visual &&
+          this.state.isClient &&
+          createPortal(<Sidebar />, document.getElementById('sidebar'))}
+      </div>
+    );
+
+    return translationObject ? (
+      <>
+        <BodyClass className="babel-view" />
+        <Grid
+          celled="internally"
+          stackable
+          columns={2}
+          id="page-add-translation"
+        >
+          <Grid.Column className="source-object">
+            <TranslationObject
+              translationObject={translationObject}
+              schema={this.props.schema}
+              pathname={this.props.pathname}
+              visual={visual}
+              isFormSelected={
+                this.state.formSelected === 'translationObjectForm'
+              }
+              onSelectForm={() => {
+                this.setState({
+                  formSelected: 'translationObjectForm',
+                });
+              }}
+            />
+          </Grid.Column>
+          <Grid.Column>
+            <div className="new-translation">
+              <Menu pointing secondary attached tabular>
+                <Menu.Item
+                  name={translateTo?.toUpperCase() || ''}
+                  active={true}
+                >
+                  {`${this.props.intl.formatMessage(messages.translateTo, {
+                    lang: translateTo || '',
+                  })}`}
+                </Menu.Item>
+              </Menu>
+              {pageAdd}
+            </div>
+          </Grid.Column>
+        </Grid>
+      </>
+    ) : (
+      pageAdd
+    );
   }
 }
 

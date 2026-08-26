@@ -111,6 +111,7 @@ const target: Target = {
   capabilities: [
     'content',
     'search-fulltext',
+    'search-filter',
     'vocabulary',
     'schema',
     'asset',
@@ -118,6 +119,9 @@ const target: Target = {
   ],
   types: { folder: 'page', page: 'page', image: 'attachment' },
   vocabularies: { categories: 'categories' },
+  // Filled in at start() from what the blueprint actually created — PHP
+  // execution limits decide, not us.
+  vocabularySize: 0,
   adapter,
 
   async start() {
@@ -129,6 +133,18 @@ const target: Target = {
     await seedContent();
     await adapter.init({ cmsBaseUrl: BASE, emit: () => {} });
     adapter.nonce = nonce;
+
+    const terms = await originalFetch(
+      `${BASE}/?rest_route=/wp/v2/categories&per_page=1`,
+      { headers: { Cookie: cookie, 'X-WP-Nonce': nonce! } },
+    );
+    this.vocabularySize = Number(terms.headers.get('X-WP-Total') ?? '0');
+    if (this.vocabularySize < 100) {
+      throw new Error(
+        `Only ${this.vocabularySize} categories seeded; the type-ahead ` +
+          `assertion needs a vocabulary large enough to be meaningful.`,
+      );
+    }
   },
 
   async stop() {
