@@ -66,3 +66,36 @@ test('asset.upload gets a longer default timeout than content.get', () => {
     rpc.timeoutFor('content.get'),
   );
 });
+
+test('rejects with a structured error when ok is false', async () => {
+  const sent = [];
+  const rpc = new BridgeRPC({ send: (m) => sent.push(m) });
+  const promise = rpc.request('content.get', { path: '/missing' });
+  rpc.handleMessage({
+    type: 'BACKEND_RESPONSE',
+    requestId: sent[0].requestId,
+    ok: false,
+    error: { code: 'NOT_FOUND', status: 404, message: 'No such resource' },
+  });
+  await expect(promise).rejects.toMatchObject({
+    code: 'NOT_FOUND',
+    status: 404,
+    message: 'No such resource',
+  });
+});
+
+test('exposes the raw flag alongside the result', async () => {
+  const sent = [];
+  const rpc = new BridgeRPC({ send: (m) => sent.push(m) });
+  const promise = rpc.request('http', { op: 'get', path: '/news' });
+  rpc.handleMessage({
+    type: 'BACKEND_RESPONSE',
+    requestId: sent[0].requestId,
+    ok: true,
+    raw: true,
+    result: { '@id': 'http://x/news' },
+  });
+  const res = await promise;
+  expect(res).toEqual({ '@id': 'http://x/news' });
+  expect(rpc.lastResponseWasRaw).toBe(true);
+});

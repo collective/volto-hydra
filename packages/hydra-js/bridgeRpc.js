@@ -63,7 +63,22 @@ export class BridgeRPC {
     if (!entry) return false;
     this.pending.delete(msg.requestId);
     clearTimeout(entry.timer);
-    entry.resolve(msg.result);
+    if (msg.ok) {
+      // Last-write-wins rather than per-request state: the only reader is the
+      // synchronous plonify() decision immediately after the await, and
+      // threading a wrapper through the Api shadow's five methods would buy
+      // nothing behaviourally. Promote to a { result, raw } tuple if a real
+      // concurrency bug ever shows up.
+      this.lastResponseWasRaw = msg.raw === true;
+      entry.resolve(msg.result);
+    } else {
+      const e = msg.error ?? {};
+      const err = new Error(e.message ?? 'Bridge request failed');
+      err.code = e.code ?? 'BRIDGE_ERROR';
+      err.status = e.status;
+      err.data = e.data;
+      entry.reject(err);
+    }
     return true;
   }
 }
