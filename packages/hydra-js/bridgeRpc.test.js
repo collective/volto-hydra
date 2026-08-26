@@ -99,3 +99,63 @@ test('exposes the raw flag alongside the result', async () => {
   expect(res).toEqual({ '@id': 'http://x/news' });
   expect(rpc.lastResponseWasRaw).toBe(true);
 });
+
+const fakeAdapter = {
+  name: 'fake',
+  capabilities: ['content'],
+  async dispatch(intent, args) {
+    if (intent === 'content.get') return { title: 'ok', path: args.path };
+    const e = new Error('unsupported');
+    e.code = 'NOT_IMPLEMENTED';
+    throw e;
+  },
+};
+
+test('serves a request from the registered adapter', async () => {
+  const sent = [];
+  const rpc = new BridgeRPC({ send: (m) => sent.push(m) });
+  rpc.serve(fakeAdapter);
+
+  await rpc.handleMessage({
+    type: 'BACKEND_REQUEST',
+    requestId: 'r1',
+    intent: 'content.get',
+    args: { path: '/a' },
+  });
+
+  expect(sent[0]).toEqual({
+    type: 'BACKEND_RESPONSE',
+    requestId: 'r1',
+    ok: true,
+    raw: false,
+    result: { title: 'ok', path: '/a' },
+  });
+});
+
+test('converts an adapter throw into an error response', async () => {
+  const sent = [];
+  const rpc = new BridgeRPC({ send: (m) => sent.push(m) });
+  rpc.serve(fakeAdapter);
+
+  await rpc.handleMessage({
+    type: 'BACKEND_REQUEST',
+    requestId: 'r2',
+    intent: 'workflow.get',
+    args: {},
+  });
+
+  expect(sent[0].ok).toBe(false);
+  expect(sent[0].error.code).toBe('NOT_IMPLEMENTED');
+});
+
+test('replies NO_ADAPTER when nothing is registered', async () => {
+  const sent = [];
+  const rpc = new BridgeRPC({ send: (m) => sent.push(m) });
+  await rpc.handleMessage({
+    type: 'BACKEND_REQUEST',
+    requestId: 'r3',
+    intent: 'content.get',
+    args: {},
+  });
+  expect(sent[0].error.code).toBe('NO_ADAPTER');
+});

@@ -57,7 +57,52 @@ export class BridgeRPC {
     return promise;
   }
 
+  /** Register the adapter this side answers BACKEND_REQUEST with. */
+  serve(adapter) {
+    this.adapter = adapter;
+  }
+
+  async handleRequest(msg) {
+    const { requestId, intent, args } = msg;
+    if (!this.adapter) {
+      this.send({
+        type: 'BACKEND_RESPONSE',
+        requestId,
+        ok: false,
+        error: {
+          code: 'NO_ADAPTER',
+          message: 'No adapter registered on this frontend',
+        },
+      });
+      return;
+    }
+    try {
+      const result = await this.adapter.dispatch(intent, args);
+      this.send({
+        type: 'BACKEND_RESPONSE',
+        requestId,
+        ok: true,
+        // Only the raw http passthrough bypasses canonical normalisation.
+        raw: intent === 'http',
+        result,
+      });
+    } catch (err) {
+      this.send({
+        type: 'BACKEND_RESPONSE',
+        requestId,
+        ok: false,
+        error: {
+          code: err.code ?? 'ADAPTER_ERROR',
+          status: err.status,
+          message: err.message,
+          data: err.data,
+        },
+      });
+    }
+  }
+
   handleMessage(msg) {
+    if (msg?.type === 'BACKEND_REQUEST') return this.handleRequest(msg);
     if (msg?.type !== 'BACKEND_RESPONSE') return false;
     const entry = this.pending.get(msg.requestId);
     if (!entry) return false;
