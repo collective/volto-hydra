@@ -35,6 +35,9 @@ export class PloneAdapter extends BaseAdapter {
   }
 
   url(path) {
+    // Volto's formatUrl passes an already-absolute URL through untouched, so
+    // callers can hand us one. Prefixing it would produce nonsense.
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
     return `${this.cmsBaseUrl}${API_PREFIX}${path}`;
   }
 
@@ -44,7 +47,11 @@ export class PloneAdapter extends BaseAdapter {
       : {};
     const res = await fetch(this.url(path), {
       method,
-      credentials: 'include',
+      // With an explicit bearer token we must NOT send credentials: a
+      // wildcard Access-Control-Allow-Origin (which is what a dev CMS
+      // typically sends) makes the browser reject a credentialled
+      // cross-origin request outright. Cookie auth is the same-origin case.
+      credentials: this.authToken ? 'omit' : 'include',
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',

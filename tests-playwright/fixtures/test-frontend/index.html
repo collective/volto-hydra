@@ -137,6 +137,11 @@
     <script src="/renderer.js"></script>
     <script type="module">
         import { initBridge, getAccessToken } from '/hydra.js';
+        // The frontend owns the adapter: it is what answers the admin's
+        // BACKEND_REQUESTs, on the frontend's origin with the frontend's
+        // credentials. Without one, an admin running with
+        // useBridgeBackend=true gets NO_ADAPTER for every call.
+        import { PloneAdapter } from '/plone-adapter.js';
         import { expandListingBlocks, ploneFetchItems, relatedItemsFetcher, searchShortcutsFetcher, rssFetcher, expandTemplates, expandTemplatesSync, contentPath } from '/helpers.js';
         import { sharedBlocksConfig } from '/shared-block-schemas.js';
         import { coreBlocksConfig } from '/core-block-schemas.js';
@@ -454,6 +459,11 @@
                     window._formDataCount = 0;
 
                     window.bridge = initBridge({
+                        adapter: new PloneAdapter({
+                            cmsBaseUrl: window._apiOrigin,
+                            authToken: getAccessToken(),
+                        }),
+                        cmsBaseUrl: window._apiOrigin,
                         page: {
                             schema: {
                                 // Blocks fields: each is a key in the shared blocks_layout dict.
