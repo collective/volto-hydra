@@ -20,6 +20,20 @@ let sessionCounter = 0;
 
 const adapter = new PloneAdapter({ cmsBaseUrl: BASE });
 
+function b64url(obj: unknown): string {
+  return Buffer.from(JSON.stringify(obj)).toString('base64').replace(/=/g, '');
+}
+
+function mintToken(sub: string, jti: number): string {
+  const header = b64url({ alg: 'HS256', typ: 'JWT' });
+  const payload = b64url({
+    sub,
+    jti,
+    exp: Math.floor(Date.now() / 1000) + 86_400,
+  });
+  return `${header}.${payload}.contract-signature`;
+}
+
 async function waitForHealth(timeoutMs = 30_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastError: unknown = null;
@@ -102,9 +116,32 @@ const target: Target = {
    * mock-plone-api.cjs) and serves everything else from disk, so handing the
    * adapter a fresh token IS a full reset — there is nothing to tear down.
    */
+  /**
+   * The mock treats EXPIRED_TOKEN as a revoked session (see isAuthenticated in
+   * mock-plone-api.cjs). Swapping the adapter's token for it reproduces a real
+   * mid-edit expiry without stubbing the adapter's own fetch.
+   */
+  async expireSession(onEvent) {
+    adapter.authToken = 'EXPIRED_TOKEN';
+    await adapter.init({
+      cmsBaseUrl: BASE,
+      emit: (event, payload) => onEvent(event, payload),
+    });
+  },
+
+  async fetchAsSession(url: string) {
+    return fetch(url, {
+      headers: { Authorization: `Bearer ${adapter.authToken}` },
+    });
+  },
+
   async seed() {
     sessionCounter += 1;
-    adapter.authToken = `contract-session-${sessionCounter}`;
+    // A JWT-shaped token, because that is what Plone issues and what the
+    // adapter reads `sub` out of. The unique jti also makes each test file's
+    // token a distinct string, which is what isolates its session in the mock
+    // (getSessionId keys on the whole token).
+    adapter.authToken = mintToken('admin', sessionCounter);
     await adapter.init({ cmsBaseUrl: BASE, emit: () => {} });
   },
 };

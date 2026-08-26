@@ -25,6 +25,18 @@ export interface Target {
   stop(): Promise<void>;
   /** Reset content to the seed state between test files. */
   seed(): Promise<void>;
+  /**
+   * Put the adapter into a state where the CMS rejects it as unauthenticated,
+   * so the 401 path can be exercised for real rather than with a stub. The
+   * callback receives every event the adapter emits while expired.
+   */
+  expireSession(onEvent: (event: string, payload: unknown) => void): Promise<void>;
+  /**
+   * Fetch a CMS URL with the current session's credentials. Asset URLs are
+   * only meaningful to a caller that is authenticated the way the adapter is,
+   * so assertions about them must not fetch anonymously.
+   */
+  fetchAsSession(url: string): Promise<Response>;
   adapter: HydraAdapter;
 }
 

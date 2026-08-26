@@ -110,6 +110,35 @@ export class PloneAdapter extends BaseAdapter {
   }
 
   /**
+   * Plone has no "current user" endpoint: the session's user id lives in the
+   * JWT's `sub` claim and is then looked up via /@users/{id}. This mirrors
+   * what Volto itself does.
+   */
+  subjectFromToken() {
+    if (!this.authToken) return null;
+    const parts = this.authToken.split('.');
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(
+      Buffer.from(parts[1], 'base64').toString('utf8'),
+    );
+    return payload.sub ?? null;
+  }
+
+  toUser(raw) {
+    return {
+      id: String(raw.id),
+      username: raw.username ?? raw.id,
+      fullname: raw.fullname,
+      email: raw.email,
+      roles: raw.roles ?? [],
+    };
+  }
+
+  async whoami() {
+    return this.dispatch('auth.whoami', {});
+  }
+
+  /**
    * Search results and navigation items are "brains" — partial documents with
    * no blocks. Normalise them to the same canonical Document shape so callers
    * never branch on where a result came from.
@@ -168,6 +197,58 @@ export class PloneAdapter extends BaseAdapter {
       case 'content.delete':
         await this.fetchJson(args.path, { method: 'DELETE' });
         return null;
+
+      case 'auth.whoami': {
+        const sub = this.subjectFromToken();
+        if (!sub) {
+          throw new AdapterError('No session token to identify the user', {
+            code: 'UNAUTHORIZED',
+            status: 401,
+          });
+        }
+        return this.toUser(
+          await this.fetchJson(`/@users/${encodeURIComponent(sub)}`),
+        );
+      }
+
+      case 'asset.upload': {
+        const raw = await this.fetchJson(args.parentPath, {
+          method: 'POST',
+          body: {
+            '@type': 'Image',
+            title: args.title ?? args.filename,
+            image: {
+              data: args.data,
+              encoding: 'base64',
+              'content-type': args.contentType,
+              filename: args.filename,
+            },
+          },
+        });
+        return this.toDocument(raw);
+      }
+
+      case 'asset.imageUrl': {
+        // Scale URLs are published by the CMS on the document itself; deriving
+        // them by string-building would bake in Plone's @@images convention
+        // and silently break the moment a scale is renamed.
+        const doc = await this.fetchJson(args.path);
+        const field = doc[args.field];
+        if (!field) {
+          throw new AdapterError(
+            `No field '${args.field}' on ${args.path}`,
+            { code: 'NOT_FOUND', status: 404 },
+          );
+        }
+        const scale = field.scales?.[args.scale];
+        if (!scale) {
+          throw new AdapterError(
+            `No scale '${args.scale}' for ${args.path}/${args.field}`,
+            { code: 'NOT_FOUND', status: 404 },
+          );
+        }
+        return scale.download;
+      }
 
       case 'types.list': {
         const raw = await this.fetchJson('/@types');

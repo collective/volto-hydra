@@ -109,6 +109,11 @@ if (process.env.SKIP_CONTENT_VALIDATION !== 'true') {
 // Format: { sessionId: { '/path': content, ... } }
 const sessionContent = {};
 
+// Bytes of images uploaded within a session, so @@images can serve back what
+// was just POSTed. Without this the mock accepts an upload and then 404s every
+// scale URL it advertised. Format: { 'sessionId:/path:field': {buffer, mime} }
+const sessionBlobs = {};
+
 // Paths deleted within a session. Disk content can't actually be removed (it
 // is shared by every session and reloaded by the watcher), so a DELETE records
 // a tombstone here and getContent treats the path as gone for that session
@@ -250,10 +255,32 @@ if (process.env.DEBUG) {
  * @param {Object} req - Express request object
  * @returns {boolean} True if authenticated
  */
+/**
+ * A token the mock always rejects, so tests can reproduce a mid-session expiry
+ * without tearing the server down. Nothing else issues this value.
+ */
+const REVOKED_TOKEN = 'EXPIRED_TOKEN';
+
+function isRevoked(req) {
+  const authHeader = req.headers.authorization;
+  return authHeader === `Bearer ${REVOKED_TOKEN}`;
+}
+
 function isAuthenticated(req) {
   const authHeader = req.headers.authorization;
-  return authHeader && authHeader.startsWith('Bearer ');
+  return authHeader && authHeader.startsWith('Bearer ') && !isRevoked(req);
 }
+
+// Reject a revoked session before any route sees the request, exactly as a
+// CMS with an expired cookie would.
+app.use((req, res, next) => {
+  if (isRevoked(req)) {
+    return res.status(401).json({
+      error: { type: 'Unauthorized', message: 'Session expired' },
+    });
+  }
+  next();
+});
 
 /**
  * Filter actions based on authentication status
@@ -1393,7 +1420,7 @@ app.post('/@login-renew', (req, res) => {
   res.json({
     token: generateAuthToken('admin'),
     user: {
-      '@id': 'http://localhost:8888/@users/admin',
+      '@id': `http://localhost:${PORT}/@users/admin`,
       id: 'admin',
       fullname: 'Admin User',
       email: 'admin@example.com',
@@ -1419,7 +1446,7 @@ app.post('/@login', (req, res) => {
     const response = {
       token,
       user: {
-        '@id': `http://localhost:8888/@users/${login}`,
+        '@id': `http://localhost:${PORT}/@users/${login}`,
         id: login,
         fullname: 'Admin User',
         email: 'admin@example.com',
@@ -1536,7 +1563,7 @@ app.post('/*', (req, res, next) => {
 
     // Create the image content
     const imageContent = {
-      '@id': `http://localhost:8888${imagePath}`,
+      '@id': `http://localhost:${PORT}${imagePath}`,
       '@type': 'Image',
       'UID': `uid-${imageId}`,
       'id': imageId,
@@ -1544,18 +1571,18 @@ app.post('/*', (req, res, next) => {
       'description': body.description || '',
       'image': {
         'content-type': body.image?.['content-type'] || 'image/png',
-        'download': `http://localhost:8888${imagePath}/@@images/image`,
+        'download': `http://localhost:${PORT}${imagePath}/@@images/image`,
         'filename': body.image?.filename || 'image.png',
         'height': height,
         'width': width,
         'scales': {
           'preview': {
-            'download': `http://localhost:8888${imagePath}/@@images/image/preview`,
+            'download': `http://localhost:${PORT}${imagePath}/@@images/image/preview`,
             'height': 400,
             'width': 400,
           },
           'large': {
-            'download': `http://localhost:8888${imagePath}/@@images/image/large`,
+            'download': `http://localhost:${PORT}${imagePath}/@@images/image/large`,
             'height': 800,
             'width': 800,
           },
@@ -1585,6 +1612,15 @@ app.post('/*', (req, res, next) => {
     const sessionId = getSessionId(req);
     setSessionContent(sessionId, imagePath, imageContent);
 
+    // Keep the bytes so @@images can serve back the scale URLs this response
+    // advertises. Session-scoped, like the content itself.
+    if (body.image?.data) {
+      sessionBlobs[`${sessionId}:${imagePath}:image`] = {
+        buffer: Buffer.from(body.image.data, body.image.encoding || 'base64'),
+        mime: body.image['content-type'] || 'image/png',
+      };
+    }
+
     if (process.env.DEBUG) {
       console.log(`Created Image: ${imagePath}${sessionId ? ` (session: ${sessionId})` : ''}`);
     }
@@ -1604,7 +1640,7 @@ app.post('/*', (req, res, next) => {
         .replace(/^-+|-+$/g, '');
     const filePath = `${parentPath === '/' ? '' : parentPath}/${fileId}`.replace(/\/+/g, '/');
     const fileContent = {
-      '@id': `http://localhost:8888${filePath}`,
+      '@id': `http://localhost:${PORT}${filePath}`,
       '@type': 'File',
       'UID': `uid-${fileId}`,
       'id': fileId,
@@ -1612,7 +1648,7 @@ app.post('/*', (req, res, next) => {
       'description': body.description || '',
       'file': {
         'content-type': body.file?.['content-type'] || 'application/octet-stream',
-        'download': `http://localhost:8888${filePath}/@@download/file`,
+        'download': `http://localhost:${PORT}${filePath}/@@download/file`,
         'filename': body.file?.filename || rawName,
         'size': body.file?.data?.length || 0,
       },
@@ -1738,7 +1774,7 @@ function collectSubjectValues() {
  */
 app.get('*/@querystring', (req, res) => {
   res.json({
-    '@id': 'http://localhost:8888/@querystring',
+    '@id': `http://localhost:${PORT}/@querystring`,
     'indexes': {
       'portal_type': {
         'title': 'Type',
@@ -2024,7 +2060,7 @@ app.get('*/@querystring', (req, res) => {
  */
 app.get('/@site', (req, res) => {
   res.json({
-    '@id': 'http://localhost:8888',
+    '@id': `http://localhost:${PORT}`,
     'plone.site_title': 'Plone Site',
     'plone.site_logo': null,
     // Volto 19 reads `plone.default_language` from this response as the
@@ -2053,7 +2089,7 @@ app.get(/.*\/@workflow$/, (req, res) => {
 app.get('/@users/:userid', (req, res) => {
   const { userid } = req.params;
   res.json({
-    '@id': `http://localhost:8888/@users/${userid}`,
+    '@id': `http://localhost:${PORT}/@users/${userid}`,
     id: userid,
     fullname: 'Admin User',
     email: 'admin@example.com',
@@ -2729,8 +2765,8 @@ app.get('*/@search', (req, res) => {
   }
 
   const searchUrl = searchPath === '' || searchPath === '/'
-    ? 'http://localhost:8888/@search'
-    : `http://localhost:8888${searchPath}/@search`;
+    ? `http://localhost:${PORT}/@search`
+    : `http://localhost:${PORT}${searchPath}/@search`;
 
   res.json({
     '@id': searchUrl,
@@ -2808,7 +2844,7 @@ app.get('*/@contents', (req, res) => {
   }
 
   res.json({
-    '@id': `http://localhost:8888${contentPath}/@contents`,
+    '@id': `http://localhost:${PORT}${contentPath}/@contents`,
     'items': items,
     'items_total': items.length,
   });
@@ -2914,6 +2950,14 @@ app.get('*/@@images/*', (req, res) => {
       || 'application/octet-stream');
     res.sendFile(file);
     return;
+  }
+
+  // Bytes uploaded in this session take precedence: they have no directory on
+  // disk, so contentDirMap will never find them.
+  const blob = sessionBlobs[`${getSessionId(req)}:${contentPath}:${fieldName}`];
+  if (blob) {
+    res.set('Content-Type', blob.mime);
+    return res.send(blob.buffer);
   }
 
   // Try to serve actual image file from content directory
