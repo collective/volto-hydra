@@ -8155,7 +8155,20 @@ export class Bridge {
     const visibleEnough =
       !!blockElement &&
       this.elementIsVisibleInViewport(blockElement, blockTallerThanViewport);
-    if (!isSelectingSameBlock && blockElement && !cameFromUserClick && !visibleEnough) {
+    // The chrome an author just summoned has to be reachable. Toolbar, chevrons
+    // and add-buttons all hang off the block's TOP edge, which for a tall block
+    // is usually above the viewport — so "don't scroll, they clicked it" left
+    // the quanta toolbar rendered off screen and its move chevrons unclickable.
+    // Anchor visible means there is room for the toolbar above the block's top.
+    const anchorRect = blockElement?.getBoundingClientRect();
+    const toolbarAnchorVisible =
+      !!anchorRect &&
+      anchorRect.top >= Bridge.TOOLBAR_ANCHOR_MARGIN &&
+      anchorRect.top < window.innerHeight;
+    // Suppress the jump only when the author can already see the chrome.
+    const suppressForUserClick = cameFromUserClick && toolbarAnchorVisible;
+    const needsScroll = !visibleEnough || !toolbarAnchorVisible;
+    if (!isSelectingSameBlock && blockElement && needsScroll && !suppressForUserClick) {
       this.scrollBlockIntoView(blockElement);
     }
 
@@ -10992,6 +11005,10 @@ export class Bridge {
    * @param {number} options.toolbarMargin - Space to reserve at top (default 50)
    * @param {number} options.bottomMargin - Space to reserve at bottom (default 50)
    */
+  // Same reservation scrollBlockIntoView keeps for the toolbar, so the two
+  // agree on what "the toolbar fits above this block" means.
+  static get TOOLBAR_ANCHOR_MARGIN() { return 50; }
+
   scrollBlockIntoView(el, { toolbarMargin = 50, bottomMargin = 50 } = {}) {
     const scrollRect = el.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
