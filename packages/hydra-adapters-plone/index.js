@@ -109,6 +109,25 @@ export class PloneAdapter extends BaseAdapter {
     };
   }
 
+  /**
+   * Search results and navigation items are "brains" — partial documents with
+   * no blocks. Normalise them to the same canonical Document shape so callers
+   * never branch on where a result came from.
+   */
+  toBrief(raw) {
+    return {
+      id: String(raw.UID ?? raw['@id']),
+      path: this.toPath(raw['@id']),
+      type: raw['@type'],
+      title: raw.title,
+      blocks: {},
+      blocksLayout: { items: [] },
+      fields: raw,
+      state: STATE_MAP[raw.review_state] ?? raw.review_state,
+      _adapter: { raw },
+    };
+  }
+
   async dispatch(intent, args) {
     return this.withAuthRetry(() => this.dispatchOnce(intent, args));
   }
@@ -149,6 +168,51 @@ export class PloneAdapter extends BaseAdapter {
       case 'content.delete':
         await this.fetchJson(args.path, { method: 'DELETE' });
         return null;
+
+      case 'search': {
+        const params = new URLSearchParams();
+        if (args.query) params.set('SearchableText', args.query);
+        if (args.path) params.set('path.query', args.path);
+        if (args.limit) params.set('b_size', String(args.limit));
+        const raw = await this.fetchJson(
+          `${args.path ?? ''}/@search?${params.toString()}`,
+        );
+        return {
+          items: (raw.items ?? []).map((i) => this.toBrief(i)),
+          total: raw.items_total ?? 0,
+          batching: raw.batching,
+        };
+      }
+
+      case 'tree.list': {
+        // plone.restapi's @search is context-scoped: searching on /news
+        // restricts to that subtree, and path.depth=1 narrows it to direct
+        // children. Passing path.query on an unscoped /@search is NOT
+        // equivalent — the context is what bounds the subtree.
+        const base = args.parent === '/' ? '' : args.parent;
+        const raw = await this.fetchJson(`${base}/@search?path.depth=1`);
+        return {
+          items: (raw.items ?? []).map((i) => this.toBrief(i)),
+          total: raw.items_total ?? 0,
+        };
+      }
+
+      case 'breadcrumbs.get': {
+        const raw = await this.fetchJson(`${args.path}/@breadcrumbs`);
+        // Canonical breadcrumbs are the ancestors BELOW the site root. Plone
+        // has a root document to point at; WordPress and Drupal do not, so a
+        // root entry could not mean the same thing across adapters.
+        const items = (raw.items ?? [])
+          .map((i) => this.toBrief(i))
+          .filter((i) => i.path !== '/');
+        return { items };
+      }
+
+      case 'navigation.get': {
+        const base = args.path === '/' ? '' : (args.path ?? '');
+        const raw = await this.fetchJson(`${base}/@navigation`);
+        return { items: (raw.items ?? []).map((i) => this.toBrief(i)) };
+      }
 
       default:
         return super.dispatch(intent, args);
