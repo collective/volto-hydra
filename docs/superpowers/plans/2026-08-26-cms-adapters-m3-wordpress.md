@@ -225,3 +225,50 @@ bridge or make it fail loudly — silently dropping an upload is the worst optio
   schema-driven `<AuthChallenge>`) gets its own spec; blueprints can seed a
   logged-out state to reach it.
 - `per-content-permissions` stays unadvertised for WordPress.
+
+---
+
+# Status at 2026-08-27
+
+## Works
+
+- Contract suite **47/47 against Plone**, including `reference.spec.ts` (a link
+  survives its target being renamed).
+- **WordPress adapter reaches 24 passed / 2 failed** on the same unchanged
+  assertions. The 21 "skipped" are `beforeAll` hook timeouts, not assertion
+  failures — see harness limits below.
+- Bootstrap deadlock root-caused and fixed: `Form` renders `<Iframe>` only in
+  its `visual` branch and `Add` forced `visual = false`, so that route hosted no
+  adapter at all. The guard was stale — Hydra's fork already replaced
+  `BlocksForm` in that branch with its own `<Iframe>`.
+
+## Does NOT work: links over the bridge
+
+Baselined cleanly, serially, one suite at a time:
+
+| suite | direct fetch | over the bridge |
+| --- | --- | --- |
+| `inline-editing-links.spec.ts` | 10/10 | 7/10 |
+
+Broken by the inversion: *can create a link*, *can edit link URL*, *can use
+browse button in link editor*. The browse button times out inside
+`AdminUIHelper.ts:5357`. No adapter-registration errors in that run, so the
+adapter is up — this is the object browser's own traffic (`@search`,
+`@querystring-search`) behaving differently over the bridge.
+
+Investigate with instrumentation at the RPC boundary, NOT by guessing: three
+successive fixes aimed at the wrong model already cost a day here.
+
+## Harness limits found
+
+- **WordPress per-file reset is too expensive.** `seed()` deletes every page and
+  recreates the tree; under WASM PHP each REST call costs seconds and the
+  60s `beforeAll` budget is exhausted. Needs snapshot/restore, or a reset that
+  touches only what a file changed.
+- **The WordPress adapter has an N+1.** `ancestryOf()` walks parents one fetch
+  at a time and `search` calls it per result, so a 25-result search issues
+  dozens of round trips. Correct, but it is why single assertions take 30-55s.
+- **Never run two Playwright projects, or Playwright and the WordPress
+  contract suite, concurrently.** They contend for CPU and collide on ports
+  (`EADDRINUSE :3002`), and the resulting numbers are noise. A "7 failed vs 4"
+  regression reported during this session was an artifact of exactly that.
