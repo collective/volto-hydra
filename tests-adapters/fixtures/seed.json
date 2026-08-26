@@ -1,0 +1,55 @@
+{
+  "_comment": "Canonical content set. Every conformance target projects this into its own CMS; every contract assertion refers to it rather than to per-CMS literals. `type` values are canonical names — each target maps them to its CMS's real type via Target.types.",
+  "documents": [
+    { "path": "/", "type": "folder", "title": "Home", "state": "published" },
+    { "path": "/news", "type": "folder", "title": "News", "state": "published" },
+    {
+      "path": "/news/first-post",
+      "type": "page",
+      "title": "First Post",
+      "state": "published",
+      "blocks": {
+        "b1": {
+          "@type": "slate",
+          "value": [{ "type": "p", "children": [{ "text": "Hello" }] }]
+        }
+      },
+      "blocksLayout": { "items": ["b1"] }
+    },
+    {
+      "path": "/news/draft-post",
+      "type": "page",
+      "title": "Draft Post",
+      "state": "draft",
+      "blocks": {},
+      "blocksLayout": { "items": [] }
+    },
+    {
+      "path": "/about",
+      "type": "page",
+      "title": "About",
+      "state": "published",
+      "blocks": {},
+      "blocksLayout": { "items": [] }
+    }
+  ],
+  "assets": [
+    {
+      "path": "/news/hero.png",
+      "type": "image",
+      "title": "Hero",
+      "width": 800,
+      "height": 600
+    }
+  ],
+  "vocabularies": {
+    "categories": {
+      "generate": 10000,
+      "tokenPrefix": "cat-",
+      "titlePrefix": "Category "
+    }
+  },
+  "users": [
+    { "username": "admin", "fullname": "Site Admin", "roles": ["Manager"] }
+  ]
+}
