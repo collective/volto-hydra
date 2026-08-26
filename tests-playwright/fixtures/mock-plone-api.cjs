@@ -2126,8 +2126,32 @@ function getTypeSchema(typeName) {
   return schema;
 }
 
+/**
+ * True when this mock knows the type at all: either it ships a schema file or
+ * it is one of the addable types. Real Plone 404s on an unknown type rather
+ * than inventing a schema, and adapters have to be able to tell the
+ * difference, so the fallback in getTypeSchema must not apply to made-up
+ * names.
+ */
+function isKnownType(typeName) {
+  const schemaPath = path.join(
+    __dirname,
+    'api',
+    `schema-${typeName.toLowerCase()}.json`,
+  );
+  if (fs.existsSync(schemaPath)) return true;
+  return listAddableTypes().some(
+    (t) => t['@id'].split('/').pop() === typeName,
+  );
+}
+
 app.get('/@types/:typeName', (req, res) => {
   const { typeName } = req.params;
+  if (!isKnownType(typeName)) {
+    return res.status(404).json({
+      error: { type: 'NotFound', message: `No such content type: ${typeName}` },
+    });
+  }
   res.json(getTypeSchema(typeName));
 });
 

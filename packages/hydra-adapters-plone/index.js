@@ -169,6 +169,30 @@ export class PloneAdapter extends BaseAdapter {
         await this.fetchJson(args.path, { method: 'DELETE' });
         return null;
 
+      case 'types.list': {
+        const raw = await this.fetchJson('/@types');
+        return {
+          items: (raw ?? []).map((t) => ({
+            // Plone identifies a type by the last segment of its @id; there is
+            // no separate id field on the listing entries.
+            id: decodeURIComponent(t['@id'].split('/').pop()),
+            title: t.title,
+            addable: t.addable === true,
+          })),
+        };
+      }
+
+      case 'types.getSchema': {
+        const raw = await this.fetchJson(
+          `/@types/${encodeURIComponent(args.type)}`,
+        );
+        return {
+          fieldsets: raw.fieldsets ?? [],
+          properties: raw.properties ?? {},
+          required: raw.required ?? [],
+        };
+      }
+
       case 'search': {
         const params = new URLSearchParams();
         if (args.query) params.set('SearchableText', args.query);
