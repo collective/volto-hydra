@@ -64,6 +64,7 @@ const target: Target = {
   name: 'plone',
   capabilities: ['content', 'search-fulltext', 'vocabulary', 'schema', 'asset'],
   types: { folder: 'Document', page: 'Document', image: 'Image' },
+  vocabularies: { categories: 'hydra.test.categories' },
   adapter,
 
   async start() {
@@ -79,6 +80,10 @@ const target: Target = {
         ...process.env,
         PORT: String(PORT),
         CONTENT_MOUNTS: '/:tests-adapters/fixtures/content',
+        // Generate the seed's large vocabularies in-process rather than
+        // committing 10 000 JSON objects to the repo.
+        VOCAB_SPEC: 'tests-adapters/fixtures/seed.json',
+        VOCAB_PREFIX: 'hydra.test.',
       },
       stdio: 'pipe',
     });

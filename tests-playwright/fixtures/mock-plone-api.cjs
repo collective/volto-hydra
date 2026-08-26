@@ -2162,7 +2162,60 @@ app.get('/@types/:typeName', (req, res) => {
 const VOCAB_ITEMS = {
   'plone.app.vocabularies.Keywords': ['news', 'plone', 'events'],
 };
+
+// Optional generated vocabularies, declared by a seed file and switched on
+// with VOCAB_SPEC. Used by the adapter contract suite, which needs a
+// vocabulary large enough that fetch-everything-and-filter-in-memory shows up
+// as a latency failure. Off unless the env var is set, so nothing else here
+// changes behaviour.
+const GENERATED_VOCABS = {};
+if (process.env.VOCAB_SPEC) {
+  const specPath = path.resolve(process.cwd(), process.env.VOCAB_SPEC);
+  const spec = JSON.parse(fs.readFileSync(specPath, 'utf-8')).vocabularies || {};
+  const prefix = process.env.VOCAB_PREFIX || '';
+  for (const [name, def] of Object.entries(spec)) {
+    GENERATED_VOCABS[`${prefix}${name}`] = Array.from(
+      { length: def.generate },
+      (_, i) => ({
+        token: `${def.tokenPrefix}${i}`,
+        title: `${def.titlePrefix}${i}`,
+      }),
+    );
+  }
+  console.log(
+    `Generated vocabularies: ${Object.entries(GENERATED_VOCABS)
+      .map(([k, v]) => `${k} (${v.length})`)
+      .join(', ')}`,
+  );
+}
+
 app.get('/@vocabularies/:vocab', (req, res) => {
+  const generated = GENERATED_VOCABS[req.params.vocab];
+  if (generated) {
+    // Real Plone filters and batches server-side; so must this, or the
+    // contract suite's type-ahead latency assertion is meaningless.
+    const title = req.query.title;
+    const filtered = title
+      ? generated.filter((i) => i.title.includes(title))
+      : generated;
+    const size = req.query.b_size ? parseInt(req.query.b_size, 10) : 25;
+    const start = req.query.b_start ? parseInt(req.query.b_start, 10) : 0;
+    return res.json({
+      '@id': `http://localhost:${PORT}/@vocabularies/${req.params.vocab}`,
+      items: filtered.slice(start, start + size),
+      items_total: filtered.length,
+    });
+  }
+
+  if (!VOCAB_ITEMS[req.params.vocab]) {
+    return res.status(404).json({
+      error: {
+        type: 'NotFound',
+        message: `No such vocabulary: ${req.params.vocab}`,
+      },
+    });
+  }
+
   const values = VOCAB_ITEMS[req.params.vocab] || [];
   res.json({
     '@id': `http://localhost:${PORT}/@vocabularies/${req.params.vocab}`,

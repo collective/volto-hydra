@@ -18,6 +18,8 @@ export interface Target {
    * hardcoding a portal type.
    */
   types: Record<string, string>;
+  /** Canonical seed vocabulary name -> this CMS's vocabulary identifier. */
+  vocabularies: Record<string, string>;
   /** Boot the backing CMS (or mock) and seed it. */
   start(): Promise<void>;
   stop(): Promise<void>;

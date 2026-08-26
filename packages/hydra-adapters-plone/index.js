@@ -193,6 +193,26 @@ export class PloneAdapter extends BaseAdapter {
         };
       }
 
+      case 'vocabulary.get': {
+        const params = new URLSearchParams();
+        // Filter and batch server-side. Pulling the whole vocabulary back and
+        // narrowing it here would work on a 3-term list and fall over on a
+        // real taxonomy.
+        if (args.title) params.set('title', args.title);
+        if (args.limit) params.set('b_size', String(args.limit));
+        const qs = params.toString();
+        const raw = await this.fetchJson(
+          `/@vocabularies/${encodeURIComponent(args.name)}${qs ? `?${qs}` : ''}`,
+        );
+        return {
+          items: (raw.items ?? []).map((i) => ({
+            token: i.token,
+            title: i.title,
+          })),
+          total: raw.items_total ?? (raw.items ?? []).length,
+        };
+      }
+
       case 'search': {
         const params = new URLSearchParams();
         if (args.query) params.set('SearchableText', args.query);
