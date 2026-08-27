@@ -108,9 +108,12 @@ function installListener(rpcClient) {
     const iframe = bridgeIframe();
     const expected = iframe?.src ? new URL(iframe.src).origin : null;
     if (expected && event.origin !== expected) return;
-    // Same reasoning as the editor's handler: with two iframes on one origin,
-    // only the window reference distinguishes them.
-    if (iframe?.contentWindow && event.source !== iframe.contentWindow) return;
+    // NOT filtering on event.source, deliberately. During an iframe reload the
+    // element's contentWindow can already be the new document while
+    // ADAPTER_READY from the old one is still in flight; dropping it leaves
+    // the gate shut and every request hanging. The host and the editor never
+    // coexist now — the host is confined to routes with no editor — so origin
+    // is sufficient to identify the sender.
 
     if (type === 'BACKEND_RESPONSE') {
       rpcClient.handleMessage(event.data);

@@ -2110,14 +2110,13 @@ const Iframe = (props) => {
       if (event.origin !== initialUrlOrigin) {
         return;
       }
-      // Origin is not enough to identify the sender: the adapter host is a
-      // second iframe on the SAME origin, and its INIT/PATH_CHANGE would be
-      // read here as the user navigating the editor. Match the window itself.
-      const editingWindow =
-        document.getElementById('previewIframe')?.contentWindow;
-      if (editingWindow && event.source !== editingWindow) {
-        return;
-      }
+      // No sender filtering here, deliberately. It was added when the adapter
+      // host could coexist with the editor, but the host is now confined to
+      // routes that render no editor, so the two never appear together.
+      // Comparing against contentWindow actively broke things: during an
+      // iframe navigation the element's contentWindow can already be the new
+      // document while a message from the old one is still in flight, so
+      // legitimate INIT and PATH_CHANGE were dropped.
       // Store the actual iframe origin from the first message we receive
       if (!iframeOriginRef.current) {
         iframeOriginRef.current = event.origin;

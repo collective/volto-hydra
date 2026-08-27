@@ -410,10 +410,12 @@ test.describe('Navigation and URL Handling', () => {
 
     // Go to view mode
     await page.goto(helper.contentUrl('/test-page'));
-    await page.waitForLoadState('networkidle');
-
+    // Wait for content rather than network silence: under the inversion the
+    // iframe carries the CMS traffic, so 'networkidle' never arrives even
+    // though the page is fully rendered. The assertion below is the real
+    // readiness signal.
     const iframe = helper.getIframe();
-    await expect(iframe.locator('text=This is a test paragraph')).toBeVisible({ timeout: 10000 });
+    await expect(iframe.locator('text=This is a test paragraph')).toBeVisible({ timeout: 15000 });
 
     // Click nav link to navigate
     const navLink = iframe.locator('a').filter({ hasText: 'Another Page' }).first();
@@ -639,8 +641,11 @@ test.describe('Navigation and URL Handling', () => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await page.goto(`${URLS.voltoSsr}/test-page`);
-    await page.waitForLoadState('networkidle');
-
+    // Wait for the thing under test, not for network silence. With the
+    // backend inversion on, CMS traffic moves from the admin page into the
+    // iframe, so 'networkidle' is no longer reachable — while the page itself
+    // is fully functional (verified: switcher visible, zero requests in
+    // flight). Playwright discourages networkidle for exactly this reason.
     const switcherBtn = page.locator('#toolbar-frontend-switcher');
     await expect(switcherBtn).toBeVisible({ timeout: 10000 });
   });
