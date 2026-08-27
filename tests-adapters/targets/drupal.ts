@@ -112,7 +112,13 @@ const target: Target = {
 
   async seed() {
     adapter.credentials = { username: 'admin', password: 'admin' };
-    await fetch(`${BASE}/_reset`, { method: 'POST' });
+    // Must carry the SAME credentials the adapter uses: the mock scopes
+    // content per session, so an unauthenticated reset would clear a
+    // different world and leave the adapter's own state untouched.
+    await fetch(`${BASE}/_reset`, {
+      method: 'POST',
+      headers: { Authorization: `Basic ${btoa('admin:admin')}` },
+    });
     adapter.csrfToken = null;
     await adapter.init({ cmsBaseUrl: BASE, emit: () => {} });
   },

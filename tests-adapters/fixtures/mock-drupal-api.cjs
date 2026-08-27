@@ -36,20 +36,42 @@ const UNFILED_PATH = '/_unfiled';
 app.use(cors());
 app.use(express.json({ type: ['application/json', 'application/vnd.api+json'], limit: '50mb' }));
 
-// --- state ---------------------------------------------------------------
-let nodes = new Map(); // uuid -> {uuid, nid, type, title, alias, blocks, status}
-let menuLinks = new Map(); // uuid -> {uuid, nodeUuid, parentUuid, weight}
-let terms = new Map(); // vocab -> [{uuid, name, slug}]
-let files = new Map(); // uuid -> {uuid, filename, mime, bytes}
-let nextNid = 1;
+// --- per-session state ---------------------------------------------------
+//
+// Playwright runs specs in parallel workers, and a single shared store would
+// let one test's move or delete surface in another's listing. The Plone mock
+// solves this by keying state on the caller's token; this does the same,
+// preferring a session cookie because that is what Drupal itself uses and it
+// gives every browser context its own world for free.
+const sessions = new Map(); // sessionId -> {nodes, menuLinks, files, nextNid}
+let terms = new Map(); // vocabularies are read-only, so they stay shared
 
 const uuid = () => crypto.randomUUID();
 
-function seed() {
-  nodes = new Map();
-  menuLinks = new Map();
-  files = new Map();
-  nextNid = 1;
+const SESSION_COOKIE = 'HYDRASESS';
+
+function sessionIdFor(req) {
+  const cookie = req.headers.cookie || '';
+  const match = cookie.match(new RegExp(`${SESSION_COOKIE}=([^;]+)`));
+  if (match) return match[1];
+  // Node callers (the contract suite) have no cookie jar; the credentials
+  // they present are stable and unique enough to key on.
+  return `auth:${req.headers.authorization || 'anonymous'}`;
+}
+
+function stateFor(req) {
+  const id = sessionIdFor(req);
+  if (!sessions.has(id)) sessions.set(id, buildState());
+  return sessions.get(id);
+}
+
+function buildState() {
+  const state = {
+    nodes: new Map(),
+    menuLinks: new Map(),
+    files: new Map(),
+    nextNid: 1,
+  };
 
   const spec = JSON.parse(fs.readFileSync(SEED_PATH, 'utf8'));
   const byPath = new Map();
@@ -57,9 +79,9 @@ function seed() {
   for (const doc of spec.documents) {
     if (doc.path === '/') continue; // Drupal has no root document
     const id = uuid();
-    nodes.set(id, {
+    state.nodes.set(id, {
       uuid: id,
-      nid: nextNid++,
+      nid: state.nextNid++,
       type: 'page',
       title: doc.title,
       alias: doc.path,
@@ -83,7 +105,7 @@ function seed() {
     const parentPath = '/' + p.split('/').filter(Boolean).slice(0, -1).join('/');
     const parentNode = parentPath === '/' ? null : byPath.get(parentPath);
     const id = uuid();
-    menuLinks.set(id, {
+    state.menuLinks.set(id, {
       uuid: id,
       nodeUuid: byPath.get(p),
       parentUuid: parentNode ? linkByNode.get(parentNode) : null,
@@ -92,6 +114,11 @@ function seed() {
     linkByNode.set(byPath.get(p), id);
   }
 
+  return state;
+}
+
+function seedTerms() {
+  const spec = JSON.parse(fs.readFileSync(SEED_PATH, 'utf8'));
   const vocab = spec.vocabularies?.categories;
   terms.set(
     'categories',
@@ -104,14 +131,7 @@ function seed() {
 }
 
 // --- helpers -------------------------------------------------------------
-const nodeByAlias = (alias) =>
-  [...nodes.values()].find((n) => n.alias === alias) || null;
-
-const linkForNode = (nodeUuid) =>
-  [...menuLinks.values()].find((l) => l.nodeUuid === nodeUuid) || null;
-
-const childLinks = (parentLinkUuid) =>
-  [...menuLinks.values()].filter((l) => l.parentUuid === parentLinkUuid);
+// (lookup helpers are inlined per-request now that state is session-scoped)
 
 /** Serialise one node in the captured JSON:API shape. */
 function toResource(n) {
@@ -187,6 +207,15 @@ function authed(req) {
 app.use((req, res, next) => {
   if (req.path.startsWith('/jsonapi') && !authed(req)) {
     return res.status(401).json({ errors: [{ status: '401', detail: 'Unauthorized' }] });
+  }
+  next();
+});
+
+// Hand out a session cookie on first contact, the way Drupal does. Each
+// Playwright browser context then gets its own isolated content automatically.
+app.use((req, res, next) => {
+  if (!(req.headers.cookie || '').includes(`${SESSION_COOKIE}=`)) {
+    res.cookie?.(SESSION_COOKIE, uuid(), { path: '/', httpOnly: true });
   }
   next();
 });
@@ -275,6 +304,7 @@ app.get('/jsonapi/taxonomy_term/:vocab', (req, res) => {
 
 // --- menu links (the hierarchy) -----------------------------------------
 app.get('/jsonapi/menu_link_content/menu_link_content', (req, res) => {
+  const { menuLinks } = stateFor(req);
   const parent = filterValue(req, 'parent');
   const list = [...menuLinks.values()].filter((l) =>
     parent === undefined ? true : (l.parentUuid ?? '') === (parent === 'null' ? '' : parent),
@@ -299,6 +329,7 @@ app.get('/jsonapi/menu_link_content/menu_link_content', (req, res) => {
 });
 
 app.patch('/jsonapi/menu_link_content/menu_link_content/:uuid', (req, res) => {
+  const { menuLinks } = stateFor(req);
   const link = menuLinks.get(req.params.uuid);
   if (!link) return notFound(res, req.params.uuid);
   // PATCH is a PARTIAL update: a field that is absent means "leave it alone",
@@ -316,6 +347,7 @@ app.patch('/jsonapi/menu_link_content/menu_link_content/:uuid', (req, res) => {
 });
 
 app.post('/jsonapi/menu_link_content/menu_link_content', (req, res) => {
+  const { menuLinks } = stateFor(req);
   const rel = req.body?.data?.relationships ?? {};
   const id = uuid();
   menuLinks.set(id, {
@@ -329,6 +361,7 @@ app.post('/jsonapi/menu_link_content/menu_link_content', (req, res) => {
 
 // --- files ---------------------------------------------------------------
 app.post('/jsonapi/:entity/:bundle/field_media_image', (req, res) => {
+  const { files } = stateFor(req);
   const id = uuid();
   const filename = String(req.headers['content-disposition'] || 'file="upload.png"')
     .split('filename=')
@@ -355,6 +388,7 @@ app.post('/jsonapi/:entity/:bundle/field_media_image', (req, res) => {
 });
 
 app.get('/sites/default/files/:name', (req, res) => {
+  const { files } = stateFor(req);
   const file = [...files.values()].find((f) => f.filename === req.params.name);
   if (!file) return notFound(res, req.params.name);
   res.set('Content-Type', file.mime).send(file.bytes);
@@ -362,12 +396,14 @@ app.get('/sites/default/files/:name', (req, res) => {
 
 // --- nodes ---------------------------------------------------------------
 app.get('/jsonapi/node/:bundle/:uuid', (req, res) => {
+  const { nodes } = stateFor(req);
   const n = nodes.get(req.params.uuid);
   if (!n) return notFound(res, req.params.uuid);
   res.json(single(toResource(n)));
 });
 
 app.get('/jsonapi/node/:bundle', (req, res) => {
+  const { nodes } = stateFor(req);
   let list = [...nodes.values()].filter((n) => n.type === req.params.bundle);
 
   const alias = filterValue(req, 'path.alias');
@@ -394,22 +430,24 @@ app.get('/jsonapi/node/:bundle', (req, res) => {
 });
 
 app.post('/jsonapi/node/:bundle', (req, res) => {
+  const state = stateFor(req);
   const attrs = req.body?.data?.attributes ?? {};
   const id = uuid();
   const n = {
     uuid: id,
-    nid: nextNid++,
+    nid: state.nextNid++,
     type: req.params.bundle,
     title: attrs.title ?? 'Untitled',
     alias: attrs.path?.alias || '',
     blocks: attrs.field_hydra_blocks ?? '{"v":1,"blocks":{},"blocksLayout":{"items":[]}}',
     status: attrs.status ?? false,
   };
-  nodes.set(id, n);
+  state.nodes.set(id, n);
   res.status(201).json(single(toResource(n)));
 });
 
 app.patch('/jsonapi/node/:bundle/:uuid', (req, res) => {
+  const { nodes } = stateFor(req);
   const n = nodes.get(req.params.uuid);
   if (!n) return notFound(res, req.params.uuid);
   const attrs = req.body?.data?.attributes ?? {};
@@ -421,6 +459,7 @@ app.patch('/jsonapi/node/:bundle/:uuid', (req, res) => {
 });
 
 app.delete('/jsonapi/node/:bundle/:uuid', (req, res) => {
+  const { nodes, menuLinks } = stateFor(req);
   if (!nodes.has(req.params.uuid)) return notFound(res, req.params.uuid);
   nodes.delete(req.params.uuid);
   for (const [id, l] of menuLinks) {
@@ -431,13 +470,16 @@ app.delete('/jsonapi/node/:bundle/:uuid', (req, res) => {
 
 // --- test control --------------------------------------------------------
 app.post('/_reset', (req, res) => {
-  seed();
+  // Resets only the caller's world, so a parallel worker's reset cannot pull
+  // content out from under another test mid-run.
+  sessions.set(sessionIdFor(req), buildState());
+  const { nodes, menuLinks } = stateFor(req);
   res.json({ status: 'reseeded', nodes: nodes.size, links: menuLinks.size });
 });
 
-seed();
+seedTerms();
 app.listen(PORT, () => {
-  console.log(`Mock Drupal JSON:API on ${BASE()}  (${nodes.size} nodes, ${menuLinks.size} menu links)`);
+  console.log(`Mock Drupal JSON:API on ${BASE()} (per-session content)`);
 });
 
 module.exports = { app, UNFILED_PATH };

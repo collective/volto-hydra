@@ -25,7 +25,10 @@ const needsF7 = projectArg?.includes('f7');
 // NOTE: the Volto webServer entries below use reuseExistingServer, so a server
 // already running WITHOUT this flag will be reused as-is. Run bridge-mock
 // against a freshly started server, or the transparency proof is vacuous.
-const useBridgeBackend = projectArg?.includes('bridge') ? 'true' : 'false';
+const useBridgeBackend =
+  projectArg?.includes('bridge') || projectArg?.includes('journey')
+    ? 'true'
+    : 'false';
 
 /**
  * Playwright Test configuration for Volto Hydra tests.
@@ -250,6 +253,19 @@ export default defineConfig({
         /multifield.*\.spec\.ts/, // Skip multifield tests (hero block not in Nuxt)
       ],
     },
+    // The end-to-end journey, one spec run against each CMS. The adapter is
+    // selected by the FRONTEND via ?adapter=, so the admin is identical in
+    // all three — which is the claim under test.
+    {
+      name: 'journey-plone',
+      testDir: 'tests-playwright/journey',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+      },
+    },
+
     // Same specs as admin-mock, but with the backend inversion switched on:
     // every CMS call travels admin -> bridge -> iframe adapter instead of
     // being fetched directly. A pass count identical to admin-mock is the

@@ -142,6 +142,34 @@
         // credentials. Without one, an admin running with
         // useBridgeBackend=true gets NO_ADAPTER for every call.
         import { PloneAdapter } from '/plone-adapter.js';
+        import { WordPressAdapter } from '/wordpress-adapter.js';
+        import { DrupalAdapter } from '/drupal-adapter.js';
+
+        // Which CMS this frontend talks to, chosen per test run. The whole
+        // point of the inversion is that the ADMIN does not know or care —
+        // it is the frontend that owns the adapter, so switching CMS is a
+        // frontend concern and nothing in Volto changes.
+        function buildAdapter() {
+            const params = new URLSearchParams(window.location.search);
+            const which = params.get('adapter') || 'plone';
+            const cmsBaseUrl = params.get('cms') || window._apiOrigin;
+            switch (which) {
+                case 'wordpress':
+                    return new WordPressAdapter({ cmsBaseUrl });
+                case 'drupal':
+                    return new DrupalAdapter({
+                        cmsBaseUrl,
+                        credentials: { username: 'admin', password: 'admin' },
+                    });
+                case 'plone':
+                    return new PloneAdapter({
+                        cmsBaseUrl,
+                        getAuthToken: () => getAccessToken(),
+                    });
+                default:
+                    throw new Error(`Unknown adapter '${which}'`);
+            }
+        }
         import { expandListingBlocks, ploneFetchItems, relatedItemsFetcher, searchShortcutsFetcher, rssFetcher, expandTemplates, expandTemplatesSync, contentPath } from '/helpers.js';
         import { sharedBlocksConfig } from '/shared-block-schemas.js';
         import { coreBlocksConfig } from '/core-block-schemas.js';
@@ -459,13 +487,10 @@
                     window._formDataCount = 0;
 
                     window.bridge = initBridge({
-                        adapter: new PloneAdapter({
-                            cmsBaseUrl: window._apiOrigin,
-                            // Resolved per request: the token arrives during
-                            // bootstrap, after this adapter is constructed.
-                            getAuthToken: () => getAccessToken(),
-                        }),
-                        cmsBaseUrl: window._apiOrigin,
+                        adapter: buildAdapter(),
+                        cmsBaseUrl:
+                            new URLSearchParams(window.location.search).get('cms') ||
+                            window._apiOrigin,
                         page: {
                             schema: {
                                 // Blocks fields: each is a key in the shared blocks_layout dict.
