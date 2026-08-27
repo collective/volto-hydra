@@ -1,6 +1,13 @@
 import { beforeAll, afterAll, beforeEach, describe, it, expect } from 'vitest';
 import { resolveTarget, type Target } from '../targets';
 
+/**
+ * Resolved at module scope so capability gating can happen at describe() time
+ * and show up as SKIPPED rather than as a silent pass. A test that quietly
+ * returns early looks identical to one that ran.
+ */
+const resolved = await resolveTarget();
+
 let target: Target;
 
 beforeAll(async () => {
@@ -16,7 +23,15 @@ beforeEach(async () => {
   await target.seed();
 });
 
-describe('search', () => {
+/**
+ * Full-text search is genuinely absent from some CMSes: core Drupal has no
+ * full-text index without the search_api contrib module. Requiring it of every
+ * adapter would force one to fake it — a title-substring filter dressed up as
+ * search, which silently misses anything not in a title. Adapters that cannot
+ * do it advertise search-filter instead, and reach content through
+ * querystringSearch and tree.list.
+ */
+describe.skipIf(!resolved.capabilities.includes('search-fulltext'))('search', () => {
   it('finds a seeded document by its title text', async () => {
     const res: any = await target.adapter.dispatch('search', {
       query: 'First',

@@ -68,6 +68,7 @@ export interface Target {
 const TARGETS: Record<string, () => Promise<{ default: Target }>> = {
   plone: () => import('./plone'),
   wordpress: () => import('./wordpress'),
+  drupal: () => import('./drupal'),
 };
 
 export async function resolveTarget(): Promise<Target> {

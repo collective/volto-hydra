@@ -26,9 +26,14 @@ export function resolveRelationship(relationship, index) {
   const data = relationship?.data;
   if (!data) return [];
   const refs = Array.isArray(data) ? data : [data];
-  return refs
-    .map((ref) => index.get(`${ref.type}:${ref.id}`))
-    .filter(Boolean);
+  // The id is ALWAYS present in JSON:API — `included` only supplies the
+  // entity body. Returning nothing when a reference was not included would
+  // discard information the response really does carry, and callers that
+  // only need the id (walking a menu tree, say) would see an empty tree.
+  return refs.map((ref) => {
+    const entity = index.get(`${ref.type}:${ref.id}`);
+    return entity ? { ...entity, id: ref.id, type: ref.type } : { id: ref.id, type: ref.type };
+  });
 }
 
 /**

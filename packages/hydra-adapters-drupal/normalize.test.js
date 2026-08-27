@@ -72,11 +72,18 @@ test('flatten keeps to-one single and to-many an array', () => {
   expect(flat.relationships.field_empty).toBeNull();
 });
 
-test('a reference pointing at something absent from included is dropped', () => {
+test('a reference not present in included keeps its id', () => {
+  // JSON:API always carries the id; `included` only adds the body. Dropping
+  // the reference would lose information the response actually has — and a
+  // menu tree walked by id would come back empty.
   const index = indexIncluded({ included: [] });
   const flat = flatten(payload.data, index);
-  expect(flat.relationships.uid).toBeNull();
-  expect(flat.relationships.field_tags).toEqual([]);
+  expect(flat.relationships.uid).toEqual({ id: 'uuid-user-1', type: 'user--user' });
+  expect(flat.relationships.uid.attributes).toBeUndefined();
+  expect(flat.relationships.field_tags.map((t) => t.id)).toEqual([
+    'uuid-term-1',
+    'uuid-term-2',
+  ]);
 });
 
 test('flattens a collection response', () => {
@@ -154,7 +161,9 @@ test('real relationships resolve without an included section', () => {
   // includes only when it needs them.
   const flat = flattenPayload(load('node-page'));
   const about = flat.find((n) => n.attributes.title === 'About');
-  expect(about.relationships.uid).toBeNull();
+  // No ?include= in this capture, so the body is absent but the id remains.
+  expect(about.relationships.uid.id).toBeTruthy();
+  expect(about.relationships.uid.attributes).toBeUndefined();
   expect(Object.keys(about.relationships)).toContain('node_type');
 });
 
