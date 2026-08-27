@@ -40,7 +40,10 @@ test.describe('editor journey', () => {
 
     // --- 2. create a page -------------------------------------------------
     await page.locator('#toolbar-add').click();
-    await page.getByRole('link', { name: /page|document/i }).first().click();
+    // Whatever addable type this CMS offers first. The submenu ids encode the
+    // TYPE NAME — #toolbar-add-document on Plone, #toolbar-add-page elsewhere
+    // — so naming one would quietly make this a Plone test.
+    await page.locator('[id^="toolbar-add-"]').first().click();
     await page.waitForURL(/\/add\?type=/, { timeout: 15000 });
 
     // The Add route renders Hydra's iframe, which hosts the adapter that

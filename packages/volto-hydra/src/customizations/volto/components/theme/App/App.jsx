@@ -3,6 +3,7 @@
  * @module components/theme/App/App
  */
 
+import AdapterHost from '../../../../../bridge/AdapterHost';
 import React, { Component } from 'react';
 import jwtDecode from 'jwt-decode';
 import PropTypes from 'prop-types';
@@ -129,6 +130,10 @@ export class App extends Component {
 
     return (
       <PluggablesProvider>
+        {/* HYDRA: hosts the frontend's adapter on EVERY route. Editing routes
+            without an iframe — the contents view above all — would otherwise
+            have no adapter and no way to reach the CMS. */}
+        <AdapterHost />
         {language && (
           <Helmet>
             <html lang={language} />
