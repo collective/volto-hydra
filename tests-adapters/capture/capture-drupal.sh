@@ -46,15 +46,58 @@ done
 #                                         menu link is reachable through a
 #                                         virtual folder in the contents view
 #                                         rather than being invisible.
-echo "==> installing site + enabling jsonapi"
+# Everything below was learned by doing; the official image is barer than it
+# looks. Each step exists because its absence produced a real failure:
+#
+#   - drupal:11 ships NO drush            -> composer require
+#   - and NO database                     -> sqlite, and the URL needs a host
+#                                            segment (driver://host/database)
+#   - vendor/bin/drush is a SHELL wrapper -> never invoke it through php
+#   - drush must be told the docroot      -> --root=/opt/drupal/web
+#   - Drupal 11's standard profile ships
+#     NO content types at all             -> apply the core recipes
+#   - JSON:API is READ-ONLY by default    -> every write would 405
+#   - field:create takes positional
+#     entityType and bundle, not --bundle
+echo "==> installing drush (composer; slowest step)"
 docker exec "$NAME" bash -lc '
   set -e
-  php -d memory_limit=-1 /opt/drupal/vendor/bin/drush site:install standard \
-    --account-name=admin --account-pass=admin --yes --site-name=HydraCapture
-  drush en jsonapi basic_auth menu_link_content --yes
-  drush field:create node --bundle=page --field-name=field_hydra_blocks \
-    --field-type=string_long --field-label="Hydra blocks" --is-required=0 --cardinality=1 --yes
+  cd /opt/drupal
+  composer require drush/drush --no-interaction --no-progress
 ' >/dev/null
+
+echo "==> installing site on sqlite"
+docker exec "$NAME" bash -lc '
+  set -e
+  cd /opt/drupal
+  chmod -R 777 web/sites/default
+  vendor/bin/drush --root=/opt/drupal/web site:install standard \
+    --db-url=sqlite://localhost/sites/default/files/.ht.sqlite \
+    --account-name=admin --account-pass=admin --site-name=HydraCapture --yes
+  chmod -R 777 web/sites/default
+' >/dev/null
+
+echo "==> content types, jsonapi, and the blocks field"
+docker exec "$NAME" bash -lc '
+  set -e
+  cd /opt/drupal/web
+  D="../vendor/bin/drush --root=/opt/drupal/web"
+  $D recipe core/recipes/page_content_type
+  $D recipe core/recipes/article_content_type
+  $D en jsonapi basic_auth menu_link_content --yes
+  $D config:set jsonapi.settings read_only 0 --yes
+  $D field:create node page --field-name=field_hydra_blocks \
+    --field-label="Hydra blocks" --field-type=string_long \
+    --field-widget=string_textarea --is-required=0 --cardinality=1 --yes
+  $D cr
+' >/dev/null
+
+echo "==> seeding a node so captured shapes are not empty"
+curl -sf -u admin:admin -X POST "${BASE}/jsonapi/node/page" \
+  -H 'Content-Type: application/vnd.api+json' \
+  -H 'Accept: application/vnd.api+json' \
+  -d '{"data":{"type":"node--page","attributes":{"title":"About","field_hydra_blocks":"{\"v\":1,\"blocks\":{\"b1\":{\"@type\":\"slate\"}}}","path":{"alias":"/about"}}}}' \
+  >/dev/null
 
 mkdir -p "$OUT"
 
@@ -68,7 +111,7 @@ capture() { # capture <name> <path>
 
 capture root                /jsonapi
 capture node-page           /jsonapi/node/page
-capture node-page-fields    '/jsonapi/node/page?page[limit]=1&include=uid'
+capture node-page-included  '/jsonapi/node/page?include=uid&page[limit]=1'
 capture menu-links          /jsonapi/menu_link_content/menu_link_content
 capture taxonomy-vocab      /jsonapi/taxonomy_vocabulary/taxonomy_vocabulary
 capture taxonomy-tags       /jsonapi/taxonomy_term/tags

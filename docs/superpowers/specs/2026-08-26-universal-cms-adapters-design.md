@@ -102,9 +102,27 @@ Blocks therefore live in `field_hydra_blocks`, a core `string_long` field added
 to the node bundle by configuration:
 
 ```bash
-drush field:create node --bundle=page \
-  --field-name=field_hydra_blocks --field-type=string_long
+# Positional entityType and bundle — there is no --bundle option.
+drush field:create node page \
+  --field-name=field_hydra_blocks --field-type=string_long \
+  --field-widget=string_textarea --is-required=0 --cardinality=1
 ```
+
+**Verified against real Drupal 11 on 2026-08-27.** Writes return 201 and the
+blocks JSON round-trips byte-for-byte — a core `string_long` is opaque text to
+Drupal, so there is none of the empty-map-versus-empty-list ambiguity PHP
+inflicts on WordPress. Standing up that site took seven steps the line above
+hides, each now encoded in `tests-adapters/capture/capture-drupal.sh`:
+
+| Assumption | Reality |
+| --- | --- |
+| the image has drush | it does not — `composer require drush/drush` |
+| the image has a database | it does not — SQLite, and the URL needs a host segment (`sqlite://localhost/…`) |
+| `php vendor/bin/drush` | it is a SHELL wrapper; through `php` it just echoes itself |
+| drush finds the site | only with `--root=/opt/drupal/web` |
+| `standard` ships page/article | **Drupal 11 ships no content types at all** — they are core recipes |
+| JSON:API accepts writes | read-only by default; every write 405s until `jsonapi.settings read_only 0` |
+| `field:create --bundle=page` | positional `node page`, and `--field-widget` is required |
 
 JSON:API then exposes it at `data.attributes.field_hydra_blocks` as a raw JSON
 string, with no normalization surprises.
