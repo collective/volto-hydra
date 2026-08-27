@@ -333,6 +333,45 @@ export class PloneAdapter extends BaseAdapter {
         };
       }
 
+      case 'content.move': {
+        // plone.restapi posts to the TARGET container with the source in the
+        // body; the object keeps its UID, which is what makes every stored
+        // link to it survive the move.
+        if (
+          args.targetParentPath === args.path ||
+          args.targetParentPath.startsWith(`${args.path}/`)
+        ) {
+          throw new AdapterError('Cannot move a document inside itself', {
+            code: 'INVALID_MOVE',
+            status: 400,
+          });
+        }
+        const result = await this.fetchJson(`${args.targetParentPath}/@move`, {
+          method: 'POST',
+          body: { source: args.path },
+        });
+        const target = Array.isArray(result) ? result[0]?.target : null;
+        const id = args.path.split('/').filter(Boolean).pop();
+        const destPath =
+          target ??
+          `${args.targetParentPath === '/' ? '' : args.targetParentPath}/${id}`;
+        return this.dispatchOnce('content.get', { path: destPath });
+      }
+
+      case 'content.order': {
+        const segments = args.path.split('/').filter(Boolean);
+        const objId = segments.pop();
+        const parentPath = `/${segments.join('/')}`;
+        await this.fetchJson(`${parentPath === '/' ? '' : parentPath}/@order`, {
+          method: 'POST',
+          body: {
+            obj_id: objId,
+            delta: args.targetIndex === 0 ? 'top' : 'bottom',
+          },
+        });
+        return null;
+      }
+
       case 'reference.resolve': {
         // Plone's own answer to this is resolveuid: store the UID, look up the
         // current path at render time. The catalog is the index that makes it

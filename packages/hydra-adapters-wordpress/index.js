@@ -414,6 +414,9 @@ export class WordPressAdapter extends BaseAdapter {
             status: 'any',
             context: 'edit',
             per_page: '100',
+            // Without this the ordering set by content.order is invisible.
+            orderby: 'menu_order',
+            order: 'asc',
           },
         });
         const parentSegments =
@@ -552,6 +555,53 @@ export class WordPressAdapter extends BaseAdapter {
           `Media ${media.id} has no retrievable image URL`,
           { code: 'NOT_FOUND', status: 404 },
         );
+      }
+
+      case 'content.move': {
+        if (
+          args.targetParentPath === args.path ||
+          args.targetParentPath.startsWith(`${args.path}/`)
+        ) {
+          throw new AdapterError('Cannot move a document inside itself', {
+            code: 'INVALID_MOVE',
+            status: 400,
+          });
+        }
+        const id = await this.resolvePath(args.path);
+        const parentId =
+          args.targetParentPath === '/'
+            ? 0
+            : await this.resolvePath(args.targetParentPath);
+
+        // A WordPress page's location IS its parent pointer, so descendants
+        // follow for free — their own parent pointers are untouched and the
+        // path is derived from the chain. The post id never changes, which is
+        // what keeps stored links resolving.
+        await this.fetchJson(`/wp/v2/${this.postType}/${id}`, {
+          method: 'POST',
+          body: { parent: parentId },
+        });
+
+        // Every cached path under the moved subtree is now wrong.
+        this.pathCache.clear();
+
+        const segments = args.path.split('/').filter(Boolean);
+        const slug = segments[segments.length - 1];
+        const destPath =
+          args.targetParentPath === '/'
+            ? `/${slug}`
+            : `${args.targetParentPath}/${slug}`;
+        return this.dispatchOnce('content.get', { path: destPath });
+      }
+
+      case 'content.order': {
+        const id = await this.resolvePath(args.path);
+        // WordPress orders pages by menu_order; lower sorts first.
+        await this.fetchJson(`/wp/v2/${this.postType}/${id}`, {
+          method: 'POST',
+          body: { menu_order: args.targetIndex },
+        });
+        return null;
       }
 
       case 'reference.resolve': {

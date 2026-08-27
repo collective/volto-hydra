@@ -120,6 +120,10 @@ const sessionBlobs = {};
 // only. Format: { sessionId: Set<'/path'> }
 const sessionDeletions = {};
 
+// Explicit child ordering per container, set by @order. Absent means "use the
+// natural order", which is what every existing test relies on.
+const sessionOrder = {};
+
 // Map URL paths to source directories (for loading content from disk)
 const contentDirMap = {};
 
@@ -1487,6 +1491,91 @@ app.post('/@logout', (req, res) => {
 });
 
 /**
+ * POST /:target/@move — relocate content into this container.
+ *
+ * plone.restapi posts to the TARGET folder with the source in the body. The
+ * mock keeps disk content immutable and shared, so a move is recorded as a
+ * session relocation: the subtree reads from its new path and 404s at the old
+ * one, for the calling session only.
+ */
+app.post('*/@move', (req, res) => {
+  const targetPath = req.path.replace('/@move', '') || '/';
+  const sessionId = getSessionId(req);
+  const rawSource = req.body?.source;
+  if (!rawSource) {
+    return res.status(400).json({
+      error: { type: 'BadRequest', message: '@move requires a source' },
+    });
+  }
+
+  // Source may be an absolute URL (as Plone sends) or a plain path.
+  let sourcePath = rawSource;
+  if (/^https?:\/\//.test(rawSource)) {
+    sourcePath = new URL(rawSource).pathname.replace('/++api++', '') || '/';
+  }
+
+  const source = getContent(sourcePath, sessionId);
+  if (!source) {
+    return res.status(404).json({
+      error: { type: 'NotFound', message: `No such resource: ${sourcePath}` },
+    });
+  }
+  if (targetPath === sourcePath || targetPath.startsWith(`${sourcePath}/`)) {
+    return res.status(400).json({
+      error: {
+        type: 'BadRequest',
+        message: 'Cannot move a document inside itself',
+      },
+    });
+  }
+
+  const id = sourcePath.split('/').filter(Boolean).pop();
+  const destPath = `${targetPath === '/' ? '' : targetPath}/${id}`;
+
+  // Relocate the whole subtree: every descendant path moves with its parent,
+  // exactly as a real move does. Anything else silently orphans children.
+  const everyPath = new Set([
+    ...Object.keys(contentDirMap),
+    ...Object.keys(sessionContent[sessionId] || {}),
+  ]);
+  for (const p of everyPath) {
+    if (p !== sourcePath && !p.startsWith(`${sourcePath}/`)) continue;
+    const moved = getContent(p, sessionId);
+    if (!moved) continue;
+    const suffix = p.slice(sourcePath.length);
+    const raw = JSON.parse(JSON.stringify(moved));
+    delete raw['@components'];
+    setSessionContent(sessionId, `${destPath}${suffix}`, raw);
+    if (!sessionDeletions[sessionId]) sessionDeletions[sessionId] = new Set();
+    sessionDeletions[sessionId].add(p);
+    if (raw.UID) uidToPathMap[raw.UID] = `${destPath}${suffix}`;
+  }
+
+  return res.json([{ source: sourcePath, target: destPath }]);
+});
+
+/**
+ * POST /:parent/@order — reorder a child within its container.
+ */
+app.post('*/@order', (req, res) => {
+  const parentPath = req.path.replace('/@order', '') || '/';
+  const sessionId = getSessionId(req);
+  const { obj_id: objId, delta } = req.body || {};
+  if (!objId) {
+    return res.status(400).json({
+      error: { type: 'BadRequest', message: '@order requires obj_id' },
+    });
+  }
+  if (!sessionOrder[sessionId]) sessionOrder[sessionId] = {};
+  const current = sessionOrder[sessionId][parentPath] || [];
+  const without = current.filter((entry) => entry !== objId);
+  const index = delta === 'top' ? 0 : Math.max(0, without.length);
+  without.splice(index, 0, objId);
+  sessionOrder[sessionId][parentPath] = without;
+  return res.status(204).send();
+});
+
+/**
  * DELETE /:path (content removal)
  *
  * Drops session-created content outright and tombstones disk-backed content
@@ -2727,6 +2816,18 @@ app.get('*/@search', (req, res) => {
       // skip it, don't crash formatSearchItem (same guard as the no-depth branch).
       .filter((content) => content != null)
       .map((content) => formatSearchItem(content, baseUrl));
+
+    // Honour an explicit ordering set via @order for this container. Items not
+    // named in it keep their natural position after the ones that are.
+    const explicit = sessionOrder[getSessionId(req)]?.[normalizedSearch];
+    if (explicit) {
+      const rank = (item) => {
+        const id = new URL(item['@id']).pathname.split('/').filter(Boolean).pop();
+        const at = explicit.indexOf(id);
+        return at === -1 ? explicit.length : at;
+      };
+      items.sort((a, b) => rank(a) - rank(b));
+    }
 
     // For root searches, also include non-root mount points as virtual folders
     // so the object browser can navigate into them (e.g., _test_data)
