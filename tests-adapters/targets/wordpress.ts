@@ -177,22 +177,54 @@ const target: Target = {
    * WordPress has no per-session content isolation, so a reset means deleting
    * what the previous file left behind and re-seeding.
    */
+  /**
+   * Reset in ONE request.
+   *
+   * This runs before every test to keep them isolated. Doing it over REST cost
+   * a listing, a DELETE per existing page and a POST per fixture — about
+   * thirteen sequential round trips against single-threaded PHP-WASM, ~10s,
+   * times sixty-odd tests. That was where the seventeen-minute run went; no
+   * adapter change moved it, because none of it was adapter work.
+   *
+   * The documents still come from seed.json and travel in the body, so the
+   * blueprint's PHP never becomes a second definition of the fixture.
+   */
   async seed() {
+    const documents = seed.documents
+      .filter((d) => d.path !== '/')
+      .sort((a, b) => a.path.split('/').length - b.path.split('/').length)
+      .map((doc) => ({
+        path: doc.path,
+        title: doc.title,
+        state: doc.state,
+        content:
+          '<!-- wp:hydra-blocks/document ' +
+          JSON.stringify({
+            v: 1,
+            blocks: (doc as any).blocks ?? {},
+            blocksLayout: (doc as any).blocksLayout ?? { items: [] },
+          }) +
+          ' /-->',
+      }));
+
     const res = await originalFetch(
-      `${BASE}/?rest_route=/wp/v2/pages&per_page=100&status=any&context=edit`,
-      { headers: { Cookie: cookie, 'X-WP-Nonce': nonce! } },
-    );
-    for (const page of await res.json()) {
-      await originalFetch(
-        `${BASE}/?rest_route=/wp/v2/pages/${page.id}&force=true`,
-        {
-          method: 'DELETE',
-          headers: { Cookie: cookie, 'X-WP-Nonce': nonce! },
+      `${BASE}/?rest_route=/hydra-test/v1/reset`,
+      {
+        method: 'POST',
+        headers: {
+          Cookie: cookie,
+          'X-WP-Nonce': nonce!,
+          'Content-Type': 'application/json',
         },
-      );
+        body: JSON.stringify({ documents }),
+      },
+    );
+    if (!res.ok) {
+      throw new Error(`Reset failed: ${res.status} ${await res.text()}`);
     }
+
     adapter.pathCache.clear();
-    await seedContent();
+    adapter.ancestorCache.clear();
   },
 };
 
