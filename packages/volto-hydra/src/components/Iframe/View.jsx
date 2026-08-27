@@ -668,7 +668,7 @@ const Iframe = (props) => {
     onChangeFormData,
     metadata,
     formData: form, // Keep for compatibility, but we'll use Redux selector for sync
-    token,
+    token: tokenFromProps,
     allowedBlocks,
     showRestricted,
     blocksConfig = config.blocks.blocksConfig,
@@ -845,6 +845,17 @@ const Iframe = (props) => {
       });
     }
   }, [selectedBlock]);
+
+  // The session token, from the store rather than from props.
+  //
+  // Routes differ in whether they thread it down: the Add route renders this
+  // through Form without one, so the iframe was built with
+  // "access_token=undefined" and the adapter could not authenticate — its
+  // whoami() threw, registration was abandoned, and the gate never opened.
+  // The store always has it, and it is the same value every caller was
+  // passing anyway.
+  const tokenFromStore = useSelector((state) => state.userSession?.token);
+  const token = tokenFromStore || tokenFromProps;
 
   const iframeOriginRef = useRef(null); // Store actual iframe origin from received messages
   // Backend RPC client. The frontend's adapter answers these over the bridge;
