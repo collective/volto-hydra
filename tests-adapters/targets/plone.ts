@@ -88,6 +88,7 @@ const target: Target = {
   vocabularies: { categories: 'hydra.test.categories' },
   vocabularySize: 10_000,
   imageScale: 'preview',
+  queryIndexes: { type: 'portal_type', path: 'path' },
   adapter,
 
   async start() {

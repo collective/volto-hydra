@@ -51,6 +51,14 @@ export type Intent =
    * adapter has to supply one.
    */
   | 'reference.resolve'
+  /**
+   * Listings. `querystring.getIndexes` describes what can be queried and how;
+   * `querystringSearch` runs one. Together they are the second highest volume
+   * call in a normal editing session after schema, because every listing,
+   * search and teaser block consults them.
+   */
+  | 'querystring.getIndexes'
+  | 'querystringSearch'
   /** Lifecycle position, available transitions and effective permissions. */
   | 'state.get'
   | 'state.transition'
@@ -105,6 +113,32 @@ export interface Reference {
   path: string;
   url: string;
   title: string;
+}
+
+/**
+ * One queryable field, and what may be done with it.
+ *
+ * Index NAMES are CMS-specific (Plone portal_type, WordPress post_type), the
+ * same way content type names are — callers discover them here rather than
+ * hardcoding. Operations are canonical so the query builder is CMS-neutral.
+ */
+export interface QueryIndex {
+  title: string;
+  description?: string;
+  group?: string;
+  enabled: boolean;
+  sortable: boolean;
+  /** Canonical operation ids this index supports, e.g. 'selection.any'. */
+  operations: string[];
+  /** Selectable values, when the index is an enumeration. */
+  values?: Record<string, { title: string }>;
+}
+
+/** One criterion: index, operation, value. */
+export interface QueryCriterion {
+  i: string;
+  o: string;
+  v?: unknown;
 }
 
 export interface Vocabulary {

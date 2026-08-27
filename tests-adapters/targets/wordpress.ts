@@ -123,6 +123,7 @@ const target: Target = {
   // execution limits decide, not us.
   vocabularySize: 0,
   imageScale: 'medium',
+  queryIndexes: { type: 'post_type', path: 'parent' },
   adapter,
 
   async start() {

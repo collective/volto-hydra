@@ -24,6 +24,19 @@ function decodeBase64Url(segment) {
 /** Plone serves its REST API under a ++api++ traversal prefix. */
 const API_PREFIX = '/++api++';
 
+/**
+ * Plone spells its query operations as fully-qualified dotted ids. The
+ * canonical form drops the package prefix so a query builder written against
+ * the contract does not have to know Plone exists.
+ */
+const OPERATION_PREFIX = 'plone.app.querystring.operation.';
+
+const toCanonicalOperation = (op) =>
+  op.startsWith(OPERATION_PREFIX) ? op.slice(OPERATION_PREFIX.length) : op;
+
+const toPloneOperation = (op) =>
+  op.startsWith(OPERATION_PREFIX) ? op : `${OPERATION_PREFIX}${op}`;
+
 /** Plone review_state -> canonical state. */
 const STATE_MAP = { published: 'published', private: 'draft' };
 
@@ -370,6 +383,44 @@ export class PloneAdapter extends BaseAdapter {
           },
         });
         return null;
+      }
+
+      case 'querystring.getIndexes': {
+        const raw = await this.fetchJson('/@querystring');
+        const indexes = {};
+        for (const [name, index] of Object.entries(raw.indexes ?? {})) {
+          indexes[name] = {
+            title: index.title,
+            description: index.description,
+            group: index.group,
+            enabled: index.enabled !== false,
+            sortable: index.sortable === true,
+            operations: (index.operations ?? []).map(toCanonicalOperation),
+            values: index.values,
+          };
+        }
+        return { indexes };
+      }
+
+      case 'querystringSearch': {
+        const raw = await this.fetchJson('/@querystring-search', {
+          method: 'POST',
+          body: {
+            query: (args.query ?? []).map((c) => ({
+              i: c.i,
+              o: toPloneOperation(c.o),
+              v: c.v,
+            })),
+            ...(args.sortOn ? { sort_on: args.sortOn } : {}),
+            ...(args.sortOrder ? { sort_order: args.sortOrder } : {}),
+            ...(args.limit ? { b_size: args.limit } : {}),
+          },
+        });
+        return {
+          items: (raw.items ?? []).map((i) => this.toBrief(i)),
+          total: raw.items_total ?? (raw.items ?? []).length,
+          batching: raw.batching,
+        };
       }
 
       case 'reference.resolve': {

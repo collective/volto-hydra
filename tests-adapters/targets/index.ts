@@ -34,6 +34,12 @@ export interface Target {
    * scale resolves to a fetchable image, not that every CMS agrees on names.
    */
   imageScale: string;
+  /**
+   * Canonical role -> this CMS's query index name. Plone calls the type index
+   * portal_type, WordPress post_type; callers discover the name rather than
+   * hardcoding one CMS's vocabulary.
+   */
+  queryIndexes: { type: string; path: string };
   /** Boot the backing CMS (or mock) and seed it. */
   start(): Promise<void>;
   stop(): Promise<void>;

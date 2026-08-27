@@ -604,6 +604,132 @@ export class WordPressAdapter extends BaseAdapter {
         return null;
       }
 
+      case 'querystring.getIndexes': {
+        // Discovered from the live site, not a hardcoded list. A WordPress
+        // install's queryable fields ARE its registered post types and
+        // taxonomies, which differ per site — a shop has product/category, a
+        // magazine has article/section. Hardcoding "categories and tags"
+        // would offer a query builder that does not describe this site, which
+        // is exactly as useless as offering Plone's portal_type here.
+        const [types, taxonomies] = await Promise.all([
+          this.fetchJson('/wp/v2/types'),
+          this.fetchJson('/wp/v2/taxonomies'),
+        ]);
+
+        const indexes = {
+          post_type: {
+            title: 'Type',
+            description: 'Content type',
+            group: 'Metadata',
+            enabled: true,
+            sortable: false,
+            operations: ['selection.any', 'selection.none'],
+            values: Object.fromEntries(
+              Object.entries(types).map(([id, t]) => [id, { title: t.name }]),
+            ),
+          },
+          parent: {
+            title: 'Location',
+            description: 'Parent page',
+            group: 'Metadata',
+            enabled: true,
+            sortable: false,
+            operations: ['string.absolutePath'],
+          },
+          status: {
+            title: 'State',
+            description: 'Publication status',
+            group: 'Metadata',
+            enabled: true,
+            sortable: false,
+            operations: ['selection.any'],
+            values: {
+              publish: { title: 'Published' },
+              draft: { title: 'Draft' },
+              pending: { title: 'Pending review' },
+              private: { title: 'Private' },
+            },
+          },
+          author: {
+            title: 'Author',
+            group: 'Metadata',
+            enabled: true,
+            sortable: false,
+            operations: ['selection.any'],
+          },
+          date: {
+            title: 'Date',
+            group: 'Dates',
+            enabled: true,
+            sortable: true,
+            operations: ['date.lessThan', 'date.largerThan'],
+          },
+        };
+
+        // One index per registered taxonomy, with its terms as values, so a
+        // custom taxonomy shows up in the query builder without any change
+        // here.
+        for (const [id, tax] of Object.entries(taxonomies)) {
+          if (tax.visibility && tax.visibility.public === false) continue;
+          indexes[id] = {
+            title: tax.name,
+            description: tax.description || undefined,
+            group: 'Categorization',
+            enabled: true,
+            sortable: false,
+            operations: ['selection.any', 'selection.none'],
+          };
+        }
+
+        return { indexes };
+      }
+
+      case 'querystringSearch': {
+        const params = {
+          status: 'any',
+          context: 'edit',
+          per_page: String(args.limit ?? 25),
+        };
+        let postType = this.postType;
+
+        for (const criterion of args.query ?? []) {
+          const value = Array.isArray(criterion.v) ? criterion.v : [criterion.v];
+          switch (criterion.i) {
+            case 'post_type':
+              postType = value[0];
+              break;
+            case 'parent':
+              params.parent = String(
+                await this.resolvePath(String(value[0])).catch(() => 0),
+              );
+              break;
+            case 'status':
+              params.status = value.join(',');
+              break;
+            case 'author':
+              params.author = value.join(',');
+              break;
+            default:
+              // A taxonomy index: WordPress filters by its rest_base with a
+              // comma-separated term list.
+              params[criterion.i] = value.join(',');
+          }
+        }
+
+        if (args.sortOn) params.orderby = args.sortOn;
+        if (args.sortOrder) params.order = args.sortOrder;
+
+        const posts = await this.fetchJson(`/wp/v2/${postType}`, { params });
+        const total = this.lastTotal;
+        const items = [];
+        for (const post of posts ?? []) {
+          items.push(
+            this.toDocument(post, this.pathFor(post, await this.ancestryOf(post))),
+          );
+        }
+        return { items, total };
+      }
+
       case 'reference.resolve': {
         // WordPress has no resolveuid. The post id IS stable across renames
         // and moves, but the permalink is not — so the id is what gets stored
