@@ -17,29 +17,54 @@ beforeEach(async () => {
 });
 
 describe('content.move', () => {
+  /**
+   * The contract fixes that the document ends up UNDER the new parent and is
+   * addressable there — deliberately not that its URL changed.
+   *
+   * Plone's path IS its tree position and WordPress derives the path from the
+   * parent chain, so both do change the URL. Drupal does not: menus carry
+   * structure and path aliases carry URLs, so re-parenting must not rewrite a
+   * published URL. Asserting a specific new path would force a Drupal adapter
+   * to fake one, which is how a contract quietly becomes a description of one
+   * CMS.
+   */
   it('relocates a document under a new parent', async () => {
     const moved: any = await target.adapter.dispatch('content.move', {
       path: '/about',
       targetParentPath: '/news',
     });
 
-    expect(moved.path).toBe('/news/about');
+    expect(moved.path).toBeTruthy();
 
+    // Addressable wherever it now lives.
     const fetched: any = await target.adapter.dispatch('content.get', {
-      path: '/news/about',
+      path: moved.path,
     });
     expect(fetched.title).toBe('About');
+
+    // And genuinely under the new parent, which is what "moved" means.
+    const children: any = await target.adapter.dispatch('tree.list', {
+      parent: '/news',
+    });
+    expect(children.items.map((i: any) => i.id)).toContain(moved.id);
   });
 
-  it('leaves nothing behind at the old path', async () => {
+  it('no longer appears under its old parent', async () => {
+    const before: any = await target.adapter.dispatch('content.get', {
+      path: '/about',
+    });
+
     await target.adapter.dispatch('content.move', {
       path: '/about',
       targetParentPath: '/news',
     });
 
-    await expect(
-      target.adapter.dispatch('content.get', { path: '/about' }),
-    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    // Membership, not addressability: a CMS may legitimately keep the old URL
+    // working. What must not survive is the old PARENT still claiming it.
+    const oldParent: any = await target.adapter.dispatch('tree.list', {
+      parent: '/',
+    });
+    expect(oldParent.items.map((i: any) => i.id)).not.toContain(before.id);
   });
 
   /**
@@ -77,7 +102,7 @@ describe('content.move', () => {
       id: before.id,
     });
     expect(ref.id).toBe(before.id);
-    expect(ref.path).toBe('/news/about');
+    expect(ref.path).toBeTruthy();
     expect(ref.title).toBe('About');
   });
 
@@ -87,12 +112,13 @@ describe('content.move', () => {
       path: '/news',
       targetParentPath: '/about',
     });
-    expect(moved.path).toBe('/about/news');
 
-    const child: any = await target.adapter.dispatch('content.get', {
-      path: '/about/news/first-post',
+    // The children came along: they are still children of the moved folder,
+    // wherever that folder now is.
+    const children: any = await target.adapter.dispatch('tree.list', {
+      parent: moved.path,
     });
-    expect(child.title).toBe('First Post');
+    expect(children.items.map((i: any) => i.title)).toContain('First Post');
   });
 
   it('rejects moving a document into itself', async () => {

@@ -360,6 +360,37 @@ where can I go" from "who has access", so it stays familiar to Plone users. Each
 half hides when its capability is absent — and `capabilities.spec.ts` already
 makes a false claim a test failure rather than a UI that lies.
 
+## 8b. Drupal hierarchy comes from menus, plus a virtual folder
+
+**Decided 2026-08-27.** Drupal has no content hierarchy in core. Nodes are
+flat and URLs come from path aliases, which carry no structural meaning. That
+collides with three things the contract asserts — `tree.list`, `breadcrumbs`
+and `content.move`.
+
+**Menu links are the hierarchy.** `tree.list` walks menu children,
+`breadcrumbs` follows the menu trail, and `content.move` re-parents the menu
+link. This is how Drupal sites actually express structure, and site builders
+already maintain it.
+
+**A virtual folder covers what menus miss.** The obvious hole in a menu-based
+hierarchy is content with no menu link: it would have no location and be
+invisible in the contents view. So the contents view exposes a virtual folder
+listing menu-less content, and giving such a document a home is the same
+operation as any other move — it creates the menu link.
+
+Two consequences recorded so they are not rediscovered:
+
+- **A node may appear in several menus, or none.** The adapter designates one
+  menu as the structural one; the rest are navigation only.
+- **Moving does NOT change a Drupal URL.** Menus carry structure, aliases
+  carry URLs, and re-parenting must not rewrite a published address. The move
+  contract was corrected for this: it now asserts the document ends up under
+  the new parent and is addressable there, NOT that its path changed. Plone
+  (path is tree position) and WordPress (path derives from the parent chain)
+  both still change it; requiring that would have forced a Drupal adapter to
+  fake a path, which is how a contract quietly becomes a description of one
+  CMS.
+
 ## 9. Out of scope
 
 Unchanged from `hydra-plan.md`: history diff, comments, relations, content
