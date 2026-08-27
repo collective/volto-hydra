@@ -124,7 +124,7 @@ class Api {
         } = {},
       ) => {
         // HYDRA: bridge if one is live right now, stock superagent otherwise.
-        const bridge = bridgeFor();
+          const bridge = bridgeFor();
         if (bridge) {
           return bridge[method](path, { params, data, type, headers, attach });
         }

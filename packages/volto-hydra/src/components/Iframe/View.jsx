@@ -11,7 +11,7 @@ import { validateAndLog, validateTemplatePlaceholders } from '../../utils/formDa
 import { toast } from 'react-toastify';
 import { getIframeUrlCookieName } from '../../utils/cookieNames';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
-import { BridgeRPC } from '@volto-hydra/hydra-js/bridgeRpc';
+import { getBridgeRpc, setBridgeTargetOrigin } from '../../bridge/client';
 import {
   isSlateFieldType,
   formDataContentEqual,
@@ -845,20 +845,10 @@ const Iframe = (props) => {
   const iframeOriginRef = useRef(null); // Store actual iframe origin from received messages
   // Backend RPC client. The frontend's adapter answers these over the bridge;
   // the admin holds no CMS credentials and makes no direct CMS request.
-  const rpcRef = useRef(null);
-  if (!rpcRef.current) {
-    rpcRef.current = new BridgeRPC({
-      // Gated: the admin now depends on the iframe's adapter to fetch the very
-      // content the iframe needs in order to render. A request sent while the
-      // iframe is between documents has nobody to answer it, and the editor
-      // sits blank until that request times out.
-      gated: true,
-      send: (msg) =>
-        document
-          .getElementById('previewIframe')
-          ?.contentWindow?.postMessage(msg, iframeOriginRef.current),
-    });
-  }
+  // The one client, created at module load so the editor bootstrap's @types
+  // and @querystring calls find it. Creating another here would leave those
+  // queued on an instance nobody ever releases.
+  const rpcRef = useRef(getBridgeRpc());
   // What the frontend's adapter told us it is and can do (ADAPTER_READY).
   // Null until the handshake completes; UI affordances gate on it.
   const [adapterInfo, setAdapterInfo] = useState(null);
@@ -2104,17 +2094,6 @@ const Iframe = (props) => {
     }
   }, [pendingDelete]);
 
-  // The Api shadow is constructed by Volto's start-client before any React
-  // tree exists, so there is no context or store for it to read. One window
-  // handle is the seam. Named ...Rpc because hydra-js already owns
-  // window.__hydraBridge (the Bridge instance) inside the iframe.
-  useEffect(() => {
-    window.__hydraBridgeRpc = rpcRef.current;
-    return () => {
-      delete window.__hydraBridgeRpc;
-    };
-  }, []);
-
   useEffect(() => {
     const initialUrlOrigin = iframeSrc && new URL(iframeSrc).origin;
     const messageHandler = (event) => {
@@ -2124,6 +2103,7 @@ const Iframe = (props) => {
       // Store the actual iframe origin from the first message we receive
       if (!iframeOriginRef.current) {
         iframeOriginRef.current = event.origin;
+        setBridgeTargetOrigin(event.origin);
       }
       const { type } = event.data;
 

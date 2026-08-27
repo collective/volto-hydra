@@ -1,3 +1,6 @@
+// Publishes window.__hydraBridgeRpc at module load — before any route can
+// dispatch, which is earlier than any component effect could manage.
+import './bridge/client';
 import { defineMessages } from 'react-intl';
 import filterSVG from '@plone/volto/icons/filter.svg';
 

@@ -1,0 +1,67 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import config from '@plone/volto/registry';
+import Api from '../customizations/volto/helpers/Api/Api';
+
+/**
+ * The routing decision, pinned.
+ *
+ * Standalone Hydra has no CMS of its own, so a direct fetch in bridge mode is
+ * not a fallback — it is a request aimed at nothing, or at the wrong CMS
+ * entirely. These assertions exist so nobody can reintroduce one as a
+ * well-meaning "graceful degradation".
+ */
+
+const originalFlag = config.settings.useBridgeBackend;
+
+beforeEach(() => {
+  delete window.__hydraBridgeRpc;
+});
+
+afterEach(() => {
+  config.settings.useBridgeBackend = originalFlag;
+  delete window.__hydraBridgeRpc;
+});
+
+describe('Api transport selection', () => {
+  // Routing is decided PER CALL, not in the constructor: Volto builds one Api
+  // at boot and the store closes over it for the app's lifetime, long before
+  // any bridge exists. A constructor-time choice can only ever be wrong.
+  it('routes a call over the bridge when one is published', async () => {
+    config.settings.useBridgeBackend = true;
+    const request = vi.fn().mockResolvedValue({ ok: 1 });
+    window.__hydraBridgeRpc = { request };
+
+    await new Api().get('/news');
+
+    expect(request).toHaveBeenCalledWith(
+      'http',
+      expect.objectContaining({ op: 'get', path: '/news' }),
+    );
+  });
+
+  it('throws rather than fetching directly when the bridge is missing', () => {
+    config.settings.useBridgeBackend = true;
+    // The client is published at module load, so its absence means bridge
+    // mode is on with no bridge at all — a bug, not a reason to fall back.
+    expect(() => new Api().get('/news')).toThrow(/cannot reach a CMS by itself/);
+  });
+
+  it('leaves stock behaviour alone when the flag is off', () => {
+    config.settings.useBridgeBackend = false;
+    const api = new Api();
+    for (const method of ['get', 'post', 'put', 'patch', 'del']) {
+      expect(typeof api[method]).toBe('function');
+    }
+    // No bridge consulted, no throw: this is stock superagent.
+    expect(() => api.get('/news')).not.toThrow();
+  });
+
+  it('keeps SSR on the direct path — there is no iframe at render time', () => {
+    config.settings.useBridgeBackend = true;
+    const request = vi.fn();
+    window.__hydraBridgeRpc = { request };
+    const api = new Api({ universalCookies: { get: () => null } });
+    api.get('/news');
+    expect(request).not.toHaveBeenCalled();
+  });
+});
