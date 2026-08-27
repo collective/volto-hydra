@@ -31,6 +31,10 @@ const port = (envName: string, def: number): number => {
 export const PORTS = {
   /** Mock Plone REST API (started by `pnpm start:mock-api`). */
   mockApi: port('HYDRA_MOCK_API_PORT', 8888),
+  /** Mock Drupal JSON:API, for the three-CMS journey. */
+  mockDrupal: port('HYDRA_MOCK_DRUPAL_PORT', 8794),
+  /** WordPress Playground, for the three-CMS journey. */
+  wordpress: port('HYDRA_WORDPRESS_PORT', 8795),
   /** Test frontend: HTML + bridge fixture served by Vite (`pnpm start:test-frontend`). */
   testFrontend: port('HYDRA_TEST_FRONTEND_PORT', 8889),
   /** Mock-parent test surface for bridge isolation tests. */

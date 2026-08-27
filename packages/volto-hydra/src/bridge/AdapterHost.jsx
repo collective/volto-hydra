@@ -1,13 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
+import { useLocation } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import config from '@plone/volto/registry';
 import { getIframeUrlCookieName } from '../utils/cookieNames';
 import { getURlsFromEnv } from '../utils/getSavedURLs';
-import {
-  isEditingIframeMounted,
-  subscribeEditingIframe,
-} from './client';
 
 /**
  * A hidden iframe whose only job is to host the frontend's adapter.
@@ -28,10 +25,20 @@ export default function AdapterHost() {
   const [isClient, setIsClient] = useState(false);
   useEffect(() => setIsClient(true), []);
 
-  // Stand down whenever the editor is on screen: that iframe already hosts an
-  // adapter, and a second one would load the frontend twice for no gain.
-  const [editing, setEditing] = useState(isEditingIframeMounted());
-  useEffect(() => subscribeEditingIframe(setEditing), []);
+  // Which routes get a host is decided by the ROUTE, not by timing.
+  //
+  // Two timing-based attempts failed here, both racy in the same way: this
+  // component sits above the editor in App's tree, so anything based on "has
+  // the editor mounted yet" is a guess about render order, and a delay long
+  // enough to be safe on one route is too long on another. The route is known
+  // synchronously and cannot race.
+  //
+  // Deliberately narrow: it covers the contents view, which is the editing
+  // route that renders no iframe. It is not a general answer for every
+  // adapter-less route, and control panels still need their own delegation to
+  // the CMS's own admin.
+  const { pathname } = useLocation();
+  const needsHost = /\/contents\/?$/.test(pathname);
 
   const frontendUrl =
     useSelector((state) => state.frontendPreviewUrl?.url) ||
@@ -48,7 +55,7 @@ export default function AdapterHost() {
   // Only meaningful in a bridge session, and only on the client: there is no
   // iframe at render time on the server.
   if (!config.settings.useBridgeBackend || !isClient || !frontendUrl) return null;
-  if (editing) return null;
+  if (!needsHost) return null;
 
   const src = (() => {
     const url = new URL(frontendUrl, window.location.origin);

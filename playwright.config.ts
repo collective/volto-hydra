@@ -18,6 +18,10 @@ const needsAstro = projectArg?.includes('astro');
 // Example frontends — opt-in only (not started unless explicitly requested)
 const needsNextjs = projectArg?.includes('nextjs');
 const needsF7 = projectArg?.includes('f7');
+// The journey runs the same spec against each CMS; only the requested one is
+// started, because booting all three costs minutes for no benefit.
+const needsDrupal = projectArg?.includes('journey-drupal');
+const needsWordPress = projectArg?.includes('journey-wordpress');
 // The bridge-mock project runs the admin with the backend inversion on. It is
 // an env var rather than a test fixture because the Api helper is constructed
 // by Volto's start-client before any test code runs.
@@ -263,6 +267,27 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
+        storageState: 'tests-playwright/fixtures/storage-journey-plone.json',
+      },
+    },
+    {
+      name: 'journey-drupal',
+      testDir: 'tests-playwright/journey',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        storageState: 'tests-playwright/fixtures/storage-journey-drupal.json',
+      },
+    },
+    {
+      name: 'journey-wordpress',
+      testDir: 'tests-playwright/journey',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        storageState: 'tests-playwright/fixtures/storage-journey-wordpress.json',
       },
     },
 
@@ -451,6 +476,30 @@ export default defineConfig({
             CI: process.env.CI || 'true',
           },
         },
+    // Mock Drupal JSON:API — only for journey-drupal.
+    ...(needsDrupal ? [{
+      name: 'Mock Drupal',
+      command: `node tests-adapters/fixtures/mock-drupal-api.cjs`,
+      url: `http://127.0.0.1:${PORTS.mockDrupal}/health`,
+      timeout: 30 * 1000,
+      reuseExistingServer: true,
+      cwd: process.cwd(),
+      stdout: 'pipe' as const,
+      stderr: 'pipe' as const,
+      env: { PORT: String(PORTS.mockDrupal) },
+    }] : []),
+    // WordPress Playground — real WordPress on PHP-WASM; slow to boot, so it
+    // is only started when the WordPress journey is actually requested.
+    ...(needsWordPress ? [{
+      name: 'WordPress Playground',
+      command: `pnpm dlx @wp-playground/cli@latest server --port ${PORTS.wordpress} --login --blueprint tests-adapters/fixtures/wp-blueprint.json`,
+      url: `http://127.0.0.1:${PORTS.wordpress}/`,
+      timeout: 300 * 1000,
+      reuseExistingServer: true,
+      cwd: process.cwd(),
+      stdout: 'pipe' as const,
+      stderr: 'pipe' as const,
+    }] : []),
     // Nuxt frontend for testing Nuxt-specific scenarios (only started when running nuxt tests)
     ...(needsNuxt ? [{
       name: 'Nuxt Frontend (Test)',
