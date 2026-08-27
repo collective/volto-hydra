@@ -124,6 +124,22 @@ const sessionDeletions = {};
 // natural order", which is what every existing test relies on.
 const sessionOrder = {};
 
+/**
+ * @move and @copy accept either one source or a list — the contents view lets
+ * an editor select several rows and paste them together, so Volto always sends
+ * whatever was selected. Each entry may be an absolute URL or a plain path.
+ */
+function normaliseSources(raw) {
+  const list = Array.isArray(raw) ? raw : [raw];
+  return list.filter(Boolean).map((entry) => {
+    const value = typeof entry === 'string' ? entry : entry?.['@id'];
+    if (typeof value !== 'string') return null;
+    return /^https?:\/\//.test(value)
+      ? new URL(value).pathname.replace('/++api++', '') || '/'
+      : value;
+  }).filter(Boolean);
+}
+
 // Map URL paths to source directories (for loading content from disk)
 const contentDirMap = {};
 
@@ -1499,21 +1515,18 @@ app.post('/@logout', (req, res) => {
  * one, for the calling session only.
  */
 app.post('*/@move', (req, res) => {
+  console.log('[DIAG-MOVE]', req.path, JSON.stringify(req.body));
   const targetPath = req.path.replace('/@move', '') || '/';
   const sessionId = getSessionId(req);
-  const rawSource = req.body?.source;
-  if (!rawSource) {
+  const sources = normaliseSources(req.body?.source);
+  if (sources.length === 0) {
     return res.status(400).json({
       error: { type: 'BadRequest', message: '@move requires a source' },
     });
   }
 
-  // Source may be an absolute URL (as Plone sends) or a plain path.
-  let sourcePath = rawSource;
-  if (/^https?:\/\//.test(rawSource)) {
-    sourcePath = new URL(rawSource).pathname.replace('/++api++', '') || '/';
-  }
-
+  const results = [];
+  for (const sourcePath of sources) {
   const source = getContent(sourcePath, sessionId);
   if (!source) {
     return res.status(404).json({
@@ -1551,12 +1564,48 @@ app.post('*/@move', (req, res) => {
     if (raw.UID) uidToPathMap[raw.UID] = `${destPath}${suffix}`;
   }
 
-  return res.json([{ source: sourcePath, target: destPath }]);
+  results.push({ source: sourcePath, target: destPath });
+  }
+
+  return res.json(results);
 });
 
 /**
  * POST /:parent/@order — reorder a child within its container.
  */
+/**
+ * POST /:target/@copy — duplicate content into this container.
+ *
+ * Same shape as @move, but the source stays put and the copy gets a fresh UID
+ * so it is a genuinely distinct document rather than a second path onto one.
+ */
+app.post('*/@copy', (req, res) => {
+  console.log('[DIAG-COPY]', req.path, JSON.stringify(req.body));
+  const targetPath = req.path.replace('/@copy', '') || '/';
+  const sessionId = getSessionId(req);
+  const sources = normaliseSources(req.body?.source);
+  if (sources.length === 0) {
+    return res.status(400).json({
+      error: { type: 'BadRequest', message: '@copy requires a source' },
+    });
+  }
+  const sourcePath = sources[0];
+  const source = getContent(sourcePath, sessionId);
+  if (!source) {
+    return res.status(404).json({
+      error: { type: 'NotFound', message: `No such resource: ${sourcePath}` },
+    });
+  }
+  const id = sourcePath.split('/').filter(Boolean).pop();
+  const destPath = `${targetPath === '/' ? '' : targetPath}/${id}`;
+  const raw = JSON.parse(JSON.stringify(source));
+  delete raw['@components'];
+  raw.UID = `${raw.UID || id}-copy-${Object.keys(sessionContent[sessionId] || {}).length}`;
+  setSessionContent(sessionId, destPath, raw);
+  uidToPathMap[raw.UID] = destPath;
+  return res.json([{ source: sourcePath, target: destPath }]);
+});
+
 app.post('*/@order', (req, res) => {
   const parentPath = req.path.replace('/@order', '') || '/';
   const sessionId = getSessionId(req);
@@ -2800,8 +2849,13 @@ app.get('*/@search', (req, res) => {
     const normalizedSearch = (searchPath === '' || searchPath === '/') ? '/' : searchPath;
     const searchDepth = normalizedSearch === '/' ? 0 : normalizedSearch.split('/').filter(Boolean).length;
 
-    // Get direct children from contentDirMap (items at searchDepth + 1)
-    items = Object.keys(contentDirMap)
+    // Direct children, from disk AND from anything this session created or
+    // moved here. Enumerating contentDirMap alone would miss a page that was
+    // just pasted in and would keep listing one that was cut away, which is
+    // precisely what the contents view is for.
+    const sessionPaths = Object.keys(sessionContent[getSessionId(req)] || {});
+    const candidates = new Set([...Object.keys(contentDirMap), ...sessionPaths]);
+    items = [...candidates]
       .filter((itemPath) => {
         if (itemPath === '/') return false;
         if (itemPath === normalizedSearch) return false;
@@ -2811,7 +2865,7 @@ app.get('*/@search', (req, res) => {
         const itemParts = itemPath.split('/').filter(Boolean);
         return itemParts.length === searchDepth + 1;
       })
-      .map((itemPath) => loadContentFromDisk(itemPath))
+      .map((itemPath) => getContent(itemPath, getSessionId(req)))
       // A dir with no parseable data.json (e.g. `templates/`) loads as null —
       // skip it, don't crash formatSearchItem (same guard as the no-depth branch).
       .filter((content) => content != null)
