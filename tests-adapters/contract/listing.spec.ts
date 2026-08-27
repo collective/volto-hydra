@@ -97,6 +97,21 @@ describe('querystringSearch', () => {
     });
     expect(res.items.length).toBeGreaterThan(0);
     expect(res.items.map((i: any) => i.path)).toContain('/news/first-post');
+
+    // Prove the filter was APPLIED, not ignored. WordPress has no title query
+    // param, so setting one returns the whole collection — which satisfies the
+    // assertions above and looks like a working filter. Only a query that must
+    // match nothing can tell the two apart.
+    const none: any = await target.adapter.dispatch('querystringSearch', {
+      query: [
+        {
+          i: target.queryIndexes.title,
+          o: 'string.contains',
+          v: 'zzzz-no-such-title-zzzz',
+        },
+      ],
+    });
+    expect(none.items).toEqual([]);
   });
 
   it('filters by a multi-value selection', async () => {

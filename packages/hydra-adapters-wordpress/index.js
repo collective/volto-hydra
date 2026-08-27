@@ -115,6 +115,14 @@ export class WordPressAdapter extends BaseAdapter {
     this.nonce = nonce ?? null;
     this.postType = postType;
     this.pathCache = new Map();
+    // id -> {slug, parent}. Rebuilding a path walks the parent chain one
+    // request per ancestor, and a listing repeats that walk for every sibling:
+    // 20 posts under /news fetched /news 20 times. Cleared by any mutation,
+    // since a move changes exactly this.
+    this.ancestorCache = new Map();
+    // type id -> REST base. 'page' is served at /wp/v2/pages, so a filter
+    // carrying the type id built /wp/v2/page and 404'd.
+    this.restBases = null;
   }
 
   async init(ctx) {
@@ -231,14 +239,37 @@ export class WordPressAdapter extends BaseAdapter {
     const segments = [];
     let parentId = post.parent;
     while (parentId) {
-      const parent = await this.fetchJson(
-        `/wp/v2/${this.postType}/${parentId}`,
-        { params: { context: 'edit' } },
-      );
-      segments.unshift(parent.slug);
-      parentId = parent.parent;
+      let entry = this.ancestorCache.get(parentId);
+      if (!entry) {
+        const parent = await this.fetchJson(
+          `/wp/v2/${this.postType}/${parentId}`,
+          { params: { context: 'edit' } },
+        );
+        entry = { slug: parent.slug, parent: parent.parent };
+        this.ancestorCache.set(parentId, entry);
+      }
+      segments.unshift(entry.slug);
+      parentId = entry.parent;
     }
     return segments;
+  }
+
+  /**
+   * REST base for a post type id, e.g. page -> pages.
+   *
+   * Returns null for a type this site does not have. Filtering by a
+   * non-existent type has no results by definition, and guessing an endpoint
+   * from the id turns that into a 404 the caller cannot distinguish from a
+   * broken request.
+   */
+  async restBaseFor(typeId) {
+    if (!this.restBases) {
+      const types = await this.fetchJson('/wp/v2/types');
+      this.restBases = new Map(
+        Object.entries(types ?? {}).map(([id, t]) => [id, t.rest_base ?? id]),
+      );
+    }
+    return this.restBases.get(typeId) ?? null;
   }
 
   pathFor(post, ancestry) {
@@ -340,6 +371,7 @@ export class WordPressAdapter extends BaseAdapter {
           params: { force: 'true' },
         });
         this.pathCache.delete(args.path);
+        this.ancestorCache.clear();
         return null;
       }
 
@@ -596,6 +628,7 @@ export class WordPressAdapter extends BaseAdapter {
 
         // Every cached path under the moved subtree is now wrong.
         this.pathCache.clear();
+        this.ancestorCache.clear();
 
         const segments = args.path.split('/').filter(Boolean);
         const slug = segments[segments.length - 1];
@@ -629,6 +662,14 @@ export class WordPressAdapter extends BaseAdapter {
         ]);
 
         const indexes = {
+          title: {
+            title: 'Title',
+            description: 'Words in the title or body',
+            group: 'Metadata',
+            enabled: true,
+            sortable: true,
+            operations: ['string.contains'],
+          },
           post_type: {
             title: 'Type',
             description: 'Content type',
@@ -708,7 +749,8 @@ export class WordPressAdapter extends BaseAdapter {
           const value = Array.isArray(criterion.v) ? criterion.v : [criterion.v];
           switch (criterion.i) {
             case 'post_type':
-              postType = value[0];
+              postType = await this.restBaseFor(String(value[0]));
+              if (postType === null) return { items: [], total: 0 };
               break;
             case 'parent':
               params.parent = String(
@@ -720,6 +762,12 @@ export class WordPressAdapter extends BaseAdapter {
               break;
             case 'author':
               params.author = value.join(',');
+              break;
+            case 'title':
+              // WordPress has no title query param — setting one is silently
+              // ignored and the endpoint returns everything, which reads as a
+              // filter that works. ?search= is the real one.
+              params.search = String(value[0]);
               break;
             default:
               // A taxonomy index: WordPress filters by its rest_base with a

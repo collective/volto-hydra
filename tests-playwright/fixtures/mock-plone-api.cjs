@@ -2694,6 +2694,18 @@ app.post('*/@querystring-search', (req, res) => {
       if (value) {
         allItems = allItems.filter((item) => matchSearchableText(value, item));
       }
+    } else if (index === 'Title' && operation.includes('string.contains')) {
+      // The Title index is its own catalog index, distinct from SearchableText.
+      // Without this branch a Title criterion matched nothing in the chain and
+      // was dropped, so the endpoint returned the whole collection and any
+      // test asserting "the filter found something" passed without filtering.
+      if (value) {
+        allItems = allItems.filter((item) =>
+          String(item.title ?? '')
+            .toLowerCase()
+            .includes(String(value).toLowerCase()),
+        );
+      }
     } else if (index === 'exclude_from_nav' && operation.includes('boolean')) {
       // Nav listings filter out items marked exclude_from_nav: true.
       // Mirrors Plone's plone.app.querystring.operation.boolean.{isFalse,isTrue}.
@@ -2705,6 +2717,14 @@ app.post('*/@querystring-search', (req, res) => {
       // Note: `review_state` and `Subject` selection.{any,all,none} are
       // handled generically above via `selectionFields` (which already
       // maps both indices), so we don't need explicit branches here.
+    } else {
+      // Never drop a criterion quietly. An ignored filter returns the whole
+      // collection, which looks exactly like a filter that matched everything
+      // — the failure mode that hid the missing Title branch above.
+      console.warn(
+        `[MOCK-API] @querystring-search: unhandled criterion '${index}' ` +
+          `with operation '${operation}' — returning unfiltered results`,
+      );
     }
   }
 
