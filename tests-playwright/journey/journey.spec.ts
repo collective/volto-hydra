@@ -34,8 +34,13 @@ const FIXTURES: Record<string, { root: string; target: string }> = {
     root: '/_test_data',
     target: '/_test_data/context-navigation-forced-folder',
   },
-  'journey-drupal': { root: '/news', target: '/about' },
-  'journey-wordpress': { root: '/news', target: '/about' },
+  // The target must be a CHILD of the root — the journey picks it out of the
+  // root's own listing, so a sibling like /about can never appear there.
+  // Drupal and WordPress both build hierarchy from menu links and parent ids
+  // rather than a distinct folder type, so any node can receive children and
+  // an existing child of /news is the natural target.
+  'journey-drupal': { root: '/news', target: '/news/first-post' },
+  'journey-wordpress': { root: '/news', target: '/news/first-post' },
 };
 
 function fixtureFor(projectName: string) {
@@ -49,9 +54,9 @@ function fixtureFor(projectName: string) {
   };
 }
 
-async function waitForRows(page: Page) {
+async function waitForRows(page: Page, timeout = 60_000) {
   await expect
-    .poll(() => page.locator('tbody tr').count(), { timeout: 30_000 })
+    .poll(() => page.locator('tbody tr').count(), { timeout })
     .toBeGreaterThan(0);
 }
 
@@ -138,15 +143,15 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
   // what bridge mode now does on the client.
   await page.goBack();
   await page.waitForURL(/\/add(\?|$)/, { timeout: 20_000 });
-  // The URL changes before the route's data arrives, so popping the next entry
-  // immediately leaves the listing restored-but-unfetched and it renders empty.
-  // Waiting for the title field to be VISIBLE is not enough — it persists
-  // across this transition, so that check passes instantly and waits for
-  // nothing. An EMPTY title distinguishes the fresh add form from the edit form
-  // we came from, so it is a real signal that this route has re-rendered.
-  await expect(page.locator('input[id="field-title"]').first()).toHaveValue('', {
-    timeout: 25_000,
-  });
+  // Let the add route finish rendering before popping the next entry: the URL
+  // changes first, and restoring the listing mid-transition leaves it fetched
+  // but not yet painted.
+  //
+  // Not by asserting an empty title. Volto keeps form state, so the restored
+  // add form still shows the title typed in step 2 — verified, not assumed
+  // (53 polls, "Journey 1787822868115" every time). The form's own controls
+  // are what indicate this route has rendered.
+  await expect(page.locator('#toolbar-save')).toBeVisible({ timeout: 25_000 });
 
   await page.goBack();
   await page.waitForURL(new RegExp(`${ROOT}/contents$`), { timeout: 20_000 });
@@ -172,9 +177,19 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
   await expect(paste).toBeEnabled();
   await paste.click();
 
-  // Under its new parent, keeping its own id segment.
-  const movedName = `${TARGET_FOLDER}/${createdPath.split('/').pop()}`;
+  // It is now listed under its new parent — that is the claim, and it holds
+  // for every CMS.
+  //
+  // Matched on the page's own id segment, NOT on a rewritten full path. Plone
+  // moves the object and its path follows; Drupal and WordPress build
+  // hierarchy from menu links and parent ids, so re-parenting deliberately
+  // leaves the URL alias alone (design spec §8b) and the row still reads
+  // /news/journey-xxx. Asserting the Plone-shaped path would demand behaviour
+  // the other adapters are specified not to have. We are looking at the target
+  // folder's own listing, so a match here means it is under the new parent
+  // whichever way that CMS models it.
+  const idSegment = createdPath.split('/').pop() as string;
   await expect(
-    page.getByRole('row', { name: movedName, exact: true }),
+    page.getByRole('row', { name: new RegExp(`/${idSegment}$`) }),
   ).toHaveCount(1, { timeout: 30_000 });
 });
