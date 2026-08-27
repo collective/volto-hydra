@@ -179,6 +179,107 @@ function filterValue(req, field) {
   return typeof entry === 'object' ? entry.value : entry;
 }
 
+/**
+ * Evaluate JSON:API filter groups the way Drupal does.
+ *
+ * Shorthand `filter[title]=x` is an EQUALS match — not a substring one. Any
+ * other operator needs the extended form, and combining conditions needs an
+ * explicit group:
+ *
+ *   filter[t][condition][path]=title
+ *   filter[t][condition][operator]=CONTAINS
+ *   filter[t][condition][value]=First
+ *   filter[t][condition][memberOf]=any
+ *   filter[any][group][conjunction]=OR
+ *
+ * The mock previously treated the shorthand as a substring match, which no
+ * real Drupal does; an adapter written against that would have searched
+ * correctly here and returned nothing in production.
+ */
+function valueAtPath(node, path) {
+  switch (path) {
+    case 'title':
+      return node.title;
+    case 'status':
+      return node.status;
+    case 'path.alias':
+      return node.alias;
+    case 'node_type':
+    case 'node_type.meta.drupal_internal__target_id':
+      return node.type;
+    case 'field_hydra_blocks':
+      return node.blocks;
+    default:
+      return undefined;
+  }
+}
+
+function matchesCondition(node, { path, operator = '=', value }) {
+  const actual = valueAtPath(node, path);
+  const wanted = value;
+  switch (String(operator).toUpperCase()) {
+    case 'CONTAINS':
+      return String(actual ?? '')
+        .toLowerCase()
+        .includes(String(wanted ?? '').toLowerCase());
+    case 'STARTS_WITH':
+      return String(actual ?? '').startsWith(String(wanted ?? ''));
+    case 'ENDS_WITH':
+      return String(actual ?? '').endsWith(String(wanted ?? ''));
+    case '<>':
+      return String(actual) !== String(wanted);
+    case '=':
+    default:
+      if (typeof actual === 'boolean') {
+        return actual === (wanted === '1' || wanted === 'true' || wanted === true);
+      }
+      return String(actual) === String(wanted);
+  }
+}
+
+function applyFilters(list, req) {
+  const filter = req.query.filter;
+  if (!filter || typeof filter !== 'object') return list;
+
+  const groups = {}; // name -> conjunction
+  const conditions = []; // {path, operator, value, memberOf}
+
+  for (const [key, entry] of Object.entries(filter)) {
+    if (entry && typeof entry === 'object' && entry.group) {
+      groups[key] = String(entry.group.conjunction ?? 'AND').toUpperCase();
+      continue;
+    }
+    if (entry && typeof entry === 'object' && entry.condition) {
+      conditions.push({ ...entry.condition });
+      continue;
+    }
+    // Shorthand: filter[field]=value, or filter[field][value]=value.
+    const value = entry && typeof entry === 'object' ? entry.value : entry;
+    conditions.push({ path: key, operator: '=', value });
+  }
+
+  return list.filter((node) => {
+    const grouped = {};
+    let ok = true;
+    for (const cond of conditions) {
+      const result = matchesCondition(node, cond);
+      if (cond.memberOf) {
+        (grouped[cond.memberOf] ??= []).push(result);
+      } else if (!result) {
+        ok = false;
+      }
+    }
+    if (!ok) return false;
+    for (const [name, results] of Object.entries(grouped)) {
+      const conjunction = groups[name] ?? 'AND';
+      const satisfied =
+        conjunction === 'OR' ? results.some(Boolean) : results.every(Boolean);
+      if (!satisfied) return false;
+    }
+    return true;
+  });
+}
+
 function pageLimit(req) {
   const page = req.query.page;
   const limit = page && typeof page === 'object' ? page.limit : undefined;
@@ -406,21 +507,7 @@ app.get('/jsonapi/node/:bundle', (req, res) => {
   const { nodes } = stateFor(req);
   let list = [...nodes.values()].filter((n) => n.type === req.params.bundle);
 
-  const alias = filterValue(req, 'path.alias');
-  if (alias) list = list.filter((n) => n.alias === alias);
-
-  const title = filterValue(req, 'title');
-  if (title !== undefined) {
-    list = list.filter((n) => n.title.includes(String(title)));
-  }
-
-  const nodeType = filterValue(req, 'node_type');
-  if (nodeType !== undefined) list = list.filter((n) => n.type === nodeType);
-
-  const status = filterValue(req, 'status');
-  if (status !== undefined) {
-    list = list.filter((n) => n.status === (status === '1' || status === 'true'));
-  }
+  list = applyFilters(list, req);
 
   const total = list.length;
   const limit = pageLimit(req);

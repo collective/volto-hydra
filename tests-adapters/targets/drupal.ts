@@ -54,8 +54,9 @@ const target: Target = {
   name: 'drupal',
   capabilities: [
     'content',
-    // No search-fulltext: core Drupal has no full-text index without
-    // search_api, and capabilities.spec enforces that we do not claim one.
+    // JSON:API filter groups match on title OR stored block content without
+    // search_api, so this is real search over the document, not a title trick.
+    'search-fulltext',
     'search-filter',
     'vocabulary',
     'schema',

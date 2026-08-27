@@ -25,9 +25,9 @@ export class DrupalAdapter extends BaseAdapter {
       name: 'drupal',
       capabilities: [
         'content',
-        // Core Drupal has no full-text index; that needs the search_api
-        // contrib module. Advertising search-fulltext here would hand the
-        // editor a search box that quietly returns nothing.
+        // JSON:API filter groups search title OR stored block content with
+        // CONTAINS, so core Drupal answers this without search_api.
+        'search-fulltext',
         'search-filter',
         'vocabulary',
         'schema',
@@ -276,6 +276,37 @@ export class DrupalAdapter extends BaseAdapter {
         return null;
       }
 
+      case 'search': {
+        // Core Drupal has no search index, but JSON:API filter groups do real
+        // work: an OR group over the title and the stored block content
+        // matches the same documents a title-only filter would miss. No
+        // search_api, no contrib module.
+        //
+        // Note the shorthand filter[title]=x is an EQUALS match in Drupal;
+        // substring matching requires the extended condition form below.
+        const q = String(args.query ?? '');
+        if (!q) return { items: [], total: 0 };
+
+        const params = new URLSearchParams();
+        params.set('filter[any][group][conjunction]', 'OR');
+        for (const [name, path] of [
+          ['t', 'title'],
+          ['b', 'field_hydra_blocks'],
+        ]) {
+          params.set(`filter[${name}][condition][path]`, path);
+          params.set(`filter[${name}][condition][operator]`, 'CONTAINS');
+          params.set(`filter[${name}][condition][value]`, q);
+          params.set(`filter[${name}][condition][memberOf]`, 'any');
+        }
+        if (args.limit) params.set('page[limit]', String(args.limit));
+
+        const flat = flattenPayload(
+          await this.fetchJson(`/jsonapi/node/${this.bundle}?${params}`),
+        );
+        const items = (flat ?? []).map((n) => this.toDocument(n));
+        return { items, total: items.length };
+      }
+
       case 'tree.list': {
         const links = await this.allMenuLinks();
 
@@ -337,14 +368,6 @@ export class DrupalAdapter extends BaseAdapter {
         }
         return { items };
       }
-
-      // `search` is the FULL-TEXT intent and core Drupal has no full-text
-      // index — that needs the search_api contrib module. Answering it with a
-      // title-substring filter would be the dishonest option: the editor gets
-      // a search box that silently misses anything not in a title. Filtered
-      // discovery goes through querystringSearch instead, which is why this
-      // adapter advertises search-filter and not search-fulltext.
-
 
       case 'auth.whoami': {
         const payload = await this.fetchJson('/jsonapi/user/user');

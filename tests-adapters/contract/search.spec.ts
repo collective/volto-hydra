@@ -24,12 +24,11 @@ beforeEach(async () => {
 });
 
 /**
- * Full-text search is genuinely absent from some CMSes: core Drupal has no
- * full-text index without the search_api contrib module. Requiring it of every
- * adapter would force one to fake it — a title-substring filter dressed up as
- * search, which silently misses anything not in a title. Adapters that cannot
- * do it advertise search-filter instead, and reach content through
- * querystringSearch and tree.list.
+ * Every target runs this. The gate stays because the contract allows a CMS
+ * without search, but no adapter we ship uses it: Plone has its catalog,
+ * WordPress has ?search=, and core Drupal answers with JSON:API filter groups
+ * over title and stored block content. A skip here means a real capability
+ * gap to close, not a CMS difference to accept.
  */
 describe.skipIf(!resolved.capabilities.includes('search-fulltext'))('search', () => {
   it('finds a seeded document by its title text', async () => {
