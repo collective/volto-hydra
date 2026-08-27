@@ -717,12 +717,20 @@ test.describe('Page Creation', () => {
     // on, that iframe hosts the adapter that answers getSchema, and a route
     // without one deadlocks.
     await helper.waitForSidebarOpen();
-    // The sidebar opens on the Blocks tab; page metadata lives behind the
-    // "Page" tab.
-    await page.getByRole('button', { name: 'Page', exact: true }).click();
     const sidebar = page.locator('#sidebar-properties');
     const titleField = sidebar.locator('input[id="field-title"]').first();
-    await expect(titleField).toBeVisible({ timeout: 15000 });
+    // isVisible() is instantaneous: if the sidebar has not rendered yet it
+    // answers false, and clicking the tab then navigates AWAY from the field
+    // being waited for. Wait for the field first, and only fall back to the
+    // tab if it genuinely is not there.
+    const appeared = await titleField
+      .waitFor({ state: 'visible', timeout: 10000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!appeared) {
+      await page.getByRole('button', { name: 'Page', exact: true }).click();
+      await expect(titleField).toBeVisible({ timeout: 15000 });
+    }
     await titleField.fill(tc.titleFieldFill);
     await page.locator('#toolbar-save, button:has-text("Save")').click();
 

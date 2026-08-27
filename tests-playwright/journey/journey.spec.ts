@@ -37,12 +37,21 @@ async function openContents(page: Page, helper: AdminUIHelper, path: string) {
 /** Page metadata lives behind the sidebar's Page tab in the visual editor. */
 async function fillTitle(page: Page, helper: AdminUIHelper, title: string) {
   await helper.waitForSidebarOpen();
-  await page.getByRole('button', { name: 'Page', exact: true }).click();
   const field = page
     .locator('#sidebar-properties')
     .locator('input[id="field-title"]')
     .first();
-  await expect(field).toBeVisible({ timeout: 20_000 });
+  // isVisible() is instantaneous: if the sidebar has not rendered yet it
+  // answers false, and clicking the tab then navigates AWAY from the field we
+  // are waiting for. Wait first, fall back to the tab only if needed.
+  const appeared = await field
+    .waitFor({ state: 'visible', timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!appeared) {
+    await page.getByRole('button', { name: 'Page', exact: true }).click();
+    await expect(field).toBeVisible({ timeout: 20_000 });
+  }
   await field.fill(title);
 }
 
