@@ -1273,9 +1273,22 @@ export class AdminUIHelper {
 
   /**
    * Get the type of block currently being edited in the sidebar.
+   *
+   * Reads the block-editor's own type class FIRST (`block-editor-<type>`, which
+   * Volto renders for every block), so this answers for any type. The
+   * hand-listed slate/image checks below only ever covered those two, and
+   * returned null for everything else — indistinguishable from "the sidebar is
+   * showing nothing", which is the state a caller usually wants to rule out.
    */
   async getSidebarBlockType(): Promise<string | null> {
     const sidebar = this.page.locator('#sidebar-properties');
+
+    const typed = sidebar.locator('[class*="block-editor-"]').first();
+    if (await typed.isVisible().catch(() => false)) {
+      const cls = (await typed.getAttribute('class')) || '';
+      const match = cls.match(/block-editor-([\w-]+)/);
+      if (match) return match[1];
+    }
 
     // Check for common block type indicators
     const selectors = [
@@ -3312,6 +3325,17 @@ export class AdminUIHelper {
     const container = options.container || '#sidebar-properties';
     const fieldWrapper = this.page.locator(`${container} .field-wrapper-${fieldName}`);
 
+    // WAIT for the field, don't probe once. The sidebar form re-renders when the
+    // selection changes, so a caller that selects a block and immediately sets a
+    // field races that render — and the single isVisible() check below would
+    // answer "no" for a field that appears a moment later, then fall through to
+    // a silent return (now a throw). Waiting here is not a blind sleep: it is
+    // the app's own signal that the form for this block is up.
+    await fieldWrapper
+      .first()
+      .waitFor({ state: 'visible', timeout: 5000 })
+      .catch(() => {});
+
     // Try text input
     const input = fieldWrapper.locator('input[type="text"], input[type="url"], textarea');
     if (await input.isVisible()) {
@@ -3347,6 +3371,25 @@ export class AdminUIHelper {
       await contentEditable.blur(); // Trigger blur to commit the value
       return;
     }
+
+    // Nothing matched. Failing here rather than returning quietly: a silent
+    // no-op surfaces much later as "the block didn't render" or "the value
+    // didn't stick", and the real cause — a wrong field name, a sidebar that
+    // isn't showing this block, a widget shape this helper doesn't drive — is
+    // invisible by then. Name what IS on offer so the caller can see which.
+    const available = await this.page
+      .locator(`${container} [class*="field-wrapper-"]`)
+      .evaluateAll((els) =>
+        els
+          .map((e) => (e.className.match(/field-wrapper-([\w-]+)/) || [])[1])
+          .filter(Boolean),
+      );
+    throw new Error(
+      `setSidebarFieldValue('${fieldName}'): no input, textarea or contenteditable ` +
+        `found in ${container}. Fields present: [${available.join(', ') || 'none'}]. ` +
+        `If that list is empty the sidebar is not showing a block form at all ` +
+        `(open it, or select the block first).`,
+    );
   }
 
   /**
