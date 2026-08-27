@@ -21,6 +21,15 @@ import { AdminUIHelper } from '../helpers/AdminUIHelper';
 const STAMP = Date.now();
 const TITLE = `Journey ${STAMP}`;
 
+/**
+ * WHERE the journey runs, per CMS. Fixture paths are environment data, not
+ * behaviour — the same distinction the contract suite draws with Target.types.
+ * Every CMS seeds a different tree; none of the STEPS differ.
+ */
+const ROOT = process.env.JOURNEY_ROOT ?? '/_test_data';
+const TARGET_FOLDER =
+  process.env.JOURNEY_TARGET_FOLDER ?? '/_test_data/context-navigation-forced-folder';
+
 async function waitForRows(page: Page) {
   await expect
     .poll(() => page.locator('tbody tr').count(), { timeout: 30_000 })
@@ -33,7 +42,7 @@ test('create a page, link to another, then move it', async ({ page }) => {
   await helper.login();
 
   // --- 1. browse existing content ---------------------------------------
-  await page.goto(`${helper.adminUrl}/_test_data/contents`);
+  await page.goto(`${helper.adminUrl}${ROOT}/contents`);
   await waitForRows(page);
 
   // --- 2. create a page --------------------------------------------------
@@ -80,7 +89,7 @@ test('create a page, link to another, then move it', async ({ page }) => {
   await page.waitForURL((url) => !url.pathname.includes('/add'), {
     timeout: 30_000,
   });
-  await expect(page).toHaveURL(/\/_test_data\/[^/]+(\/edit)?$/, {
+  await expect(page).toHaveURL(new RegExp(`${ROOT}/[^/]+(/edit)?$`), {
     timeout: 25_000,
   });
   const createdPath = new URL(page.url()).pathname.replace(/\/edit$/, '');
@@ -120,7 +129,7 @@ test('create a page, link to another, then move it', async ({ page }) => {
   });
 
   await page.goBack();
-  await page.waitForURL(/\/_test_data\/contents$/, { timeout: 20_000 });
+  await page.waitForURL(new RegExp(`${ROOT}/contents$`), { timeout: 20_000 });
   await waitForRows(page);
 
   const created = page.getByRole('row', { name: createdPath, exact: true });
@@ -132,12 +141,9 @@ test('create a page, link to another, then move it', async ({ page }) => {
   await expect(cut).toBeEnabled();
   await cut.click();
 
-  const folder = page.getByRole('row', {
-    name: '/_test_data/context-navigation-forced-folder',
-    exact: true,
-  });
+  const folder = page.getByRole('row', { name: TARGET_FOLDER, exact: true });
   await folder.getByRole('link').first().click();
-  await expect(page).toHaveURL(/context-navigation-forced-folder\/contents$/, {
+  await expect(page).toHaveURL(new RegExp(`${TARGET_FOLDER}/contents$`), {
     timeout: 20_000,
   });
   await waitForRows(page);
@@ -147,9 +153,7 @@ test('create a page, link to another, then move it', async ({ page }) => {
   await paste.click();
 
   // Under its new parent, keeping its own id segment.
-  const movedName = `/_test_data/context-navigation-forced-folder/${createdPath
-    .split('/')
-    .pop()}`;
+  const movedName = `${TARGET_FOLDER}/${createdPath.split('/').pop()}`;
   await expect(
     page.getByRole('row', { name: movedName, exact: true }),
   ).toHaveCount(1, { timeout: 30_000 });

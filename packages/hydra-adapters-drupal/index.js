@@ -50,7 +50,7 @@ export class DrupalAdapter extends BaseAdapter {
   /** Drupal requires a CSRF token for every write. */
   async fetchCsrfToken() {
     const res = await fetch(`${this.cmsBaseUrl}/session/token`, {
-      credentials: 'include',
+      credentials: this.credentials ? 'omit' : 'include',
       headers: this.authHeaders(),
     });
     if (!res.ok) return null;
@@ -73,8 +73,13 @@ export class DrupalAdapter extends BaseAdapter {
     if (method !== 'GET' && this.csrfToken) headers['X-CSRF-Token'] = this.csrfToken;
 
     const res = await fetch(`${this.cmsBaseUrl}${route}${qs}`, {
+      // With explicit credentials we must NOT also send cookies: a wildcard
+      // Access-Control-Allow-Origin — what a dev CMS typically returns —
+      // makes the browser reject a credentialled cross-origin request
+      // outright, surfacing only as "Failed to fetch". Cookie auth is the
+      // same-origin case. The Plone adapter had this exact bug.
+      credentials: this.credentials ? 'omit' : 'include',
       method,
-      credentials: 'include',
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
     });
@@ -466,7 +471,7 @@ export class DrupalAdapter extends BaseAdapter {
           `${this.cmsBaseUrl}/jsonapi/node/${this.bundle}/field_media_image`,
           {
             method: 'POST',
-            credentials: 'include',
+            credentials: this.credentials ? 'omit' : 'include',
             headers: {
               ...this.authHeaders(),
               ...(this.csrfToken ? { 'X-CSRF-Token': this.csrfToken } : {}),

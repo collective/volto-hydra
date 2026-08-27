@@ -273,6 +273,9 @@ export default defineConfig({
     {
       name: 'journey-drupal',
       testDir: 'tests-playwright/journey',
+      // Drupal's mock seeds the canonical set (/news, /about); the Plone mock
+      // serves its own test tree under /_test_data. Different fixtures, same
+      // journey.
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },

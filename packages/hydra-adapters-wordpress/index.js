@@ -157,7 +157,11 @@ export class WordPressAdapter extends BaseAdapter {
 
     const res = await fetch(this.url(route, params), {
       method,
-      credentials: 'include',
+      // With an explicit nonce we must NOT also send cookies: a wildcard
+      // Access-Control-Allow-Origin makes the browser reject a credentialled
+      // cross-origin request outright, surfacing only as "Failed to fetch".
+      // Same bug the Plone and Drupal adapters had.
+      credentials: this.nonce ? 'omit' : 'include',
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
     });
@@ -481,7 +485,11 @@ export class WordPressAdapter extends BaseAdapter {
         const type = await this.fetchJson(`/wp/v2/types/${args.type}`);
         const res = await fetch(this.url(`/wp/v2/${type.rest_base}`), {
           method: 'OPTIONS',
-          credentials: 'include',
+          // With an explicit nonce we must NOT also send cookies: a wildcard
+      // Access-Control-Allow-Origin makes the browser reject a credentialled
+      // cross-origin request outright, surfacing only as "Failed to fetch".
+      // Same bug the Plone and Drupal adapters had.
+      credentials: this.nonce ? 'omit' : 'include',
           headers: this.nonce ? { 'X-WP-Nonce': this.nonce } : {},
         });
         const described = await res.json();
@@ -501,7 +509,11 @@ export class WordPressAdapter extends BaseAdapter {
         const binary = Uint8Array.from(atob(args.data), (c) => c.charCodeAt(0));
         const res = await fetch(this.url('/wp/v2/media'), {
           method: 'POST',
-          credentials: 'include',
+          // With an explicit nonce we must NOT also send cookies: a wildcard
+      // Access-Control-Allow-Origin makes the browser reject a credentialled
+      // cross-origin request outright, surfacing only as "Failed to fetch".
+      // Same bug the Plone and Drupal adapters had.
+      credentials: this.nonce ? 'omit' : 'include',
           headers: {
             ...(this.nonce ? { 'X-WP-Nonce': this.nonce } : {}),
             'Content-Type': args.contentType,
