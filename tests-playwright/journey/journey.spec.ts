@@ -26,9 +26,28 @@ const TITLE = `Journey ${STAMP}`;
  * behaviour — the same distinction the contract suite draws with Target.types.
  * Every CMS seeds a different tree; none of the STEPS differ.
  */
-const ROOT = process.env.JOURNEY_ROOT ?? '/_test_data';
-const TARGET_FOLDER =
-  process.env.JOURNEY_TARGET_FOLDER ?? '/_test_data/context-navigation-forced-folder';
+const FIXTURES: Record<string, { root: string; target: string }> = {
+  // Plone's mock serves the site's own test tree; the others seed the shared
+  // canonical fixture (/news, /about). Playwright cannot set process.env per
+  // project, so the run names its own fixture.
+  'journey-plone': {
+    root: '/_test_data',
+    target: '/_test_data/context-navigation-forced-folder',
+  },
+  'journey-drupal': { root: '/news', target: '/about' },
+  'journey-wordpress': { root: '/news', target: '/about' },
+};
+
+function fixtureFor(projectName: string) {
+  const fixture = FIXTURES[projectName];
+  // A new CMS must declare where it seeds content; defaulting would silently
+  // run the journey against a tree that does not exist and report empty.
+  if (!fixture) throw new Error(`No journey fixture declared for ${projectName}`);
+  return {
+    root: process.env.JOURNEY_ROOT ?? fixture.root,
+    target: process.env.JOURNEY_TARGET_FOLDER ?? fixture.target,
+  };
+}
 
 async function waitForRows(page: Page) {
   await expect
@@ -36,8 +55,9 @@ async function waitForRows(page: Page) {
     .toBeGreaterThan(0);
 }
 
-test('create a page, link to another, then move it', async ({ page }) => {
+test('create a page, link to another, then move it', async ({ page }, testInfo) => {
   test.setTimeout(180_000);
+  const { root: ROOT, target: TARGET_FOLDER } = fixtureFor(testInfo.project.name);
   const helper = new AdminUIHelper(page);
   await helper.login();
 

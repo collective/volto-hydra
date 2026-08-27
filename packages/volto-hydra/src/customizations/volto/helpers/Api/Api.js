@@ -24,6 +24,7 @@ import {
 } from '@plone/volto/helpers/Url/Url';
 // HYDRA: bridge transport, used instead of superagent inside a Hydra session.
 import { BridgeApi } from '../../../../bridge/BridgeApi';
+import { getAdapterInfo, whenAdapterReady } from '../../../../bridge/client';
 
 const methods = ['get', 'post', 'put', 'patch', 'del'];
 
@@ -105,7 +106,8 @@ class Api {
             'The admin cannot reach a CMS by itself.',
         );
       }
-      if (!bridgeApis.has(rpc)) bridgeApis.set(rpc, new BridgeApi(rpc));
+      if (!bridgeApis.has(rpc))
+        bridgeApis.set(rpc, new BridgeApi(rpc, { getAdapterInfo, whenAdapterReady }));
       return bridgeApis.get(rpc);
     };
 

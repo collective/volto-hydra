@@ -1,0 +1,123 @@
+import { describe, it, expect, vi } from 'vitest';
+import { BridgeApi } from './BridgeApi';
+import { routeToIntent } from './intentRouter';
+import { plonify } from './plonify';
+
+const semanticAdapter = () => ({ capabilities: ['content', 'search-filter'] });
+const passthroughAdapter = () => ({ capabilities: ['content', 'http-passthrough'] });
+
+const doc = {
+  id: 'uuid-1',
+  path: '/news/first-post',
+  type: 'Document',
+  title: 'First post',
+  blocks: { a: { '@type': 'slate' } },
+  blocksLayout: { items: ['a'] },
+  fields: { description: 'hi' },
+  state: 'published',
+};
+
+describe('routeToIntent', () => {
+  it.each([
+    ['get', '/_test_data/@types/Document', 'types.getSchema'],
+    ['get', '/@querystring', 'querystring.getIndexes'],
+    ['get', '/@users/admin', 'auth.whoami'],
+    ['get', '/news/@search?path.depth=1', 'tree.list'],
+    ['get', '/@search?SearchableText=x', 'search'],
+    ['get', '/news/first-post', 'content.get'],
+    ['patch', '/news/first-post', 'content.update'],
+    ['post', '/news', 'content.create'],
+    ['del', '/news/first-post', 'content.delete'],
+    ['get', '/news/@breadcrumbs', 'breadcrumbs.get'],
+    ['post', '/news/@workflow/publish', 'state.transition'],
+    ['post', '/target/@move', 'content.move'],
+  ])('%s %s -> %s', (op, path, intent) => {
+    expect(routeToIntent({ op, path, data: {} })?.intent).toBe(intent);
+  });
+
+  it('returns null for endpoints with no canonical form', () => {
+    expect(routeToIntent({ op: 'get', path: '/x/@history' })).toBeNull();
+  });
+
+  it('distinguishes a folder listing from a search', () => {
+    // path.depth=1 is how the contents view asks for children; treating it as
+    // a fulltext search would ask CMSes for an index they may not have.
+    expect(routeToIntent({ op: 'get', path: '/n/@search?path.depth=1' }).intent).toBe('tree.list');
+    expect(routeToIntent({ op: 'get', path: '/n/@search?b_size=5' }).intent).toBe('search');
+  });
+
+  it('maps blocks_layout onto the canonical blocksLayout on update', () => {
+    const r = routeToIntent({
+      op: 'patch',
+      path: '/a',
+      data: { title: 'T', blocks: {}, blocks_layout: { items: ['x'] } },
+    });
+    expect(r.args.data.blocksLayout).toEqual({ items: ['x'] });
+    expect(r.args.data.blocks_layout).toBeUndefined();
+  });
+});
+
+describe('plonify', () => {
+  it('renders a Document in the shape reducers read', () => {
+    const p = plonify('content.get', doc);
+    expect(p['@id']).toBe('/news/first-post');
+    expect(p['@type']).toBe('Document');
+    expect(p.id).toBe('first-post');
+    expect(p.UID).toBe('uuid-1');
+    expect(p.blocks_layout).toEqual({ items: ['a'] });
+    expect(p.review_state).toBe('published');
+    expect(p.description).toBe('hi');
+  });
+
+  it('renders listings with items_total', () => {
+    const p = plonify('tree.list', { items: [doc], total: 1 }, { path: '/news' });
+    expect(p.items_total).toBe(1);
+    expect(p.items[0]['@id']).toBe('/news/first-post');
+  });
+
+  it('splits query indexes into sortable and all', () => {
+    const p = plonify('querystring.getIndexes', {
+      Title: { title: 'Title', sortable: true, enabled: true, operations: [] },
+      Sub: { title: 'Subject', sortable: false, enabled: true, operations: [] },
+    });
+    expect(Object.keys(p.indexes)).toEqual(['Title', 'Sub']);
+    expect(Object.keys(p.sortable_indexes)).toEqual(['Title']);
+  });
+});
+
+describe('BridgeApi transport selection', () => {
+  it('uses the passthrough when the adapter advertises it', async () => {
+    const rpc = { request: vi.fn().mockResolvedValue({}) };
+    await new BridgeApi(rpc, { getAdapterInfo: passthroughAdapter }).get('/@querystring');
+    expect(rpc.request).toHaveBeenCalledWith('http', expect.objectContaining({ op: 'get' }));
+  });
+
+  it('routes semantically when the adapter does not', async () => {
+    const rpc = { request: vi.fn().mockResolvedValue(doc) };
+    const out = await new BridgeApi(rpc, { getAdapterInfo: semanticAdapter }).get('/news/first-post');
+    expect(rpc.request).toHaveBeenCalledWith('content.get', { path: '/news/first-post' });
+    expect(out['@id']).toBe('/news/first-post');
+  });
+
+  it('folds Volto params into the path before matching', async () => {
+    const rpc = { request: vi.fn().mockResolvedValue({ items: [], total: 0 }) };
+    await new BridgeApi(rpc, { getAdapterInfo: semanticAdapter }).get('/news/@search', {
+      params: { 'path.depth': '1' },
+    });
+    expect(rpc.request).toHaveBeenCalledWith('tree.list', { parent: '/news' });
+  });
+
+  it('fails loudly on an unroutable path rather than returning empty', async () => {
+    const rpc = { request: vi.fn() };
+    await expect(
+      new BridgeApi(rpc, { getAdapterInfo: semanticAdapter }).get('/x/@history'),
+    ).rejects.toThrow(/No canonical intent/);
+    expect(rpc.request).not.toHaveBeenCalled();
+  });
+
+  it('treats an unannounced adapter as passthrough', async () => {
+    const rpc = { request: vi.fn().mockResolvedValue({}) };
+    await new BridgeApi(rpc, { getAdapterInfo: () => null }).get('/anything');
+    expect(rpc.request).toHaveBeenCalledWith('http', expect.objectContaining({ op: 'get' }));
+  });
+});

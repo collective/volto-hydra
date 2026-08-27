@@ -22,6 +22,23 @@ afterEach(() => {
   delete window.__hydraBridgeRpc;
 });
 
+/**
+ * Speak as the frontend does on connect.
+ *
+ * Which transport a request takes depends on what the adapter says it can
+ * serve, so a test that never announces one is not testing routing — it is
+ * testing the unannounced state, which production never reaches: the adapter
+ * host is mounted on every route.
+ */
+function announceAdapter(capabilities) {
+  window.dispatchEvent(
+    new MessageEvent('message', {
+      data: { type: 'ADAPTER_READY', name: 'test', capabilities, protocolVersion: 1 },
+      origin: window.location.origin,
+    }),
+  );
+}
+
 describe('Api transport selection', () => {
   // Routing is decided PER CALL, not in the constructor: Volto builds one Api
   // at boot and the store closes over it for the app's lifetime, long before
@@ -30,6 +47,7 @@ describe('Api transport selection', () => {
     config.settings.useBridgeBackend = true;
     const request = vi.fn().mockResolvedValue({ ok: 1 });
     window.__hydraBridgeRpc = { request };
+    announceAdapter(['content', 'http-passthrough']);
 
     await new Api().get('/news');
 

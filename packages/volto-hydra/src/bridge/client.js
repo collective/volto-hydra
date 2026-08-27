@@ -104,6 +104,8 @@ export function getBridgeRpc() {
  * queued behind it. The client owns its own transport so it works regardless
  * of what is on screen.
  */
+const ADAPTER_ANNOUNCE_TIMEOUT_MS = 15_000;
+
 function installListener(rpcClient) {
   window.addEventListener('message', (event) => {
     const type = event.data?.type;
@@ -132,6 +134,7 @@ function installListener(rpcClient) {
         user: event.data.user,
       };
       rpcClient.markReady();
+      resolveAdapterReady?.(lastAdapter);
     }
   });
 }
@@ -141,6 +144,32 @@ let lastAdapter = null;
 
 export function getAdapterInfo() {
   return lastAdapter;
+}
+
+/**
+ * Resolves once the frontend has said what it is.
+ *
+ * Callers that only need a request answered can rely on the RPC queue, which
+ * already holds traffic until readiness. Callers that must *decide something*
+ * from the adapter's capabilities cannot: they run at call time, before the
+ * announcement, and would bake in a default that never gets revisited. That is
+ * exactly how every request ended up on the passthrough regardless of which
+ * CMS was connected.
+ *
+ * Resolves with null if no adapter ever announces, so a missing frontend
+ * surfaces as the usual NO_ADAPTER error instead of a hang here.
+ */
+let resolveAdapterReady;
+const adapterReadyPromise =
+  typeof window === 'undefined'
+    ? Promise.resolve(null)
+    : new Promise((resolve) => {
+        resolveAdapterReady = resolve;
+        setTimeout(() => resolve(lastAdapter), ADAPTER_ANNOUNCE_TIMEOUT_MS);
+      });
+
+export function whenAdapterReady() {
+  return adapterReadyPromise;
 }
 
 if (typeof window !== 'undefined') {
