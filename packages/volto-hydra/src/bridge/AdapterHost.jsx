@@ -5,6 +5,7 @@ import Cookies from 'js-cookie';
 import config from '@plone/volto/registry';
 import { getIframeUrlCookieName } from '../utils/cookieNames';
 import { getURlsFromEnv } from '../utils/getSavedURLs';
+import { getBridgeRpc } from './client';
 
 /**
  * A hidden iframe whose only job is to host the frontend's adapter.
@@ -39,6 +40,20 @@ export default function AdapterHost() {
   // the CMS's own admin.
   const { pathname } = useLocation();
   const needsHost = /\/contents\/?$/.test(pathname);
+
+  // Close the gate whenever this host goes away.
+  //
+  // Leaving /contents for /add swaps WHICH iframe hosts the adapter. The gate
+  // would still say "ready" from this host's announcement while requests were
+  // already being sent to the editor's iframe, which has not registered yet —
+  // so they went to an iframe with no adapter and were simply dropped. Closing
+  // the gate makes them queue until the new host announces itself.
+  useEffect(() => {
+    if (!needsHost) return undefined;
+    return () => {
+      getBridgeRpc().markNotReady();
+    };
+  }, [needsHost]);
 
   const frontendUrl =
     useSelector((state) => state.frontendPreviewUrl?.url) ||
