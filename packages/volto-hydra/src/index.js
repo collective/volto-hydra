@@ -284,7 +284,21 @@ const applyConfig = (config) => {
           ...(blockTab?.fieldsets?.slice(1) || []),
         ],
         properties: {
-          value: { title: 'Body', widget: 'slate', placeholder },
+          // Default lives HERE, on the field, not only in the initialValue
+          // hook above. initialValue is called by _applyBlockInitialValue,
+          // which only the add-block flow runs; every other way a slate block
+          // comes into being — ensureEmptyBlockIfEmpty seeding an empty
+          // container, initialBlocks for a new page, a template slot — goes
+          // through applyBlockDefaults, which reads schema defaults. Without
+          // this a slate block could exist with no value, and the frontend
+          // would render its empty-state placeholder with no addressable slate
+          // node, which disables selection sync for the block.
+          value: {
+            title: 'Body',
+            widget: 'slate',
+            placeholder,
+            default: config.settings.slate.defaultValue(),
+          },
           ...(blockTab?.properties || {}),
         },
         required: blockTab?.required || [],

@@ -181,15 +181,43 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
   const imageBlock = withImage.find((uid) => !initialBlocks.includes(uid))!;
   expect(imageBlock).toBeTruthy();
 
-  // --- the image -----------------------------------------------------------
-  await helper.setMediaFieldUrlInline(
-    imageBlock,
-    'url',
-    'https://picsum.photos/400/300',
-  );
-  await expect(
-    helper.getIframe().locator(`[data-block-uid="${imageBlock}"] img`),
-  ).toHaveAttribute('src', /picsum\.photos/, { timeout: 15_000 });
+  // --- the image: an UPLOAD, not a URL ------------------------------------
+  // The contract already proves asset.upload and asset.imageUrl against all
+  // three CMSes, but it calls the adapter directly — no browser, no bridge.
+  // What only this test can cover is an editor dropping a file into a block
+  // and that upload travelling admin -> bridge -> adapter. Setting an external
+  // URL instead, as this step first did, exercises none of that: the adapter
+  // never sees an asset at all.
+  const imageEl = helper
+    .getIframe()
+    .locator(`[data-block-uid="${imageBlock}"] [data-edit-media="url"]`);
+  await expect(imageEl).toBeVisible({ timeout: 20_000 });
+
+  // Offset click: the empty-image overlay is pointerEvents:none, but the icon
+  // at its centre is pointerEvents:auto, so a centre click lands on the icon
+  // and the block never gets selected — which is why the URL was being applied
+  // to whichever block was already selected.
+  await imageEl.click({ position: { x: 8, y: 8 } });
+
+  await helper.dragDropImageFile(imageEl, 'journey-upload.png');
+
+  // The rendered image now points at the CMS that stored it, not at some
+  // external host — which is what makes this an upload rather than a link.
+  await expect
+    .poll(
+      async () => {
+        try {
+          return await helper
+            .getIframe()
+            .locator('img[src]:not([src^="data:"])')
+            .count();
+        } catch {
+          return 0; // preview remounting
+        }
+      },
+      { timeout: 45_000 },
+    )
+    .toBeGreaterThan(0);
 
   // --- the link, chosen by browsing ---------------------------------------
   // The object browser is how an editor picks a link target, and it is the

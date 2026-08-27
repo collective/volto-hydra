@@ -365,8 +365,16 @@
                 // the per-page allowedLayouts config that other tests rely
                 // on stays in effect. Same idea as the footer's
                 // forceFooterLayout flag, just keyed off URL depth.
+                // /news is the journey's fixture root on Drupal and WordPress.
+                // Excluded for the same reason as /_test_data: a forced layout
+                // injects fixed, read-only blocks into the page, and the
+                // journey's add-a-block step then selects and diffs against
+                // template blocks rather than its own. Forced layouts are
+                // covered by the context-navigation-forced-folder tests; the
+                // journey is testing create, link, image and move.
                 const contextNavLayoutForced =
                     !contentPath.startsWith('/_test_data/')
+                    && !contentPath.startsWith('/news/')
                     && contentPath.split('/').filter(Boolean).length >= 2
                         ? ['/templates/context-navigation-layout']
                         : null;

@@ -505,6 +505,12 @@ function renderSlateBlock(block) {
         }
     });
 
+    // Deliberately NO data-node-id here. A slate block should never reach the
+    // frontend without a value — the slate schema defaults it, so every
+    // creation path gets one via applyBlockDefaults. Fabricating an id for a
+    // node that does not exist would hide that, and the bridge's "Missing
+    // data-node-id" warning is the signal that something created a slate block
+    // without its default.
     return html || '<p data-edit-text="value">Empty block</p>';
 }
 
