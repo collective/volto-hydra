@@ -37,10 +37,10 @@ async function openContents(page: Page, helper: AdminUIHelper, path: string) {
 /** Page metadata lives behind the sidebar's Page tab in the visual editor. */
 async function fillTitle(page: Page, helper: AdminUIHelper, title: string) {
   await helper.waitForSidebarOpen();
-  const field = page
-    .locator('#sidebar-properties')
-    .locator('input[id="field-title"]')
-    .first();
+  // NOT scoped to #sidebar-properties: which container holds the metadata
+  // form varies with how the route was reached, and the test cares about the
+  // field, not its wrapper.
+  const field = page.locator('input[id="field-title"]').first();
   // isVisible() is instantaneous: if the sidebar has not rendered yet it
   // answers false, and clicking the tab then navigates AWAY from the field we
   // are waiting for. Wait first, fall back to the tab only if needed.

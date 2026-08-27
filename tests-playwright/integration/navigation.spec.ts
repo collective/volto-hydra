@@ -717,8 +717,9 @@ test.describe('Page Creation', () => {
     // on, that iframe hosts the adapter that answers getSchema, and a route
     // without one deadlocks.
     await helper.waitForSidebarOpen();
-    const sidebar = page.locator('#sidebar-properties');
-    const titleField = sidebar.locator('input[id="field-title"]').first();
+    // NOT scoped to #sidebar-properties: which container holds the metadata
+    // form varies with how the route was reached.
+    const titleField = page.locator('input[id="field-title"]').first();
     // isVisible() is instantaneous: if the sidebar has not rendered yet it
     // answers false, and clicking the tab then navigates AWAY from the field
     // being waited for. Wait for the field first, and only fall back to the

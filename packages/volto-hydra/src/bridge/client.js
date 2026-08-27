@@ -73,16 +73,20 @@ export function getBridgeRpc() {
   if (rpc) return rpc;
   rpc = new BridgeRPC({
     gated: true,
+    // Readiness is not just "an adapter announced" — it is also "there is an
+    // iframe to send to". Leaving one route for another can remove the host
+    // before the next mounts, and a request dispatched into that gap is lost.
+    canSend: () => Boolean(bridgeIframe()?.contentWindow),
     send: (msg) => {
       const iframe = bridgeIframe();
       const origin = resolveTargetOrigin();
       if (!iframe?.contentWindow || !origin) {
-        // Cannot happen once an adapter has announced — announcing requires
-        // the iframe to exist — so reaching here means the gate released
-        // without a frontend, which is a bug worth seeing.
+        // canSend() should have kept this queued. Reaching here means the
+        // transport vanished between the check and the send, so surface it
+        // rather than dropping the message silently.
         throw new Error(
-          '[hydra] bridge send with no iframe to send to; the gate released ' +
-            'without a frontend.',
+          '[hydra] bridge send with no iframe to send to; the transport ' +
+            'disappeared after the readiness check.',
         );
       }
       iframe.contentWindow.postMessage(msg, origin);

@@ -287,3 +287,40 @@ describe('no adapter is an error, not a silent wait', () => {
     jest.useRealTimers();
   });
 });
+
+describe('readiness means an adapter AND somewhere to send', () => {
+  test('holds a request when there is no transport, even while ready', () => {
+    const sent = [];
+    let haveIframe = false;
+    const rpc = new BridgeRPC({
+      send: (m) => sent.push(m),
+      gated: true,
+      canSend: () => haveIframe,
+    });
+
+    rpc.markReady();
+    rpc.request('content.get', { path: '/a' }).catch(() => {});
+
+    // Ready, but nothing to send to: during a route change the old host is
+    // gone and the new one has not mounted. Dispatching here loses the
+    // request entirely.
+    expect(sent).toHaveLength(0);
+
+    haveIframe = true;
+    rpc.markReady();
+    expect(sent).toHaveLength(1);
+  });
+
+  test('flushing is a no-op while no transport exists', () => {
+    const sent = [];
+    const rpc = new BridgeRPC({
+      send: (m) => sent.push(m),
+      gated: true,
+      canSend: () => false,
+    });
+    rpc.request('content.get', {}).catch(() => {});
+    rpc.markReady();
+    expect(sent).toHaveLength(0);
+    expect(rpc.queue.length).toBe(1);
+  });
+});

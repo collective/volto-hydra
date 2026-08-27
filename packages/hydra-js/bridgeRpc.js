@@ -38,8 +38,16 @@ export class BridgeRPC {
    *   failing: the admin has no CMS of its own to fall back to, so a request
    *   nothing will ever answer must surface as an error rather than a spinner.
    */
-  constructor({ send, gated = false, adapterTimeoutMs = 15_000 }) {
+  /**
+   * @param {() => boolean} [opts.canSend] - whether a transport exists right
+   *   now. Readiness is two things, not one: an adapter has announced itself,
+   *   AND there is somewhere to send. During a route change the iframe hosting
+   *   the adapter can be gone while the next one has not mounted, and
+   *   dispatching into that window loses the request outright.
+   */
+  constructor({ send, gated = false, adapterTimeoutMs = 15_000, canSend }) {
     this.send = send;
+    this.canSend = canSend ?? (() => true);
     this.pending = new Map();
     this.nextId = 0;
     this.gated = gated;
@@ -49,11 +57,17 @@ export class BridgeRPC {
     this.adapterTimer = null;
   }
 
-  /** An adapter has announced itself; release anything held. */
+  /** True only when an adapter has announced AND a transport exists. */
+  get dispatchable() {
+    return this.ready && this.canSend();
+  }
+
+  /** An adapter has announced itself; release anything held, if we can. */
   markReady() {
     this.ready = true;
     clearTimeout(this.adapterTimer);
     this.adapterTimer = null;
+    if (!this.canSend()) return; // nothing to send to yet; stay queued
     const queued = this.queue;
     this.queue = [];
     for (const entry of queued) entry.dispatch();
@@ -112,7 +126,7 @@ export class BridgeRPC {
         });
       };
 
-      if (this.ready) {
+      if (this.dispatchable) {
         dispatch();
       } else {
         this.queue.push({ dispatch, reject });
