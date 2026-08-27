@@ -71,7 +71,18 @@ test.describe('Contents view — cut and paste', () => {
 
     // ...and is gone from the old one. Asserting only the first half would
     // pass just as happily for a copy, which is a different operation.
-    await openContents(page, helper, '/_test_data');
+    //
+    // Navigate back through the breadcrumb rather than reloading. The mock
+    // scopes every mutation to the caller's auth token, and a full page load
+    // is served by Volto's SSR under a different token — so a reload lands in
+    // a session that never saw the move and still lists the page at its old
+    // path. Real Plone has no such split; this is a property of the harness.
+    await page
+      .getByRole('link', { name: 'Test Data', exact: true })
+      .first()
+      .click();
+    await expect(page).toHaveURL(/\/_test_data\/contents$/);
+    await waitForRows(page);
     await expect(row(page, SOURCE)).toHaveCount(0);
   });
 
@@ -83,9 +94,16 @@ test.describe('Contents view — cut and paste', () => {
     await expect(row(page, MOVED)).toBeVisible({ timeout: 20000 });
 
     // A move that leaves the document unreachable at its new path has moved
-    // nothing useful.
-    await page.goto(`${helper.adminUrl}${MOVED}`);
-    await expect(page.locator('#main, main').first()).toContainText(
+    // nothing useful. Click through rather than reloading, for the same
+    // session reason as above.
+    await row(page, MOVED).getByRole('link').first().click();
+    await expect(page).toHaveURL(new RegExp(`${MOVED}$`));
+
+    // The document renders in the iframe, not in the admin's <main> — Hydra
+    // delegates rendering to the frontend, so asserting on admin markup would
+    // pass or fail for reasons unrelated to whether the page actually moved.
+    await helper.waitForIframeReady();
+    await expect(helper.getIframe().locator('body')).toContainText(
       'Accordion Test Page',
       { timeout: 20000 },
     );

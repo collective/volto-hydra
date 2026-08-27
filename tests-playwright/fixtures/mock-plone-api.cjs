@@ -1515,7 +1515,6 @@ app.post('/@logout', (req, res) => {
  * one, for the calling session only.
  */
 app.post('*/@move', (req, res) => {
-  console.log('[DIAG-MOVE]', req.path, JSON.stringify(req.body));
   const targetPath = req.path.replace('/@move', '') || '/';
   const sessionId = getSessionId(req);
   const sources = normaliseSources(req.body?.source);
@@ -1580,7 +1579,6 @@ app.post('*/@move', (req, res) => {
  * so it is a genuinely distinct document rather than a second path onto one.
  */
 app.post('*/@copy', (req, res) => {
-  console.log('[DIAG-COPY]', req.path, JSON.stringify(req.body));
   const targetPath = req.path.replace('/@copy', '') || '/';
   const sessionId = getSessionId(req);
   const sources = normaliseSources(req.body?.source);
