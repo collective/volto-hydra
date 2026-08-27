@@ -871,12 +871,6 @@ const Iframe = (props) => {
     return () => setEditingIframeMounted(false);
   }, []);
 
-  // Once this iframe exists there is a transport again, so release anything
-  // that queued while the previous host was going away. markReady is a no-op
-  // if the adapter has not announced yet; the announcement will call it too.
-  useEffect(() => {
-    if (iframeSrc) rpcRef.current.markReady();
-  }, [iframeSrc]);
   // What the frontend's adapter told us it is and can do (ADAPTER_READY).
   // Null until the handshake completes; UI affordances gate on it.
   const [adapterInfo, setAdapterInfo] = useState(null);
@@ -1540,6 +1534,14 @@ const Iframe = (props) => {
   // (which would cause a duplicate iframe load for the same URL).
   // On first-ever load, persistedIframe.src is null (safe for SSR hydration).
   const [iframeSrc, setIframeSrc] = useState(persistedIframe.src);
+
+  // Once this iframe exists there is a transport again, so release anything
+  // that queued while the previous host was going away. Declared HERE, after
+  // iframeSrc: referencing it earlier is a temporal dead zone error that only
+  // shows up during SSR.
+  useEffect(() => {
+    if (iframeSrc) rpcRef.current.markReady();
+  }, [iframeSrc]);
 
   // Note: window.name inside iframe is set via the `name` attribute on the <iframe> element.
   // When iframe reloads (e.g., on mode switch), it picks up the current `name` attribute value.

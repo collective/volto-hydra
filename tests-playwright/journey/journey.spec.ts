@@ -93,14 +93,34 @@ test('create a page, link to another, then move it', async ({ page }) => {
   // Cancel — no Back, no Contents. Leave edit mode first, then go up to the
   // parent, then into its listing. Every hop stays inside the SPA because the
   // mock scopes content to the session and a page load would start a new one.
-  await page.getByRole('button', { name: 'Cancel', exact: true }).first().click();
-  // Cancel returns to the PARENT, not to the new document's view.
-  await expect(page).toHaveURL(/\/_test_data$/, { timeout: 20_000 });
-  // By href, not by label: the Contents control is an icon Link whose
-  // accessible name comes from a translated message, and matching the target
-  // URL is both simpler and stable across locales.
-  await page.locator('a[href$="/contents"]').first().click();
-  await expect(page).toHaveURL(/\/_test_data\/contents$/, { timeout: 20_000 });
+  // Back to the listing through browser history.
+  //
+  // Not via the toolbar: after client-side navigation Volto's toolbar has no
+  // Contents control here, because actions are fetched server-side and the
+  // store still holds the previous route's. And not via page.goto: a full
+  // load is served under a different session by the mock, which would land in
+  // a world that never saw the create — verified, not assumed (49 rows, none
+  // of them this page).
+  //
+  // History back is client-side, so the session and the new page both survive.
+  // Wait for each hop to actually arrive rather than sleeping between them.
+  // Popping the next history entry before the intermediate route has settled
+  // leaves the listing restored-but-unfetched, and it renders empty.
+  await page.goBack();
+  await page.waitForURL(/\/add(\?|$)/, { timeout: 20_000 });
+  // The URL changes before the route's data arrives, so popping the next
+  // entry immediately leaves the listing restored-but-unfetched and it renders
+  // empty. Waiting for the title field to be VISIBLE is not enough either —
+  // it persists across this transition, so that check passes instantly and
+  // waits for nothing. An EMPTY title distinguishes the fresh add form from
+  // the edit form we came from, so it is a real signal that this route has
+  // re-rendered.
+  await expect(page.locator('input[id="field-title"]').first()).toHaveValue('', {
+    timeout: 25_000,
+  });
+
+  await page.goBack();
+  await page.waitForURL(/\/_test_data\/contents$/, { timeout: 20_000 });
   await waitForRows(page);
 
   const created = page.getByRole('row', { name: createdPath, exact: true });

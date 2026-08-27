@@ -44,10 +44,16 @@ export default function AdapterHost() {
   // the CMS's own admin.
   const { pathname } = useLocation();
 
-  // Routes that can be without an editor iframe: the contents view never has
-  // one, and /add has none until its schema arrives — which is the request
-  // this host exists to answer.
-  const adapterlessRoute = /\/(contents|add)\/?$/.test(pathname);
+  // Every route, until the editor takes over.
+  //
+  // Narrowing this to /contents and /add was wrong: a plain content view
+  // deadlocks the same way. App fetches the content over the bridge, no
+  // adapter has registered, the request queues, so the route never renders —
+  // and therefore never renders the iframe that would have hosted the
+  // adapter. On a full page load SSR hides this (it fetches directly), which
+  // is why it only appears on SPA navigation, exactly as an editor moving
+  // between pages would experience it.
+  const adapterlessRoute = true;
 
   // Stand down once the editor owns an iframe, so the frontend is loaded once.
   // The handoff gap this used to race against is now covered by the RPC's
