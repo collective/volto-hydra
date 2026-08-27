@@ -3321,7 +3321,11 @@ export class AdminUIHelper {
    * Set the value of a text field in the sidebar.
    * Matches Cypress pattern: #sidebar-properties #field-{fieldname}
    */
-  async setSidebarFieldValue(fieldName: string, value: string, options: { container?: string } = {}): Promise<void> {
+  async setSidebarFieldValue(
+    fieldName: string,
+    value: string | boolean,
+    options: { container?: string } = {},
+  ): Promise<void> {
     const container = options.container || '#sidebar-properties';
     const fieldWrapper = this.page.locator(`${container} .field-wrapper-${fieldName}`);
 
@@ -3335,6 +3339,92 @@ export class AdminUIHelper {
       .first()
       .waitFor({ state: 'visible', timeout: 5000 })
       .catch(() => {});
+
+    // A BOOLEAN field is a checkbox, which fill() cannot drive — it needs
+    // check/uncheck. Callers already pass booleans (the columns clip sets
+    // `gap`), and before this they fell through every branch below and returned
+    // silently, so the field simply never changed.
+    if (typeof value === 'boolean') {
+      const checkbox = fieldWrapper.locator('input[type="checkbox"]').first();
+      await checkbox.waitFor({ state: 'attached', timeout: 5000 });
+      // Click the LABEL, which is what a user clicks: Volto styles the checkbox
+      // by covering the real input, so check()/uncheck() report the input as
+      // visible and then time out because the label intercepts the pointer.
+      // Only click when the state actually needs to change — clicking a checkbox
+      // already in the wanted state would toggle it away.
+      if ((await checkbox.isChecked()) !== value) {
+        const label = fieldWrapper.locator('label').first();
+        if (await label.count()) {
+          await label.click();
+        } else {
+          await checkbox.click({ force: true });
+        }
+      }
+      await expect(checkbox).toBeChecked({ checked: value, timeout: 5000 });
+      return;
+    }
+
+    // A CHOICE field. Three shapes appear in this admin and none of them is a
+    // text input, so without this they fell through to the throw below (or,
+    // before that, to a silent return): a native <select>, a Volto/Semantic
+    // dropdown, and a react-select. Try them in that order.
+    const nativeSelect = fieldWrapper.locator('select').first();
+    if (await nativeSelect.count()) {
+      await nativeSelect.selectOption(value);
+      return;
+    }
+    const dropdown = fieldWrapper
+      .locator('.ui.dropdown, [class*="react-select"], [role="combobox"]')
+      .first();
+    if (await dropdown.count()) {
+      await dropdown.click();
+      // The menu portals out of the field wrapper, so look for the option on the
+      // page, matched on its visible text OR its value.
+      // Match on the option's VALUE first, then its visible text. Callers pass
+      // the stored value (a block id like `listItem`), while the menu shows a
+      // human label ("List item"), so a text-only match silently finds nothing
+      // and the field never changes.
+      const byValue = this.page
+        .locator(
+          `[role="option"][data-value="${value}"], .menu .item[data-value="${value}"]`,
+        )
+        .first();
+      const byText = this.page
+        .locator('[role="option"], .menu .item')
+        .filter({ hasText: new RegExp(`^\\s*${value}\\s*$`, 'i') })
+        .first();
+      const option = (await byValue.count()) ? byValue : byText;
+      if (await option.count()) {
+        await option.click();
+        // VERIFY: a dropdown that closes without applying the choice looks
+        // exactly like success from here, and the caller only finds out when an
+        // assertion about the rendered page fails much later. Name the options
+        // that were on offer so a wrong value is obvious.
+        const applied = await dropdown
+          .textContent()
+          .then((t) => (t || '').toLowerCase())
+          .catch(() => '');
+        if (applied && !applied.includes(String(value).toLowerCase())) {
+          const labels = await this.page
+            .locator('[role="option"], .menu .item')
+            .evaluateAll((els) =>
+              els.map((e) => `${e.getAttribute('data-value') ?? ''}=${(e.textContent || '').trim()}`),
+            );
+          if (labels.length) {
+            throw new Error(
+              `setSidebarFieldValue('${fieldName}'): clicked an option for ` +
+                `'${value}' but the control still reads '${applied.trim()}'. ` +
+                `Options offered: [${labels.join(', ')}]`,
+            );
+          }
+        }
+      } else {
+        // Keyboard-driven react-select: type to filter, then commit.
+        await this.page.keyboard.type(String(value), { delay: 20 });
+        await this.page.keyboard.press('Enter');
+      }
+      return;
+    }
 
     // Try text input
     const input = fieldWrapper.locator('input[type="text"], input[type="url"], textarea');
