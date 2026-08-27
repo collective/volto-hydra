@@ -4,6 +4,10 @@ import Cookies from 'js-cookie';
 import config from '@plone/volto/registry';
 import { getIframeUrlCookieName } from '../utils/cookieNames';
 import { getURlsFromEnv } from '../utils/getSavedURLs';
+import {
+  isEditingIframeMounted,
+  subscribeEditingIframe,
+} from './client';
 
 /**
  * A hidden iframe whose only job is to host the frontend's adapter.
@@ -24,6 +28,11 @@ export default function AdapterHost() {
   const [isClient, setIsClient] = useState(false);
   useEffect(() => setIsClient(true), []);
 
+  // Stand down whenever the editor is on screen: that iframe already hosts an
+  // adapter, and a second one would load the frontend twice for no gain.
+  const [editing, setEditing] = useState(isEditingIframeMounted());
+  useEffect(() => subscribeEditingIframe(setEditing), []);
+
   const frontendUrl =
     useSelector((state) => state.frontendPreviewUrl?.url) ||
     (isClient ? Cookies.get(getIframeUrlCookieName()) : null) ||
@@ -39,6 +48,7 @@ export default function AdapterHost() {
   // Only meaningful in a bridge session, and only on the client: there is no
   // iframe at render time on the server.
   if (!config.settings.useBridgeBackend || !isClient || !frontendUrl) return null;
+  if (editing) return null;
 
   const src = (() => {
     const url = new URL(frontendUrl, window.location.origin);

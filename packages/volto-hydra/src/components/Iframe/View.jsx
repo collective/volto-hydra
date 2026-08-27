@@ -11,7 +11,11 @@ import { validateAndLog, validateTemplatePlaceholders } from '../../utils/formDa
 import { toast } from 'react-toastify';
 import { getIframeUrlCookieName } from '../../utils/cookieNames';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
-import { getBridgeRpc, setBridgeTargetOrigin } from '../../bridge/client';
+import {
+  getBridgeRpc,
+  setBridgeTargetOrigin,
+  setEditingIframeMounted,
+} from '../../bridge/client';
 import {
   isSlateFieldType,
   formDataContentEqual,
@@ -849,6 +853,12 @@ const Iframe = (props) => {
   // and @querystring calls find it. Creating another here would leave those
   // queued on an instance nobody ever releases.
   const rpcRef = useRef(getBridgeRpc());
+
+  // Tell the adapter host to stand down while the editor owns an iframe.
+  useEffect(() => {
+    setEditingIframeMounted(true);
+    return () => setEditingIframeMounted(false);
+  }, []);
   // What the frontend's adapter told us it is and can do (ADAPTER_READY).
   // Null until the handshake completes; UI affordances gate on it.
   const [adapterInfo, setAdapterInfo] = useState(null);
@@ -2098,6 +2108,14 @@ const Iframe = (props) => {
     const initialUrlOrigin = iframeSrc && new URL(iframeSrc).origin;
     const messageHandler = (event) => {
       if (event.origin !== initialUrlOrigin) {
+        return;
+      }
+      // Origin is not enough to identify the sender: the adapter host is a
+      // second iframe on the SAME origin, and its INIT/PATH_CHANGE would be
+      // read here as the user navigating the editor. Match the window itself.
+      const editingWindow =
+        document.getElementById('previewIframe')?.contentWindow;
+      if (editingWindow && event.source !== editingWindow) {
         return;
       }
       // Store the actual iframe origin from the first message we receive

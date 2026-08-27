@@ -29,11 +29,38 @@ export function setBridgeTargetOrigin(origin) {
  * open, so relying on it would leave the contents view — and anything else
  * without an iframe — unable to reach the CMS at all.
  */
+/**
+ * The editing iframe when there is one, the host otherwise.
+ *
+ * Preferring the editing iframe matters: it already exists on editing routes,
+ * so using it means the frontend is loaded ONCE. The host exists only to
+ * cover routes that render no editor — the contents view above all.
+ */
 function bridgeIframe() {
   return (
-    document.getElementById('hydraAdapterHost') ||
-    document.getElementById('previewIframe')
+    document.getElementById('previewIframe') ||
+    document.getElementById('hydraAdapterHost')
   );
+}
+
+// Whether an editing iframe is currently mounted. The host subscribes so it
+// can stay out of the way rather than loading the frontend a second time.
+let editingMounted = false;
+const editingListeners = new Set();
+
+export function setEditingIframeMounted(value) {
+  if (editingMounted === value) return;
+  editingMounted = value;
+  for (const listener of editingListeners) listener(editingMounted);
+}
+
+export function subscribeEditingIframe(listener) {
+  editingListeners.add(listener);
+  return () => editingListeners.delete(listener);
+}
+
+export function isEditingIframeMounted() {
+  return editingMounted;
 }
 
 function resolveTargetOrigin() {
@@ -81,6 +108,9 @@ function installListener(rpcClient) {
     const iframe = bridgeIframe();
     const expected = iframe?.src ? new URL(iframe.src).origin : null;
     if (expected && event.origin !== expected) return;
+    // Same reasoning as the editor's handler: with two iframes on one origin,
+    // only the window reference distinguishes them.
+    if (iframe?.contentWindow && event.source !== iframe.contentWindow) return;
 
     if (type === 'BACKEND_RESPONSE') {
       rpcClient.handleMessage(event.data);
