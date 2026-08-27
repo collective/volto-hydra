@@ -286,9 +286,18 @@ class Add extends Component {
     //
     // An empty schema renders an empty field set for one paint; the fields
     // appear as soon as the request it just unblocked comes back.
-    const schema = this.props.schemaRequest.loaded
-      ? this.props.schema
-      : { properties: {}, fieldsets: [], required: [], title: this.props.type };
+    // Render nothing until the schema is real.
+    //
+    // This briefly rendered a placeholder empty schema so the iframe would
+    // mount and host the adapter that answers getSchema. That had a cost only
+    // an end-to-end test could show: the form accepted a title, then
+    // re-initialised when the real schema arrived and threw the typed value
+    // away — the page saved untitled.
+    //
+    // It is no longer needed. AdapterHost covers this route, so the schema
+    // request is answered without the form existing yet.
+    if (!this.props.schemaRequest.loaded) return <div />;
+    const schema = this.props.schema;
 
     // HYDRA: use the visual branch, which in THIS fork means Hydra's iframe.
     //

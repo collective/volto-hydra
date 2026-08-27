@@ -5,7 +5,11 @@ import Cookies from 'js-cookie';
 import config from '@plone/volto/registry';
 import { getIframeUrlCookieName } from '../utils/cookieNames';
 import { getURlsFromEnv } from '../utils/getSavedURLs';
-import { getBridgeRpc } from './client';
+import {
+  getBridgeRpc,
+  isEditingIframeMounted,
+  subscribeEditingIframe,
+} from './client';
 
 /**
  * A hidden iframe whose only job is to host the frontend's adapter.
@@ -39,7 +43,19 @@ export default function AdapterHost() {
   // adapter-less route, and control panels still need their own delegation to
   // the CMS's own admin.
   const { pathname } = useLocation();
-  const needsHost = /\/contents\/?$/.test(pathname);
+
+  // Routes that can be without an editor iframe: the contents view never has
+  // one, and /add has none until its schema arrives — which is the request
+  // this host exists to answer.
+  const adapterlessRoute = /\/(contents|add)\/?$/.test(pathname);
+
+  // Stand down once the editor owns an iframe, so the frontend is loaded once.
+  // The handoff gap this used to race against is now covered by the RPC's
+  // canSend(): requests queue while no transport exists.
+  const [editing, setEditing] = useState(isEditingIframeMounted());
+  useEffect(() => subscribeEditingIframe(setEditing), []);
+
+  const needsHost = adapterlessRoute && !editing;
 
   // Close the gate whenever this host goes away.
   //
