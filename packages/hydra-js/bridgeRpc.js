@@ -32,21 +32,46 @@ export class BridgeRPC {
    *   the editor deadlocks until the request times out. The iframe side is
    *   ungated — it only ever answers.
    */
-  constructor({ send, gated = false }) {
+  /**
+   * @param {number} [opts.adapterTimeoutMs] - how long a gated request waits
+   *   for an adapter before giving up. Waiting forever would be worse than
+   *   failing: the admin has no CMS of its own to fall back to, so a request
+   *   nothing will ever answer must surface as an error rather than a spinner.
+   */
+  constructor({ send, gated = false, adapterTimeoutMs = 15_000 }) {
     this.send = send;
     this.pending = new Map();
     this.nextId = 0;
     this.gated = gated;
     this.ready = !gated;
     this.queue = [];
+    this.adapterTimeoutMs = adapterTimeoutMs;
+    this.adapterTimer = null;
   }
 
   /** An adapter has announced itself; release anything held. */
   markReady() {
     this.ready = true;
+    clearTimeout(this.adapterTimer);
+    this.adapterTimer = null;
     const queued = this.queue;
     this.queue = [];
-    for (const dispatch of queued) dispatch();
+    for (const entry of queued) entry.dispatch();
+  }
+
+  /** Give up on an adapter that never arrived, and say so plainly. */
+  failQueued() {
+    const queued = this.queue;
+    this.queue = [];
+    this.adapterTimer = null;
+    for (const entry of queued) {
+      const err = new Error(
+        `No adapter registered after ${this.adapterTimeoutMs}ms — the frontend ` +
+          `did not announce one, and the admin cannot reach a CMS by itself.`,
+      );
+      err.code = 'NO_ADAPTER';
+      entry.reject(err);
+    }
   }
 
   /** The iframe is navigating; whatever was serving us is gone. */
@@ -87,8 +112,17 @@ export class BridgeRPC {
         });
       };
 
-      if (this.ready) dispatch();
-      else this.queue.push(dispatch);
+      if (this.ready) {
+        dispatch();
+      } else {
+        this.queue.push({ dispatch, reject });
+        if (!this.adapterTimer) {
+          this.adapterTimer = setTimeout(
+            () => this.failQueued(),
+            this.adapterTimeoutMs,
+          );
+        }
+      }
     });
   }
 

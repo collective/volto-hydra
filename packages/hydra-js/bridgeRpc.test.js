@@ -244,3 +244,46 @@ describe('readiness gate', () => {
     expect(sent).toHaveLength(1);
   });
 });
+
+describe('no adapter is an error, not a silent wait', () => {
+  test('queued requests reject once the adapter deadline passes', async () => {
+    jest.useFakeTimers();
+    const rpc = new BridgeRPC({
+      send: () => {},
+      gated: true,
+      adapterTimeoutMs: 5000,
+    });
+
+    const promise = rpc.request('content.get', { path: '/a' });
+    const settled = expect(promise).rejects.toMatchObject({
+      code: 'NO_ADAPTER',
+    });
+
+    jest.advanceTimersByTime(5001);
+    await settled;
+    jest.useRealTimers();
+  });
+
+  test('the deadline is cancelled once an adapter announces', async () => {
+    jest.useFakeTimers();
+    const sent = [];
+    const rpc = new BridgeRPC({
+      send: (m) => sent.push(m),
+      gated: true,
+      adapterTimeoutMs: 5000,
+    });
+
+    const promise = rpc.request('content.get', { path: '/a' });
+    rpc.markReady();
+    jest.advanceTimersByTime(10_000);
+
+    rpc.handleMessage({
+      type: 'BACKEND_RESPONSE',
+      requestId: sent[0].requestId,
+      ok: true,
+      result: 'ok',
+    });
+    await expect(promise).resolves.toBe('ok');
+    jest.useRealTimers();
+  });
+});

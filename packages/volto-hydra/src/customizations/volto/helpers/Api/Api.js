@@ -73,16 +73,38 @@ class Api {
     // superagent forever — the failure mode is invisible, because everything
     // still works, just not over the bridge.
     const bridgeApis = new WeakMap();
+
+    /**
+     * In a bridge session EVERY CMS call must cross the bridge. There is no
+     * fallback, deliberately.
+     *
+     * Standalone Hydra has no CMS of its own: `apiPath` points at nothing
+     * meaningful, and for a WordPress site a direct request would be aimed at
+     * a Plone that does not exist. Falling back to a direct fetch is not
+     * graceful degradation, it is a nonsense request that fails confusingly
+     * far from its cause. Anything the adapter cannot serve is a bug — either
+     * a UI affordance that should have been capability-gated, or a control
+     * panel that should be delegating to the CMS's own admin via
+     * adapter.getAdminUrl() instead of calling an API at all.
+     *
+     * SSR is the one exception, and only until the editor routes are made
+     * client-only: there is no iframe at render time, so there is nothing to
+     * ask.
+     */
     const bridgeFor = () => {
-      if (
-        !config.settings.useBridgeBackend ||
-        req || // SSR: no iframe exists at render time
-        typeof window === 'undefined' ||
-        !window.__hydraBridgeRpc
-      ) {
+      if (!config.settings.useBridgeBackend || typeof window === 'undefined') {
         return null;
       }
+      if (req) return null; // SSR — see above
       const rpc = window.__hydraBridgeRpc;
+      if (!rpc) {
+        // Published at App mount, before any route can dispatch, so this
+        // means the admin is running bridge-backed with no bridge at all.
+        throw new Error(
+          '[hydra] useBridgeBackend is on but no bridge client is present. ' +
+            'The admin cannot reach a CMS by itself.',
+        );
+      }
       if (!bridgeApis.has(rpc)) bridgeApis.set(rpc, new BridgeApi(rpc));
       return bridgeApis.get(rpc);
     };
