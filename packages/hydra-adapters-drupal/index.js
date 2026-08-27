@@ -618,7 +618,18 @@ export class DrupalAdapter extends BaseAdapter {
               params.set('filter[title][value]', String(value[0]));
               break;
             default:
-              params.set(`filter[${criterion.i}]`, value.join(','));
+              // selection.any is multi-value, and Drupal has no comma syntax:
+              // filter[x]=a,b is one equality against the literal "a,b" and
+              // matches nothing. Every field_config-derived index advertises
+              // selection.any, so this branch carries most of them.
+              if (value.length > 1) {
+                params.set(`filter[${criterion.i}][operator]`, 'IN');
+                for (const v of value) {
+                  params.append(`filter[${criterion.i}][value][]`, String(v));
+                }
+              } else {
+                params.set(`filter[${criterion.i}]`, String(value[0]));
+              }
           }
         }
 

@@ -84,6 +84,40 @@ describe('querystringSearch', () => {
     }
   });
 
+  it('filters by title substring', async () => {
+    // Every adapter advertises a contains-style operation on title, and the
+    // query builder offers it, but nothing exercised it. Drupal's shorthand
+    // filter[title][operator]=CONTAINS was silently downgraded to an equality
+    // match by a mock that ignored the operator; the CMS and the fixture
+    // disagreed and no test could tell.
+    const res: any = await target.adapter.dispatch('querystringSearch', {
+      query: [
+        { i: target.queryIndexes.title, o: 'string.contains', v: 'First' },
+      ],
+    });
+    expect(res.items.length).toBeGreaterThan(0);
+    expect(res.items.map((i: any) => i.path)).toContain('/news/first-post');
+  });
+
+  it('filters by a multi-value selection', async () => {
+    // selection.any means "any of these", and most indexes advertise it. Drupal
+    // was emitting filter[x]=a,b — a single equality against the literal "a,b",
+    // which matches nothing — because no test ever passed more than one value.
+    const res: any = await target.adapter.dispatch('querystringSearch', {
+      query: [
+        {
+          i: target.queryIndexes.type,
+          o: 'selection.any',
+          v: [target.types.page, target.types.folder],
+        },
+      ],
+    });
+    expect(res.items.length).toBeGreaterThan(0);
+    for (const item of res.items) {
+      expect([target.types.page, target.types.folder]).toContain(item.type);
+    }
+  });
+
   it('returns canonical Documents, not CMS-shaped brains', async () => {
     const res: any = await target.adapter.dispatch('querystringSearch', {
       query: [

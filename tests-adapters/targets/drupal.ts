@@ -67,7 +67,12 @@ const target: Target = {
   vocabularies: { categories: 'categories' },
   vocabularySize: seed.vocabularies.categories.generate,
   imageScale: 'large',
-  queryIndexes: { type: 'node_type', path: 'menu_parent' },
+  queryIndexes: {
+    type: 'node_type',
+    path: 'menu_parent',
+    title: 'title',
+    state: 'status',
+  },
   adapter,
 
   async start() {

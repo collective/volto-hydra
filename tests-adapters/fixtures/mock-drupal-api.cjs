@@ -228,6 +228,10 @@ function matchesCondition(node, { path, operator = '=', value }) {
       return String(actual ?? '').endsWith(String(wanted ?? ''));
     case '<>':
       return String(actual) !== String(wanted);
+    case 'IN':
+      return [].concat(wanted ?? []).some((w) => String(actual) === String(w));
+    case 'NOT IN':
+      return ![].concat(wanted ?? []).some((w) => String(actual) === String(w));
     case '=':
     default:
       if (typeof actual === 'boolean') {
@@ -253,9 +257,19 @@ function applyFilters(list, req) {
       conditions.push({ ...entry.condition });
       continue;
     }
-    // Shorthand: filter[field]=value, or filter[field][value]=value.
-    const value = entry && typeof entry === 'object' ? entry.value : entry;
-    conditions.push({ path: key, operator: '=', value });
+    // Shorthand: filter[field]=value, or the keyed form
+    // filter[field][value]=x&filter[field][operator]=CONTAINS, where the key
+    // doubles as the path. Ignoring the operator here would silently downgrade
+    // every such filter to an equality match.
+    if (entry && typeof entry === 'object') {
+      conditions.push({
+        path: entry.path ?? key,
+        operator: entry.operator ?? '=',
+        value: entry.value,
+      });
+    } else {
+      conditions.push({ path: key, operator: '=', value: entry });
+    }
   }
 
   return list.filter((node) => {
