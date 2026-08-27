@@ -1,5 +1,37 @@
 import { test, expect, type Page } from '@playwright/test';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
+import { PORTS } from '../ports';
+
+/**
+ * Nothing may reach the Plone API during a non-Plone run.
+ *
+ * The whole point of the inversion is that the admin holds no CMS of its own:
+ * every call travels admin -> bridge -> iframe adapter -> that site's CMS. A
+ * request to the Plone mock during a Drupal or WordPress run means something
+ * bypassed the bridge, and it is a bug whether or not the page still renders —
+ * on a real WordPress site that host does not exist at all.
+ *
+ * This is an assertion, not a warning. Drupal's contract suite was green for
+ * hours while the editor could not load a page against it, because five layers
+ * between the admin and the adapter were still Plone-shaped and nothing failed
+ * when they spoke to the wrong server.
+ */
+function forbidPloneApi(page: Page, projectName: string): string[] {
+  const offenders: string[] = [];
+  if (projectName === 'journey-plone') return offenders;
+
+  const ploneOrigins = [
+    `localhost:${PORTS.mockApi}`,
+    `127.0.0.1:${PORTS.mockApi}`,
+  ];
+  page.on('request', (request) => {
+    const url = request.url();
+    if (ploneOrigins.some((origin) => url.includes(origin))) {
+      offenders.push(`${request.method()} ${url}`);
+    }
+  });
+  return offenders;
+}
 
 /**
  * The editor journey, run unchanged against every CMS.
@@ -63,6 +95,7 @@ async function waitForRows(page: Page, timeout = 60_000) {
 test('create a page, link to another, then move it', async ({ page }, testInfo) => {
   test.setTimeout(180_000);
   const { root: ROOT, target: TARGET_FOLDER } = fixtureFor(testInfo.project.name);
+  const ploneCalls = forbidPloneApi(page, testInfo.project.name);
   const helper = new AdminUIHelper(page);
   await helper.login();
 
@@ -82,29 +115,6 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
   await expect(titleField).toBeVisible({ timeout: 25_000 });
   await titleField.fill(TITLE);
 
-  // --- 3. link to another page, chosen by browsing -----------------------
-  // The object browser is how an editor picks a link target, and it is the
-  // interesting half: the reference must be stored by the target's stable id,
-  // not its path, or the move in step 5 would break it.
-  const relatedBrowse = page
-    .locator('#sidebar-properties')
-    .locator('.field-wrapper-relatedItems button, #field-relatedItems button')
-    .first();
-  const canBrowse = await relatedBrowse
-    .waitFor({ state: 'visible', timeout: 8_000 })
-    .then(() => true)
-    .catch(() => false);
-
-  if (canBrowse) {
-    await relatedBrowse.click();
-    const target = page
-      .locator('.object-browser-body, .sidebar-container')
-      .getByText('Another Page', { exact: false })
-      .first();
-    await target.click({ timeout: 10_000 }).catch(() => {});
-    await page.keyboard.press('Escape').catch(() => {});
-  }
-
   await page.locator('#toolbar-save, button:has-text("Save")').first().click();
 
   // The CMS assigned the document its own address, which it can only do if
@@ -118,6 +128,93 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
     timeout: 25_000,
   });
   const createdPath = new URL(page.url()).pathname.replace(/\/edit$/, '');
+
+  // --- 3. add an image and a link, in a BLOCK ----------------------------
+  //
+  // This step used to drive the relatedItems field, guarded by a canBrowse
+  // check that skipped the whole thing and two .catch(() => {}) that swallowed
+  // the clicks — so it asserted nothing, on every CMS. Removing the guard
+  // showed why it was there: relatedItems is a Plone schema field. Drupal
+  // assembles its schema from field_config and WordPress from its post type;
+  // neither has one, so the step could never have worked on three CMSes.
+  //
+  // Blocks are the CMS-neutral half of the model. Their schemas are registered
+  // by the FRONTEND, which is the same for all three journeys, and they travel
+  // in one opaque field per CMS. The image block carries both an editable
+  // media target and an editable link, so it covers the link and the image in
+  // one place.
+  // On the EDIT route, not the add form. Adding a block needs the editing
+  // iframe's selection chrome — clicking a block on /add never produces a
+  // handle, because that route does not render the editing surface — and an
+  // update is the more honest exercise of the adapter anyway.
+  if (!page.url().endsWith('/edit')) {
+    await page.locator('#toolbar-edit, a[aria-label="Edit"]').first().click();
+    await page.waitForURL(/\/edit$/, { timeout: 20_000 });
+  }
+
+  // The frontend renders blocks only once it has the document over the bridge,
+  // so this is a condition to wait for, not a state to assert immediately.
+  await expect
+    .poll(
+      async () => {
+        try {
+          return (await helper.getBlockOrder()).length;
+        } catch {
+          // Reading the iframe mid-navigation throws "Execution context was
+          // destroyed". That is the poll catching the route in transit, not a
+          // failure — returning 0 lets it retry, and it still fails for real
+          // if blocks never arrive.
+          return 0;
+        }
+      },
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThan(0);
+  const initialBlocks = await helper.getBlockOrder();
+
+  await helper.clickBlockInIframe(initialBlocks[initialBlocks.length - 1]);
+  await helper.clickAddBlockButton();
+  await helper.selectBlockType('image');
+  await helper.waitForBlockCountToBe(initialBlocks.length + 1);
+
+  const withImage = await helper.getBlockOrder();
+  const imageBlock = withImage.find((uid) => !initialBlocks.includes(uid))!;
+  expect(imageBlock).toBeTruthy();
+
+  // --- the image -----------------------------------------------------------
+  await helper.setMediaFieldUrlInline(
+    imageBlock,
+    'url',
+    'https://picsum.photos/400/300',
+  );
+  await expect(
+    helper.getIframe().locator(`[data-block-uid="${imageBlock}"] img`),
+  ).toHaveAttribute('src', /picsum\.photos/, { timeout: 15_000 });
+
+  // --- the link, chosen by browsing ---------------------------------------
+  // The object browser is how an editor picks a link target, and it is the
+  // interesting half: the reference must be stored by the target's stable id,
+  // not its path, or the move in step 5 would break it.
+  const linkField = page
+    .locator('#sidebar-properties')
+    .locator('.field-wrapper-href, #field-href')
+    .first();
+  await expect(linkField).toBeVisible({ timeout: 20_000 });
+
+  const objectBrowser = await helper.openObjectBrowserFromField(linkField);
+  const targetName = TARGET_FOLDER.split('/').pop()!;
+  await helper.objectBrowserSelectItem(objectBrowser, new RegExp(targetName));
+
+  await expect(linkField).toContainText(targetName, { timeout: 15_000 });
+
+  // Save the block work. The page already exists, so this is an update rather
+  // than a create, and it is what puts the block through the adapter's
+  // content.update path.
+  await page.locator('#toolbar-save, button:has-text("Save")').first().click();
+  await expect(page).toHaveURL(new RegExp(`${createdPath}$`), {
+    timeout: 25_000,
+  });
+
 
   // --- 4. it is listed under its parent ----------------------------------
   // Navigate within the SPA: a full page load is served under a different
@@ -192,4 +289,13 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
   await expect(
     page.getByRole('row', { name: new RegExp(`/${idSegment}$`) }),
   ).toHaveCount(1, { timeout: 30_000 });
+
+  // Checked last so the report lists every offender rather than only the first,
+  // and so a genuine journey failure is not masked by this one.
+  expect(
+    ploneCalls,
+    `${ploneCalls.length} request(s) reached the Plone API during a ` +
+      `${testInfo.project.name} run — something bypassed the bridge:\n` +
+      ploneCalls.slice(0, 20).join('\n'),
+  ).toEqual([]);
 });

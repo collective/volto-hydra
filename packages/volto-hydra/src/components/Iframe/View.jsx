@@ -1476,6 +1476,16 @@ const Iframe = (props) => {
   // Sync effect will send INITIAL_DATA after templates are merged
   const pendingInitialDataRef = useRef(null);
 
+  // An INIT that arrived before the form existed, waiting to be answered.
+  //
+  // The admin used to have content in the store before the iframe ever
+  // mounted, because SSR fetched it. A bridge-backed admin cannot fetch on the
+  // server — the adapter lives in this iframe — so content now loads in the
+  // browser and INIT can win the race. Dropping it left the frontend on
+  // "Loading..." permanently, reporting "INIT was sent but admin did not
+  // respond with INITIAL_DATA", with no blocks to edit.
+  const pendingInitEventRef = useRef(null);
+
   // Handle Escape key in Admin UI — three-state machine (same as iframe):
   //   Text mode (sidebar field focused) → Block mode (blur field, stay on block)
   //   Block mode → Parent block (or deselect if at page level)
@@ -3788,7 +3798,14 @@ const Iframe = (props) => {
             break;
           }
           if (!form) {
-            log('INIT: form data not available yet, skipping INITIAL_DATA');
+            // Deferred, not dropped: replayed by the effect below as soon as
+            // the form arrives. The iframe sends INIT once and waits forever.
+            log('INIT: form not available yet, deferring INITIAL_DATA');
+            pendingInitEventRef.current = {
+              source: event.source,
+              origin: event.origin,
+              data: event.data,
+            };
             break;
           }
 
@@ -3841,6 +3858,21 @@ const Iframe = (props) => {
 
     // Listen for messages from the iframe
     window.addEventListener('message', messageHandler);
+
+    // Answer an INIT that arrived before there was a form to answer it with.
+    // This effect re-runs when `form` changes, so this is the first moment the
+    // handshake can be completed.
+    if (form && pendingInitEventRef.current) {
+      const pending = pendingInitEventRef.current;
+      pendingInitEventRef.current = null;
+      messageHandler(
+        new MessageEvent('message', {
+          data: pending.data,
+          origin: pending.origin,
+          source: pending.source,
+        }),
+      );
+    }
 
     // Clean up the event listener on unmount
     return () => {
