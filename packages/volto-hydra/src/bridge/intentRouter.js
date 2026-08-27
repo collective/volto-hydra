@@ -111,6 +111,12 @@ export function routeToIntent({ op, path, data }) {
       };
     }
 
+    case 'actions':
+      // Plone's way of asking "what may I do here". The canonical form is
+      // PermissionsAndState.effective, which is the same question — CMSes
+      // without two separate concepts should not have to invent one.
+      return { intent: 'state.get', args: { path: contextPath }, endpoint };
+
     case 'breadcrumbs':
       return { intent: 'breadcrumbs.get', args: { path: contextPath } };
 

@@ -132,18 +132,18 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
   // of them this page).
   //
   // History back is client-side, so the session and the new page both survive.
-  // Wait for each hop to actually arrive rather than sleeping between them.
-  // Popping the next history entry before the intermediate route has settled
-  // leaves the listing restored-but-unfetched, and it renders empty.
+  // Each hop is awaited by URL; the listing then refetches on arrival, so
+  // there is nothing to settle in between. It used to render restored-but-
+  // unfetched because route data was only ever loaded server-side, which is
+  // what bridge mode now does on the client.
   await page.goBack();
   await page.waitForURL(/\/add(\?|$)/, { timeout: 20_000 });
-  // The URL changes before the route's data arrives, so popping the next
-  // entry immediately leaves the listing restored-but-unfetched and it renders
-  // empty. Waiting for the title field to be VISIBLE is not enough either —
-  // it persists across this transition, so that check passes instantly and
-  // waits for nothing. An EMPTY title distinguishes the fresh add form from
-  // the edit form we came from, so it is a real signal that this route has
-  // re-rendered.
+  // The URL changes before the route's data arrives, so popping the next entry
+  // immediately leaves the listing restored-but-unfetched and it renders empty.
+  // Waiting for the title field to be VISIBLE is not enough — it persists
+  // across this transition, so that check passes instantly and waits for
+  // nothing. An EMPTY title distinguishes the fresh add form from the edit form
+  // we came from, so it is a real signal that this route has re-rendered.
   await expect(page.locator('input[id="field-title"]').first()).toHaveValue('', {
     timeout: 25_000,
   });

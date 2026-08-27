@@ -3,6 +3,7 @@
  * Combined "/" and "/**" View routes into single entry to prevent remount on navigation
  * @module routes
  */
+import React from 'react';
 import debug from 'debug';
 import compact from 'lodash/compact';
 
@@ -358,4 +359,43 @@ const routes = [
   },
 ];
 
-export default routes;
+/**
+ * Strip server-side data prefetching when the admin is bridge-backed.
+ *
+ * asyncConnect prefetches content during SSR, where the bridge cannot exist —
+ * the adapter lives in an iframe that has not been created yet. The direct
+ * fetch it falls back to goes to whichever CMS the admin was built against,
+ * which for a WordPress or Drupal site is the wrong server: the Drupal journey
+ * 404'd on the server because the admin asked Plone for a path only Drupal
+ * had, so the view never mounted and the browser never got as far as asking
+ * the adapter.
+ *
+ * loadOnServer decides what to prefetch by looking for `reduxAsyncConnect` on
+ * each matched route's component, so removing it here removes the prefetch.
+ * Wrapping only happens in the server bundle; the client keeps the originals
+ * and loads everything over the bridge, which is the only place it can.
+ *
+ * This is not a degraded render. The editor cannot function without the
+ * iframe, so there was never any content the server could usefully produce.
+ */
+function withoutServerPrefetch(routeList) {
+  return routeList.map((route) => {
+    const stripped = { ...route };
+    if (route.component?.reduxAsyncConnect) {
+      const Component = route.component;
+      const Passthrough = (props) => React.createElement(Component, props);
+      Passthrough.displayName = `NoPrefetch(${
+        Component.displayName || Component.name || 'Component'
+      })`;
+      stripped.component = Passthrough;
+    }
+    if (route.routes) stripped.routes = withoutServerPrefetch(route.routes);
+    return stripped;
+  });
+}
+
+const isServer = typeof window === 'undefined';
+
+export default config.settings.useBridgeBackend && isServer
+  ? withoutServerPrefetch(routes)
+  : routes;

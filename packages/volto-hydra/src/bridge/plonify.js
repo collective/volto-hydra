@@ -70,7 +70,23 @@ function permissionsToPlone(pas) {
   };
 }
 
-export function plonify(intent, result, { path } = {}) {
+/**
+ * Volto's toolbar and contents view read @actions to decide which controls to
+ * show. Derive them from the canonical permissions rather than asking adapters
+ * to model Plone's action registry.
+ */
+function actionsToPlone(pas) {
+  const e = pas?.effective ?? {};
+  const object = [{ id: 'view', title: 'View' }];
+  if (e.canEdit) object.push({ id: 'edit', title: 'Edit' });
+  if (e.canEdit) object.push({ id: 'folderContents', title: 'Contents' });
+  if (e.canDelete) object.push({ id: 'delete', title: 'Delete' });
+  if (e.canShare) object.push({ id: 'sharing', title: 'Sharing' });
+  return { object, object_buttons: [], user: [], site: [] };
+}
+
+export function plonify(intent, result, { path, endpoint } = {}) {
+  if (endpoint === 'actions') return actionsToPlone(result);
   switch (intent) {
     case 'content.get':
     case 'content.update':
@@ -90,7 +106,9 @@ export function plonify(intent, result, { path } = {}) {
       return result;
 
     case 'types.list':
-      return (result ?? []).map((t) => ({
+      // Canonical listings are always {items}, never a bare array — Volto's
+      // types reducer stores the response as-is and the toolbar maps over it.
+      return (result?.items ?? []).map((t) => ({
         '@id': `/@types/${t.id}`,
         id: t.id,
         title: t.title,

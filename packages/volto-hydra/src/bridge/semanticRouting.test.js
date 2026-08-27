@@ -75,6 +75,17 @@ describe('plonify', () => {
     expect(p.items[0]['@id']).toBe('/news/first-post');
   });
 
+  it('reads types.list from the canonical {items} envelope', () => {
+    // Every adapter returns {items}; treating it as a bare array threw
+    // ".map is not a function" and left the add menu permanently empty.
+    const p = plonify('types.list', {
+      items: [{ id: 'page', title: 'Page', addable: true }],
+    });
+    expect(p).toHaveLength(1);
+    expect(p[0]['@id']).toBe('/@types/page');
+    expect(p[0].addable).toBe(true);
+  });
+
   it('splits query indexes into sortable and all', () => {
     const p = plonify('querystring.getIndexes', {
       Title: { title: 'Title', sortable: true, enabled: true, operations: [] },

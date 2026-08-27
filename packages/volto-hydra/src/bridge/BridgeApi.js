@@ -72,7 +72,10 @@ export class BridgeApi {
     }
 
     const result = await this.rpc.request(routed.intent, routed.args);
-    return plonify(routed.intent, result, { path: fullPath });
+    return plonify(routed.intent, result, {
+      path: fullPath,
+      endpoint: routed.endpoint,
+    });
   }
 }
 

@@ -86,6 +86,20 @@ const applyConfig = (config) => {
   config.settings.useBridgeBackend =
     process.env.RAZZLE_USE_BRIDGE_BACKEND === 'true';
 
+  if (config.settings.useBridgeBackend) {
+    // Volto's apiExpanders declare that breadcrumbs, actions, types, navroot
+    // and navigation arrive embedded in the content response, so it skips
+    // fetching them and reads content['@components']. That is a Plone REST
+    // optimisation — one request instead of five — and no other CMS has an
+    // equivalent. Left on, the toolbar waits forever for types that were never
+    // requested, which is why the add menu came up empty on Drupal.
+    //
+    // The canonical contract has a distinct intent for each of these, so the
+    // adapters answer them individually. Five round trips over an in-page
+    // postMessage bridge cost nothing like five HTTP requests.
+    config.settings.apiExpanders = [];
+  }
+
   // Inject the Volto-config-derived values the pure block-path / schema utils
   // need, so those modules carry NO static `@plone/volto/registry` import and can
   // be loaded (bare Node) by block-sanity's offline discovery. Lazy getters so a
