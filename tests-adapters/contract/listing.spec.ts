@@ -133,6 +133,65 @@ describe('querystringSearch', () => {
     }
   });
 
+  it('offers a sortable last-edited index', async () => {
+    // The listing block's "most recently edited first" is only offerable if the
+    // index EXISTS and says it is sortable. Drupal advertised no such index at
+    // all, so the query builder could not present the ordering — the sort was
+    // not merely broken, it was absent.
+    const res: any = await target.adapter.dispatch('querystring.getIndexes', {});
+    const index = res.indexes[target.queryIndexes.modified];
+    expect(index, `${target.queryIndexes.modified} index`).toBeDefined();
+    expect(index.sortable).toBe(true);
+  });
+
+  it('sorts by last edited, most recent first', async () => {
+    const res: any = await target.adapter.dispatch('querystringSearch', {
+      query: [
+        {
+          i: target.queryIndexes.type,
+          o: 'selection.any',
+          v: [target.types.page],
+        },
+      ],
+      sortOn: target.queryIndexes.modified,
+      sortOrder: 'descending',
+    });
+    expect(res.items.length).toBeGreaterThan(1);
+
+    // Assert the ORDER, not just that results came back. Drupal ignored the
+    // sort parameter entirely, which an unordered assertion would have passed.
+    const seen = res.items.map((i: any) => i.path);
+    const reversed: any = await target.adapter.dispatch('querystringSearch', {
+      query: [
+        {
+          i: target.queryIndexes.type,
+          o: 'selection.any',
+          v: [target.types.page],
+        },
+      ],
+      sortOn: target.queryIndexes.modified,
+      sortOrder: 'ascending',
+    });
+    expect(reversed.items.map((i: any) => i.path)).toEqual([...seen].reverse());
+  });
+
+  it('filters by keyword AND sorts in one query', async () => {
+    // What the listing block actually does: narrow, then order. Exercised
+    // together because an adapter can honour either alone and drop the other
+    // when both are present.
+    const res: any = await target.adapter.dispatch('querystringSearch', {
+      query: [
+        { i: target.queryIndexes.title, o: 'string.contains', v: 'post' },
+      ],
+      sortOn: target.queryIndexes.modified,
+      sortOrder: 'descending',
+    });
+    expect(res.items.length).toBeGreaterThan(0);
+    for (const item of res.items) {
+      expect(item.path).toMatch(/post/i);
+    }
+  });
+
   it('returns canonical Documents, not CMS-shaped brains', async () => {
     const res: any = await target.adapter.dispatch('querystringSearch', {
       query: [

@@ -74,6 +74,7 @@ const target: Target = {
     path: 'menu_parent',
     title: 'title',
     state: 'status',
+    modified: 'changed',
   },
   adapter,
 

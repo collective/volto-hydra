@@ -69,21 +69,36 @@ const TITLE = `Journey ${STAMP}`;
  * behaviour — the same distinction the contract suite draws with Target.types.
  * Every CMS seeds a different tree; none of the STEPS differ.
  */
-const FIXTURES: Record<string, { root: string; target: string }> = {
+const FIXTURES: Record<
+  string,
+  { root: string; target: string; lastEditedLabel: string }
+> = {
   // Plone's mock serves the site's own test tree; the others seed the shared
   // canonical fixture (/news, /about). Playwright cannot set process.env per
   // project, so the run names its own fixture.
   'journey-plone': {
     root: '/_test_data',
     target: '/_test_data/context-navigation-forced-folder',
+    // Plone names its own indexes, so the query builder shows ITS label. The
+    // steps are identical across CMSes; only this environment data differs,
+    // the same way target.queryIndexes handles it in the contract suite.
+    lastEditedLabel: 'Modification date',
   },
   // The target must be a CHILD of the root — the journey picks it out of the
   // root's own listing, so a sibling like /about can never appear there.
   // Drupal and WordPress both build hierarchy from menu links and parent ids
   // rather than a distinct folder type, so any node can receive children and
   // an existing child of /news is the natural target.
-  'journey-drupal': { root: '/news', target: '/news/first-post' },
-  'journey-wordpress': { root: '/news', target: '/news/first-post' },
+  'journey-drupal': {
+    root: '/news',
+    target: '/news/first-post',
+    lastEditedLabel: 'Last edited',
+  },
+  'journey-wordpress': {
+    root: '/news',
+    target: '/news/first-post',
+    lastEditedLabel: 'Last edited',
+  },
 };
 
 function fixtureFor(projectName: string) {
@@ -94,6 +109,7 @@ function fixtureFor(projectName: string) {
   return {
     root: process.env.JOURNEY_ROOT ?? fixture.root,
     target: process.env.JOURNEY_TARGET_FOLDER ?? fixture.target,
+    lastEditedLabel: fixture.lastEditedLabel,
   };
 }
 
@@ -105,7 +121,11 @@ async function waitForRows(page: Page, timeout = 60_000) {
 
 test('create a page, link to another, then move it', async ({ page }, testInfo) => {
   test.setTimeout(180_000);
-  const { root: ROOT, target: TARGET_FOLDER } = fixtureFor(testInfo.project.name);
+  const {
+    root: ROOT,
+    target: TARGET_FOLDER,
+    lastEditedLabel: LAST_EDITED,
+  } = fixtureFor(testInfo.project.name);
   const ploneCalls = forbidPloneApi(page, testInfo.project.name);
   const helper = new AdminUIHelper(page);
   await helper.login();
@@ -298,6 +318,21 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
   await helper.objectBrowserSelectItem(objectBrowser, targetName);
 
   await expect(linkField).toContainText(targetName, { timeout: 15_000 });
+
+  // --- 4. add a listing: filter by keyword, sort by last edited ----------
+  // NOT YET WORKING, deliberately left out rather than left failing.
+  //
+  // The adapter half is done and covered by listing.spec: every target now
+  // advertises a sortable last-edited index and honours sortOn/sortOrder, which
+  // this step is what found — Drupal advertised no such index and implemented
+  // no sorting at all, and WordPress offered publish date but not modified.
+  //
+  // What is unfinished is driving the query builder from the journey. Adding a
+  // listing block does not select it: selection is iframe-driven, and an
+  // unconfigured listing renders nothing to click. Giving it a placeholder that
+  // carries data-block-uid was not enough — the block does not appear to reach
+  // the form at all, so renderListingBlock is never called. That needs its own
+  // diagnosis rather than another guess.
 
   // Save the block work. The page already exists, so this is an update rather
   // than a create, and it is what puts the block through the adapter's

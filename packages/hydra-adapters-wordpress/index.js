@@ -710,6 +710,16 @@ export class WordPressAdapter extends BaseAdapter {
             sortable: false,
             operations: ['selection.any'],
           },
+          modified: {
+            title: 'Last edited',
+            description: 'When the content was last changed',
+            group: 'Dates',
+            enabled: true,
+            // WordPress accepts orderby=modified already; it simply was not
+            // offered, so the query builder had no way to sort by it.
+            sortable: true,
+            operations: ['date.lessThan', 'date.largerThan'],
+          },
           date: {
             title: 'Date',
             group: 'Dates',

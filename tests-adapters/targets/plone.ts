@@ -93,6 +93,7 @@ const target: Target = {
     path: 'path',
     title: 'Title',
     state: 'review_state',
+    modified: 'modified',
   },
   adapter,
 

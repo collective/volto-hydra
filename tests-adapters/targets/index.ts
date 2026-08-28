@@ -39,7 +39,14 @@ export interface Target {
    * portal_type, WordPress post_type; callers discover the name rather than
    * hardcoding one CMS's vocabulary.
    */
-  queryIndexes: { type: string; path: string; title: string; state: string };
+  queryIndexes: {
+    type: string;
+    path: string;
+    title: string;
+    state: string;
+    /** Whatever this CMS calls "last edited": modified, changed, … */
+    modified: string;
+  };
   /** Boot the backing CMS (or mock) and seed it. */
   start(): Promise<void>;
   stop(): Promise<void>;

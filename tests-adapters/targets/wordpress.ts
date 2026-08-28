@@ -128,6 +128,7 @@ const target: Target = {
     path: 'parent',
     title: 'title',
     state: 'status',
+    modified: 'modified',
   },
   adapter,
 

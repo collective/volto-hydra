@@ -146,7 +146,10 @@ function toResource(n) {
       title: n.title,
       status: n.status,
       created: '2026-01-01T00:00:00+00:00',
-      changed: '2026-01-01T00:00:00+00:00',
+      // DISTINCT per node. Every node sharing one timestamp made any ordering
+      // by date vacuously correct — a sort test could not tell a working sort
+      // from an ignored one.
+      changed: new Date(Date.UTC(2026, 0, 1, 0, n.nid ?? 0)).toISOString(),
       path: { alias: n.alias, pid: n.nid, langcode: 'en' },
       field_hydra_blocks: n.blocks,
     },
@@ -590,6 +593,27 @@ app.get('/jsonapi/node/:bundle', (req, res) => {
   let list = [...nodes.values()].filter((n) => n.type === req.params.bundle);
 
   list = applyFilters(list, req);
+
+  // JSON:API sorting: `sort=field` ascending, `sort=-field` descending. The
+  // mock ignored it entirely, so an adapter that dropped the sort parameter
+  // would still have looked correct here.
+  const sort = req.query.sort;
+  if (typeof sort === 'string' && sort) {
+    const descending = sort.startsWith('-');
+    const field = descending ? sort.slice(1) : sort;
+    const keyOf = (n) => {
+      if (field === 'changed' || field === 'created') {
+        return new Date(Date.UTC(2026, 0, 1, 0, n.nid ?? 0)).toISOString();
+      }
+      if (field === 'title') return n.title ?? '';
+      return String(valueAtPath(n, field) ?? '');
+    };
+    list = [...list].sort((a, b) => {
+      const x = keyOf(a);
+      const y = keyOf(b);
+      return descending ? (x < y ? 1 : x > y ? -1 : 0) : x < y ? -1 : x > y ? 1 : 0;
+    });
+  }
 
   const total = list.length;
   const limit = pageLimit(req);

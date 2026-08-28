@@ -676,6 +676,17 @@ export class DrupalAdapter extends BaseAdapter {
               draft: { title: 'Draft' },
             },
           },
+          changed: {
+            title: 'Last edited',
+            description: 'When the content was last changed',
+            group: 'Dates',
+            enabled: true,
+            // The listing block's "most recently edited first" needs a
+            // sortable date, and without one the query builder cannot offer
+            // the ordering at all — the index has to exist, not just the sort.
+            sortable: true,
+            operations: ['date.lessThan', 'date.largerThan'],
+          },
           title: {
             title: 'Title',
             group: 'Metadata',
@@ -748,6 +759,13 @@ export class DrupalAdapter extends BaseAdapter {
           return { items: limited, total: subtree.total };
         }
 
+        // Sorting was not implemented at all: JSON:API takes `sort`, with a
+        // leading '-' for descending. Advertising a sortable index without
+        // this would offer an ordering that silently did nothing.
+        if (args.sortOn) {
+          const descending = String(args.sortOrder ?? '').startsWith('desc');
+          params.set('sort', `${descending ? '-' : ''}${args.sortOn}`);
+        }
         if (args.limit) params.set('page[limit]', String(args.limit));
         const payload = await this.fetchJson(`/jsonapi/node/${this.bundle}`, {
           params: params.toString(),

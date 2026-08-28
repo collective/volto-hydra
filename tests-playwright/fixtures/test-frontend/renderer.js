@@ -1798,6 +1798,21 @@ async function renderListingBlock(block, blockId) {
         fragment.appendChild(pagingContainer.firstElementChild);
     }
 
+    // A listing with no results must still be SELECTABLE in edit mode.
+    // Returning only the expanded children means an unconfigured listing
+    // contributes no element at all, so nothing carries data-block-uid and the
+    // editor has nothing to click — you cannot open the query builder to give
+    // it the criteria that would make it render. Same responsibility as the
+    // empty slate block: emitting data-block-uid in edit mode is the
+    // renderer's job, and the empty case is the one that matters.
+    if (!fragment.firstChild && window.name?.startsWith('hydra')) {
+        const placeholder = document.createElement('div');
+        placeholder.setAttribute('data-block-uid', blockId);
+        placeholder.className = 'listing-empty-placeholder';
+        placeholder.textContent = 'Empty listing — set its criteria';
+        fragment.appendChild(placeholder);
+    }
+
     return fragment;
 }
 
