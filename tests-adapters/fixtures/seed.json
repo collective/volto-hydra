@@ -1,5 +1,5 @@
 {
-  "_comment": "Canonical content set. Every conformance target projects this into its own CMS; every contract assertion refers to it rather than to per-CMS literals. `type` values are canonical names \u2014 each target maps them to its CMS's real type via Target.types. Templates are CMS content, not frontend config: the frontend names one by path via allowedLayouts and the admin resolves it against whichever CMS is connected. Every target therefore has to carry the templates its frontend forces, or the editor never receives INITIAL_DATA and renders nothing at all.",
+  "_comment": "Canonical content set. Every conformance target projects this into its own CMS; every contract assertion refers to it rather than to per-CMS literals. `type` values are canonical names \u2014 each target maps them to its CMS's real type via Target.types. No template documents here: the frontend forces a layout only on paths it is not excluded from, and the journey's roots are excluded, so nothing needs them. They were seeded when forcing was still on for /news, and every WordPress test re-seeds \u2014 the extra document pushed two tests past the 30s timeout. Re-seed them if forcing is ever enabled for a journey root; templates ARE CMS content and each target must carry the ones its frontend references.",
   "documents": [
     {
       "path": "/",
@@ -57,105 +57,6 @@
       "blocks": {},
       "blocksLayout": {
         "items": []
-      }
-    },
-    {
-      "path": "/templates",
-      "type": "folder",
-      "title": "Templates",
-      "state": "published",
-      "blocks": {},
-      "blocksLayout": {
-        "items": []
-      }
-    },
-    {
-      "path": "/templates/context-navigation-layout",
-      "type": "page",
-      "title": "Context Navigation Layout",
-      "state": "published",
-      "blocks": {
-        "tpl-context-nav": {
-          "@type": "contextNavigation",
-          "fixed": true,
-          "readOnly": true,
-          "templateId": "/templates/context-navigation-layout",
-          "templateInstanceId": "context-navigation-layout-def-instance",
-          "slotId": "context-navigation",
-          "ariaLabel": "In this section",
-          "blocks": {
-            "tpl-cnav-listing": {
-              "@type": "listing",
-              "variation": "navItem",
-              "fixed": true,
-              "readOnly": true,
-              "templateId": "/templates/context-navigation-layout",
-              "templateInstanceId": "context-navigation-layout-def-instance",
-              "slotId": "context-navigation-listing",
-              "fieldMapping": {
-                "@id": {
-                  "field": "href",
-                  "type": "link"
-                },
-                "title": {
-                  "field": "label"
-                }
-              },
-              "querystring": {
-                "query": [
-                  {
-                    "i": "path",
-                    "o": "plone.app.querystring.operation.string.relativePath",
-                    "v": ".."
-                  },
-                  {
-                    "i": "portal_type",
-                    "o": "plone.app.querystring.operation.selection.none",
-                    "v": [
-                      "Image",
-                      "File"
-                    ]
-                  },
-                  {
-                    "i": "exclude_from_nav",
-                    "o": "plone.app.querystring.operation.boolean.isFalse",
-                    "v": ""
-                  }
-                ],
-                "sort_on": "getObjPositionInParent",
-                "depth": 4
-              }
-            }
-          },
-          "blocks_layout": {
-            "items": [
-              "tpl-cnav-listing"
-            ]
-          }
-        },
-        "tpl-default-slot": {
-          "@type": "slate",
-          "templateId": "/templates/context-navigation-layout",
-          "templateInstanceId": "context-navigation-layout-def-instance",
-          "slotId": "default",
-          "value": [
-            {
-              "type": "p",
-              "children": [
-                {
-                  "text": ""
-                }
-              ]
-            }
-          ],
-          "plaintext": ""
-        }
-      },
-      "blocksLayout": {
-        "items": [
-          "tpl-context-nav",
-          "tpl-default-slot"
-        ]
       }
     }
   ],

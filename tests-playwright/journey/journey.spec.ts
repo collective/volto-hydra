@@ -192,11 +192,14 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
     .toBeGreaterThan(0);
   const initialBlocks = await helper.getBlockOrder();
 
-  // Pinned: a page with no blocks of its own is a container, so the editor
-  // seeds one 'empty' picker block (getEmptyBlockType: default -> single
-  // allowed -> picker). If that ever changes, this names it here instead of
-  // surfacing as a confusing block-count mismatch further down.
-  expect(initialBlocks.length).toBe(1);
+  // There is something to select. The COUNT is legitimately CMS-dependent and
+  // must not be pinned: config.blocks.initialBlocks is keyed by content type,
+  // and only Plone's 'Document' has an entry, so a new Plone page starts with
+  // title + slate while Drupal and WordPress — both reporting 'page' — fall
+  // back to the container seeding one 'empty' picker. Asserting Drupal's count
+  // here made this a single-CMS test, which is the exact failure mode this
+  // journey exists to avoid.
+  expect(initialBlocks.length).toBeGreaterThan(0);
 
   await helper.clickBlockInIframe(initialBlocks[initialBlocks.length - 1]);
   await helper.clickAddBlockButton();
