@@ -304,6 +304,37 @@ export class WordPressAdapter extends BaseAdapter {
     return `/${[...ancestry, post.slug].join('/')}`;
   }
 
+  /**
+   * The document's path, without walking the tree when WordPress already knows.
+   *
+   * The canonical model addresses content by path, and WordPress is the only
+   * one of the three CMSes that does not store one: Plone's path IS its
+   * address, Drupal carries path.alias as a field, and WordPress derives a
+   * permalink from the parent chain. So every id -> path cost an ancestor walk,
+   * once PER ITEM in a listing — a genuine N+1 that the cache only hid until
+   * the next mutation cleared it.
+   *
+   * `link` is that permalink, already in the response: no request at all.
+   *
+   * Except for drafts. Unpublished content has no public URL, so WordPress
+   * returns ?page_id=N instead of a path, and those still have to be walked.
+   * That is a real asymmetry of the CMS, not something to paper over — the
+   * model wants a path for every document, published or not.
+   */
+  async pathOfPost(post) {
+    const link = typeof post?.link === 'string' ? post.link : '';
+    if (link && !link.includes('?')) {
+      const { pathname } = new URL(link, this.cmsBaseUrl);
+      const path = pathname.replace(/\/+$/, '');
+      if (path) {
+        this.pathCache.set(path, post.id);
+        return path;
+      }
+    }
+    // Draft, or a site without pretty permalinks: fall back to the walk.
+    return this.pathFor(post, await this.ancestryOf(post));
+  }
+
   toDocument(post, path) {
     const raw = post.content?.raw ?? '';
     const { blocks, blocksLayout, legacy } = parseBlocks(raw);
@@ -469,7 +500,7 @@ export class WordPressAdapter extends BaseAdapter {
         const items = [];
         for (const post of posts) {
           items.push(
-            this.toDocument(post, this.pathFor(post, await this.ancestryOf(post))),
+            this.toDocument(post, await this.pathOfPost(post)),
           );
         }
         return { items, total };
@@ -916,7 +947,7 @@ export class WordPressAdapter extends BaseAdapter {
         const items = [];
         for (const post of posts ?? []) {
           items.push(
-            this.toDocument(post, this.pathFor(post, await this.ancestryOf(post))),
+            this.toDocument(post, await this.pathOfPost(post)),
           );
         }
         return { items, total };
