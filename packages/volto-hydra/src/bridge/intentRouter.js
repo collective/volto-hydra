@@ -31,6 +31,33 @@ function splitEndpoint(path) {
   return { contextPath, endpoint, rest };
 }
 
+
+/**
+ * Find a file upload inside a create payload.
+ *
+ * Plone serialises an upload as a field holding
+ * {data, encoding, 'content-type', filename}. The field NAME varies (image,
+ * file, …) and the '@type' is CMS-specific, so match on the value's shape:
+ * base64 data plus a filename is unambiguous.
+ */
+function findFilePayload(data) {
+  for (const value of Object.values(data ?? {})) {
+    if (
+      value &&
+      typeof value === 'object' &&
+      typeof value.data === 'string' &&
+      typeof value.filename === 'string'
+    ) {
+      return {
+        filename: value.filename,
+        contentType: value['content-type'] ?? 'application/octet-stream',
+        data: value.data,
+      };
+    }
+  }
+  return null;
+}
+
 export function routeToIntent({ op, path, data }) {
   const { contextPath, endpoint, rest } = splitEndpoint(path);
   const params = queryOf(path);
@@ -53,6 +80,28 @@ export function routeToIntent({ op, path, data }) {
       };
     }
     if (op === 'post') {
+      // An upload, not a content create. Volto's image widget posts
+      // {'@type':'Image', image: {data, encoding, 'content-type', filename}},
+      // and routing that to content.create makes the CMS build a PAGE named
+      // after the file: on Drupal it produced a node instead of a media entity,
+      // so asset.upload — implemented by every adapter and covered by the
+      // contract — was never exercised by the editor at all.
+      //
+      // Detected by the SHAPE of the payload rather than by '@type': 'Image',
+      // which is a Plone type name and means nothing to the other two.
+      const file = findFilePayload(data);
+      if (file) {
+        return {
+          intent: 'asset.upload',
+          args: {
+            parentPath: contextPath,
+            filename: file.filename,
+            contentType: file.contentType,
+            data: file.data,
+          },
+          endpoint: 'upload',
+        };
+      }
       return {
         intent: 'content.create',
         args: {

@@ -85,7 +85,30 @@ function actionsToPlone(pas) {
   return { object, object_buttons: [], user: [], site: [] };
 }
 
+/**
+ * An uploaded asset, in the shape the image widget reads back.
+ *
+ * It uses content['@id'] as the stored value and content.image as
+ * image_scales.image[0], so those two are the contract here — not the whole
+ * canonical Document.
+ */
+function assetToPlone(doc) {
+  const url = doc?.fields?.url ?? doc?.path;
+  return {
+    '@id': url,
+    '@type': 'Image',
+    id: doc?.id,
+    title: doc?.title,
+    image: {
+      filename: doc?.fields?.filename,
+      download: url,
+      scales: {},
+    },
+  };
+}
+
 export function plonify(intent, result, { path, endpoint } = {}) {
+  if (intent === 'asset.upload') return assetToPlone(result);
   if (endpoint === 'actions') return actionsToPlone(result);
   switch (intent) {
     case 'content.get':

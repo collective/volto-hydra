@@ -612,7 +612,15 @@ export class DrupalAdapter extends BaseAdapter {
           blocksLayout: { items: [] },
           fields: {
             filename: file.attributes.filename,
-            url: file.attributes.uri?.url,
+            // ABSOLUTE. `path` stays CMS-relative per the Document contract,
+            // but this is what gets rendered in an <img>, and a relative URL
+            // there is resolved against whatever origin the page came from —
+            // which put a Drupal file path on the Plone mock, with Plone's
+            // @@images scale suffix appended for good measure. Same reason
+            // asset.imageUrl is specified as absolute.
+            url: file.attributes.uri?.url
+              ? new URL(file.attributes.uri.url, this.cmsBaseUrl).href
+              : undefined,
           },
           state: media.attributes?.status === false ? 'draft' : 'published',
           _adapter: { raw: { media, file } },

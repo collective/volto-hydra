@@ -43,6 +43,25 @@ function bridgeIframe() {
   );
 }
 
+/**
+ * The window whose adapter has announced itself.
+ *
+ * Readiness used to be a single boolean on the client, but there are two
+ * possible targets — the hidden adapter host and the editing iframe — and
+ * bridgeIframe() prefers the editing one the moment its element exists. So on
+ * the way into /edit the host would announce, the editing iframe would mount
+ * and become the target while still loading, and canSend() would say yes
+ * because an element with a contentWindow existed. Requests were then posted
+ * into a document with no listener and silently dropped, surfacing much later
+ * as a per-request timeout: 22 requests in, 6 out, an edit form with no title
+ * and a preview stuck on "Loading...".
+ *
+ * Comparing against the announcing window makes readiness a property of the
+ * transport rather than of the client, so a target that has not announced
+ * queues instead of swallowing.
+ */
+let readyWindow = null;
+
 // Whether an editing iframe is currently mounted. The host subscribes so it
 // can stay out of the way rather than loading the frontend a second time.
 let editingMounted = false;
@@ -76,7 +95,13 @@ export function getBridgeRpc() {
     // Readiness is not just "an adapter announced" — it is also "there is an
     // iframe to send to". Leaving one route for another can remove the host
     // before the next mounts, and a request dispatched into that gap is lost.
-    canSend: () => Boolean(bridgeIframe()?.contentWindow),
+    // Not just "is there an iframe" — "is there an adapter in the window I am
+    // about to post to". The two differ exactly while a target is swapping,
+    // which is when requests were being lost.
+    canSend: () => {
+      const target = bridgeIframe()?.contentWindow;
+      return Boolean(target) && target === readyWindow;
+    },
     send: (msg) => {
       const iframe = bridgeIframe();
       const origin = resolveTargetOrigin();
@@ -133,6 +158,8 @@ function installListener(rpcClient) {
         protocolVersion: event.data.protocolVersion,
         user: event.data.user,
       };
+      // Readiness belongs to the WINDOW that announced it, not to the client.
+      readyWindow = event.source;
       rpcClient.markReady();
       resolveAdapterReady?.(lastAdapter);
     }

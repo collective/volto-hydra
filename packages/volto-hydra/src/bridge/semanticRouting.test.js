@@ -35,6 +35,45 @@ describe('routeToIntent', () => {
     expect(routeToIntent({ op, path, data: {} })?.intent).toBe(intent);
   });
 
+  it('routes an upload to asset.upload, not content.create', () => {
+    // The image widget posts a file payload to a folder. Treating that as a
+    // content create made the CMS build a page named after the file — a node
+    // on Drupal rather than a media entity — so asset.upload was never
+    // exercised by the editor despite every adapter implementing it.
+    const r = routeToIntent({
+      op: 'post',
+      path: '/news',
+      data: {
+        '@type': 'Image',
+        title: 'hero.png',
+        image: {
+          data: 'aGVsbG8=',
+          encoding: 'base64',
+          'content-type': 'image/png',
+          filename: 'hero.png',
+        },
+      },
+    });
+    expect(r.intent).toBe('asset.upload');
+    expect(r.args).toMatchObject({
+      parentPath: '/news',
+      filename: 'hero.png',
+      contentType: 'image/png',
+      data: 'aGVsbG8=',
+    });
+  });
+
+  it('still treats a plain create as content.create', () => {
+    // Guard against the shape check being too eager: a document with ordinary
+    // fields must not be mistaken for an upload.
+    const r = routeToIntent({
+      op: 'post',
+      path: '/news',
+      data: { '@type': 'Document', title: 'A page', description: 'not a file' },
+    });
+    expect(r.intent).toBe('content.create');
+  });
+
   it('returns null for endpoints with no canonical form', () => {
     expect(routeToIntent({ op: 'get', path: '/x/@history' })).toBeNull();
   });
@@ -84,6 +123,20 @@ describe('plonify', () => {
     expect(p).toHaveLength(1);
     expect(p[0]['@id']).toBe('/@types/page');
     expect(p[0].addable).toBe(true);
+  });
+
+  it('renders an uploaded asset as the image widget reads it', () => {
+    // The widget uses content['@id'] as the stored value and content.image as
+    // image_scales.image[0]; those two are the contract, not the whole Document.
+    const p = plonify('asset.upload', {
+      id: 'media-uuid-1',
+      path: '/sites/default/files/hero.png',
+      title: 'hero.png',
+      fields: { filename: 'hero.png', url: '/sites/default/files/hero.png' },
+    });
+    expect(p['@id']).toBe('/sites/default/files/hero.png');
+    expect(p.image.download).toBe('/sites/default/files/hero.png');
+    expect(p['@type']).toBe('Image');
   });
 
   it('splits query indexes into sortable and all', () => {

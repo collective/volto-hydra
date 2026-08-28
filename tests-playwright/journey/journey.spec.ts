@@ -26,9 +26,20 @@ function forbidPloneApi(page: Page, projectName: string): string[] {
   ];
   page.on('request', (request) => {
     const url = request.url();
-    if (ploneOrigins.some((origin) => url.includes(origin))) {
-      offenders.push(`${request.method()} ${url}`);
+    if (!ploneOrigins.some((origin) => url.includes(origin))) return;
+
+    // Only the ADMIN's own requests. The test frontend renders Inka's Plone
+    // content, so its fetches legitimately hit the Plone mock even on a Drupal
+    // run — that is a fixture limitation, not the admin bypassing the bridge.
+    // The claim under test is that the admin holds no CMS of its own.
+    let fromAdmin = false;
+    try {
+      fromAdmin = request.frame() === page.mainFrame();
+    } catch {
+      // A frame detached mid-request cannot be attributed; do not guess.
+      return;
     }
+    if (fromAdmin) offenders.push(`${request.method()} ${url}`);
   });
   return offenders;
 }
@@ -151,6 +162,15 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
     await page.locator('#toolbar-edit, a[aria-label="Edit"]').first().click();
     await page.waitForURL(/\/edit$/, { timeout: 20_000 });
   }
+
+  // Assert the edit form actually loaded the document BEFORE touching it.
+  // Without this, an empty form looks identical to a loaded one until the save
+  // fails validation many steps later with "Title is required" — which says
+  // nothing about when the title went missing.
+  await expect(page.locator('input[id="field-title"]').first()).toHaveValue(
+    TITLE,
+    { timeout: 25_000 },
+  );
 
   // The frontend renders blocks only once it has the document over the bridge,
   // so this is a condition to wait for, not a state to assert immediately.

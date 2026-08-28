@@ -214,6 +214,13 @@
         }
 
         // API origin — the mock Plone API always runs on port 8888
+        // NOTE: this fixture renders Inka's own (Plone) content, so its own
+        // fetching stays on the Plone mock even during a Drupal or WordPress
+        // journey. Pointing it at the run's CMS breaks its bootstrap — the
+        // Plone-shaped /++api++ requests fail, the adapter never announces and
+        // the admin gets nothing. Making the fixture CMS-agnostic is its own
+        // piece of work; until then the journey's guard scopes itself to the
+        // ADMIN's requests, which are the ones that must never reach Plone.
         window._apiOrigin = 'http://localhost:8888';
 
         // Make search criteria available globally for form handlers
