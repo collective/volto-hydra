@@ -227,14 +227,27 @@ export class WordPressAdapter extends BaseAdapter {
     // The disambiguation is unchanged: each segment must sit under the previous
     // one, so "/news/first-post" still cannot match a different "first-post"
     // elsewhere in the tree.
+    const PER_PAGE = 100;
     const candidates = await this.fetchJson(`/wp/v2/${this.postType}`, {
       params: {
         slug: segments.join(','),
-        per_page: '100',
+        per_page: String(PER_PAGE),
         status: 'any',
-        context: 'edit',
+        // id, slug and parent are all a path resolution needs. Without this the
+        // response carries every field of every candidate — content included —
+        // to answer a question about three of them.
+        _fields: 'id,slug,parent',
       },
     });
+
+    // A full page means there may be more candidates we cannot see, and picking
+    // from a truncated set could resolve to the WRONG page — a site with fifty
+    // "about" pages in different branches would not necessarily have ours in
+    // the first hundred. Fall back to the walk, which is slower but cannot be
+    // fooled: it asks for one slug under one specific parent at a time.
+    if ((candidates?.length ?? 0) >= PER_PAGE) {
+      return this.resolvePathByWalking(path, segments);
+    }
 
     let parent = 0;
     let id = null;
@@ -257,6 +270,43 @@ export class WordPressAdapter extends BaseAdapter {
       walked = `${walked}/${slug}`;
       this.pathCache.set(walked, hit.id);
       this.ancestorCache.set(hit.id, { slug: hit.slug, parent: hit.parent });
+    }
+    this.pathCache.set(path, id);
+    return id;
+  }
+
+  /**
+   * One request per segment, each scoped to the parent found by the last.
+   *
+   * Slower, but it cannot be defeated by slug collisions at any scale, because
+   * it never has to choose between candidates: the CMS is asked for this slug
+   * under this parent. Kept as the fallback for when the single-query form
+   * cannot prove it saw every candidate.
+   */
+  async resolvePathByWalking(path, segments) {
+    let parent = 0;
+    let id = null;
+    let walked = '';
+    for (const slug of segments) {
+      const matches = await this.fetchJson(`/wp/v2/${this.postType}`, {
+        params: {
+          slug,
+          parent: String(parent),
+          status: 'any',
+          _fields: 'id,slug,parent',
+        },
+      });
+      if (!matches || matches.length === 0) {
+        throw new AdapterError(`Not found: ${path}`, {
+          code: 'NOT_FOUND',
+          status: 404,
+        });
+      }
+      id = matches[0].id;
+      parent = id;
+      walked = `${walked}/${slug}`;
+      this.pathCache.set(walked, id);
+      this.ancestorCache.set(id, { slug: matches[0].slug, parent: matches[0].parent });
     }
     this.pathCache.set(path, id);
     return id;

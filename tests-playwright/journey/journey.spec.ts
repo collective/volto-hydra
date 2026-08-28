@@ -16,6 +16,69 @@ import { PORTS } from '../ports';
  * between the admin and the adapter were still Plone-shaped and nothing failed
  * when they spoke to the wrong server.
  */
+
+/**
+ * Count the CMS round trips the journey actually makes.
+ *
+ * Wall-clock hides where the cost is, and at ~1.1s per request against
+ * WordPress-on-WASM the count IS the cost. Counting per step turns "the journey
+ * got slower" into "step 3 went from 9 requests to 14", which is a regression
+ * you can act on — and it names the adapter operations worth optimising rather
+ * than leaving them to be guessed at.
+ *
+ * Counts requests to the CMS, from any frame: the adapter runs inside the
+ * iframe, so these are its calls, not the admin's.
+ */
+function countCmsRequests(page: Page, projectName: string) {
+  const cmsPort: Record<string, number> = {
+    'journey-plone': PORTS.mockApi,
+    'journey-drupal': PORTS.mockDrupal,
+    'journey-wordpress': PORTS.wordpress,
+  };
+  const port = cmsPort[projectName];
+  const steps: Array<{ label: string; count: number }> = [];
+  let total = 0;
+  let sinceMark = 0;
+
+  const byEndpoint = new Map<string, number>();
+
+  page.on('request', (request) => {
+    if (!port || !request.url().includes(`:${port}`)) return;
+    total += 1;
+    sinceMark += 1;
+
+    // Group by endpoint SHAPE, so ids and query strings collapse together and
+    // the fan-out per route is visible rather than buried in 149 distinct URLs.
+    const { pathname } = new URL(request.url());
+    const shape = pathname
+      .replace(/\/[0-9a-f-]{8,}/gi, '/{id}')
+      .replace(/\/\d+/g, '/{id}');
+    byEndpoint.set(shape, (byEndpoint.get(shape) ?? 0) + 1);
+  });
+
+  return {
+    mark(label: string) {
+      steps.push({ label, count: sinceMark });
+      sinceMark = 0;
+    },
+    report() {
+      const rows = steps
+        .map((s) => `  ${String(s.count).padStart(4)}  ${s.label}`)
+        .join('\n');
+      const top = [...byEndpoint.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 12)
+        .map(([shape, n]) => `  ${String(n).padStart(4)}  ${shape}`)
+        .join('\n');
+      // eslint-disable-next-line no-console
+      console.log(
+        `\n[CMS REQUESTS] ${projectName} — ${total} total\n${rows}\n` +
+          `\n[BY ENDPOINT]\n${top}\n`,
+      );
+    },
+  };
+}
+
 function forbidPloneApi(page: Page, projectName: string): string[] {
   const offenders: string[] = [];
   if (projectName === 'journey-plone') return offenders;
@@ -131,12 +194,15 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
     lastEditedLabel: LAST_EDITED,
   } = fixtureFor(testInfo.project.name);
   const ploneCalls = forbidPloneApi(page, testInfo.project.name);
+  const reqs = countCmsRequests(page, testInfo.project.name);
   const helper = new AdminUIHelper(page);
   await helper.login();
 
   // --- 1. browse existing content ---------------------------------------
   await page.goto(`${helper.adminUrl}${ROOT}/contents`);
   await waitForRows(page);
+
+  reqs.mark("1. browse the listing");
 
   // --- 2. create a page --------------------------------------------------
   await page.locator('#toolbar-add').click();
@@ -163,6 +229,8 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
     timeout: 25_000,
   });
   const createdPath = new URL(page.url()).pathname.replace(/\/edit$/, '');
+
+  reqs.mark("2. create the page");
 
   // --- 3. add an image and a link, in a BLOCK ----------------------------
   //
@@ -357,6 +425,8 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
   });
 
 
+  reqs.mark("3. image upload + link");
+
   // --- 4. it is listed under its parent ----------------------------------
   // Navigate within the SPA: a full page load is served under a different
   // session by the mock, so it would land in a world that never saw the
@@ -388,17 +458,28 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
   // 20s later at a URL nobody had predicted. Popping until the URL matches
   // depends on where we are going rather than on how we got here.
   const listingUrl = new RegExp(`${ROOT}/contents$`);
-  for (let hop = 0; hop < 10 && !listingUrl.test(page.url()); hop++) {
+  for (let hop = 0; hop < 8; hop++) {
+    if (listingUrl.test(page.url())) break;
+    if (page.url() === 'about:blank') {
+      throw new Error(
+        'Walked back past the start of history without finding the listing — ' +
+          'the journey pushed a different set of entries than expected.',
+      );
+    }
     await page.goBack();
-    // Each hop is client-side; give the route a moment to settle before
-    // testing the URL, but never assume a fixed number of hops.
-    await page.waitForLoadState('domcontentloaded').catch(() => {});
+    // WAIT for arrival after each hop rather than reading the URL straight
+    // away. goBack() resolves before the SPA finishes routing, so checking
+    // immediately sees the previous URL, decides it has not arrived, and pops
+    // again — overshooting the listing and eventually landing on about:blank.
+    await page.waitForURL(listingUrl, { timeout: 4_000 }).catch(() => {});
   }
   await expect(page).toHaveURL(listingUrl, { timeout: 25_000 });
   await waitForRows(page);
 
   const created = page.getByRole('row', { name: createdPath, exact: true });
   await expect(created).toHaveCount(1, { timeout: 20_000 });
+
+  reqs.mark("4. back to the listing");
 
   // --- 5. move it with cut and paste -------------------------------------
   await created.locator('td').nth(1).locator('button').click();
@@ -454,6 +535,9 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
   //   - popping a fixed number of history entries encoded the history depth of
   //     an older version of this test; adding steps to step 3 silently broke
   //     navigation two steps later.
+
+  reqs.mark('5. cut, paste and verify the move');
+  reqs.report();
 
   // Checked last so the report lists every offender rather than only the first,
   // and so a genuine journey failure is not masked by this one.
