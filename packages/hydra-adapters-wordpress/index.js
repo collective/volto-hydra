@@ -370,8 +370,14 @@ export class WordPressAdapter extends BaseAdapter {
           method: 'DELETE',
           params: { force: 'true' },
         });
-        this.pathCache.delete(args.path);
-        this.ancestorCache.clear();
+        // Same reasoning as content.move: the deleted post and anything under
+        // it are stale, nothing else is.
+        for (const cached of [...this.pathCache.keys()]) {
+          if (cached === args.path || cached.startsWith(`${args.path}/`)) {
+            this.pathCache.delete(cached);
+          }
+        }
+        this.ancestorCache.delete(id);
         return null;
       }
 
@@ -626,9 +632,23 @@ export class WordPressAdapter extends BaseAdapter {
           body: { parent: parentId },
         });
 
-        // Every cached path under the moved subtree is now wrong.
-        this.pathCache.clear();
-        this.ancestorCache.clear();
+        // Only the moved subtree is wrong — invalidate exactly that.
+        //
+        // Clearing both maps wholesale was correct but ruinously broad: every
+        // later lookup re-walked the tree at a full request per hop, and with
+        // ~1.1s per request under PHP-WASM it put every move test within a few
+        // seconds of the 30s limit, so whichever landed worst failed.
+        //
+        // A move re-parents ONE post. Paths at or under its old location are
+        // stale; every other cached path still holds. In the ancestor map,
+        // which is id -> {slug, parent}, only the moved post's own entry
+        // changes — its descendants still have the same parent, namely it.
+        for (const cached of [...this.pathCache.keys()]) {
+          if (cached === args.path || cached.startsWith(`${args.path}/`)) {
+            this.pathCache.delete(cached);
+          }
+        }
+        this.ancestorCache.delete(id);
 
         const segments = args.path.split('/').filter(Boolean);
         const slug = segments[segments.length - 1];
@@ -641,11 +661,48 @@ export class WordPressAdapter extends BaseAdapter {
 
       case 'content.order': {
         const id = await this.resolvePath(args.path);
-        // WordPress orders pages by menu_order; lower sorts first.
-        await this.fetchJson(`/wp/v2/${this.postType}/${id}`, {
-          method: 'POST',
-          body: { menu_order: args.targetIndex },
+        const post = await this.fetchJson(`/wp/v2/${this.postType}/${id}`, {
+          params: { context: 'edit' },
         });
+
+        // Renumber ALL the siblings, not just this one.
+        //
+        // WordPress orders pages by menu_order, and every page starts at 0. So
+        // writing menu_order on one post alone leaves it tied with its
+        // siblings, WordPress breaks the tie however it likes, and the move
+        // silently does nothing — "reorder draft-post to the front" returned
+        // first-post still leading. A position is only meaningful relative to
+        // the others, so the whole run has to be given distinct, ordered
+        // values.
+        const siblings = await this.fetchJson(`/wp/v2/${this.postType}`, {
+          params: {
+            parent: String(post.parent ?? 0),
+            per_page: '100',
+            orderby: 'menu_order',
+            order: 'asc',
+            status: 'any',
+            context: 'edit',
+          },
+        });
+
+        const rest = (siblings ?? []).filter((s) => s.id !== id);
+        const index = Math.max(0, Math.min(args.targetIndex ?? 0, rest.length));
+        const ordered = [...rest.slice(0, index), post, ...rest.slice(index)];
+
+        for (let i = 0; i < ordered.length; i++) {
+          if (ordered[i].menu_order === i) continue; // already correct
+          await this.fetchJson(`/wp/v2/${this.postType}/${ordered[i].id}`, {
+            method: 'POST',
+            body: { menu_order: i },
+          });
+        }
+
+        // NOT clearing the path caches. Ordering changes menu_order, which
+        // affects neither slugs nor parents, so every cached path is still
+        // correct. Clearing them made the following tree.list re-resolve every
+        // ancestor at a full request each, which is what pushed this test past
+        // the 30s limit — invalidating more than changed is not free when a
+        // request costs a second.
         return null;
       }
 
@@ -787,7 +844,13 @@ export class WordPressAdapter extends BaseAdapter {
         }
 
         if (args.sortOn) params.orderby = args.sortOn;
-        if (args.sortOrder) params.order = args.sortOrder;
+        if (args.sortOrder) {
+          // WordPress accepts only asc|desc and 400s on anything else. The
+          // canonical value is Plone's long form ("descending"), which passed
+          // straight through and made every sorted query fail — as a 400 on
+          // /wp/v2/pages, which says nothing about the parameter at fault.
+          params.order = String(args.sortOrder).startsWith('desc') ? 'desc' : 'asc';
+        }
 
         const posts = await this.fetchJson(`/wp/v2/${postType}`, { params });
         const total = this.lastTotal;
