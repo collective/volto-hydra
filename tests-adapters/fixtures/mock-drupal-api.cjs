@@ -70,6 +70,8 @@ function buildState() {
     nodes: new Map(),
     menuLinks: new Map(),
     files: new Map(),
+    // The asset RECORD, distinct from the file bytes — what the editor browses.
+    media: new Map(),
     nextNid: 1,
   };
 
@@ -362,6 +364,72 @@ app.get('/jsonapi/user/user', (req, res) =>
 );
 
 // --- types & schema ------------------------------------------------------
+// Media: the asset record an editor browses. Bare file entities have no name,
+// no published state and no listing, so the adapter requires media and this
+// mock has to model it or the contract would pass against something Drupal
+// users would not recognise.
+app.get('/jsonapi/media_type/media_type', (req, res) =>
+  res.json(
+    collection(
+      ['image', 'document'].map((t) => ({
+        type: 'media_type--media_type',
+        id: `mediatype-${t}`,
+        attributes: { drupal_internal__id: t, name: t === 'image' ? 'Image' : 'Document' },
+      })),
+    ),
+  ),
+);
+
+app.post('/jsonapi/media/:bundle/:field', (req, res) => {
+  const { files } = stateFor(req);
+  const disposition = req.headers['content-disposition'] || '';
+  const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? 'upload.bin';
+  const id = `file-${files.size + 1}`;
+  const file = {
+    id,
+    filename,
+    url: `/sites/default/files/${filename}`,
+    mime: req.headers['content-type'] || 'application/octet-stream',
+  };
+  files.set(id, file);
+  res.status(201).json(
+    single({
+      type: 'file--file',
+      id,
+      attributes: {
+        filename,
+        uri: { value: `public://${filename}`, url: file.url },
+        filemime: file.mime,
+      },
+    }),
+  );
+});
+
+app.post('/jsonapi/media/:bundle', (req, res) => {
+  const { media } = stateFor(req);
+  const attrs = req.body?.data?.attributes ?? {};
+  const fileRel = Object.values(req.body?.data?.relationships ?? {})[0]?.data;
+  const id = `media-${media.size + 1}`;
+  const entity = {
+    id,
+    bundle: req.params.bundle,
+    name: attrs.name ?? 'Untitled',
+    status: attrs.status !== false,
+    fileId: fileRel?.id ?? null,
+  };
+  media.set(id, entity);
+  res.status(201).json(
+    single({
+      type: `media--${entity.bundle}`,
+      id,
+      attributes: { name: entity.name, status: entity.status },
+      relationships: {
+        field_media_image: { data: fileRel ?? null },
+      },
+    }),
+  );
+});
+
 app.get('/jsonapi/node_type/node_type', (req, res) =>
   res.json(
     collection(

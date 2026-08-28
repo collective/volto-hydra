@@ -63,7 +63,9 @@ const target: Target = {
     'asset',
     'state',
   ],
-  types: { folder: 'page', page: 'page', image: 'file' },
+  // Assets are media entities, not bare files: a file has no name, no state and
+  // no listing, so it is not something an editor can browse or relocate.
+  types: { folder: 'page', page: 'page', image: 'image' },
   vocabularies: { categories: 'categories' },
   vocabularySize: seed.vocabularies.categories.generate,
   imageScale: 'large',

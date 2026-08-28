@@ -17,6 +17,19 @@ import { flattenPayload, aliasOf } from './normalize.js';
 /** Virtual folder listing content that has no menu link yet. */
 export const UNFILED_PATH = '/_unfiled';
 
+/**
+ * Assets are Media entities, not bare files.
+ *
+ * A file entity has a uuid and a URI and nothing else — no name, no published
+ * state, no listing. Media is Drupal's equivalent of a WordPress attachment or
+ * a Plone Image object, and it is what makes an asset something an editor can
+ * find, rename and relocate. Core has shipped Media since 8.4 and the standard
+ * profile enables it, so requiring it is reasonable; sites without it are told
+ * so at init rather than silently given a degraded record.
+ */
+const MEDIA_BUNDLE = 'image';
+const MEDIA_FILE_FIELD = 'field_media_image';
+
 const STATE_MAP = { true: 'published', false: 'draft' };
 
 export class DrupalAdapter extends BaseAdapter {
@@ -45,6 +58,43 @@ export class DrupalAdapter extends BaseAdapter {
     await super.init(ctx);
     this.cmsBaseUrl = ctx.cmsBaseUrl ?? this.cmsBaseUrl;
     if (!this.csrfToken) this.csrfToken = await this.fetchCsrfToken();
+    await this.assertMediaAvailable();
+  }
+
+  /**
+   * Refuse to run against a site with no Media, rather than quietly degrading.
+   *
+   * Without it an upload can still create a file entity, but the editor gets an
+   * asset with no name, no state and no listing — a record it cannot browse or
+   * relocate. Failing here names the missing setup; failing later looks like a
+   * broken object browser.
+   */
+  async assertMediaAvailable() {
+    const res = await fetch(
+      `${this.cmsBaseUrl}/jsonapi/media_type/media_type`,
+      { credentials: this.credentials ? 'omit' : 'include', headers: this.authHeaders() },
+    );
+    // An auth failure is NOT a missing module. Conflating them would send an
+    // integrator to install Media on a site that already has it, so leave 401
+    // and 403 to the normal auth path.
+    if (res.status === 401 || res.status === 403) return;
+    if (!res.ok) {
+      throw new AdapterError(
+        'Drupal Media is required but /jsonapi/media_type is unavailable. ' +
+          'Enable the Media and JSON:API modules.',
+        { code: 'SETUP_REQUIRED', status: res.status },
+      );
+    }
+    const bundles = (flattenPayload(await res.json()) ?? []).map(
+      (t) => t.attributes?.drupal_internal__id,
+    );
+    if (!bundles.includes(MEDIA_BUNDLE)) {
+      throw new AdapterError(
+        `Drupal Media bundle '${MEDIA_BUNDLE}' not found (have: ${bundles.join(', ') || 'none'}). ` +
+          'Hydra stores assets as media entities so editors can browse and rename them.',
+        { code: 'SETUP_REQUIRED' },
+      );
+    }
   }
 
   /** Drupal requires a CSRF token for every write. */
@@ -489,9 +539,20 @@ export class DrupalAdapter extends BaseAdapter {
       }
 
       case 'asset.upload': {
+        // Two steps, because a bare file entity is not something an editor can
+        // work with. Uploading to the media bundle's field creates the FILE;
+        // the media entity that wraps it is what carries a name, a published
+        // state, a bundle (image / document / video) and a place in
+        // /admin/content/media. Without it there is no record to browse, rename
+        // or relocate — the object browser would list a filename and nothing
+        // else, which is what it did while this created files alone.
+        //
+        // This is why the adapter requires Media (see init): it is the only
+        // Drupal construct equivalent to a WordPress attachment or a Plone
+        // Image object.
         const binary = Uint8Array.from(atob(args.data), (c) => c.charCodeAt(0));
-        const res = await fetch(
-          `${this.cmsBaseUrl}/jsonapi/node/${this.bundle}/field_media_image`,
+        const fileRes = await fetch(
+          `${this.cmsBaseUrl}/jsonapi/media/${MEDIA_BUNDLE}/${MEDIA_FILE_FIELD}`,
           {
             method: 'POST',
             credentials: this.credentials ? 'omit' : 'include',
@@ -504,23 +565,57 @@ export class DrupalAdapter extends BaseAdapter {
             body: binary,
           },
         );
-        if (!res.ok) {
-          throw new AdapterError(`Upload failed: ${res.status}`, {
+        if (!fileRes.ok) {
+          throw new AdapterError(`Upload failed: ${fileRes.status}`, {
             code: 'UPLOAD_FAILED',
-            status: res.status,
+            status: fileRes.status,
           });
         }
-        const file = flattenPayload(await res.json());
+        const file = flattenPayload(await fileRes.json());
+
+        const mediaRes = await fetch(`${this.cmsBaseUrl}/jsonapi/media/${MEDIA_BUNDLE}`, {
+          method: 'POST',
+          credentials: this.credentials ? 'omit' : 'include',
+          headers: {
+            ...this.authHeaders(),
+            ...(this.csrfToken ? { 'X-CSRF-Token': this.csrfToken } : {}),
+            'Content-Type': 'application/vnd.api+json',
+          },
+          body: JSON.stringify({
+            data: {
+              type: `media--${MEDIA_BUNDLE}`,
+              attributes: { name: args.filename, status: true },
+              relationships: {
+                [MEDIA_FILE_FIELD]: {
+                  data: { type: 'file--file', id: file.id },
+                },
+              },
+            },
+          }),
+        });
+        if (!mediaRes.ok) {
+          throw new AdapterError(`Media create failed: ${mediaRes.status}`, {
+            code: 'UPLOAD_FAILED',
+            status: mediaRes.status,
+          });
+        }
+        const media = flattenPayload(await mediaRes.json());
+
         return {
-          id: file.id,
+          // The MEDIA entity's uuid is the asset's identity — the thing blocks
+          // reference and the editor browses. The file url is a property of it.
+          id: media.id,
           path: file.attributes.uri?.url ?? `/${file.attributes.filename}`,
-          type: 'file',
-          title: file.attributes.filename,
+          type: MEDIA_BUNDLE,
+          title: media.attributes?.name ?? args.filename,
           blocks: {},
           blocksLayout: { items: [] },
-          fields: { filename: file.attributes.filename },
-          state: 'published',
-          _adapter: { raw: file },
+          fields: {
+            filename: file.attributes.filename,
+            url: file.attributes.uri?.url,
+          },
+          state: media.attributes?.status === false ? 'draft' : 'published',
+          _adapter: { raw: { media, file } },
         };
       }
 

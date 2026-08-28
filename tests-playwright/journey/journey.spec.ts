@@ -172,6 +172,12 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
     .toBeGreaterThan(0);
   const initialBlocks = await helper.getBlockOrder();
 
+  // Pinned: a page with no blocks of its own is a container, so the editor
+  // seeds one 'empty' picker block (getEmptyBlockType: default -> single
+  // allowed -> picker). If that ever changes, this names it here instead of
+  // surfacing as a confusing block-count mismatch further down.
+  expect(initialBlocks.length).toBe(1);
+
   await helper.clickBlockInIframe(initialBlocks[initialBlocks.length - 1]);
   await helper.clickAddBlockButton();
   await helper.selectBlockType('image');
@@ -181,6 +187,18 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
   const imageBlock = withImage.find((uid) => !initialBlocks.includes(uid))!;
   expect(imageBlock).toBeTruthy();
 
+  // Assert the block is what we asked for, rather than inferring it later from
+  // a screenshot. A block count that went up only proves SOMETHING was added:
+  // when this step actually inserted a slate block instead of an image, the
+  // count assertion passed and the failure surfaced eight steps downstream as
+  // "no img with that src", which said nothing about the cause.
+  //
+  // .parent-nav carries the selected block's title, which is the same signal a
+  // human reads off the sidebar.
+  await expect(
+    page.locator('#sidebar-properties, .sidebar-container').locator('.parent-nav').first(),
+  ).toContainText(/image/i, { timeout: 15_000 });
+
   // --- the image: an UPLOAD, not a URL ------------------------------------
   // The contract already proves asset.upload and asset.imageUrl against all
   // three CMSes, but it calls the adapter directly — no browser, no bridge.
@@ -188,21 +206,21 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
   // and that upload travelling admin -> bridge -> adapter. Setting an external
   // URL instead, as this step first did, exercises none of that: the adapter
   // never sees an asset at all.
-  const imageEl = helper
-    .getIframe()
-    .locator(`[data-block-uid="${imageBlock}"] [data-edit-media="url"]`);
-  await expect(imageEl).toBeVisible({ timeout: 20_000 });
+  // The drop target is the picker in the ADMIN's overlay, not the <img> in the
+  // iframe. dragDropImageFile runs document.elementFromPoint in the admin
+  // document, so iframe coordinates there resolve to the <iframe> element and
+  // the drop never reaches the block — which is why no asset.upload was ever
+  // dispatched. Asserted rather than assumed this time.
+  const imageOverlay = page.locator('.empty-image-overlay');
+  await expect(imageOverlay).toBeVisible({ timeout: 20_000 });
 
-  // Offset click: the empty-image overlay is pointerEvents:none, but the icon
-  // at its centre is pointerEvents:auto, so a centre click lands on the icon
-  // and the block never gets selected — which is why the URL was being applied
-  // to whichever block was already selected.
-  await imageEl.click({ position: { x: 8, y: 8 } });
+  const dropzone = imageOverlay.locator('.hydra-image-picker-inline');
+  await expect(dropzone).toBeVisible({ timeout: 15_000 });
 
-  await helper.dragDropImageFile(imageEl, 'journey-upload.png');
+  await helper.dragDropImageFile(dropzone, 'journey-upload.png');
 
-  // The rendered image now points at the CMS that stored it, not at some
-  // external host — which is what makes this an upload rather than a link.
+  // The upload reached the CMS and came back as a real asset: the rendered
+  // image is no longer the inline SVG placeholder.
   await expect
     .poll(
       async () => {
@@ -219,6 +237,10 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
     )
     .toBeGreaterThan(0);
 
+  // The overlay closes once the upload lands — the editor's own signal that it
+  // finished, rather than us deciding it must have.
+  await expect(imageOverlay).not.toBeVisible({ timeout: 15_000 });
+
   // --- the link, chosen by browsing ---------------------------------------
   // The object browser is how an editor picks a link target, and it is the
   // interesting half: the reference must be stored by the target's stable id,
@@ -230,8 +252,27 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
   await expect(linkField).toBeVisible({ timeout: 20_000 });
 
   const objectBrowser = await helper.openObjectBrowserFromField(linkField);
-  const targetName = TARGET_FOLDER.split('/').pop()!;
-  await helper.objectBrowserSelectItem(objectBrowser, new RegExp(targetName));
+  // The browser lists TITLES ("First Post"), while the fixture names paths
+  // ("first-post"). Match either: the id-to-title relationship is the CMS's
+  // business, and asserting one shape would tie this to a single CMS.
+  const targetSlug = TARGET_FOLDER.split('/').pop()!;
+  const targetName = new RegExp(targetSlug.replace(/-/g, '[ -]?'), 'i');
+
+  // The browser opens at the CURRENT page's context, which is the page we just
+  // created and which has no children — so the target is not in that listing.
+  // Navigate into the folder that CONTAINS the target, the way an editor
+  // would. Passing the target's own name here navigates nowhere: the helper
+  // looks for a folder to enter, and first-post is the item we want to pick.
+  const containingFolder = ROOT.split('/').filter(Boolean).pop()!;
+  await helper.objectBrowserNavigateToFolder(objectBrowser, containingFolder);
+
+  // Assert we are looking at a listing that actually contains the target
+  // before selecting, rather than discovering it from a select timeout.
+  await expect(
+    page.locator('.object-listing li').filter({ hasText: targetName }).first(),
+  ).toBeVisible({ timeout: 15_000 });
+
+  await helper.objectBrowserSelectItem(objectBrowser, targetName);
 
   await expect(linkField).toContainText(targetName, { timeout: 15_000 });
 
@@ -239,7 +280,15 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
   // than a create, and it is what puts the block through the adapter's
   // content.update path.
   await page.locator('#toolbar-save, button:has-text("Save")').first().click();
-  await expect(page).toHaveURL(new RegExp(`${createdPath}$`), {
+
+  // Saving an existing page keeps you on /edit — unlike the create, which
+  // leaves /add. Asserting a navigation that does not happen would have been a
+  // wrong premise, so assert the two things that ARE true: no error surfaced,
+  // and the editor settled back on this document.
+  await expect(
+    page.locator('.Toastify__toast--error, .toast.error'),
+  ).toHaveCount(0);
+  await expect(page).toHaveURL(new RegExp(`${createdPath}(/edit)?$`), {
     timeout: 25_000,
   });
 
