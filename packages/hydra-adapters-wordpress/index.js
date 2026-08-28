@@ -215,20 +215,48 @@ export class WordPressAdapter extends BaseAdapter {
     if (this.pathCache.has(path)) return this.pathCache.get(path);
 
     const segments = path.split('/').filter(Boolean);
+
+    // ONE request for every slug in the path, resolved in memory.
+    //
+    // This walked the tree a segment at a time, which is a full round trip per
+    // segment — and against WordPress-on-WASM a round trip is ~1.1s regardless
+    // of payload, so a two-segment path cost two seconds before any real work
+    // began. WordPress accepts a slug list, so the whole chain arrives at once
+    // and the parent pointers are matched here.
+    //
+    // The disambiguation is unchanged: each segment must sit under the previous
+    // one, so "/news/first-post" still cannot match a different "first-post"
+    // elsewhere in the tree.
+    const candidates = await this.fetchJson(`/wp/v2/${this.postType}`, {
+      params: {
+        slug: segments.join(','),
+        per_page: '100',
+        status: 'any',
+        context: 'edit',
+      },
+    });
+
     let parent = 0;
     let id = null;
+    let walked = '';
     for (const slug of segments) {
-      const matches = await this.fetchJson(`/wp/v2/${this.postType}`, {
-        params: { slug, parent: String(parent), status: 'any', context: 'edit' },
-      });
-      if (!matches || matches.length === 0) {
+      const hit = (candidates ?? []).find(
+        (c) => c.slug === slug && (c.parent ?? 0) === parent,
+      );
+      if (!hit) {
         throw new AdapterError(`Not found: ${path}`, {
           code: 'NOT_FOUND',
           status: 404,
         });
       }
-      id = matches[0].id;
+      id = hit.id;
       parent = id;
+
+      // Every ancestor was resolved on the way past, so cache them too rather
+      // than making the next lookup pay for the same walk.
+      walked = `${walked}/${slug}`;
+      this.pathCache.set(walked, hit.id);
+      this.ancestorCache.set(hit.id, { slug: hit.slug, parent: hit.parent });
     }
     this.pathCache.set(path, id);
     return id;
@@ -627,9 +655,10 @@ export class WordPressAdapter extends BaseAdapter {
         // follow for free — their own parent pointers are untouched and the
         // path is derived from the chain. The post id never changes, which is
         // what keeps stored links resolving.
-        await this.fetchJson(`/wp/v2/${this.postType}/${id}`, {
+        const moved = await this.fetchJson(`/wp/v2/${this.postType}/${id}`, {
           method: 'POST',
           body: { parent: parentId },
+          params: { context: 'edit' },
         });
 
         // Only the moved subtree is wrong — invalidate exactly that.
@@ -656,14 +685,23 @@ export class WordPressAdapter extends BaseAdapter {
           args.targetParentPath === '/'
             ? `/${slug}`
             : `${args.targetParentPath}/${slug}`;
-        return this.dispatchOnce('content.get', { path: destPath });
+
+        // Built from the response we already have, not re-fetched by path.
+        // content.get here would resolve destPath a segment at a time, fetch
+        // the post again and re-walk its ancestors — around five requests to
+        // rediscover what the write just returned. At ~1.1s each that was most
+        // of the cost of a move.
+        this.pathCache.set(destPath, id);
+        return this.toDocument(moved, destPath);
       }
 
       case 'content.order': {
         const id = await this.resolvePath(args.path);
-        const post = await this.fetchJson(`/wp/v2/${this.postType}/${id}`, {
-          params: { context: 'edit' },
-        });
+
+        // resolvePath cached this post's parent on the way past, so the
+        // separate fetch it used to do is redundant. The post itself is one of
+        // the siblings fetched below.
+        const parentId = this.ancestorCache.get(id)?.parent ?? 0;
 
         // Renumber ALL the siblings, not just this one.
         //
@@ -676,7 +714,7 @@ export class WordPressAdapter extends BaseAdapter {
         // values.
         const siblings = await this.fetchJson(`/wp/v2/${this.postType}`, {
           params: {
-            parent: String(post.parent ?? 0),
+            parent: String(parentId),
             per_page: '100',
             orderby: 'menu_order',
             order: 'asc',
@@ -685,15 +723,36 @@ export class WordPressAdapter extends BaseAdapter {
           },
         });
 
+        const post = (siblings ?? []).find((s) => s.id === id);
+        if (!post) {
+          throw new AdapterError(`Not found among siblings: ${args.path}`, {
+            code: 'NOT_FOUND',
+            status: 404,
+          });
+        }
+
         const rest = (siblings ?? []).filter((s) => s.id !== id);
         const index = Math.max(0, Math.min(args.targetIndex ?? 0, rest.length));
         const ordered = [...rest.slice(0, index), post, ...rest.slice(index)];
 
-        for (let i = 0; i < ordered.length; i++) {
-          if (ordered[i].menu_order === i) continue; // already correct
-          await this.fetchJson(`/wp/v2/${this.postType}/${ordered[i].id}`, {
+        // ONE request for every renumbering, via WordPress core's batch
+        // endpoint (5.6+). The writes are independent — each sets a different
+        // post's menu_order — so there is nothing to serialise, and at ~1.1s
+        // per round trip issuing them one at a time was most of what a reorder
+        // cost. Batch caps at 25 per call, so long sibling runs are chunked.
+        const writes = ordered
+          .map((sibling, i) => ({ sibling, i }))
+          .filter(({ sibling, i }) => sibling.menu_order !== i)
+          .map(({ sibling, i }) => ({
             method: 'POST',
+            path: `/wp/v2/${this.postType}/${sibling.id}`,
             body: { menu_order: i },
+          }));
+
+        for (let start = 0; start < writes.length; start += 25) {
+          await this.fetchJson('/batch/v1', {
+            method: 'POST',
+            body: { requests: writes.slice(start, start + 25) },
           });
         }
 

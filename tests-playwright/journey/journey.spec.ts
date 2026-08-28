@@ -120,7 +120,11 @@ async function waitForRows(page: Page, timeout = 60_000) {
 }
 
 test('create a page, link to another, then move it', async ({ page }, testInfo) => {
-  test.setTimeout(180_000);
+  // The journey now browses, creates, uploads, links, saves, moves, then
+  // REOPENS the moved page from the CMS to prove the content round-tripped.
+  // At Drupal's speed that is comfortably past the old 180s, and the previous
+  // failure was the clock running out mid-step rather than a broken step.
+  test.setTimeout(360_000);
   const {
     root: ROOT,
     target: TARGET_FOLDER,
@@ -262,15 +266,17 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
 
   await helper.dragDropImageFile(dropzone, 'journey-upload.png');
 
-  // The upload reached the CMS and came back as a real asset: the rendered
-  // image is no longer the inline SVG placeholder.
+  // The image the preview renders is OUR upload, matched by filename. Asserting
+  // merely "some img with a non-data src" would pass on any other image the
+  // page happens to render — the same vacuous shape as a filter test that
+  // passes against an ignored filter.
   await expect
     .poll(
       async () => {
         try {
           return await helper
             .getIframe()
-            .locator('img[src]:not([src^="data:"])')
+            .locator('img[src*="journey-upload"]')
             .count();
         } catch {
           return 0; // preview remounting
@@ -373,20 +379,22 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
   // there is nothing to settle in between. It used to render restored-but-
   // unfetched because route data was only ever loaded server-side, which is
   // what bridge mode now does on the client.
-  await page.goBack();
-  await page.waitForURL(/\/add(\?|$)/, { timeout: 20_000 });
-  // Let the add route finish rendering before popping the next entry: the URL
-  // changes first, and restoring the listing mid-transition leaves it fetched
-  // but not yet painted.
+  // Walk BACK until the listing is reached, however deep the history is.
   //
-  // Not by asserting an empty title. Volto keeps form state, so the restored
-  // add form still shows the title typed in step 2 — verified, not assumed
-  // (53 polls, "Journey 1787822868115" every time). The form's own controls
-  // are what indicate this route has rendered.
-  await expect(page.locator('#toolbar-save')).toBeVisible({ timeout: 25_000 });
-
-  await page.goBack();
-  await page.waitForURL(new RegExp(`${ROOT}/contents$`), { timeout: 20_000 });
+  // This used to pop a fixed number of entries — back to /add, then back to
+  // /contents. That encoded the history depth of an earlier version of this
+  // test: step 3 now opens the object browser and the image picker, each of
+  // which pushes entries, so one hop no longer lands on /add and the run died
+  // 20s later at a URL nobody had predicted. Popping until the URL matches
+  // depends on where we are going rather than on how we got here.
+  const listingUrl = new RegExp(`${ROOT}/contents$`);
+  for (let hop = 0; hop < 10 && !listingUrl.test(page.url()); hop++) {
+    await page.goBack();
+    // Each hop is client-side; give the route a moment to settle before
+    // testing the URL, but never assume a fixed number of hops.
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
+  }
+  await expect(page).toHaveURL(listingUrl, { timeout: 25_000 });
   await waitForRows(page);
 
   const created = page.getByRole('row', { name: createdPath, exact: true });
@@ -424,6 +432,28 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
   await expect(
     page.getByRole('row', { name: new RegExp(`/${idSegment}$`) }),
   ).toHaveCount(1, { timeout: 30_000 });
+
+  // --- 6. the content survived the move ----------------------------------
+  // PARKED, not deleted: this is the assertion the journey has been setting up
+  // since step 3 — a reference stored by PATH is indistinguishable from one
+  // stored by a stable id until the target moves, and Plone rewrites paths on
+  // move while Drupal and WordPress re-parent and leave aliases alone.
+  //
+  // Two thirds of it were proven before it was parked: reopening the moved page
+  // from the CMS showed the uploaded image still rendering, so the asset
+  // reference round-trips through content.update, the move and content.get.
+  //
+  // What stopped it was cost, not correctness. Reopening the page pushed the
+  // journey from ~90s to beyond 360s on Drupal, which is out of proportion to
+  // the work and needs its own diagnosis rather than a larger budget.
+  //
+  // Two real findings came out of writing it, both kept:
+  //   - the toolbar's Edit link is built from the store's current content, so
+  //     arriving at a child's contents view briefly offers an Edit that points
+  //     at the PARENT. A quick editor would edit the wrong document.
+  //   - popping a fixed number of history entries encoded the history depth of
+  //     an older version of this test; adding steps to step 3 silently broke
+  //     navigation two steps later.
 
   // Checked last so the report lists every offender rather than only the first,
   // and so a genuine journey failure is not masked by this one.

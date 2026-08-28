@@ -6,7 +6,7 @@ let target: Target;
 beforeAll(async () => {
   target = await resolveTarget();
   await target.start();
-}, 60_000);
+});
 
 afterAll(async () => {
   await target.stop();
