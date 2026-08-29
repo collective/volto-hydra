@@ -1509,10 +1509,10 @@ const Iframe = (props) => {
   // says which half the author means.
   //
   // So when the cursor lands in a sidebar field, tell the page which field it
-  // is. The bridge shows that field's place if it is hidden (a `uid#field`
-  // handle, falling back to the block's own) and does nothing at all when it is
-  // already visible or nothing advertises it — so this is safe to send on every
-  // focus, and it never takes the caret out of the sidebar.
+  // is — the FOCUS_FIELD the bridge has always handled, with `moveCaret: false`
+  // so it reveals without taking the caret out of the sidebar. The bridge shows
+  // that field's place only when a `uid#field` handle advertises it, and does
+  // nothing when it is already visible, so this is safe to send on every focus.
   useEffect(() => {
     const handleSidebarFocus = (e) => {
       if (!selectedBlock || !iframeOriginRef.current) return;
@@ -1527,7 +1527,14 @@ const Iframe = (props) => {
       if (!fieldName) return;
       const iframe = document.getElementById('previewIframe');
       iframe?.contentWindow?.postMessage(
-        { type: 'REVEAL_FIELD', blockId: selectedBlock, fieldName },
+        // One message with an intent, not two message types: `moveCaret: false`
+        // says "reveal it, and leave the caret where the author put it".
+        {
+          type: 'FOCUS_FIELD',
+          blockId: selectedBlock,
+          fieldName,
+          moveCaret: false,
+        },
         iframeOriginRef.current,
       );
     };
