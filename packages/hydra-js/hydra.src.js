@@ -4465,15 +4465,24 @@ export class Bridge {
           log('Received TOGGLE_OPTIONAL_FIELDS:', event.data.blockUid);
           this.toggleOptionalFields(event.data.blockUid);
         } else if (event.data.type === 'FOCUS_FIELD') {
-          // Restore focus to a specific field (e.g., after LinkEditor closes),
-          // or follow the sidebar: an author who puts the cursor in a field
-          // there is asking to work on it, and it may be somewhere the page is
-          // not currently showing.
-          const { blockId, fieldName } = event.data;
-          log('Received FOCUS_FIELD:', blockId, fieldName);
+          // The sidebar is on this field. Two things follow from that, and only
+          // one of them is always wanted:
+          //
+          //   REVEAL — show where the field is edited, if the page is not
+          //            showing it. Always right: the author is working on that
+          //            field, and it may be inside something closed.
+          //   CARET  — move the cursor into the page. Right when the admin is
+          //            handing editing back (a LinkEditor closing), wrong while
+          //            someone is typing in the sidebar, which is where the
+          //            caret would be taken from.
+          //
+          // So it is one message with an intent, not two messages: `moveCaret`
+          // defaults to true, which is what every existing sender means.
+          const { blockId, fieldName, moveCaret = true } = event.data;
+          log('Received FOCUS_FIELD:', blockId, fieldName, { moveCaret });
 
           this.revealFieldPlace(blockId, fieldName);
-          const blockElement = this.queryBlockElement(blockId);
+          const blockElement = moveCaret ? this.queryBlockElement(blockId) : null;
           if (blockElement) {
             // Find the specific field by data-field-id attribute
             const field =
@@ -4492,15 +4501,6 @@ export class Bridge {
               }
             }
           }
-        } else if (event.data.type === 'REVEAL_FIELD') {
-          // The sidebar moved to a field: show where that field is edited, and
-          // leave the caret where the author put it. FOCUS_FIELD is the same
-          // reveal followed by taking the caret INTO the page, which is right
-          // when the admin is handing editing back and wrong when someone is
-          // typing in the sidebar.
-          const { blockId, fieldName } = event.data;
-          log('Received REVEAL_FIELD:', blockId, fieldName);
-          this.revealFieldPlace(blockId, fieldName);
         } else if (event.data.type === 'SLASH_MENU_CLOSED') {
           // Admin closed the slash menu (user selected a block type or dismissed)
           log('Received SLASH_MENU_CLOSED');
@@ -11608,11 +11608,29 @@ export class Bridge {
    */
   revealFieldPlace(blockId, fieldName) {
     if (!blockId || !fieldName) return false;
+    // OPT-IN, and strictly so: unless a handle advertises this exact field,
+    // there is nothing to reveal and nothing to do.
+    //
+    // Falling back to the block's own handle here was wrong, and wrong in a way
+    // that reached far beyond this feature: most sidebar fields have no element
+    // on the canvas at all — alignment, a link's href, any setting — so "no
+    // element" is the ordinary case rather than a hidden one. With a fallback,
+    // every focus in the sidebar clicked whatever handle the block or its
+    // ANCESTORS published, opening containers nobody asked to open. Five of
+    // hydra's own integration tests failed on it.
+    if (!this.fieldHandleFor(blockId, fieldName)) return false;
     const blockElement = this.queryBlockElement(blockId);
     const fieldElement =
       blockElement && this.getEditableFieldByName(blockElement, fieldName);
     if (fieldElement && !this.isElementHidden(fieldElement)) return false;
     return this.tryMakeBlockVisible(blockId, 0, fieldName);
+  }
+
+  /** The handle advertising where one field of a block is edited, if any. */
+  fieldHandleFor(blockId, fieldName) {
+    return document.querySelector(
+      `[data-block-selector~="${blockId}#${fieldName}"]`,
+    );
   }
 
   tryMakeBlockVisible(targetUid, depth = 0, fieldName = null) {

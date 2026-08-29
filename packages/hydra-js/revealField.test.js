@@ -45,11 +45,15 @@ describe('selector tokens — a handle may name a field', () => {
 
 describe('revealFieldPlace — asks about the FIELD', () => {
   /** A bridge with only the parts this decision touches. */
-  const bridgeWith = ({ fieldElement, hidden }) => {
+  const bridgeWith = ({ fieldElement, hidden, handle = {} }) => {
     const calls = [];
     return {
       calls,
       bridge: Object.assign(Object.create(Bridge.prototype), {
+        // The handle is what opts a frontend in. Without one, nothing happens —
+        // which is the ordinary case for a sidebar field with no canvas element
+        // (a setting, an alignment, a link).
+        fieldHandleFor: () => handle,
         queryBlockElement: () => ({}),
         getEditableFieldByName: () => fieldElement,
         isElementHidden: () => hidden,
@@ -83,9 +87,22 @@ describe('revealFieldPlace — asks about the FIELD', () => {
     expect(calls[0].field).toBe('about_analytics');
   });
 
+  test('a field nothing advertises is left alone', () => {
+    // The rule that keeps this feature from reaching past itself: most sidebar
+    // fields have no canvas element AND no handle, and focusing one must not go
+    // clicking whatever handle the block or its ancestors happen to publish.
+    const { bridge, calls } = bridgeWith({
+      fieldElement: null,
+      hidden: true,
+      handle: null,
+    });
+    expect(bridge.revealFieldPlace('block-1', 'align')).toBe(false);
+    expect(calls).toEqual([]);
+  });
+
   test('without a field name there is nothing to reveal', () => {
-    // FOCUS_FIELD and REVEAL_FIELD both carry one; a caller that does not is
-    // asking about the block, which is `tryMakeBlockVisible`'s own job.
+    // FOCUS_FIELD carries one; a caller that does not is asking about the
+    // block, which is `tryMakeBlockVisible`'s own job.
     const { bridge, calls } = bridgeWith({ fieldElement: null, hidden: true });
     expect(bridge.revealFieldPlace('block-1', undefined)).toBe(false);
     expect(bridge.revealFieldPlace(undefined, 'message')).toBe(false);
