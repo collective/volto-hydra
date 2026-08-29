@@ -801,8 +801,11 @@ export class Bridge {
         .trim()
         .split(/\s+/)
         .filter(Boolean);
-      const single = advertised.length === 1 ? advertised[0] : null;
-      if (single && single !== '+1' && single !== '-1' && !single.includes(':')) {
+      const single =
+        advertised.length === 1
+          ? Bridge.uidFromSelectorToken(advertised[0])
+          : null;
+      if (single) {
         // Prefer the handle only when it is NEARER than the uid element, i.e. the
         // uid element is an ancestor of the handle (a container) rather than the
         // block the field sits in.
@@ -824,6 +827,22 @@ export class Bridge {
    * tab's field. Comparing against data-block-uid alone dropped every field on
    * such an element.
    */
+  /**
+   * The uid a selector token names, or undefined if the token is not a uid.
+   *
+   * `+1` / `-1` and `uid:direction` are navigation, not naming. `uid#field` IS
+   * naming — it says WHERE a particular field of that uid is edited (see
+   * `tryMakeBlockVisible`), and for every purpose but choosing which handle to
+   * click, it means the same as the bare uid.
+   */
+  static uidFromSelectorToken(token) {
+    if (!token || token === '+1' || token === '-1' || token.includes(':')) {
+      return undefined;
+    }
+    const uid = token.split('#')[0];
+    return uid || undefined;
+  }
+
   uidRepresentedBy(element) {
     if (!element) return undefined;
     const own = element.getAttribute?.('data-block-uid');
@@ -833,9 +852,7 @@ export class Bridge {
       .split(/\s+/)
       .filter(Boolean);
     if (advertised.length !== 1) return undefined;
-    const single = advertised[0];
-    if (single === '+1' || single === '-1' || single.includes(':')) return undefined;
-    return single;
+    return Bridge.uidFromSelectorToken(advertised[0]);
   }
 
   /**
@@ -865,8 +882,11 @@ export class Bridge {
     // clicking it does nothing.
     const uid = blockElement.getAttribute('data-block-uid');
     if (uid) {
+      // Both handle forms: the plain `uid`, and `uid#field` — a handle that
+      // opens the one place a particular field of this block is edited. `~=`
+      // matches whole tokens, so the field form needs its own pass.
       for (const handle of document.querySelectorAll(
-        `[data-block-selector~="${uid}"]`,
+        `[data-block-selector~="${uid}"], [data-block-selector*="${uid}#"]`,
       )) {
         if (handle.hasAttribute('data-edit-text') && !result.includes(handle)) {
           result.push(handle);
@@ -4445,14 +4465,21 @@ export class Bridge {
           log('Received TOGGLE_OPTIONAL_FIELDS:', event.data.blockUid);
           this.toggleOptionalFields(event.data.blockUid);
         } else if (event.data.type === 'FOCUS_FIELD') {
-          // Restore focus to a specific field (e.g., after LinkEditor closes)
+          // Restore focus to a specific field (e.g., after LinkEditor closes),
+          // or follow the sidebar: an author who puts the cursor in a field
+          // there is asking to work on it, and it may be somewhere the page is
+          // not currently showing.
           const { blockId, fieldName } = event.data;
           log('Received FOCUS_FIELD:', blockId, fieldName);
 
+          this.revealFieldPlace(blockId, fieldName);
           const blockElement = this.queryBlockElement(blockId);
           if (blockElement) {
             // Find the specific field by data-field-id attribute
-            const field = blockElement.querySelector(`[data-field-id="${fieldName}"][contenteditable="true"]`);
+            const field =
+              blockElement.querySelector(
+                `[data-field-id="${fieldName}"][contenteditable="true"]`,
+              ) || this.getEditableFieldByName(blockElement, fieldName);
             if (field) {
               field.focus();
               log('Focused field:', fieldName);
@@ -4465,6 +4492,15 @@ export class Bridge {
               }
             }
           }
+        } else if (event.data.type === 'REVEAL_FIELD') {
+          // The sidebar moved to a field: show where that field is edited, and
+          // leave the caret where the author put it. FOCUS_FIELD is the same
+          // reveal followed by taking the caret INTO the page, which is right
+          // when the admin is handing editing back and wrong when someone is
+          // typing in the sidebar.
+          const { blockId, fieldName } = event.data;
+          log('Received REVEAL_FIELD:', blockId, fieldName);
+          this.revealFieldPlace(blockId, fieldName);
         } else if (event.data.type === 'SLASH_MENU_CLOSED') {
           // Admin closed the slash menu (user selected a block type or dismissed)
           log('Received SLASH_MENU_CLOSED');
@@ -11554,7 +11590,32 @@ export class Bridge {
    * @returns {boolean} True if a selector was clicked (block may now be visible)
    */
 
-  tryMakeBlockVisible(targetUid, depth = 0) {
+  /**
+   * Show the place a FIELD is edited, if it is not already on screen.
+   *
+   * Not the same question as "is the block visible". A block can be drawn in
+   * several places with a different field in each: the design system's cookie
+   * consent puts its message in a banner and its category wording in a
+   * preferences dialog, each built in JavaScript into `<body>`, each hidden
+   * until its own trigger is pressed — while the block's own element (its
+   * editing bar) sits on screen the whole time. Asking about the block would
+   * always answer "visible" and reveal nothing.
+   *
+   * Does nothing when the field is already showing, and nothing when no handle
+   * advertises it — so it is safe to call on every sidebar focus.
+   *
+   * @returns {boolean} whether a reveal was attempted
+   */
+  revealFieldPlace(blockId, fieldName) {
+    if (!blockId || !fieldName) return false;
+    const blockElement = this.queryBlockElement(blockId);
+    const fieldElement =
+      blockElement && this.getEditableFieldByName(blockElement, fieldName);
+    if (fieldElement && !this.isElementHidden(fieldElement)) return false;
+    return this.tryMakeBlockVisible(blockId, 0, fieldName);
+  }
+
+  tryMakeBlockVisible(targetUid, depth = 0, fieldName = null) {
     log(`tryMakeBlockVisible: ${targetUid}`);
     // Nested closed containers need one pass each. Bounded so a container that
     // never opens can't spin.
@@ -11569,9 +11630,27 @@ export class Bridge {
     // descendants — `data-block-selector="uid-a uid-b uid-c"` matches
     // any listed uid. Used by collapsible containers like a
     // contextNavigation `<summary>` that carries every child's uid.
-    const directCandidate = document.querySelector(
-      `[data-block-selector~="${targetUid}"]`,
-    );
+    //
+    // A block can also be drawn in SEVERAL places at once, with a different
+    // field in each: the design system's cookie consent puts its message in a
+    // banner and its category wording in a preferences dialog, both built into
+    // `<body>`, both hidden until their own trigger is pressed. One handle per
+    // uid cannot serve that — whichever half it opened, the other's wording
+    // would stay unreachable. So a handle may name a FIELD as well:
+    //
+    //     data-block-selector="uid#message"   → opens where `message` is edited
+    //     data-block-selector="uid"           → opens the block, any field
+    //
+    // `#` rather than `:`, which already means navigation (`uid:direction`).
+    // The field handle is preferred when the caller says which field it is
+    // after, and the plain one remains the fallback — so nothing that exists
+    // today changes.
+    const directCandidate =
+      (fieldName &&
+        document.querySelector(
+          `[data-block-selector~="${targetUid}#${fieldName}"]`,
+        )) ||
+      document.querySelector(`[data-block-selector~="${targetUid}"]`);
     // A handle that is itself hidden — inside a container that is still closed —
     // cannot be used yet: clicking it opens ITS container while the outer one
     // stays shut, so the target never appears. Fall through to the ancestor walk

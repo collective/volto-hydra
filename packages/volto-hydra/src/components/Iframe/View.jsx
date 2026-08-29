@@ -1498,6 +1498,44 @@ const Iframe = (props) => {
     return () => document.removeEventListener('keydown', handleEscape, true);
   }, [selectedBlock, iframeSyncState.blockPathMap, onSelectBlock]);
 
+  // Follow the sidebar into the page.
+  //
+  // A field is edited SOMEWHERE, and that somewhere is not always on screen: a
+  // block can be drawn in several places with a different field in each — the
+  // design system's cookie consent puts its message in a banner and its
+  // category wording in a preferences dialog, each built in JavaScript, each
+  // hidden until its own trigger is pressed. Selecting the block reveals at most
+  // one of them, because a block-level handle is one handle; the field is what
+  // says which half the author means.
+  //
+  // So when the cursor lands in a sidebar field, tell the page which field it
+  // is. The bridge shows that field's place if it is hidden (a `uid#field`
+  // handle, falling back to the block's own) and does nothing at all when it is
+  // already visible or nothing advertises it — so this is safe to send on every
+  // focus, and it never takes the caret out of the sidebar.
+  useEffect(() => {
+    const handleSidebarFocus = (e) => {
+      if (!selectedBlock || !iframeOriginRef.current) return;
+      const target = e.target;
+      if (!target?.closest) return;
+      // Volto wraps each field as `.field-wrapper-<name>`.
+      const wrapper = target.closest('[class*="field-wrapper-"]');
+      if (!wrapper) return;
+      const fieldName = Array.from(wrapper.classList)
+        .find((name) => name.startsWith('field-wrapper-'))
+        ?.slice('field-wrapper-'.length);
+      if (!fieldName) return;
+      const iframe = document.getElementById('previewIframe');
+      iframe?.contentWindow?.postMessage(
+        { type: 'REVEAL_FIELD', blockId: selectedBlock, fieldName },
+        iframeOriginRef.current,
+      );
+    };
+
+    document.addEventListener('focusin', handleSidebarFocus);
+    return () => document.removeEventListener('focusin', handleSidebarFocus);
+  }, [selectedBlock]);
+
   // Initialize from persisted state so component remounts don't reset to null
   // (which would cause a duplicate iframe load for the same URL).
   // On first-ever load, persistedIframe.src is null (safe for SSR hydration).
