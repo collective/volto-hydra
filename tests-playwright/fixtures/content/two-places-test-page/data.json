@@ -1,0 +1,31 @@
+{
+  "@id": "http://localhost:8888/two-places-test-page",
+  "@type": "Document",
+  "title": "Two Places Test Page",
+  "review_state": "published",
+  "is_folderish": false,
+  "blocks": {
+    "title-block": {
+      "@type": "title"
+    },
+    "split-1": {
+      "@type": "twoPlaces",
+      "alpha": "What the banner says",
+      "beta": "What the dialog says"
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "title-block",
+      "split-1"
+    ]
+  },
+  "UID": "two-places-test-page-uid",
+  "id": "two-places-test-page",
+  "description": "A block whose two fields are rendered in two different hidden places",
+  "parent": {
+    "@id": "http://localhost:8888",
+    "@type": "Plone Site",
+    "title": "Site"
+  }
+}
