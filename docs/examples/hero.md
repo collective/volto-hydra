@@ -4,6 +4,8 @@ A full-width hero section with heading, subheading, image, rich text description
 
 This is a **custom** block — register it via `initBridge`.
 
+**Demonstrates:** [HTML Annotations for Visual Editing](../visual-editing.md#html-annotations-for-visual-editing) — text, rich text, media and link in a single block.
+
 ## Schema
 
 ```json

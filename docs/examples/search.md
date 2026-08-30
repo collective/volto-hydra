@@ -4,6 +4,8 @@ A search interface with faceted filtering. Contains a child listing block for re
 
 This is a **built-in** block. The facet types are custom sub-blocks.
 
+**Demonstrates:** [Multiple regions](../container-blocks.md#multiple-regions) — facets and results as two regions of one block.
+
 ## Schema
 
 ```json

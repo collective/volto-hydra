@@ -21,6 +21,7 @@
   import MapsBlock from './MapsBlock.svelte';
   import TocBlock from './TocBlock.svelte';
   import CodeExampleBlock from './CodeExampleBlock.svelte';
+  import CookieConsentBlock from './CookieConsentBlock.svelte';
 
   export let block;
   export let content = {};
@@ -66,6 +67,8 @@
   <MapsBlock {block} />
 {:else if block['@type'] === 'toc'}
   <TocBlock {block} {content} />
+{:else if block['@type'] === 'cookieConsent'}
+  <CookieConsentBlock {block} />
 {:else if block['@type'] === 'codeExample'}
   <CodeExampleBlock {block} />
 {:else if block['@type'] === 'summary' || block['@type'] === 'default'}

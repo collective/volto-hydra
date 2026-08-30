@@ -381,6 +381,12 @@ async function renderBlock(blockId, block) {
         case 'codeExample':
             wrapper.innerHTML = renderCodeExampleBlock(block, blockId);
             break;
+        case 'cookieConsent':
+            // The bar is the block's element; the banner and the preferences
+            // dialog it words are built OUTSIDE it (see renderCookieConsentBar).
+            wrapper.innerHTML = renderCookieConsentBar(block, blockId);
+            mountCookieConsentChrome(block, blockId);
+            break;
         case 'title':
             // Title block is just rendered by page title, empty here
             wrapper.innerHTML = '';
@@ -2070,6 +2076,96 @@ async function renderSliderBlock(block, blockId) {
 }
 
 /**
+ * Cookie consent: one block drawn in three places, two of them hidden.
+ *
+ * The bar is the block's own element (it carries data-block-uid, and is always
+ * on screen). The wording an author writes is read somewhere else entirely: the
+ * `message` in a banner and the `analyticsPurpose` beside a tick box in a
+ * preferences dialog, both built into <body> — which is where a design system's
+ * own JavaScript puts them — and both hidden until their trigger is pressed.
+ *
+ * So "is the block visible?" answers nothing here, and one handle cannot serve
+ * two halves: each trigger names the FIELD its half holds, and the bridge opens
+ * the half whose field the author reached for in the sidebar.
+ *
+ * @param {Object} block - Cookie consent block data
+ * @param {string} blockId - Block ID
+ * @returns {string} HTML string
+ */
+function renderCookieConsentBar(block, blockId) {
+    return (
+        '<div class="cookie-consent-bar" style="display: flex; gap: 12px; align-items: center; padding: 8px 12px; background: #f4f4f6; border: 1px solid #ddd;">' +
+        '<strong>Cookie consent</strong>' +
+        `<button type="button" data-block-selector="${blockId}#message" data-linkable-allow data-cookie-open="banner">Show the banner</button>` +
+        `<button type="button" data-block-selector="${blockId}#analyticsPurpose" data-linkable-allow data-cookie-open="dialog">Show cookie preferences</button>` +
+        '</div>'
+    );
+}
+
+/**
+ * Build (or rebuild) the two halves outside the block's element, and wire the
+ * bar's triggers to them. Kept idempotent per uid: renderBlock runs again on
+ * every change, and a second banner would mean a second data-edit-text="message".
+ * @param {Object} block - Cookie consent block data
+ * @param {string} blockId - Block ID
+ */
+function mountCookieConsentChrome(block, blockId) {
+    document
+        .querySelectorAll(`[data-cookie-chrome="${blockId}"]`)
+        .forEach((el) => el.remove());
+
+    let messageHtml = '';
+    (block.message || []).forEach((node) => {
+        const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
+        messageHtml += `<p data-edit-text="message"${nodeIdAttr}>${renderChildren(node.children)}</p>`;
+    });
+
+    const banner = document.createElement('div');
+    banner.setAttribute('data-cookie-chrome', blockId);
+    // The half advertises the field it holds, as well as the bar's trigger doing
+    // so. Without that the wording inside it belongs to no block at all — it is
+    // outside the block's element, so `data-edit-text` there resolves to nothing
+    // and the text is not editable. The bar's trigger is what the bridge clicks
+    // (this one is hidden until it opens), and both name the same field.
+    banner.setAttribute('data-block-selector', `${blockId}#message`);
+    banner.className = 'cookie-banner';
+    banner.hidden = true;
+    banner.innerHTML = messageHtml + '<button type="button" data-cookie-close>Accept all</button>';
+
+    const dialog = document.createElement('div');
+    dialog.setAttribute('data-cookie-chrome', blockId);
+    dialog.setAttribute('data-block-selector', `${blockId}#analyticsPurpose`);
+    dialog.className = 'cookie-dialog';
+    dialog.hidden = true;
+    dialog.innerHTML =
+        '<h2>Manage cookie preferences</h2>' +
+        '<label><input type="checkbox" name="analytics"> Analytics</label>' +
+        `<p data-edit-text="analyticsPurpose">${escapeHtml(block.analyticsPurpose || '')}</p>` +
+        '<button type="button" data-cookie-close>Save</button>';
+
+    // Rendered as SIBLINGS of the bar, not on <body>: the two halves are still
+    // outside the block's element, which is the whole point, but they stay
+    // inside the page the bridge walks. (A design system's own JavaScript does
+    // put them on <body>; that shape is drawn the same way and is what the
+    // frontends in docs/examples/cookie-consent.md show.)
+    document.body.appendChild(banner);
+    document.body.appendChild(dialog);
+
+    document.addEventListener('click', (e) => {
+        const opener = e.target.closest(`[data-block-uid="${blockId}"] [data-cookie-open]`);
+        if (opener) {
+            const half = opener.getAttribute('data-cookie-open') === 'banner' ? banner : dialog;
+            half.hidden = false;
+            return;
+        }
+        const closer = e.target.closest('[data-cookie-close]');
+        if (closer && closer.parentElement.getAttribute('data-cookie-chrome') === blockId) {
+            closer.parentElement.hidden = true;
+        }
+    });
+}
+
+/**
  * Render a codeExample block with tabs as child blocks.
  * Each tab has its own data-block-uid and the code is shown in a <pre> element.
  * @param {Object} block - Code example block data
@@ -2090,7 +2186,11 @@ function renderCodeExampleBlock(block, blockId) {
             // whenever the bar is, so selecting an inactive tab would never reveal
             // the code it holds. data-block-selector says "I represent this uid" —
             // the label still edits the tab, and clicking switches to it.
-            html += `<button data-block-selector="${tabId}" data-linkable-allow style="padding: 8px 16px; color: #aaa; background: transparent; border: none; cursor: pointer; font-size: 13px;"><span data-edit-text="label">${tab.label || tab.language || 'Tab'}</span></button>`;
+            // Two tokens: the bare uid reveals the tab (any field), and
+            // `uid#code` says WHERE the code field is edited — the panel this
+            // button opens. The label needs no handle: it is on this button,
+            // already on screen, so a focus in it has nothing to reveal.
+            html += `<button data-block-selector="${tabId} ${tabId}#code" data-linkable-allow style="padding: 8px 16px; color: #aaa; background: transparent; border: none; cursor: pointer; font-size: 13px;"><span data-edit-text="label">${tab.label || tab.language || 'Tab'}</span></button>`;
         });
         html += '</div>';
     }
@@ -2758,7 +2858,12 @@ if (typeof window !== 'undefined' && window.matchMedia) {
 document.addEventListener('click', (event) => {
     const button = event.target.closest('[data-tab-bar] button[data-block-selector]');
     if (!button) return;
-    const uid = button.getAttribute('data-block-selector');
+    // The FIRST token, not the whole attribute: a handle may name its block
+    // twice — plainly and by field (`tab-py tab-py#code`) — and comparing the
+    // raw attribute to a uid then matches no panel at all.
+    const uid = (button.getAttribute('data-block-selector') || '')
+        .trim()
+        .split(/\s+/)[0];
     const bar = button.closest('[data-tab-bar]');
     const container = bar?.parentElement;
     if (!container) return;

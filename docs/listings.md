@@ -69,6 +69,8 @@ async function ListingItems({ id, blocks, paging, seen, fetchItems, onPaging }) 
 }
 ```
 
+**Worked example:** [Listing Block](./examples/listing.md) — the built-in block, with renderers for all four stacks.
+
 ## expandListingBlocks Options
 
 - **`blocks`** — Map of blockId to block data
@@ -166,6 +168,8 @@ Built-in item types and the fields they expose:
 Types: string (array→join, image→URL), link (→[{@id}]), image (pass through)
 ```
 
+**Worked example:** [RSS Feed Block](./examples/rssFeed.md) — feed entries mapped onto the item schema by a fetcher you provide.
+
 ## Item Type Selection
 
 Use `variation` on the listing block to control what `@type` expanded items get. Listings reuse the same `inheritSchemaFrom` recipe as container blocks (see [Container Blocks › Synchronised Block Types](container-blocks.md#synchronised-block-types-in-a-container)) but differ in one structural way: there's no blocks field to declare `itemTypeField` on, since listing children are *virtual* (produced from query results at render time, not authored as page data). Instead, declare the typeField directly on the `inheritSchemaFrom` recipe:
@@ -196,6 +200,8 @@ listing: {
 ```
 
 `filterConvertibleFrom: '@default'` restricts the dropdown to types that have a `fieldMappings['@default']` entry — i.e. types that can be populated from the canonical content fields (`@id`, `title`, `description`, `image`) that listing queries return. Each item type's `fieldMappings['@default']` (on its own block config) defines how those source fields land on its schema. Adding `mappingField` to the enhancer exposes the `FieldMappingWidget` so the editor can override the mapping per listing instance.
+
+**Worked example:** [Related Items Block](./examples/relatedItemsListing.md) — the page's relation field, drawn with a configurable item type.
 
 ### Where the mapping lives
 

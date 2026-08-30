@@ -162,6 +162,8 @@ Child block types (like `slide` above) must be defined at the top level of `bloc
 
 **A `widget: 'slate'` field holds one top-level node.** A slate field — like `description` on the `slide` above — stores a single paragraph, heading, or list, not a document of several. Pasting or typing multiple paragraphs into it flattens them back into one node; only the built-in `slate` *block* splits multi-node content into separate blocks. Design slate fields for single-node content, and use a `blocks_layout`/`object_list` of `slate` blocks when you need several. See [Visual Editing › One top-level node per slate field](visual-editing.md#one-top-level-node-per-slate-field).
 
+**Worked example:** [Heading Block](./examples/heading.md) — roughly the smallest custom block there is: one field, one annotation.
+
 ## Inline-editable fields: annotation and schema must agree
 
 A field is inline-editable only when BOTH halves are in place. They are easy to
@@ -320,6 +322,8 @@ Field paths: `../field` for the parent block's field (and `@index` / `../@index`
 - **Copy from a linked target** — a block pulls fields from the content item its link field points at, with a per-field linked/custom toggle (see [`@target`](#target--copy-from-a-linked-content-item)).
 
 Each key in `fieldMappings` is either a **specific block type name**, **`@default`**, or **`@target`**.
+
+**Worked example:** [Teaser Block](./examples/teaser.md) — `@default` mappings, so a converted or dragged block keeps its title, description and image.
 
 ### `@default` — the canonical content shape
 
