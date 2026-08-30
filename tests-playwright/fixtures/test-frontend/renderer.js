@@ -2122,12 +2122,19 @@ function mountCookieConsentChrome(block, blockId) {
 
     const banner = document.createElement('div');
     banner.setAttribute('data-cookie-chrome', blockId);
+    // The half advertises the field it holds, as well as the bar's trigger doing
+    // so. Without that the wording inside it belongs to no block at all — it is
+    // outside the block's element, so `data-edit-text` there resolves to nothing
+    // and the text is not editable. The bar's trigger is what the bridge clicks
+    // (this one is hidden until it opens), and both name the same field.
+    banner.setAttribute('data-block-selector', `${blockId}#message`);
     banner.className = 'cookie-banner';
     banner.hidden = true;
     banner.innerHTML = messageHtml + '<button type="button" data-cookie-close>Accept all</button>';
 
     const dialog = document.createElement('div');
     dialog.setAttribute('data-cookie-chrome', blockId);
+    dialog.setAttribute('data-block-selector', `${blockId}#analyticsPurpose`);
     dialog.className = 'cookie-dialog';
     dialog.hidden = true;
     dialog.innerHTML =
@@ -2136,6 +2143,11 @@ function mountCookieConsentChrome(block, blockId) {
         `<p data-edit-text="analyticsPurpose">${escapeHtml(block.analyticsPurpose || '')}</p>` +
         '<button type="button" data-cookie-close>Save</button>';
 
+    // Rendered as SIBLINGS of the bar, not on <body>: the two halves are still
+    // outside the block's element, which is the whole point, but they stay
+    // inside the page the bridge walks. (A design system's own JavaScript does
+    // put them on <body>; that shape is drawn the same way and is what the
+    // frontends in docs/examples/cookie-consent.md show.)
     document.body.appendChild(banner);
     document.body.appendChild(dialog);
 

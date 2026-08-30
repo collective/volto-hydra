@@ -56,8 +56,16 @@ export default function CookieConsentBlock({ id, block, SlateNodes }) {
         </button>
       </div>
 
-      {/* Outside the block's element, and annotated where the text is READ. */}
-      <div className="cookie-banner" hidden={!showBanner} role="alert">
+      {/* Outside the block's element, and annotated where the text is READ.
+          Each half advertises the field it holds as well: without that the
+          wording inside belongs to no block, and is not editable. The bar's
+          trigger is what the bridge clicks — this is hidden until it opens. */}
+      <div
+        className="cookie-banner"
+        data-block-selector={`${id}#message`}
+        hidden={!showBanner}
+        role="alert"
+      >
         <div data-edit-text="message">
           <SlateNodes value={block.message || []} />
         </div>
@@ -66,7 +74,12 @@ export default function CookieConsentBlock({ id, block, SlateNodes }) {
         </button>
       </div>
 
-      <div className="cookie-dialog" hidden={!showDialog} role="dialog">
+      <div
+        className="cookie-dialog"
+        data-block-selector={`${id}#analyticsPurpose`}
+        hidden={!showDialog}
+        role="dialog"
+      >
         <h2>Manage cookie preferences</h2>
         <label>
           <input type="checkbox" name="analytics" /> Analytics

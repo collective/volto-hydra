@@ -2470,7 +2470,7 @@
     },
     "ul-48": {
       "@type": "slate",
-      "plaintext": "data-block-selector=\"uid#fieldName\" — a handle that reveals where one FIELD of that block is edited, rather than the block as a whole. Use it when a block is drawn in several places at once with a different field in each, and each place has its own trigger. The design system cookie-consent block is the case it was written for: its message is rendered into a banner and its category wording into a preferences dialog, both built by the component's own JavaScript into <body>, both hidden until their trigger is pressed — while the block's element (an editing bar) is on screen the whole time. A block-level handle is one handle and one click, so whichever half it opened, the other half's wording stayed unreachable from the sidebar. # is used because : already means navigation (uid:direction). Everything except which handle to click treats uid#field exactly like uid: a data-edit-* inside such a handle still edits that block.",
+      "plaintext": "data-block-selector=\"uid#fieldName\" — a handle that reveals where one FIELD of that block is edited, rather than the block as a whole. Use it when a block is drawn in several places at once with a different field in each, and each place has its own trigger. The design system cookie-consent block is the case it was written for: its message is rendered into a banner and its category wording into a preferences dialog, both built by the component's own JavaScript into <body>, both hidden until their trigger is pressed — while the block's element (an editing bar) is on screen the whole time. A block-level handle is one handle and one click, so whichever half it opened, the other half's wording stayed unreachable from the sidebar. # is used because : already means navigation (uid:direction). Everything except which handle to click treats uid#field exactly like uid: a data-edit-* inside such a handle still edits that block — which is why the place a field is edited usually carries the handle too, not just the trigger that opens it. Several elements may name the same field; the bridge clicks the first one that is on screen, so a hidden half is never the thing it tries to click.",
       "value": [
         {
           "type": "ul",
@@ -2597,7 +2597,29 @@
                   ]
                 },
                 {
-                  "text": " inside such a handle still edits that block."
+                  "text": " inside such a handle still edits that block — which is why the place a field is edited usually carries the handle "
+                },
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "too"
+                    }
+                  ]
+                },
+                {
+                  "text": ", not just the trigger that opens it. Several elements may name the same field; the bridge clicks the first one that is "
+                },
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "on screen"
+                    }
+                  ]
+                },
+                {
+                  "text": ", so a hidden half is never the thing it tries to click."
                 }
               ]
             }

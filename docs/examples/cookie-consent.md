@@ -21,17 +21,29 @@ Two consequences follow, and they are the whole lesson:
 1. **"Is the block visible?" answers nothing.** The bar is on screen whatever the other two are doing, so the ordinary reveal — select a block, and if it is hidden, click its handle — finds nothing to do, while the wording an author came to edit stays out of sight.
 2. **One handle cannot serve two halves.** `data-block-selector="uid"` is one element and one click. Whichever half it opened, the fields in the other would stay unreachable from the sidebar.
 
-So each trigger names the field its half holds:
+So each trigger names the field its half holds — and so does the half itself:
 
 <!-- codeExample: html -->
 ```html
-<button data-block-selector="{uid}#message">Show the banner</button>
-<button data-block-selector="{uid}#analyticsPurpose">Show cookie preferences</button>
+<div data-block-uid="{uid}">
+  <button data-block-selector="{uid}#message">Show the banner</button>
+  <button data-block-selector="{uid}#analyticsPurpose">Show cookie preferences</button>
+</div>
+
+<div class="cookie-banner" data-block-selector="{uid}#message" hidden>
+  <p data-edit-text="message">…</p>
+</div>
+<div class="cookie-dialog" data-block-selector="{uid}#analyticsPurpose" hidden>
+  <p data-edit-text="analyticsPurpose">…</p>
+</div>
 ```
 
-Put the cursor in **Banner message** in the sidebar and the bridge clicks the first, so the banner is on screen while its wording is written. Put it in **Analytics cookies — what they are for** and the dialog opens instead. Reaching for a field that is already visible opens nothing at all: the reveal fires only where a handle names that exact field.
+Put the cursor in **Banner message** in the sidebar and the bridge opens the banner, so it is on screen while its wording is written. Put it in **Analytics cookies — what they are for** and the dialog opens instead. Reaching for a field that is already visible opens nothing at all: the reveal fires only where a handle names that exact field.
 
-The editable text is annotated **where it is read** — inside the banner and inside the dialog — even though those elements are nowhere near the block's own element. A `data-edit-*` inside an element that names the block belongs to that block, which is what makes this legal.
+**The two sides do different jobs, and both are needed.**
+
+- *On the trigger*, the handle is what the bridge **clicks**. Several elements may carry the same token; the bridge takes the first one that is **on screen**, so the hidden half is never the thing it tries to click.
+- *On the half*, the handle is what makes the wording inside it **belong to the block at all**. The editable text is annotated where it is read — inside the banner, inside the dialog — and those elements are nowhere near the block's own element. A `data-edit-*` resolves to the block it is inside, or to the block named by the nearest enclosing `data-block-selector`; with neither, it belongs to nothing and is not editable. Naming the field rather than the bare uid keeps the two halves distinct.
 
 ## Schema
 
@@ -154,8 +166,18 @@ function CookieConsentBlock({ block }) {
         </button>
       </div>
 
-      {/* Outside the block's element, and annotated where the text is READ. */}
-      <div className="cookie-banner" hidden={!showBanner} role="alert">
+      {/* Outside the block's element, and annotated where the text is READ.
+          Each half advertises the field it holds, as well as the bar's trigger doing so.
+          Without that the wording inside belongs to no block — it sits outside the block's
+          element, so `data-edit-text` there resolves to nothing and cannot be edited. The
+          trigger in the bar is still what the bridge CLICKS: a hidden handle cannot open
+          anything, so the bridge takes the first one that is on screen. */}
+      <div
+        className="cookie-banner"
+        data-block-selector={`${uid}#message`}
+        hidden={!showBanner}
+        role="alert"
+      >
         <p data-edit-text="message">{slateToText(block.message)}</p>
         <button type="button" onClick={() => setShowBanner(false)}>
           Accept all
@@ -165,7 +187,12 @@ function CookieConsentBlock({ block }) {
         </button>
       </div>
 
-      <div className="cookie-dialog" hidden={!showDialog} role="dialog">
+      <div
+        className="cookie-dialog"
+        data-block-selector={`${uid}#analyticsPurpose`}
+        hidden={!showDialog}
+        role="dialog"
+      >
         <h2>Manage cookie preferences</h2>
         <label>
           <input type="checkbox" name="analytics" />
@@ -226,12 +253,14 @@ function slateToText(value) {
          <body>, where a design system's own JavaScript puts them; sibling
          elements are the same thing as far as the bridge is concerned — outside
          the block's element, and hidden. -->
-      <div class="cookie-banner" :hidden="!showBanner" role="alert">
+      <div class="cookie-banner" :data-block-selector="`${block['@uid']}#message`"
+        :hidden="!showBanner" role="alert">
         <p data-edit-text="message">{{ slateToText(block.message) }}</p>
         <button type="button" @click="showBanner = false">Accept all</button>
         <button type="button" @click="showDialog = true">Manage preferences</button>
       </div>
-      <div class="cookie-dialog" :hidden="!showDialog" role="dialog">
+      <div class="cookie-dialog" :data-block-selector="`${block['@uid']}#analyticsPurpose`"
+        :hidden="!showDialog" role="dialog">
         <h2>Manage cookie preferences</h2>
         <label><input type="checkbox" name="analytics" /> Analytics</label>
         <p data-edit-text="analyticsPurpose">{{ block.analyticsPurpose }}</p>
@@ -297,13 +326,15 @@ function slateToText(value) {
 <!-- Svelte renders these where they are written; a real frontend would portal
      them to <body>, as the React and Vue examples do. What matters for the
      pattern is that they are OUTSIDE the block's element and hidden. -->
-<div class="cookie-banner" hidden={!showBanner} role="alert">
+<div class="cookie-banner" data-block-selector={`${block['@uid']}#message`}
+  hidden={!showBanner} role="alert">
   <p data-edit-text="message">{slateToText(block.message)}</p>
   <button type="button" on:click={() => (showBanner = false)}>Accept all</button>
   <button type="button" on:click={() => (showDialog = true)}>Manage preferences</button>
 </div>
 
-<div class="cookie-dialog" hidden={!showDialog} role="dialog">
+<div class="cookie-dialog" data-block-selector={`${block['@uid']}#analyticsPurpose`}
+  hidden={!showDialog} role="dialog">
   <h2>Manage cookie preferences</h2>
   <label><input type="checkbox" name="analytics" /> Analytics</label>
   <p data-edit-text="analyticsPurpose">{block.analyticsPurpose}</p>
@@ -350,11 +381,11 @@ const slateToText = (value: any) =>
   </div>
 </div>
 
-<div class="cookie-banner" id="cookie-banner" role="alert">
+<div class="cookie-banner" id="cookie-banner" data-block-selector={`${uid}#message`} role="alert">
   <p data-edit-text="message">{slateToText(block.message)}</p>
 </div>
 
-<div class="cookie-dialog" id="cookie-dialog" role="dialog" hidden>
+<div class="cookie-dialog" id="cookie-dialog" data-block-selector={`${uid}#analyticsPurpose`} role="dialog" hidden>
   <h2>Manage cookie preferences</h2>
   <label><input type="checkbox" name="analytics" /> Analytics</label>
   <p data-edit-text="analyticsPurpose">{block.analyticsPurpose}</p>

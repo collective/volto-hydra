@@ -27,14 +27,19 @@
   </div>
 
   <!-- Outside the block's element, and annotated where the text is READ. -->
-  <div v-show="showBanner" class="cookie-banner rounded bg-gray-900 p-4 text-white" role="alert">
+  <!-- Each half advertises the field it holds: it is outside the block's
+       element, so without that the wording inside belongs to no block and is
+       not editable. The bar's trigger is what the bridge clicks to open it. -->
+  <div v-show="showBanner" :data-block-selector="`${block_uid}#message`"
+    class="cookie-banner rounded bg-gray-900 p-4 text-white" role="alert">
     <p v-for="(node, i) in message" :key="i" data-edit-text="message" :data-node-id="node.nodeId">
       {{ nodeText(node) }}
     </p>
     <button type="button" class="mt-2 rounded bg-white px-3 py-1 text-sm text-gray-900" @click="showBanner = false">Accept all</button>
   </div>
 
-  <div v-show="showDialog" class="cookie-dialog rounded border border-gray-300 p-4" role="dialog">
+  <div v-show="showDialog" :data-block-selector="`${block_uid}#analyticsPurpose`"
+    class="cookie-dialog rounded border border-gray-300 p-4" role="dialog">
     <h2 class="font-semibold">Manage cookie preferences</h2>
     <label class="mt-2 flex items-center gap-2">
       <input type="checkbox" name="analytics"> Analytics

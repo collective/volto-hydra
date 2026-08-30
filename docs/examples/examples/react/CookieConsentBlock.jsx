@@ -44,8 +44,18 @@ function CookieConsentBlock({ block }) {
         </button>
       </div>
 
-      {/* Outside the block's element, and annotated where the text is READ. */}
-      <div className="cookie-banner" hidden={!showBanner} role="alert">
+      {/* Outside the block's element, and annotated where the text is READ.
+          Each half advertises the field it holds, as well as the bar's trigger doing so.
+          Without that the wording inside belongs to no block — it sits outside the block's
+          element, so `data-edit-text` there resolves to nothing and cannot be edited. The
+          trigger in the bar is still what the bridge CLICKS: a hidden handle cannot open
+          anything, so the bridge takes the first one that is on screen. */}
+      <div
+        className="cookie-banner"
+        data-block-selector={`${uid}#message`}
+        hidden={!showBanner}
+        role="alert"
+      >
         <p data-edit-text="message">{slateToText(block.message)}</p>
         <button type="button" onClick={() => setShowBanner(false)}>
           Accept all
@@ -55,7 +65,12 @@ function CookieConsentBlock({ block }) {
         </button>
       </div>
 
-      <div className="cookie-dialog" hidden={!showDialog} role="dialog">
+      <div
+        className="cookie-dialog"
+        data-block-selector={`${uid}#analyticsPurpose`}
+        hidden={!showDialog}
+        role="dialog"
+      >
         <h2>Manage cookie preferences</h2>
         <label>
           <input type="checkbox" name="analytics" />

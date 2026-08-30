@@ -33,11 +33,11 @@ const slateToText = (value: any) =>
   </div>
 </div>
 
-<div class="cookie-banner" id="cookie-banner" role="alert">
+<div class="cookie-banner" id="cookie-banner" data-block-selector={`${uid}#message`} role="alert">
   <p data-edit-text="message">{slateToText(block.message)}</p>
 </div>
 
-<div class="cookie-dialog" id="cookie-dialog" role="dialog" hidden>
+<div class="cookie-dialog" id="cookie-dialog" data-block-selector={`${uid}#analyticsPurpose`} role="dialog" hidden>
   <h2>Manage cookie preferences</h2>
   <label><input type="checkbox" name="analytics" /> Analytics</label>
   <p data-edit-text="analyticsPurpose">{block.analyticsPurpose}</p>

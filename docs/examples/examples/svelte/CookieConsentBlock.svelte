@@ -33,13 +33,15 @@
 <!-- Svelte renders these where they are written; a real frontend would portal
      them to <body>, as the React and Vue examples do. What matters for the
      pattern is that they are OUTSIDE the block's element and hidden. -->
-<div class="cookie-banner" hidden={!showBanner} role="alert">
+<div class="cookie-banner" data-block-selector={`${block['@uid']}#message`}
+  hidden={!showBanner} role="alert">
   <p data-edit-text="message">{slateToText(block.message)}</p>
   <button type="button" on:click={() => (showBanner = false)}>Accept all</button>
   <button type="button" on:click={() => (showDialog = true)}>Manage preferences</button>
 </div>
 
-<div class="cookie-dialog" hidden={!showDialog} role="dialog">
+<div class="cookie-dialog" data-block-selector={`${block['@uid']}#analyticsPurpose`}
+  hidden={!showDialog} role="dialog">
   <h2>Manage cookie preferences</h2>
   <label><input type="checkbox" name="analytics" /> Analytics</label>
   <p data-edit-text="analyticsPurpose">{block.analyticsPurpose}</p>
