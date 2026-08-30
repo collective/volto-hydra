@@ -27,6 +27,7 @@ These blocks demonstrate common patterns. Register them via `initBridge({ blocks
 
 | Block | Description |
 |-------|-------------|
+| [Cookie Consent Block](./cookie-consent.md) | A consent banner and a preferences dialog written by one block, each built outside the block's own element and hidden until its trigger is pressed. The worked example for revealing the place a FIELD is edited (`data-block-selector="uid#fieldName"`). |
 | [Accordion Block](./accordion.md) | A collapsible panel group. Each panel is an `object_list` item with a title and a content area that holds child blocks. |
 | [Button Block](./button.md) | A call-to-action button with an editable label and link. |
 | [Columns Block](./columns.md) | A horizontal multi-column container. The block has one slot — `columns` — restricted to `column` children, capped at four. Each `column` is itself a container holding any of its allowed inner block types (slate, image, …). |

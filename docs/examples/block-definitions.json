@@ -1697,8 +1697,8 @@
           "properties": {
             "url": {
               "title": "Map Embed URL",
-            "widget": "url"
-          },
+              "widget": "url"
+            },
             "title": {
               "title": "Title",
               "type": "string"
@@ -2198,5 +2198,38 @@
       }
     },
     "excludeFromExamplesPage": true
+  },
+  "cookieConsent": {
+    "blocks": {
+      "cookieConsent": {
+        "id": "cookieConsent",
+        "title": "Cookie consent",
+        "blockSchema": {
+          "fieldsets": [
+            {
+              "id": "default",
+              "title": "Default",
+              "fields": [
+                "message",
+                "analyticsPurpose"
+              ]
+            }
+          ],
+          "properties": {
+            "message": {
+              "title": "Banner message",
+              "widget": "slate",
+              "description": "Shown in the consent banner, at the foot of every page, until a visitor chooses."
+            },
+            "analyticsPurpose": {
+              "title": "Analytics cookies \u2014 what they are for",
+              "widget": "textarea",
+              "description": "Shown beside the analytics tick box, inside the preferences dialog."
+            }
+          },
+          "required": []
+        }
+      }
+    }
   }
 }
