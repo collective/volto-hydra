@@ -2222,13 +2222,29 @@
               "description": "Shown in the consent banner, at the foot of every page, until a visitor chooses."
             },
             "analyticsPurpose": {
-              "title": "Analytics cookies \u2014 what they are for",
+              "title": "Analytics cookies — what they are for",
               "widget": "textarea",
               "description": "Shown beside the analytics tick box, inside the preferences dialog."
             }
           },
           "required": []
         }
+      }
+    },
+    "examples": {
+      "ex-cookieConsent": {
+        "@type": "cookieConsent",
+        "message": [
+          {
+            "type": "p",
+            "children": [
+              {
+                "text": "We use essential cookies to make this site work, and analytics cookies to see how it is used."
+              }
+            ]
+          }
+        ],
+        "analyticsPurpose": "Counts visits and pages, so we can see what is worth improving. Never used to identify you."
       }
     }
   }

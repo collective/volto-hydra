@@ -56,7 +56,8 @@
     "docs/examples/table/preview_image/black-starry-night.jpg",
     "docs/examples/teaser/preview_image/black-starry-night.jpg",
     "docs/examples/toc/preview_image/black-starry-night.jpg",
-    "quadrant-svg/image/quadrant.svg"
+    "quadrant-svg/image/quadrant.svg",
+    "templates/newsitem-view/preview_image/newsitem.svg"
   ],
   "_data_files_": [
     "plone_site_root/data.json",
@@ -94,6 +95,7 @@
     "docs/examples/columns/data.json",
     "docs/examples/content-types/data.json",
     "docs/examples/contextNavigation/data.json",
+    "docs/examples/cookie-consent/data.json",
     "docs/examples/form/data.json",
     "docs/examples/grid/data.json",
     "docs/examples/heading/data.json",
@@ -960,6 +962,13 @@
       }
     },
     "docs-images-template-edit-locked-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-examples-cookie-consent-001": {
       "local_roles": {
         "admin": [
           "Owner"
