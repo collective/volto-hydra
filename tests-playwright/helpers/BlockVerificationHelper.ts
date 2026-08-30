@@ -590,17 +590,30 @@ async function editableFieldsIn(block: Locator): Promise<EditableField[]> {
   const collected = await block.evaluateHandle((el) => {
     const attrs = ['data-edit-text', 'data-edit-media', 'data-edit-link'];
     const bridge = (window as unknown as { __hydraBridge?: any }).__hydraBridge;
-    const uid = el.getAttribute('data-block-uid');
     const strip = (v: string | null) => (v || '').replace(/^\//, '');
     const out: Array<{ attr: string; field: string; el: Element }> = [];
-    const add = (node: Element, attr: string) => {
-      const field = strip(node.getAttribute(attr));
-      if (field) out.push({ attr, field, el: node });
+    const add = (node: Element, attr: string, name: string) => {
+      const field = strip(name);
+      if (field && !out.some((o) => o.el === node && o.attr === attr)) {
+        out.push({ attr, field, el: node });
+      }
     };
     for (const attr of attrs) {
-      if (el.hasAttribute(attr)) add(el, attr);
-      for (const d of Array.from(el.querySelectorAll(`[${attr}]`))) add(d, attr);
-      for (const d of bridge?.fieldsOnHandlesFor?.(uid, { attr }) ?? []) add(d, attr);
+      if (bridge?.collectBlockFields) {
+        // The BRIDGE's own walk, not a second one: every element carrying the
+        // uid (a block can be several), what stands in for the block, minus
+        // what belongs to a nested block or is marked readonly. Asking it is
+        // the point — a check that re-derives "the block's fields" can pass
+        // while the editor disagrees, which is the failure it exists to catch.
+        bridge.collectBlockFields(el, attr, (node: Element, name: string) => add(node, attr, name));
+      } else {
+        // No bridge (a plain-DOM harness): the block's own subtree is all there
+        // is to go on.
+        if (el.hasAttribute(attr)) add(el, attr, el.getAttribute(attr) ?? '');
+        for (const d of Array.from(el.querySelectorAll(`[${attr}]`))) {
+          add(d, attr, d.getAttribute(attr) ?? '');
+        }
+      }
     }
     return out;
   });

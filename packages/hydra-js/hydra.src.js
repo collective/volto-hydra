@@ -11859,9 +11859,19 @@ export class Bridge {
       let parentUid = this.blockPathMap?.[targetUid]?.parentId;
       while (parentUid && !seen.has(parentUid)) {
         seen.add(parentUid);
-        const handle = document.querySelector(
-          `[data-block-selector~="${parentUid}"]`,
-        );
+        // A handle naming the ancestor's REGION counts as naming what is in it:
+        // `uid#field` says where that field is edited, and when the field is a
+        // region — a blocks_layout or an object_list — the blocks inside it are
+        // edited exactly there. A container publishes one handle for the region
+        // rather than enumerating children it cannot know in advance, and the
+        // bare-uid form still works for a container that reveals everything.
+        const childRegion = this.blockPathMap?.[childUid]?.region;
+        const handle =
+          (childRegion &&
+            document.querySelector(
+              `[data-block-selector~="${parentUid}#${childRegion}"]`,
+            )) ||
+          document.querySelector(`[data-block-selector~="${parentUid}"]`);
         if (handle) handles.push({ uid: parentUid, handle, child: childUid });
         childUid = parentUid;
         parentUid = this.blockPathMap?.[parentUid]?.parentId;

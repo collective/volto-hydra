@@ -58,3 +58,64 @@ describe('waitForBlockVisibleAndSelect — only the newest navigation selects', 
     expect(selected).toEqual(['tab-1']);
   });
 });
+
+/**
+ * A handle that names a REGION names everything in it.
+ *
+ * `data-block-selector="uid#field"` says "this is where that field of that
+ * block is edited". When the field IS a region — a `blocks_layout` or an
+ * `object_list` — the blocks inside it are edited in exactly that place, so the
+ * handle is the way to reveal them too. An accordion whose panels live in
+ * `data/items` publishes one handle for the region rather than enumerating
+ * children it cannot know in advance.
+ *
+ * The bridge already walks up from a hidden block to the nearest ancestor that
+ * published a handle. It looked only for the bare-uid form, so a container that
+ * named its region was treated as publishing nothing and its children stayed
+ * unreachable.
+ */
+describe('tryMakeBlockVisible — a region handle reveals the blocks in that region', () => {
+  const page = () => {
+    const { window } = new JSDOM(`<!DOCTYPE html>
+      <div data-block-uid="acc-1">
+        <button data-block-selector="acc-1#items" data-name="region-handle"></button>
+        <div data-block-uid="panel-1" data-name="panel" hidden></div>
+      </div>`);
+    return window.document;
+  };
+
+  const bridgeOn = (document) => {
+    const clicked = [];
+    const bridge = Object.assign(Object.create(Bridge.prototype), {
+      _selectorNavSeq: 0,
+      blockPathMap: {
+        'panel-1': { parentId: 'acc-1', region: 'items' },
+        'acc-1': { parentId: null, region: null },
+      },
+      isElementHidden: (el) => el.getAttribute('data-name') === 'panel',
+      queryBlockElement: (uid) => document.querySelector(`[data-block-uid="${uid}"]`),
+      elementIsVisibleInViewport: () => true,
+      scrollBlockIntoView: () => {},
+    });
+    for (const el of document.querySelectorAll('[data-block-selector]')) {
+      el.click = () => clicked.push(el.getAttribute('data-name'));
+    }
+    return { bridge, clicked };
+  };
+
+  test('the region handle is clicked to reveal a block inside it', () => {
+    const document = page();
+    const previous = globalThis.document;
+    const previousRaf = globalThis.requestAnimationFrame;
+    globalThis.document = document;
+    globalThis.requestAnimationFrame = () => 0;
+    try {
+      const { bridge, clicked } = bridgeOn(document);
+      bridge.tryMakeBlockVisible('panel-1');
+      expect(clicked).toEqual(['region-handle']);
+    } finally {
+      globalThis.document = previous;
+      globalThis.requestAnimationFrame = previousRaf;
+    }
+  });
+});
