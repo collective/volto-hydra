@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 import SlateBlock, { SlateInline } from "@/components/SlateBlock";
 import CodeExampleBlock from "@/components/CodeExampleBlock/CodeExampleBlock";
+import CookieConsentBlock from "@/components/CookieConsentBlock/CookieConsentBlock";
 import { expandTemplatesSync, expandListingBlocks, ploneFetchItems, staticBlocks, contentPath } from "#utils/helpers";
 import { isEditMode } from "#utils/hydra";
 import SwiperSlider from "@/components/SwiperSlider";
@@ -1526,6 +1527,12 @@ function Block({ block, id, data, apiUrl, contextPath }) {
     // ── Code Example ──
     case "codeExample":
       return <CodeExampleBlock id={id} block={block} />;
+
+    // ── Cookie Consent ──
+    // The two halves it words are rendered outside its element, each opened by
+    // the trigger that names the field it holds.
+    case "cookieConsent":
+      return <CookieConsentBlock id={id} block={block} SlateNodes={SlateNodes} />;
 
     // ── Empty ──
     case "empty":

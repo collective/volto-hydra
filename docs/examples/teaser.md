@@ -4,7 +4,7 @@ A content preview card that links to another page. Selecting a target page via t
 
 This is a **built-in** block.
 
-**Demonstrates:** [`fieldRules`](../custom-blocks.md#schema-enhancers) — its wording fields are withdrawn while `overwrite` is off.
+**Demonstrates:** [Block Conversion & fieldMappings](../custom-blocks.md#block-conversion--fieldmappings) — `@default` mappings that survive a conversion; [`fieldRules`](../custom-blocks.md#schema-enhancers) — its wording fields are withdrawn while `overwrite` is off.
 
 ## Schema
 

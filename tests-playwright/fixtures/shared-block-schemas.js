@@ -600,6 +600,37 @@ export const sharedBlocksConfig = {
         controls: { title: 'Show controls', type: 'boolean' },
         loop: { title: 'Loop', type: 'boolean' },
         muted: { title: 'Muted', type: 'boolean' },} } },
+    // Cookie consent — the worked example for revealing the place a FIELD is
+    // edited (docs/examples/cookie-consent.md). Its two authored fields are read
+    // in two different places, each outside the block's own element and hidden
+    // until its trigger is pressed, so each trigger names the field its half
+    // holds: `data-block-selector="uid#message"` / `uid#analyticsPurpose`.
+    cookieConsent: {
+        id: 'cookieConsent',
+        title: 'Cookie consent',
+        blockSchema: {
+            fieldsets: [
+                { id: 'default', title: 'Default', fields: ['message', 'analyticsPurpose'] },
+            ],
+            properties: {
+                message: {
+                    title: 'Banner message',
+                    type: 'array',
+                    widget: 'slate',
+                    description:
+                        'Shown in the consent banner, at the foot of every page, until a visitor chooses.',
+                },
+                analyticsPurpose: {
+                    title: 'Analytics cookies — what they are for',
+                    type: 'string',
+                    widget: 'textarea',
+                    description:
+                        'Shown beside the analytics tick box, inside the preferences dialog.',
+                },
+            },
+            required: [],
+        },
+    },
     // Code example block: tabbed code display with syntax highlighting
     codeExample: {
         id: 'codeExample',

@@ -4,6 +4,8 @@ A multi-field form with configurable field types, validation, and email submissi
 
 This is a **custom** block — register it via `initBridge`.
 
+**Demonstrates:** [object_list with allowedBlocks: Typed Items](../container-blocks.md#object_list-with-allowedblocks-typed-items) — a typed item per kind of field.
+
 ## Schema
 
 ```json

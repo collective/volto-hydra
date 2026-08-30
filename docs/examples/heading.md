@@ -4,6 +4,8 @@ A standalone heading block that renders as h1–h6 based on a configurable `tag`
 
 This is a **built-in** block.
 
+**Demonstrates:** [Defining a custom block](../custom-blocks.md#defining-a-custom-block) — schema, registration and annotation at their smallest.
+
 ## Schema
 
 ```json
