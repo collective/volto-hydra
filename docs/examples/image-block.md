@@ -4,7 +4,7 @@ Displays an image with optional alt text and link. Supports the image picker wid
 
 This is a **built-in** block.
 
-**Demonstrates:** [HTML Annotations for Visual Editing](../visual-editing.md#html-annotations-for-visual-editing) — `data-edit-media`, which opens the picker on click.
+**Demonstrates:** [HTML Annotations for Visual Editing](../visual-editing.md#html-annotations-for-visual-editing) — `data-edit-media`, which opens the picker on click; [`fieldRules`](../custom-blocks.md#schema-enhancers) — a full-width image is offered no size to choose.
 
 ## Schema
 

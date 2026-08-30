@@ -1005,7 +1005,15 @@ export const sharedBlocksConfig = {
             fieldRules: {
                 alt: { when: { url: { isSet: true } }, else: false },
                 align: { when: { url: { isSet: true } }, else: false },
-                size: { when: { url: { isSet: true } }, else: false },
+                // Volto's own Image schema drops the size choice for a
+                // full-width image: the width IS the page, so there is nothing
+                // to choose. Written as a LIST of rules — the first whose
+                // condition holds wins, and the bare `false` at the end is the
+                // catch-all that hides the field when none does.
+                size: [
+                  { when: { url: { isSet: true }, align: { isNot: 'full' } } },
+                  false,
+                ],
                 href: { when: { url: { isSet: true } }, else: false },
                 openLinkInNewTab: { when: { url: { isSet: true } }, else: false },
             },
@@ -1345,77 +1353,6 @@ export const sharedBlocksConfig = {
             },
         },
     },
-    // fieldRules test block: demonstrates conditional field visibility
-    skiplogicTest: {
-        id: 'skiplogicTest',
-        title: 'Field Rules Test',
-        group: 'common',
-        blockSchema: {
-            properties: {
-                mode: {
-                    title: 'Mode',
-                    widget: 'select',
-                    choices: [['simple', 'Simple'], ['advanced', 'Advanced']],
-                },
-                columns: {
-                    title: 'Columns',
-                    type: 'integer',
-                    default: 1,
-                },
-                basicTitle: {
-                    title: 'Basic Title',
-                    type: 'string',
-                },
-                advancedOptions: {
-                    title: 'Advanced Options',
-                    type: 'string',
-                },
-                simpleWarning: {
-                    title: 'Simple Warning',
-                    type: 'string',
-                },
-                columnLayout: {
-                    title: 'Column Layout',
-                    widget: 'select',
-                    choices: [['equal', 'Equal'], ['weighted', 'Weighted']],
-                },
-                pageNotice: {
-                    title: 'Page Notice',
-                    type: 'string',
-                    description: 'Only visible when page has a description',
-                },
-                switchField: {
-                    title: 'Switch Field',
-                    type: 'string',
-                    description: 'Array rule with bare false as catch-all hide',
-                },
-            },
-        },
-        schemaEnhancer: {
-            fieldRules: {
-                advancedOptions: { when: { mode: 'advanced' }, else: false },
-                simpleWarning: { when: { mode: { isNot: 'advanced' } }, else: false },
-                columnLayout: { when: { columns: { gte: 2 } }, else: false },
-                pageNotice: { when: { '../description': { isSet: true } }, else: false },
-                // Array rule: show when simple OR advanced, bare false hides otherwise
-                switchField: [
-                    { when: { mode: 'simple' } },
-                    { when: { mode: 'advanced' } },
-                    false,
-                ],
-            },
-        },
-    },
-    // Page-metadata and content-type blocks. These RENDER in every example
-    // frontend (block.vue branches for each) but were never declared, so
-    // discovery reported them as "used in content but not registered — it
-    // renders as Not implemented Block", which was wrong: they render fine.
-    //
-    // Their editable content is the PAGE's fields, not the block's — the
-    // annotations are page-field paths (/title, /description, /start) — so the
-    // block schemas are legitimately empty. `restricted` keeps them out of the
-    // page block chooser, which is where they would make no sense: a page has
-    // one title.
     title: {
       id: 'title',
       title: 'Title',
