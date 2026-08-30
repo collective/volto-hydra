@@ -28,6 +28,7 @@ function BlockRenderer({ block, content }) {
     case 'maps':          return <MapsBlock block={block} />;
     case 'toc':           return <TocBlock block={block} content={content} />;
     case 'codeExample':   return <CodeExampleBlock block={block} />;
+    case 'cookieConsent': return <CookieConsentBlock block={block} />;
     case 'empty':         return <EmptyBlock block={block} />;
     case 'eventMetadata': return <EventMetadataBlock block={block} content={content} />;
     case 'socialLinks':   return <SocialLinksBlock block={block} />;

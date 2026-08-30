@@ -10,6 +10,7 @@ import { readFileSync } from 'fs';
 const COMPONENT_IMPORTS = {
   SlateNode:         './SlateNode.jsx',
   BlockRenderer:     './BlockRenderer.jsx',
+  CookieConsentBlock: './CookieConsentBlock.jsx',
   SlateBlock:        './SlateBlock.jsx',
   IntroductionBlock: './IntroductionBlock.jsx',
   ListingBlock:      './ListingBlock.jsx',

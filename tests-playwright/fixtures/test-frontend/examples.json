@@ -670,6 +670,20 @@
           "nav-3"
         ]
       }
+    },
+    "ex-cookieConsent": {
+      "@type": "cookieConsent",
+      "message": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "We use essential cookies to make this site work, and analytics cookies to see how it is used."
+            }
+          ]
+        }
+      ],
+      "analyticsPurpose": "Counts visits and pages, so we can see what is worth improving. Never used to identify you."
     }
   },
   "blocks_layout": {
@@ -698,7 +712,8 @@
       "ex-toc",
       "ex-codeExample",
       "ex-grid",
-      "ex-contextnav"
+      "ex-contextnav",
+      "ex-cookieConsent"
     ]
   },
   "is_folderish": false,

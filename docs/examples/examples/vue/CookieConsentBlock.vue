@@ -9,8 +9,8 @@
     pressed. So "is the block visible?" is the wrong question, and each trigger
     names the FIELD its half holds instead.
   -->
-  <div :data-block-uid="block['@uid']" class="cookie-consent">
-    <div class="cookie-consent__bar">
+  <div class="cookie-consent">
+    <div :data-block-uid="block['@uid']" class="cookie-consent__bar">
       <strong>Cookie consent</strong>
       <!-- "I reveal where `message` is edited": focusing Banner message in the
            sidebar makes the bridge click this, so the banner is on screen while
@@ -26,8 +26,10 @@
     </div>
 
     <!-- Both halves live outside this block's DOM, so their editable text is
-         annotated where it is READ. -->
-    <Teleport to="body">
+         annotated where it is READ. A real frontend often teleports these to
+         <body>, where a design system's own JavaScript puts them; sibling
+         elements are the same thing as far as the bridge is concerned — outside
+         the block's element, and hidden. -->
       <div class="cookie-banner" :hidden="!showBanner" role="alert">
         <p data-edit-text="message">{{ slateToText(block.message) }}</p>
         <button type="button" @click="showBanner = false">Accept all</button>
@@ -39,7 +41,6 @@
         <p data-edit-text="analyticsPurpose">{{ block.analyticsPurpose }}</p>
         <button type="button" @click="showDialog = false">Save</button>
       </div>
-    </Teleport>
   </div>
 </template>
 
