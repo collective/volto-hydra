@@ -309,6 +309,8 @@ A block that isn't an `object_list` item yields an unset `@index`, so comparison
 
 Field paths: `../field` for the parent block's field (and `@index` / `../@index` for position), `/field` for a page metadata field.
 
+**Worked examples:** two blocks in the reference carry rules for their own reasons — the [Teaser Block](./examples/teaser.md) has nothing to ask for while it borrows the linked page's wording (`overwrite` off), and the [Image Block](./examples/image-block.md) offers no size for a full-width image, written as a list of rules with a bare `false` as the catch-all.
+
 ## Block Conversion & fieldMappings
 
 `fieldMappings` (plural) on a block config defines how fields map between block types (and from linked content). This enables:

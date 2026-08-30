@@ -4,6 +4,8 @@ Displays an image with optional alt text and link. Supports the image picker wid
 
 This is a **built-in** block.
 
+**Demonstrates:** [`fieldRules`](../custom-blocks.md#schema-enhancers) — a full-width image is offered no size to choose.
+
 ## Schema
 
 ```json

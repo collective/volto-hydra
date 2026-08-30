@@ -3562,7 +3562,79 @@
         }
       ]
     },
-    "h-55": {
+    "p-55": {
+      "@type": "slate",
+      "plaintext": "**Worked examples:** two blocks in the reference carry rules for their own reasons — the [Teaser Block](./examples/teaser.md) has nothing to ask for while it borrows the linked page's wording (`overwrite` off), and the [Image Block](./examples/image-block.md) offers no size for a full-width image, written as a list of rules with a bare `false` as the catch-all.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Worked examples:"
+                }
+              ]
+            },
+            {
+              "text": " two blocks in the reference carry rules for their own reasons — the "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "/docs/examples/teaser"
+              },
+              "children": [
+                {
+                  "text": "Teaser Block"
+                }
+              ]
+            },
+            {
+              "text": " has nothing to ask for while it borrows the linked page's wording ("
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "overwrite"
+                }
+              ]
+            },
+            {
+              "text": " off), and the "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "/docs/examples/image-block"
+              },
+              "children": [
+                {
+                  "text": "Image Block"
+                }
+              ]
+            },
+            {
+              "text": " offers no size for a full-width image, written as a list of rules with a bare "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "false"
+                }
+              ]
+            },
+            {
+              "text": " as the catch-all."
+            }
+          ]
+        }
+      ]
+    },
+    "h-56": {
       "@type": "slate",
       "plaintext": "Block Conversion & fieldMappings",
       "value": [
@@ -3576,7 +3648,7 @@
         }
       ]
     },
-    "p-56": {
+    "p-57": {
       "@type": "slate",
       "plaintext": "`fieldMappings` (plural) on a block config defines how fields map between block types (and from linked content). This enables:",
       "value": [
@@ -3598,7 +3670,7 @@
         }
       ]
     },
-    "ul-57": {
+    "ul-58": {
       "@type": "slate",
       "plaintext": "\"Convert to...\" UI action — editors can convert a block to another type (e.g. teaser → image). Listing item types — query results are mapped to item blocks via @default (see Listings). Synchronised container children — a parent controls child type, all children convert together (see Container Blocks › Synchronised Block Types). Drag / paste via conversion — a block can be dropped or pasted into a container that only accepts a convertible type; it's converted on drop (see below). Copy from a linked target — a block pulls fields from the content item its link field points at, with a per-field linked/custom toggle (see @target).",
       "value": [
@@ -3753,7 +3825,7 @@
         }
       ]
     },
-    "p-58": {
+    "p-59": {
       "@type": "slate",
       "plaintext": "Each key in `fieldMappings` is either a **specific block type name**, **`@default`**, or **`@target`**.",
       "value": [
@@ -3811,7 +3883,7 @@
         }
       ]
     },
-    "h-59": {
+    "h-60": {
       "@type": "slate",
       "plaintext": "@default — the canonical content shape",
       "value": [
@@ -3833,7 +3905,7 @@
         }
       ]
     },
-    "p-60": {
+    "p-61": {
       "@type": "slate",
       "plaintext": "`@default` is a virtual type representing a linked content item's fields — anything a catalog **search** returns as metadata (`metadata_fields: '_all'`): `@id`, `title`, `description`, `image`, `Subject` (tags), `created`/`effective` dates, and so on. A block with `fieldMappings['@default']` is saying \"I can be populated from a content item.\" The keys are content/metadata field names — not this block's own field names (e.g. `label`, `field`, `required` are not content metadata and are invalid).",
       "value": [
@@ -3998,7 +4070,7 @@
         }
       ]
     },
-    "h-61": {
+    "h-62": {
       "@type": "slate",
       "plaintext": "Explicit type-to-type mappings",
       "value": [
@@ -4012,7 +4084,7 @@
         }
       ]
     },
-    "p-62": {
+    "p-63": {
       "@type": "slate",
       "plaintext": "Use these when blocks share fields that aren't part of the `@default` set — for example, facet types sharing `{ title, field, hidden }` or form field types sharing `{ label, description, required }`.",
       "value": [
@@ -4059,18 +4131,18 @@
         }
       ]
     },
-    "ce-63": {
+    "ce-64": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-63-javascript-a971d4",
+          "@id": "ce-64-javascript-791bfd",
           "label": "Javascript",
           "language": "javascript",
           "code": "// Content item types: use @default (canonical fields) + explicit cross-mappings\nteaser: {\n    fieldMappings: {\n        '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },\n        image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },\n    },\n},\nimage: {\n    fieldMappings: {\n        '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },\n        teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },\n    },\n},\n\n// Non-content types: use explicit hub-type mappings (NOT @default).\n// All facet types map through checkboxFacet as a hub:\nselectFacet:  { fieldMappings: { checkboxFacet: { title: 'title', field: 'field', hidden: 'hidden' } } },\ncheckboxFacet: { fieldMappings: { selectFacet: { /* ... */ }, daterangeFacet: { /* ... */ } } },"
         }
       ]
     },
-    "h-64": {
+    "h-65": {
       "@type": "slate",
       "plaintext": "@target — copy from a linked content item",
       "value": [
@@ -4092,7 +4164,7 @@
         }
       ]
     },
-    "p-65": {
+    "p-66": {
       "@type": "slate",
       "plaintext": "`@target` maps a **linked** content item's attributes onto this block's own fields — the generic version of the Volto teaser's \"copy from target\" button. It maps *source content attributes* (`title`, `description`, `image`, …) to *this block's fields*. The item is whichever the block's **link field** points at (the `object_browser mode: 'link'` field — its stored snapshot is the source), so you don't name a URL field separately: \"the url is the link in the mapping\".",
       "value": [
@@ -4202,18 +4274,18 @@
         }
       ]
     },
-    "ce-66": {
+    "ce-67": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-66-json-3f5bb3",
+          "@id": "ce-67-javascript-55e21b",
           "label": "Javascript",
           "language": "javascript",
           "code": "button: {\n    // The Label (title) syncs from the linked item's title.\n    fieldMappings: {\n        '@target': {\n            title: 'title',\n            description: 'description',\n            // image: the conversion is derived from the destination field's\n            // widget, so the value is assembled into the shape it expects.\n            image: 'preview_image',\n        },\n    },\n},"
         }
       ]
     },
-    "p-67": {
+    "p-68": {
       "@type": "slate",
       "plaintext": "Declaring `@target` is the **only** opt-in — no per-block enhancer wiring. Each mapped field then shows a small **🔗 pull from linked** toggle in the sidebar (only when a target is selected). Every mapped field is one of two states:",
       "value": [
@@ -4260,7 +4332,7 @@
         }
       ]
     },
-    "ul-68": {
+    "ul-69": {
       "@type": "slate",
       "plaintext": "Linked (default, toggle ticked) — the field pulls from the linked item.",
       "value": [
@@ -4298,7 +4370,7 @@
         }
       ]
     },
-    "p-69": {
+    "p-70": {
       "@type": "slate",
       "plaintext": "Its value is filled from the target's snapshot when the page opens for editing   and re-pulled when you change the link, so it always mirrors the linked content.",
       "value": [
@@ -4312,7 +4384,7 @@
         }
       ]
     },
-    "ul-70": {
+    "ul-71": {
       "@type": "slate",
       "plaintext": "Custom (toggle unticked) — your own value, ignored by the target. A field",
       "value": [
@@ -4339,7 +4411,7 @@
         }
       ]
     },
-    "p-71": {
+    "p-72": {
       "@type": "slate",
       "plaintext": "becomes custom the moment you edit it, or when you untick the toggle;   re-ticking re-pulls the target value. Custom fields are recorded in the block's   `_customFields` array (absence ⇒ linked), so the state persists with the block.",
       "value": [
@@ -4364,7 +4436,7 @@
         }
       ]
     },
-    "h-72": {
+    "h-73": {
       "@type": "slate",
       "plaintext": "Container ⇄ value (region-crossing paths)",
       "value": [
@@ -4378,7 +4450,7 @@
         }
       ]
     },
-    "p-73": {
+    "p-74": {
       "@type": "slate",
       "plaintext": "A `fieldMappings` value is usually a sibling **field name**. It may instead be a **region-crossing path** `<region>/<type|*>/<field>`, which reaches the `<field>` of a container region's children — the one place the path grammar crosses a region boundary. This bridges a **container** block (a region of child blocks) and a **value** block (a scalar field), so a block can convert between the two shapes:",
       "value": [
@@ -4469,18 +4541,18 @@
         }
       ]
     },
-    "ce-74": {
+    "ce-75": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-74-javascript-f37b96",
+          "@id": "ce-75-javascript-b1a8d9",
           "label": "Javascript",
           "language": "javascript",
           "code": "tableHeaderCell: {                                   // the value form: one slate\n    blockSchema: { properties: { value: { widget: 'slate' } } },\n    // Declared ONCE on the value block; works both directions.\n    fieldMappings: { tableCell: { value: 'blocks/slate/value' } },\n},\ntableCell: {                                         // the container form\n    blockSchema: { properties: {\n        blocks: { widget: 'object_list', typeField: '@type',\n                  allowedBlocks: ['slate', 'image', 'video'] },\n    } },\n},"
         }
       ]
     },
-    "ul-75": {
+    "ul-76": {
       "@type": "slate",
       "plaintext": "container → value (collapse) — gather the region's matching children's",
       "value": [
@@ -4507,7 +4579,7 @@
         }
       ]
     },
-    "p-76": {
+    "p-77": {
       "@type": "slate",
       "plaintext": "`<field>`; slate values are **merged** into one (lossless), not truncated.",
       "value": [
@@ -4540,7 +4612,7 @@
         }
       ]
     },
-    "ul-77": {
+    "ul-78": {
       "@type": "slate",
       "plaintext": "value → container (expand) — wrap the value in one child of <type> in",
       "value": [
@@ -4589,7 +4661,7 @@
         }
       ]
     },
-    "p-78": {
+    "p-79": {
       "@type": "slate",
       "plaintext": "the region.",
       "value": [
@@ -4603,7 +4675,7 @@
         }
       ]
     },
-    "ul-79": {
+    "ul-80": {
       "@type": "slate",
       "plaintext": "<type> selects a child type; * = any child that exposes <field> (siblings",
       "value": [
@@ -4652,7 +4724,7 @@
         }
       ]
     },
-    "p-80": {
+    "p-81": {
       "@type": "slate",
       "plaintext": "without it — an `image` for a `value` path — are skipped). A **concrete** type   (`blocks/slate/value`) makes expand unambiguous, so use it for a two-way bridge;   `*` suits read-only cross-region reads (e.g. a `when` condition).",
       "value": [
@@ -4732,7 +4804,7 @@
         }
       ]
     },
-    "p-81": {
+    "p-82": {
       "@type": "slate",
       "plaintext": "Non-region scalar fields (`key`, `width`, …) carry over unchanged. This is the `convertValueContainer` helper; DnD/paste and the block chooser reuse it via the same `fieldMappings` graph. See `proposals/container-value-conversion.md`.",
       "value": [
@@ -4801,7 +4873,7 @@
         }
       ]
     },
-    "h-82": {
+    "h-83": {
       "@type": "slate",
       "plaintext": "typeRule — position picks a typed item's @type",
       "value": [
@@ -4831,7 +4903,7 @@
         }
       ]
     },
-    "p-83": {
+    "p-84": {
       "@type": "slate",
       "plaintext": "The bridge converts on demand; a **`@type` rule** on a typed `object_list` field decides *when*, by **position**. It is an ordinary `when`-based fieldRule (same grammar — `@index`, `../@index`, `../../<field>`, `oneOf`, `lt`, …) whose `set` is a block-**type name** instead of a field definition:",
       "value": [
@@ -4977,18 +5049,18 @@
         }
       ]
     },
-    "ce-84": {
+    "ce-85": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-84-javascript-29f981",
+          "@id": "ce-85-javascript-f9b270",
           "label": "Javascript",
           "language": "javascript",
           "code": "cells: {\n    widget: 'object_list', typeField: '@type',\n    allowedBlocks: ['tableCell', 'tableHeaderCell'],\n    typeRule: [\n        // header row OR header column → the value form\n        { when: { '../../headerMode': { oneOf: ['row', 'both'] }, '../@index': { lt: 1 } }, set: 'tableHeaderCell' },\n        { when: { '../../headerMode': { oneOf: ['col', 'both'] }, '@index': { lt: 1 } },     set: 'tableHeaderCell' },\n        { set: 'tableCell' },                                // otherwise the container form\n    ],\n},"
         }
       ]
     },
-    "p-85": {
+    "p-86": {
       "@type": "slate",
       "plaintext": "The rule is evaluated in the same pass that applies field defaults (run on every edit): each typed item's target `@type` is re-resolved, and when it differs from the stored `@type` the item is **converted in place** via the bridge above. So moving a row to/from row 0 flips its cells between `tableHeaderCell` (a slate `value`) and `tableCell` (a `blocks` container), losslessly — no imperative \"re-type the cells\" code. Only meaningful on a **typed** object_list (a `typeField` item has an `@type` to rewrite); it settles in one pass (the target type re-resolves to itself once the item is in place).",
       "value": [
@@ -5112,7 +5184,7 @@
         }
       ]
     },
-    "p-86": {
+    "p-87": {
       "@type": "slate",
       "plaintext": "Each field's value is converted to the shape its destination widget expects (derived from the widget): strings copy across, an image field is assembled from the target's `image_scales` / `image_field`, multi-value fields (e.g. `Subject` → tags) pass through as-is.",
       "value": [
@@ -5159,7 +5231,7 @@
         }
       ]
     },
-    "p-87": {
+    "p-88": {
       "@type": "slate",
       "plaintext": "The pull is **snapshot-based** — there is no separate live fetch. When you pick or type a link, the url widget stores the target's **full** metadata onto the link field (the object browser already fetches every item with `metadata_fields: '_all'`, and the field's `selectedItemAttrs` keeps the whole canonical set), so the block carries its own source data. Every mapped field then pulls straight from that stored snapshot: **on page open** (all blocks fill at once) and again whenever you change the link.",
       "value": [
@@ -5228,7 +5300,7 @@
         }
       ]
     },
-    "p-88": {
+    "p-89": {
       "@type": "slate",
       "plaintext": "Only an **internal** link is a pull source. An external URL has no catalog item to search, so a field linked to one can't pull — the toggle is hidden and the field behaves as a plain editable field. (Unfurling external links via OpenGraph is a future enhancement.)",
       "value": [
@@ -5253,7 +5325,7 @@
         }
       ]
     },
-    "h-89": {
+    "h-90": {
       "@type": "slate",
       "plaintext": "Conversion graph rules",
       "value": [
@@ -5267,7 +5339,7 @@
         }
       ]
     },
-    "ul-90": {
+    "ul-91": {
       "@type": "slate",
       "plaintext": "Explicit fieldMappings[typeName] always creates a conversion edge. @default only creates edges between types that both have valid @default mappings (keys from { @id, title, description, image }). Types with non-canonical @default keys are ignored. Types without fieldMappings never appear in the \"Convert to...\" menu. Transitive conversions use paths through intermediate types (e.g. hero → teaser → image). Unmapped fields are kept in the data so converting back restores them.",
       "value": [
@@ -5381,7 +5453,7 @@
         }
       ]
     },
-    "h-91": {
+    "h-92": {
       "@type": "slate",
       "plaintext": "Drag / paste via conversion",
       "value": [
@@ -5395,7 +5467,7 @@
         }
       ]
     },
-    "p-92": {
+    "p-93": {
       "@type": "slate",
       "plaintext": "The same conversion graph gives drag-and-drop (and paste) more valid destinations: a block can be dropped or pasted into a container whose `allowedBlocks` only admits a type the block can *convert* to.",
       "value": [
@@ -5431,7 +5503,7 @@
         }
       ]
     },
-    "p-93": {
+    "p-94": {
       "@type": "slate",
       "plaintext": "**Every drop/paste is TRIALLED before it commits.** The candidate result is normalised (the same pass that applies field defaults and evaluates [`@type` rules](#typerule--position-picks-a-typed-items-type)), then each block's `@type` is diffed against what was dropped. If **anything** converted — because the dropped block had to convert to fit the container, **or** because a rule re-typed a block by its new position (e.g. a table row moved to row 0 turns its cells into header cells) — a **\"Convert blocks?\"** confirm lists each `from → to` and waits: **Convert** commits the already-converted result, **Cancel** aborts the whole drop. Nothing converted → it commits silently.",
       "value": [
@@ -5544,7 +5616,7 @@
         }
       ]
     },
-    "p-94": {
+    "p-95": {
       "@type": "slate",
       "plaintext": "The chooser popup survives only for the genuinely ambiguous case: a single block reachable to *several* target types, where you pick which one (cancelling leaves it untouched). Zero reachable types rejects the drop; multi-block selections are auto-only (every member must reach exactly one type). On mobile, conversion happens via cut → paste (drag/chevron move stays native-only). External-link and other type restrictions are unaffected; only the container's `allowedBlocks` gate is relaxed to \"allowed or convertible\".",
       "value": [
@@ -5580,7 +5652,7 @@
         }
       ]
     },
-    "h-95": {
+    "h-96": {
       "@type": "slate",
       "plaintext": "Mapping value format",
       "value": [
@@ -5594,7 +5666,7 @@
         }
       ]
     },
-    "p-96": {
+    "p-97": {
       "@type": "slate",
       "plaintext": "A mapping value is either a string (simple field rename) or `{ field, type }` (rename with type conversion):",
       "value": [
@@ -5619,18 +5691,18 @@
         }
       ]
     },
-    "ce-97": {
+    "ce-98": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-97-json-f5bee0",
+          "@id": "ce-98-json-678ea6",
           "label": "Json",
           "language": "json",
           "code": "{\n    \"@id\": { \"field\": \"href\", \"type\": \"link\" },\n    \"title\": \"title\",\n    \"description\": \"description\",\n    \"image\": \"preview_image\"\n}"
         }
       ]
     },
-    "p-98": {
+    "p-99": {
       "@type": "slate",
       "plaintext": "When `type` is specified, the value is converted at runtime:",
       "value": [
@@ -5655,7 +5727,7 @@
         }
       ]
     },
-    "tbl-99": {
+    "tbl-100": {
       "@type": "slateTable",
       "table": {
         "fixed": true,
@@ -5666,10 +5738,10 @@
         "striped": false,
         "rows": [
           {
-            "key": "tbl-99-r0",
+            "key": "tbl-100-r0",
             "cells": [
               {
-                "key": "tbl-99-r0c0",
+                "key": "tbl-100-r0c0",
                 "type": "header",
                 "value": [
                   {
@@ -5683,7 +5755,7 @@
                 ]
               },
               {
-                "key": "tbl-99-r0c1",
+                "key": "tbl-100-r0c1",
                 "type": "header",
                 "value": [
                   {
@@ -5699,10 +5771,10 @@
             ]
           },
           {
-            "key": "tbl-99-r1",
+            "key": "tbl-100-r1",
             "cells": [
               {
-                "key": "tbl-99-r1c0",
+                "key": "tbl-100-r1c0",
                 "type": "data",
                 "value": [
                   {
@@ -5721,7 +5793,7 @@
                 ]
               },
               {
-                "key": "tbl-99-r1c1",
+                "key": "tbl-100-r1c1",
                 "type": "data",
                 "value": [
                   {
@@ -5748,10 +5820,10 @@
             ]
           },
           {
-            "key": "tbl-99-r2",
+            "key": "tbl-100-r2",
             "cells": [
               {
-                "key": "tbl-99-r2c0",
+                "key": "tbl-100-r2c0",
                 "type": "data",
                 "value": [
                   {
@@ -5770,7 +5842,7 @@
                 ]
               },
               {
-                "key": "tbl-99-r2c1",
+                "key": "tbl-100-r2c1",
                 "type": "data",
                 "value": [
                   {
@@ -5797,10 +5869,10 @@
             ]
           },
           {
-            "key": "tbl-99-r3",
+            "key": "tbl-100-r3",
             "cells": [
               {
-                "key": "tbl-99-r3c0",
+                "key": "tbl-100-r3c0",
                 "type": "data",
                 "value": [
                   {
@@ -5819,7 +5891,7 @@
                 ]
               },
               {
-                "key": "tbl-99-r3c1",
+                "key": "tbl-100-r3c1",
                 "type": "data",
                 "value": [
                   {
@@ -5846,10 +5918,10 @@
             ]
           },
           {
-            "key": "tbl-99-r4",
+            "key": "tbl-100-r4",
             "cells": [
               {
-                "key": "tbl-99-r4c0",
+                "key": "tbl-100-r4c0",
                 "type": "data",
                 "value": [
                   {
@@ -5868,7 +5940,7 @@
                 ]
               },
               {
-                "key": "tbl-99-r4c1",
+                "key": "tbl-100-r4c1",
                 "type": "data",
                 "value": [
                   {
@@ -5892,10 +5964,10 @@
             ]
           },
           {
-            "key": "tbl-99-r5",
+            "key": "tbl-100-r5",
             "cells": [
               {
-                "key": "tbl-99-r5c0",
+                "key": "tbl-100-r5c0",
                 "type": "data",
                 "value": [
                   {
@@ -5914,7 +5986,7 @@
                 ]
               },
               {
-                "key": "tbl-99-r5c1",
+                "key": "tbl-100-r5c1",
                 "type": "data",
                 "value": [
                   {
@@ -5932,7 +6004,7 @@
         ]
       }
     },
-    "h-100": {
+    "h-101": {
       "@type": "slate",
       "plaintext": "FieldMappingWidget",
       "value": [
@@ -5946,7 +6018,7 @@
         }
       ]
     },
-    "p-101": {
+    "p-102": {
       "@type": "slate",
       "plaintext": "When a parent block has `mappingField` set in its `inheritSchemaFrom` recipe, the admin sidebar shows a widget that lets editors configure field mappings visually:",
       "value": [
@@ -5982,7 +6054,7 @@
         }
       ]
     },
-    "ul-102": {
+    "ul-103": {
       "@type": "slate",
       "plaintext": "Shows the @default source fields (@id, title, description, image) on the left. For each source field, lets the editor pick a field from the selected child type's schema. Auto-detects the conversion type from the target field definition (e.g. object_browser with mode=link → type: \"link\"). Saves the result as fieldMapping (singular) on the block data.",
       "value": [
@@ -6135,7 +6207,7 @@
         }
       ]
     },
-    "p-103": {
+    "p-104": {
       "@type": "slate",
       "plaintext": "The saved `fieldMapping` is read at render time by `expandListingBlocks` — no block registry access needed at render time.",
       "value": [
@@ -6171,7 +6243,7 @@
         }
       ]
     },
-    "h-104": {
+    "h-105": {
       "@type": "slate",
       "plaintext": "HTML Paste Support (TODO)",
       "value": [
@@ -6185,7 +6257,7 @@
         }
       ]
     },
-    "p-105": {
+    "p-106": {
       "@type": "slate",
       "plaintext": "When the editor pastes rich HTML into the page, Hydra will eventually be able to recognise it as a custom block by matching against a CSS selector mapping. The proposed shape:",
       "value": [
@@ -6199,18 +6271,18 @@
         }
       ]
     },
-    "ce-106": {
+    "ce-107": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-106-javascript-9a4450",
+          "@id": "ce-107-javascript-9bb4fe",
           "label": "Javascript",
           "language": "javascript",
           "code": "video: {\n    fieldMappings: {\n        'css:video': { 'src': 'url', 'caption[@class=\"alt\"]': 'alt' },\n    },\n}"
         }
       ]
     },
-    "p-107": {
+    "p-108": {
       "@type": "slate",
       "plaintext": "The `css:<selector>` key in `fieldMappings` matches a pasted HTML element; the value maps element attributes to block fields. Not yet implemented — open question on whether this should run via `htmlTagsToSlate` (bypassing slate conversion) or be encoded into slate so attributes/classes survive.",
       "value": [
@@ -6315,59 +6387,60 @@
       "ce-52",
       "p-53",
       "p-54",
-      "h-55",
-      "p-56",
-      "ul-57",
-      "p-58",
-      "h-59",
-      "p-60",
-      "h-61",
-      "p-62",
-      "ce-63",
-      "h-64",
-      "p-65",
-      "ce-66",
-      "p-67",
-      "ul-68",
-      "p-69",
-      "ul-70",
-      "p-71",
-      "h-72",
-      "p-73",
-      "ce-74",
-      "ul-75",
-      "p-76",
-      "ul-77",
-      "p-78",
-      "ul-79",
-      "p-80",
+      "p-55",
+      "h-56",
+      "p-57",
+      "ul-58",
+      "p-59",
+      "h-60",
+      "p-61",
+      "h-62",
+      "p-63",
+      "ce-64",
+      "h-65",
+      "p-66",
+      "ce-67",
+      "p-68",
+      "ul-69",
+      "p-70",
+      "ul-71",
+      "p-72",
+      "h-73",
+      "p-74",
+      "ce-75",
+      "ul-76",
+      "p-77",
+      "ul-78",
+      "p-79",
+      "ul-80",
       "p-81",
-      "h-82",
-      "p-83",
-      "ce-84",
-      "p-85",
+      "p-82",
+      "h-83",
+      "p-84",
+      "ce-85",
       "p-86",
       "p-87",
       "p-88",
-      "h-89",
-      "ul-90",
-      "h-91",
-      "p-92",
+      "p-89",
+      "h-90",
+      "ul-91",
+      "h-92",
       "p-93",
       "p-94",
-      "h-95",
-      "p-96",
-      "ce-97",
-      "p-98",
-      "tbl-99",
-      "h-100",
-      "p-101",
-      "ul-102",
-      "p-103",
-      "h-104",
-      "p-105",
-      "ce-106",
-      "p-107"
+      "p-95",
+      "h-96",
+      "p-97",
+      "ce-98",
+      "p-99",
+      "tbl-100",
+      "h-101",
+      "p-102",
+      "ul-103",
+      "p-104",
+      "h-105",
+      "p-106",
+      "ce-107",
+      "p-108"
     ]
   }
 }

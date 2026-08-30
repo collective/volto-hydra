@@ -372,9 +372,6 @@ async function renderBlock(blockId, block) {
             wrapper.innerHTML = renderFormBlock(block);
             attachFormValidation(wrapper.querySelector('form'), block);
             break;
-        case 'skiplogicTest':
-            wrapper.innerHTML = renderSkiplogicTestBlock(block);
-            break;
         case 'empty':
             wrapper.innerHTML = renderEmptyBlock(block);
             break;
@@ -2485,25 +2482,6 @@ function renderSlateTableBlock(block) {
 
     html += '</table>';
     return html;
-}
-
-/**
- * Render a Skiplogic Test block.
- * @param {Object} block - Skiplogic test block data
- * @returns {string} HTML string
- */
-function renderSkiplogicTestBlock(block) {
-    const mode = block.mode || 'not set';
-    const columns = block.columns || 1;
-    const title = block.basicTitle || 'Untitled';
-    return `
-        <div class="skiplogic-test-block" style="padding: 16px; border: 1px solid #ccc; background: #f9f9f9;">
-            <h4>Skiplogic Test Block</h4>
-            <p data-skiplogic-mode="${mode}">Mode</p>
-            <p data-skiplogic-columns="${columns}">Columns</p>
-            <p data-edit-text="basicTitle">${title}</p>
-        </div>
-    `;
 }
 
 /**
