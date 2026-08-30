@@ -601,25 +601,6 @@ export const sharedBlocksConfig = {
         loop: { title: 'Loop', type: 'boolean' },
         muted: { title: 'Muted', type: 'boolean' },} } },
     // Code example block: tabbed code display with syntax highlighting
-    // A block whose two fields are rendered in two different hidden places, each
-    // with its own trigger — the shape a component library imposes when it
-    // builds its own chrome (see renderTwoPlacesBlock). It exists to exercise
-    // `data-block-selector="uid#field"`: block-level reveal cannot serve it,
-    // because the block's own element is always visible and one handle is one
-    // click.
-    twoPlaces: {
-        id: 'twoPlaces',
-        title: 'Two Places',
-        group: 'common',
-        blockSchema: {
-            fieldsets: [{ id: 'default', title: 'Default', fields: ['alpha', 'beta'] }],
-            properties: {
-                alpha: { title: 'Alpha', type: 'string' },
-                beta: { title: 'Beta', type: 'string' },
-            },
-            required: [],
-        },
-    },
     codeExample: {
         id: 'codeExample',
         title: 'Code Example',

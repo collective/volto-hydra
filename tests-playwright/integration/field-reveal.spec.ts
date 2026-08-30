@@ -2,106 +2,117 @@ import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 /**
- * A block whose fields are rendered somewhere else, in two DIFFERENT places.
+ * Revealing the place a FIELD is edited, rather than the place a block is.
  *
- * Component libraries impose this shape: the chrome is built in JavaScript,
- * outside the block's markup, and hidden until its own trigger is pressed —
- * while the block's own element, a bar of triggers, stays on screen. Selecting
- * the block reveals nothing, because it was never the thing that was hidden.
+ * A tab is the smallest block whose fields live in two different places, and
+ * only one of them is ever hidden: its `label` sits on the button in the tab
+ * bar, always on screen, while its `code` sits in a panel that is hidden unless
+ * that tab is active. So "is the block visible?" is the wrong question — the
+ * button is visible whatever the panel is doing — and the answer depends on
+ * WHICH field the author reached for.
  *
- * `data-block-selector="uid"` cannot serve it either: one handle is one click,
- * so whichever place it opened, the fields in the other stayed unreachable. The
- * handle has to name the FIELD — `data-block-selector="uid#alpha"` — and the
- * bridge opens the place the sidebar is actually in.
+ * That is what `data-block-selector="uid#fieldName"` says. The tab button now
+ * carries two tokens: the bare uid (reveal the tab, any field — what
+ * tab-reveal.spec.ts covers) and `uid#code` (reveal where the code is edited).
+ * The label needs none: it is on the button already.
  *
- * The `twoPlaces` fixture block is that shape at its smallest: two fields, two
- * hidden panels, two triggers (see renderTwoPlacesBlock).
+ * The reveal is driven by the sidebar. Focusing a field there sends
+ * `FOCUS_FIELD { blockId, fieldName, moveCaret: false }`, and the bridge opens
+ * that field's place only when it is hidden AND something advertises it — so
+ * focusing `label` must open nothing at all, which is the assertion that makes
+ * the other one mean something.
  */
 test.describe('Field reveal', () => {
-  const ALPHA = '#two-places-alpha-split-1';
-  const BETA = '#two-places-beta-split-1';
-
   /** Put the cursor in a sidebar field, the way an author reaching for it does. */
   async function focusSidebarField(page, field: string) {
     const control = page
-      .locator(`#sidebar-properties .field-wrapper-${field} input, ` +
-               `#sidebar-properties .field-wrapper-${field} textarea`)
+      .locator(
+        `#sidebar-properties .field-wrapper-${field} input, ` +
+          `#sidebar-properties .field-wrapper-${field} textarea, ` +
+          `#sidebar-properties .field-wrapper-${field} [contenteditable="true"]`,
+      )
       .first();
     await control.waitFor({ state: 'visible', timeout: 15000 });
+    // Clicked, not `.focus()`ed: it is what an author does, and what raises the
+    // focusin the admin listens for.
     await control.click();
   }
 
-  test('the sidebar field opens the place THAT field is edited', async ({ page }) => {
+  const selectBlock = (page, uid: string) =>
+    page.evaluate((id) => {
+      (document.querySelector('iframe') as HTMLIFrameElement).contentWindow!.postMessage(
+        { type: 'SELECT_BLOCK', uid: id }, '*');
+    }, uid);
+
+  test('focusing a hidden field in the sidebar opens the place it is edited', async ({
+    page,
+  }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
-    await helper.navigateToEdit('/two-places-test-page');
+    await helper.navigateToEdit('/code-example-test-page');
 
     const iframe = helper.getIframe();
-    const alpha = iframe.locator(ALPHA);
-    const beta = iframe.locator(BETA);
+    // tab-js is the active tab; tab-py's panel is hidden.
+    const pyCode = iframe
+      .locator('[data-block-uid="tab-py"]')
+      .locator('[data-edit-text="code"]')
+      .first();
+    await expect(pyCode).toBeAttached({ timeout: 15000 });
+    await expect(pyCode, 'the code starts out of sight').toBeHidden();
 
-    // Both places start closed, and the block itself is on screen the whole
-    // time — which is why asking about the block would reveal nothing.
-    await expect(iframe.locator('.two-places-bar')).toBeVisible({ timeout: 15000 });
-    await expect(alpha).toBeHidden();
-    await expect(beta).toBeHidden();
+    await selectBlock(page, 'tab-py');
+    await expect(page.locator('#sidebar-properties')).toContainText('Code', {
+      timeout: 15000,
+    });
 
-    await page.evaluate((uid) => {
-      (document.querySelector('iframe') as HTMLIFrameElement).contentWindow!.postMessage(
-        { type: 'SELECT_BLOCK', uid }, '*');
-    }, 'split-1');
-    await expect(page.locator('#sidebar-properties')).toContainText('Alpha', { timeout: 15000 });
+    await focusSidebarField(page, 'code');
 
-    // Selecting the block alone leaves both shut: nothing about the selection
-    // says which of the two the author means.
-    await expect(alpha, 'selection alone opens neither place').toBeHidden();
-    await expect(beta).toBeHidden();
-
-    await focusSidebarField(page, 'alpha');
-
-    // The discriminating assertion, and the whole reason the handle names a
-    // field: the place holding THAT field opened, and only that one.
-    await expect(alpha, "the field's own place opened").toBeVisible({ timeout: 10000 });
-    await expect(beta, 'and the other stayed shut').toBeHidden();
+    await expect(
+      pyCode,
+      'the panel holding THAT field opened',
+    ).toBeVisible({ timeout: 10000 });
   });
 
-  test('the other field opens the other place', async ({ page }) => {
+  test('focusing a field that is already on screen opens nothing', async ({
+    page,
+  }) => {
+    // The no-op that makes this safe to send on every sidebar focus — and the
+    // reason the handle names a field rather than the block. A tab's label is on
+    // the button, in plain sight; reaching for it must not go opening panels.
     const helper = new AdminUIHelper(page);
     await helper.login();
-    await helper.navigateToEdit('/two-places-test-page');
+    await helper.navigateToEdit('/code-example-test-page');
 
     const iframe = helper.getIframe();
-    await expect(iframe.locator('.two-places-bar')).toBeVisible({ timeout: 15000 });
+    const pyCode = iframe
+      .locator('[data-block-uid="tab-py"]')
+      .locator('[data-edit-text="code"]')
+      .first();
+    await expect(pyCode).toBeAttached({ timeout: 15000 });
+    await expect(pyCode).toBeHidden();
 
-    await page.evaluate((uid) => {
-      (document.querySelector('iframe') as HTMLIFrameElement).contentWindow!.postMessage(
-        { type: 'SELECT_BLOCK', uid }, '*');
-    }, 'split-1');
-    await expect(page.locator('#sidebar-properties')).toContainText('Beta', { timeout: 15000 });
+    // Select the tab — which reveals it, as selecting a block should (see
+    // tab-reveal.spec.ts) — then switch the canvas back to another tab. The tab
+    // is still the SELECTED block, and its code is hidden again: the state where
+    // "did the reveal fire?" is answerable.
+    await selectBlock(page, 'tab-py');
+    await expect(pyCode).toBeVisible({ timeout: 10000 });
+    await iframe.locator('[data-block-selector~="tab-js"]').first().click();
+    await expect(pyCode, 'the code is out of sight again').toBeHidden({
+      timeout: 10000,
+    });
+    await expect(page.locator('#sidebar-properties')).toContainText('Label', {
+      timeout: 15000,
+    });
 
-    await focusSidebarField(page, 'beta');
+    await focusSidebarField(page, 'label');
 
-    await expect(iframe.locator(BETA)).toBeVisible({ timeout: 10000 });
-    await expect(iframe.locator(ALPHA), 'the first place was never asked for').toBeHidden();
-  });
-
-  test('a field already on screen is left alone', async ({ page }) => {
-    // The reveal is a no-op when there is nothing to reveal — which is what
-    // makes it safe to send on every sidebar focus. Here the title block's own
-    // field is plainly visible, and focusing it must not go clicking triggers.
-    const helper = new AdminUIHelper(page);
-    await helper.login();
-    await helper.navigateToEdit('/two-places-test-page');
-
-    const iframe = helper.getIframe();
-    await expect(iframe.locator('.two-places-bar')).toBeVisible({ timeout: 15000 });
-
-    await page.evaluate((uid) => {
-      (document.querySelector('iframe') as HTMLIFrameElement).contentWindow!.postMessage(
-        { type: 'SELECT_BLOCK', uid }, '*');
-    }, 'title-block');
-
-    await expect(iframe.locator(ALPHA), 'nothing was opened').toBeHidden();
-    await expect(iframe.locator(BETA)).toBeHidden();
+    // Give the message the same room the positive case gets, then assert the
+    // panel is still shut: a reveal that fired late would show up here.
+    await page.waitForTimeout(1500);
+    await expect(
+      pyCode,
+      'the label is already visible, so there was nothing to reveal',
+    ).toBeHidden();
   });
 });

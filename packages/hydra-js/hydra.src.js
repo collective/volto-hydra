@@ -801,10 +801,7 @@ export class Bridge {
         .trim()
         .split(/\s+/)
         .filter(Boolean);
-      const single =
-        advertised.length === 1
-          ? Bridge.uidFromSelectorToken(advertised[0])
-          : null;
+      const single = Bridge.soleUidNamedBy(advertised);
       if (single) {
         // Prefer the handle only when it is NEARER than the uid element, i.e. the
         // uid element is an ancestor of the handle (a container) rather than the
@@ -835,6 +832,27 @@ export class Bridge {
    * `tryMakeBlockVisible`), and for every purpose but choosing which handle to
    * click, it means the same as the bare uid.
    */
+  /**
+   * The one block a selector's tokens name, or undefined if they name several.
+   *
+   * A word list of DIFFERENT uids is a container advertising its children — it
+   * stands in for no single block, and never did. But a handle may now name the
+   * same block twice, once plainly and once by field:
+   *
+   *     data-block-selector="tab-py tab-py#code"
+   *
+   * which is one block said two ways — reveal the tab, and reveal where its code
+   * is edited — so it still stands in for that block. Counting tokens rather
+   * than the blocks they name took the label on such a button away from its tab,
+   * and with it the ability to select the tab at all.
+   */
+  static soleUidNamedBy(tokens) {
+    const uids = new Set(
+      (tokens || []).map((t) => Bridge.uidFromSelectorToken(t)).filter(Boolean),
+    );
+    return uids.size === 1 ? [...uids][0] : undefined;
+  }
+
   static uidFromSelectorToken(token) {
     if (!token || token === '+1' || token === '-1' || token.includes(':')) {
       return undefined;
@@ -851,8 +869,7 @@ export class Bridge {
       .trim()
       .split(/\s+/)
       .filter(Boolean);
-    if (advertised.length !== 1) return undefined;
-    return Bridge.uidFromSelectorToken(advertised[0]);
+    return Bridge.soleUidNamedBy(advertised);
   }
 
   /**
@@ -3275,7 +3292,11 @@ export class Bridge {
     )) {
       const advertised = (handle.getAttribute('data-block-selector') || '').trim().split(/\s+/);
       if (!includeStandIns) continue;
-      if (advertised.length !== 1 || own.includes(handle)) continue;
+      // Naming ONE block is what makes a handle a stand-in for it — but a
+      // handle may name that block twice, plainly and by field
+      // (`tab-py tab-py#code`), which is still one block. Counting tokens
+      // instead of the blocks they name dropped the tab's own label.
+      if (!Bridge.soleUidNamedBy(advertised) || own.includes(handle)) continue;
       // Advertising a uid makes something a TRIGGER, not part of the block: a
       // carousel dot names the slide it scrolls to and holds none of its
       // content. Only an element that carries the block's own editable content

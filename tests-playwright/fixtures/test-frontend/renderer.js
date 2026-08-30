@@ -236,9 +236,6 @@ async function renderBlock(blockId, block) {
         case 'multifield':
             wrapper.innerHTML = renderMultiFieldBlock(block);
             break;
-        case 'twoPlaces':
-            wrapper.innerHTML = renderTwoPlacesBlock(block, blockId);
-            break;
         case 'hero':
             // Hero uses comment syntax instead of data attributes
             // This tests the hydra comment parser with selectors
@@ -658,66 +655,6 @@ function renderTextareaBlock(block) {
  * @param {Object} block - Multi-field block data
  * @returns {string} HTML string
  */
-/**
- * A block whose fields are rendered SOMEWHERE ELSE, in two different places.
- *
- * This is the shape a component library imposes when it builds its own chrome:
- * the design system's cookie consent puts its message in a banner and its
- * category descriptions in a preferences dialog, both created in JavaScript
- * outside the block's markup, both hidden until their own trigger is pressed —
- * while the block's own element, a bar of buttons, is on screen the whole time.
- *
- * That breaks block-level reveal: asking "is the block visible" always answers
- * yes, and a single `data-block-selector="uid"` handle is one click, so it could
- * only ever open one of the two. Each trigger therefore names the FIELD its
- * place holds — `data-block-selector="uid#alpha"` — and the bridge opens the
- * one the sidebar is actually in.
- *
- * The panels sit OUTSIDE the block element (appended to the page, like a dialog
- * appended to `<body>`), which is what makes the field lookup miss them and the
- * reveal necessary.
- */
-function renderTwoPlacesBlock(block, blockId) {
-    const alpha = block.alpha || '';
-    const beta = block.beta || '';
-    const alphaId = `two-places-alpha-${blockId}`;
-    const betaId = `two-places-beta-${blockId}`;
-
-    // The always-visible part: the block's own element is these buttons.
-    let html = '<div class="two-places-bar" style="display: flex; gap: 8px; padding: 8px; background: #eee;">';
-    html += `<button class="two-places-open-alpha" data-block-selector="${blockId}#alpha" data-linkable-allow style="cursor: pointer;">Show alpha</button>`;
-    html += `<button class="two-places-open-beta" data-block-selector="${blockId}#beta" data-linkable-allow style="cursor: pointer;">Show beta</button>`;
-    html += '</div>';
-
-    // The two hidden places. Rendered after the bar and outside the block
-    // element, the way a component appends its own chrome to the document.
-    html += `<div id="${alphaId}" class="two-places-panel" hidden><span data-edit-text="alpha">${alpha}</span></div>`;
-    html += `<div id="${betaId}" class="two-places-panel" hidden><span data-edit-text="beta">${beta}</span></div>`;
-
-    installTwoPlacesTriggers();
-    return html;
-}
-
-/**
- * The component's own reveal behaviour, delegated from the document — the way a
- * design system binds its triggers. The bridge never knows about any of this: it
- * clicks the trigger, and the component does what it does.
- *
- * Installed once; a script tag inside `innerHTML` would never run.
- */
-let twoPlacesTriggersInstalled = false;
-function installTwoPlacesTriggers() {
-    if (twoPlacesTriggersInstalled) return;
-    twoPlacesTriggersInstalled = true;
-    document.addEventListener('click', (event) => {
-        const handle = event.target.closest?.('[data-block-selector*="#"]');
-        if (!handle) return;
-        const [uid, field] = (handle.getAttribute('data-block-selector') || '').split('#');
-        if (!uid || !field) return;
-        document.getElementById(`two-places-${field}-${uid}`)?.removeAttribute('hidden');
-    });
-}
-
 function renderMultiFieldBlock(block) {
     const title = block.title || '';
     const description = block.description || [];
@@ -2153,7 +2090,11 @@ function renderCodeExampleBlock(block, blockId) {
             // whenever the bar is, so selecting an inactive tab would never reveal
             // the code it holds. data-block-selector says "I represent this uid" —
             // the label still edits the tab, and clicking switches to it.
-            html += `<button data-block-selector="${tabId}" data-linkable-allow style="padding: 8px 16px; color: #aaa; background: transparent; border: none; cursor: pointer; font-size: 13px;"><span data-edit-text="label">${tab.label || tab.language || 'Tab'}</span></button>`;
+            // Two tokens: the bare uid reveals the tab (any field), and
+            // `uid#code` says WHERE the code field is edited — the panel this
+            // button opens. The label needs no handle: it is on this button,
+            // already on screen, so a focus in it has nothing to reveal.
+            html += `<button data-block-selector="${tabId} ${tabId}#code" data-linkable-allow style="padding: 8px 16px; color: #aaa; background: transparent; border: none; cursor: pointer; font-size: 13px;"><span data-edit-text="label">${tab.label || tab.language || 'Tab'}</span></button>`;
         });
         html += '</div>';
     }
@@ -2821,7 +2762,12 @@ if (typeof window !== 'undefined' && window.matchMedia) {
 document.addEventListener('click', (event) => {
     const button = event.target.closest('[data-tab-bar] button[data-block-selector]');
     if (!button) return;
-    const uid = button.getAttribute('data-block-selector');
+    // The FIRST token, not the whole attribute: a handle may name its block
+    // twice — plainly and by field (`tab-py tab-py#code`) — and comparing the
+    // raw attribute to a uid then matches no panel at all.
+    const uid = (button.getAttribute('data-block-selector') || '')
+        .trim()
+        .split(/\s+/)[0];
     const bar = button.closest('[data-tab-bar]');
     const container = bar?.parentElement;
     if (!container) return;
