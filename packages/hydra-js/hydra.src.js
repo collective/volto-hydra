@@ -11684,18 +11684,28 @@ export class Bridge {
     // The field handle is preferred when the caller says which field it is
     // after, and the plain one remains the fallback — so nothing that exists
     // today changes.
-    const directCandidate =
-      (fieldName &&
-        document.querySelector(
-          `[data-block-selector~="${targetUid}#${fieldName}"]`,
-        )) ||
-      document.querySelector(`[data-block-selector~="${targetUid}"]`);
+    // Every element that advertises the field, then every one that advertises
+    // the block — in that order of preference, but ALL of them: a place a field
+    // is edited may advertise itself as well as being opened by a trigger
+    // elsewhere (the cookie-consent banner does exactly that, so that the
+    // wording inside it belongs to a block at all). Taking only the first match
+    // in document order would then hand back the hidden half and give up.
+    const candidates = [
+      ...(fieldName
+        ? document.querySelectorAll(
+            `[data-block-selector~="${targetUid}#${fieldName}"]`,
+          )
+        : []),
+      ...document.querySelectorAll(`[data-block-selector~="${targetUid}"]`),
+    ];
+    const directCandidate = candidates[0] || null;
     // A handle that is itself hidden — inside a container that is still closed —
     // cannot be used yet: clicking it opens ITS container while the outer one
-    // stays shut, so the target never appears. Fall through to the ancestor walk
-    // and open from the outside in; this handle becomes usable on a later pass.
+    // stays shut, so the target never appears. Use the first one that IS
+    // reachable; if none is, fall through to the ancestor walk and open from the
+    // outside in, and these become usable on a later pass.
     const directSelector =
-      directCandidate && !this.isElementHidden(directCandidate) ? directCandidate : null;
+      candidates.find((el) => !this.isElementHidden(el)) || null;
     if (directCandidate && !directSelector) {
       log(`tryMakeBlockVisible: handle for ${targetUid} is itself hidden, opening its ancestors first`);
     }

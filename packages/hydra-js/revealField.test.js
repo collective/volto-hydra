@@ -1,3 +1,4 @@
+import { JSDOM } from 'jsdom';
 import { Bridge } from './hydra.src.js';
 
 /**
@@ -107,5 +108,64 @@ describe('revealFieldPlace — asks about the FIELD', () => {
     expect(bridge.revealFieldPlace('block-1', undefined)).toBe(false);
     expect(bridge.revealFieldPlace(undefined, 'message')).toBe(false);
     expect(calls).toEqual([]);
+  });
+});
+
+/**
+ * Which handle gets clicked when SEVERAL name the same field.
+ *
+ * The place a field is edited may advertise itself as well as being opened by a
+ * trigger somewhere else. The cookie-consent banner has to: it sits outside the
+ * block's element, so without `data-block-selector="uid#message"` on the banner
+ * the wording inside it belongs to no block and cannot be edited at all.
+ *
+ * That leaves two elements carrying the same token — and the one in the DOM
+ * first is the hidden half, which is exactly the thing that needs opening.
+ * Clicking it would do nothing, so the bridge takes the first handle that is
+ * ON SCREEN and only falls through to the ancestor walk if none is.
+ */
+describe('tryMakeBlockVisible — the handle that can actually be clicked', () => {
+  /** A page where the hidden half advertises the field before its trigger does. */
+  const page = () => {
+    const { window } = new JSDOM(`<!DOCTYPE html>
+      <div class="cookie-banner" data-block-selector="cc-1#message" data-name="half"></div>
+      <div data-block-uid="cc-1">
+        <button data-block-selector="cc-1#message" data-name="trigger"></button>
+      </div>`);
+    return window.document;
+  };
+
+  /** A bridge with only the parts this decision touches. */
+  const bridgeOn = (document) => {
+    const clicked = [];
+    const bridge = Object.assign(Object.create(Bridge.prototype), {
+      blockPathMap: {},
+      isElementHidden: (el) => el.getAttribute('data-name') === 'half',
+      queryBlockElement: (uid) => document.querySelector(`[data-block-uid="${uid}"]`),
+      elementIsVisibleInViewport: () => true,
+      scrollBlockIntoView: () => {},
+    });
+    for (const el of document.querySelectorAll('[data-block-selector]')) {
+      el.click = () => clicked.push(el.getAttribute('data-name'));
+    }
+    return { bridge, clicked };
+  };
+
+  test('the visible trigger is clicked, not the hidden half it opens', () => {
+    const document = page();
+    const previous = globalThis.document;
+    const previousRaf = globalThis.requestAnimationFrame;
+    globalThis.document = document;
+    // The bridge polls for the target appearing on the next frame; this test is
+    // about WHICH handle it clicked, so the poll is a no-op here.
+    globalThis.requestAnimationFrame = () => 0;
+    try {
+      const { bridge, clicked } = bridgeOn(document);
+      bridge.tryMakeBlockVisible('cc-1', 0, 'message');
+      expect(clicked).toEqual(['trigger']);
+    } finally {
+      globalThis.document = previous;
+      globalThis.requestAnimationFrame = previousRaf;
+    }
   });
 });
