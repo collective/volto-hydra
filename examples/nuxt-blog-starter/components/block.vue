@@ -846,6 +846,9 @@
   <!-- Code example block: tabbed code with syntax highlighting -->
   <CodeExample v-else-if="block['@type'] == 'codeExample'" :block_uid="block_uid" :block="block" />
 
+  <!-- Cookie consent: a bar, plus two halves built outside the block's element -->
+  <CookieConsent v-else-if="block['@type'] == 'cookieConsent'" :block_uid="block_uid" :block="block" />
+
   <!-- Empty block - placeholder for deleted blocks in containers -->
   <div v-else-if="block['@type'] == 'empty'" :data-block-uid="block_uid" class="empty-block min-h-[60px]">
   </div>

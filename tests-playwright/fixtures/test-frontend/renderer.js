@@ -381,6 +381,12 @@ async function renderBlock(blockId, block) {
         case 'codeExample':
             wrapper.innerHTML = renderCodeExampleBlock(block, blockId);
             break;
+        case 'cookieConsent':
+            // The bar is the block's element; the banner and the preferences
+            // dialog it words are built OUTSIDE it (see renderCookieConsentBar).
+            wrapper.innerHTML = renderCookieConsentBar(block, blockId);
+            mountCookieConsentChrome(block, blockId);
+            break;
         case 'title':
             // Title block is just rendered by page title, empty here
             wrapper.innerHTML = '';
@@ -2067,6 +2073,84 @@ async function renderSliderBlock(block, blockId) {
 
     html += '</div>';
     return html;
+}
+
+/**
+ * Cookie consent: one block drawn in three places, two of them hidden.
+ *
+ * The bar is the block's own element (it carries data-block-uid, and is always
+ * on screen). The wording an author writes is read somewhere else entirely: the
+ * `message` in a banner and the `analyticsPurpose` beside a tick box in a
+ * preferences dialog, both built into <body> — which is where a design system's
+ * own JavaScript puts them — and both hidden until their trigger is pressed.
+ *
+ * So "is the block visible?" answers nothing here, and one handle cannot serve
+ * two halves: each trigger names the FIELD its half holds, and the bridge opens
+ * the half whose field the author reached for in the sidebar.
+ *
+ * @param {Object} block - Cookie consent block data
+ * @param {string} blockId - Block ID
+ * @returns {string} HTML string
+ */
+function renderCookieConsentBar(block, blockId) {
+    return (
+        '<div class="cookie-consent-bar" style="display: flex; gap: 12px; align-items: center; padding: 8px 12px; background: #f4f4f6; border: 1px solid #ddd;">' +
+        '<strong>Cookie consent</strong>' +
+        `<button type="button" data-block-selector="${blockId}#message" data-linkable-allow data-cookie-open="banner">Show the banner</button>` +
+        `<button type="button" data-block-selector="${blockId}#analyticsPurpose" data-linkable-allow data-cookie-open="dialog">Show cookie preferences</button>` +
+        '</div>'
+    );
+}
+
+/**
+ * Build (or rebuild) the two halves outside the block's element, and wire the
+ * bar's triggers to them. Kept idempotent per uid: renderBlock runs again on
+ * every change, and a second banner would mean a second data-edit-text="message".
+ * @param {Object} block - Cookie consent block data
+ * @param {string} blockId - Block ID
+ */
+function mountCookieConsentChrome(block, blockId) {
+    document
+        .querySelectorAll(`[data-cookie-chrome="${blockId}"]`)
+        .forEach((el) => el.remove());
+
+    let messageHtml = '';
+    (block.message || []).forEach((node) => {
+        const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
+        messageHtml += `<p data-edit-text="message"${nodeIdAttr}>${renderChildren(node.children)}</p>`;
+    });
+
+    const banner = document.createElement('div');
+    banner.setAttribute('data-cookie-chrome', blockId);
+    banner.className = 'cookie-banner';
+    banner.hidden = true;
+    banner.innerHTML = messageHtml + '<button type="button" data-cookie-close>Accept all</button>';
+
+    const dialog = document.createElement('div');
+    dialog.setAttribute('data-cookie-chrome', blockId);
+    dialog.className = 'cookie-dialog';
+    dialog.hidden = true;
+    dialog.innerHTML =
+        '<h2>Manage cookie preferences</h2>' +
+        '<label><input type="checkbox" name="analytics"> Analytics</label>' +
+        `<p data-edit-text="analyticsPurpose">${escapeHtml(block.analyticsPurpose || '')}</p>` +
+        '<button type="button" data-cookie-close>Save</button>';
+
+    document.body.appendChild(banner);
+    document.body.appendChild(dialog);
+
+    document.addEventListener('click', (e) => {
+        const opener = e.target.closest(`[data-block-uid="${blockId}"] [data-cookie-open]`);
+        if (opener) {
+            const half = opener.getAttribute('data-cookie-open') === 'banner' ? banner : dialog;
+            half.hidden = false;
+            return;
+        }
+        const closer = e.target.closest('[data-cookie-close]');
+        if (closer && closer.parentElement.getAttribute('data-cookie-chrome') === blockId) {
+            closer.parentElement.hidden = true;
+        }
+    });
 }
 
 /**
