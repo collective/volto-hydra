@@ -4,9 +4,9 @@
 
     The block's own element is the bar; its `message` is read in a BANNER at the
     foot of the page and its `analyticsPurpose` beside a tick box in a
-    PREFERENCES DIALOG. Both are teleported to <body> — where a design system's
-    own JavaScript would put them — and both are hidden until their trigger is
-    pressed. So "is the block visible?" is the wrong question, and each trigger
+    PREFERENCES DIALOG. Both sit OUTSIDE the block's element — a real frontend
+    usually teleports them to <body>, where a design system's own JavaScript
+    puts them — and both are hidden until their trigger is pressed. So "is the block visible?" is the wrong question, and each trigger
     names the FIELD its half holds instead.
   -->
   <div class="cookie-consent">

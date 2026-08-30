@@ -4,6 +4,8 @@ A consent banner and a preferences dialog, written by one block. It is the worke
 
 This is a **custom** block — register it via `initBridge`.
 
+**Demonstrates:** [Rendering Containers in Your Frontend](../container-blocks.md#rendering-containers-in-your-frontend) — where the handle syntax, and the rest of `data-block-selector`, is specified.
+
 ## Why this block needs field-grained handles
 
 Most blocks are somewhere. This one is in three places at once:
@@ -11,8 +13,8 @@ Most blocks are somewhere. This one is in three places at once:
 | what | where it lives | on screen? |
 |---|---|---|
 | the bar | where the block renders | always |
-| the **banner**, holding `message` | portalled to `<body>` | until the visitor chooses |
-| the **preferences dialog**, holding `analyticsPurpose` | portalled to `<body>` | only when opened |
+| the **banner**, holding `message` | outside the block's element, usually portalled to `<body>` | until the visitor chooses |
+| the **preferences dialog**, holding `analyticsPurpose` | outside the block's element, usually portalled to `<body>` | only when opened |
 
 Two consequences follow, and they are the whole lesson:
 
@@ -111,24 +113,24 @@ The editable text is annotated **where it is read** — inside the banner and in
 // Cookie consent is the everyday case for `data-block-selector="uid#field"`.
 // The block's own element is a bar; its `message` is read in a BANNER at the
 // foot of the page, and its `analyticsPurpose` beside a tick box inside a
-// PREFERENCES DIALOG. Both are portalled to <body> — which is where a design
-// system's own JavaScript puts them too — and both are hidden until their
-// trigger is pressed.
+// PREFERENCES DIALOG. Both sit OUTSIDE the block's element — a real frontend
+// usually portals them to <body>, which is where a design system's own
+// JavaScript puts them — and both are hidden until their trigger is pressed.
 //
 // So "is the block visible?" is the wrong question: the bar is always visible,
 // and neither half of what an author writes is. Each trigger therefore names
-// the FIELD its half holds, and the bridge opens the half whose field the author
-// reached for in the sidebar.
+// the FIELD its half holds, and the bridge opens the half whose field the
+// author reached for in the sidebar.
 function CookieConsentBlock({ block }) {
   const uid = block['@uid'];
   const [showBanner, setShowBanner] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
 
   return (
-    <div data-block-uid={uid} className="cookie-consent">
+    <>
       {/* The block's own element: always on screen, and the way back to two
           halves a visitor may already have dismissed. */}
-      <div className="cookie-consent__bar">
+      <div data-block-uid={uid} className="cookie-consent__bar">
         <strong>Cookie consent</strong>
         <button
           type="button"
@@ -152,36 +154,29 @@ function CookieConsentBlock({ block }) {
         </button>
       </div>
 
-      {/* Both halves live outside this block's DOM, so their editable text is
-          annotated where it is READ rather than where the block renders. */}
-      {createPortal(
-        <div className="cookie-banner" hidden={!showBanner} role="alert">
-          <p data-edit-text="message">{slateToText(block.message)}</p>
-          <button type="button" onClick={() => setShowBanner(false)}>
-            Accept all
-          </button>
-          <button type="button" onClick={() => setShowDialog(true)}>
-            Manage preferences
-          </button>
-        </div>,
-        document.body,
-      )}
+      {/* Outside the block's element, and annotated where the text is READ. */}
+      <div className="cookie-banner" hidden={!showBanner} role="alert">
+        <p data-edit-text="message">{slateToText(block.message)}</p>
+        <button type="button" onClick={() => setShowBanner(false)}>
+          Accept all
+        </button>
+        <button type="button" onClick={() => setShowDialog(true)}>
+          Manage preferences
+        </button>
+      </div>
 
-      {createPortal(
-        <div className="cookie-dialog" hidden={!showDialog} role="dialog">
-          <h2>Manage cookie preferences</h2>
-          <label>
-            <input type="checkbox" name="analytics" />
-            Analytics
-          </label>
-          <p data-edit-text="analyticsPurpose">{block.analyticsPurpose}</p>
-          <button type="button" onClick={() => setShowDialog(false)}>
-            Save
-          </button>
-        </div>,
-        document.body,
-      )}
-    </div>
+      <div className="cookie-dialog" hidden={!showDialog} role="dialog">
+        <h2>Manage cookie preferences</h2>
+        <label>
+          <input type="checkbox" name="analytics" />
+          Analytics
+        </label>
+        <p data-edit-text="analyticsPurpose">{block.analyticsPurpose}</p>
+        <button type="button" onClick={() => setShowDialog(false)}>
+          Save
+        </button>
+      </div>
+    </>
   );
 }
 
@@ -205,13 +200,13 @@ function slateToText(value) {
 
     The block's own element is the bar; its `message` is read in a BANNER at the
     foot of the page and its `analyticsPurpose` beside a tick box in a
-    PREFERENCES DIALOG. Both are teleported to <body> — where a design system's
-    own JavaScript would put them — and both are hidden until their trigger is
-    pressed. So "is the block visible?" is the wrong question, and each trigger
+    PREFERENCES DIALOG. Both sit OUTSIDE the block's element — a real frontend
+    usually teleports them to <body>, where a design system's own JavaScript
+    puts them — and both are hidden until their trigger is pressed. So "is the block visible?" is the wrong question, and each trigger
     names the FIELD its half holds instead.
   -->
-  <div :data-block-uid="block['@uid']" class="cookie-consent">
-    <div class="cookie-consent__bar">
+  <div class="cookie-consent">
+    <div :data-block-uid="block['@uid']" class="cookie-consent__bar">
       <strong>Cookie consent</strong>
       <!-- "I reveal where `message` is edited": focusing Banner message in the
            sidebar makes the bridge click this, so the banner is on screen while
@@ -227,8 +222,10 @@ function slateToText(value) {
     </div>
 
     <!-- Both halves live outside this block's DOM, so their editable text is
-         annotated where it is READ. -->
-    <Teleport to="body">
+         annotated where it is READ. A real frontend often teleports these to
+         <body>, where a design system's own JavaScript puts them; sibling
+         elements are the same thing as far as the bridge is concerned — outside
+         the block's element, and hidden. -->
       <div class="cookie-banner" :hidden="!showBanner" role="alert">
         <p data-edit-text="message">{{ slateToText(block.message) }}</p>
         <button type="button" @click="showBanner = false">Accept all</button>
@@ -240,7 +237,6 @@ function slateToText(value) {
         <p data-edit-text="analyticsPurpose">{{ block.analyticsPurpose }}</p>
         <button type="button" @click="showDialog = false">Save</button>
       </div>
-    </Teleport>
   </div>
 </template>
 

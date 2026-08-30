@@ -85,6 +85,7 @@ accordion
 button
 columns
 contextNavigation
+cookie-consent
 form
 grid
 heading
