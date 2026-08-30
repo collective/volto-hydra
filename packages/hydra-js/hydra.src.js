@@ -909,19 +909,12 @@ export class Bridge {
     const add = (el) => {
       if (el && !found.includes(el)) found.push(el);
     };
-    // The block's own drawing: `collectBlockFields` already walks every element
-    // carrying the uid, skips what belongs to a nested block, and drops
-    // readonly content. This is that walk, kept as text fields in order.
+    // `collectBlockFields` is the walk: every element carrying the uid AND
+    // every element that stands in for the block, minus what belongs to a
+    // nested block or is readonly. This is that walk, as text fields, in order.
     this.collectBlockFields(blockElement, 'data-edit-text', (el, name) => {
       if (fieldName === null || name === fieldName) add(el);
     });
-    // Then what stands in for it, which that walk cannot see.
-    for (const field of this.fieldsOnHandlesFor(
-      blockElement.getAttribute('data-block-uid'),
-      fieldName,
-    )) {
-      add(field);
-    }
     return found;
   }
 
@@ -988,6 +981,19 @@ export class Bridge {
           }
         }
       }
+      // Fields drawn on something that stands in for the block — the same
+      // elements `collectBlockFields` reaches, and for the same reason: this
+      // list is what the admin reads to decide what a block is made of.
+      for (const [attr, type] of Object.entries(ATTR_TO_TYPE)) {
+        for (const node of this.fieldsOnHandlesFor(blockUid, { attr })) {
+          const fieldName = node.getAttribute(attr);
+          const key = `${attr}:${fieldName}`;
+          if (fieldName && !seen.has(key)) {
+            seen.add(key);
+            fields.push({ fieldName, type });
+          }
+        }
+      }
       if (fields.length) result[blockUid] = fields;
     }
     return result;
@@ -1002,6 +1008,29 @@ export class Bridge {
    */
   getOwnFirstEditableField(blockElement) {
     return this.editableFieldsOf(blockElement)[0] || null;
+  }
+
+  /**
+   * Where a field of this block is edited, whatever KIND of field it is — text,
+   * link or media. A field's place can be hidden or drawn elsewhere regardless
+   * of which picker it opens, so anything asking "is this field reachable?"
+   * needs an answer that does not assume text.
+   *
+   * @param {HTMLElement} blockElement - Any element of the block
+   * @param {string} fieldName - The field name to find
+   * @returns {HTMLElement|null} The element, or null if the block has no such field
+   */
+  editableElementFor(blockElement, fieldName) {
+    const text = this.getEditableFieldByName(blockElement, fieldName);
+    if (text) return text;
+    const uid = blockElement?.getAttribute?.('data-block-uid');
+    for (const attr of ['data-edit-link', 'data-edit-media']) {
+      const own = blockElement?.querySelector?.(`[${attr}="${fieldName}"]`);
+      if (own) return own;
+      const onHandle = this.fieldsOnHandlesFor(uid, { attr, fieldName })[0];
+      if (onHandle) return onHandle;
+    }
+    return null;
   }
 
   /**
@@ -1084,6 +1113,20 @@ export class Bridge {
           }
         }
       }
+    }
+
+    // And the elements that stand in for the block rather than being it. A
+    // field can be drawn anywhere the frontend says the block is: a tab's label
+    // on the button that reveals its panel, a cookie banner the design system
+    // builds into `<body>`. They say so with `data-block-selector`, and that is
+    // as true of a link or an image as of text — so this walk, which every
+    // field kind goes through, is where it belongs. Without it a field drawn
+    // outside the block's own element is invisible to everything downstream:
+    // the editor's field list, the admin's merge decisions, block sanity.
+    for (const field of this.fieldsOnHandlesFor(blockUid, { attr: attrName })) {
+      if (field.closest('[data-block-readonly]')) continue;
+      const fieldName = field.getAttribute(attrName);
+      if (fieldName) processor(field, fieldName, results);
     }
     return results;
   }
@@ -11671,8 +11714,11 @@ export class Bridge {
     // hydra's own integration tests failed on it.
     if (!this.fieldHandleFor(blockId, fieldName)) return false;
     const blockElement = this.queryBlockElement(blockId);
+    // Any kind of field: an image or a link can sit in the half a trigger opens
+    // just as a paragraph can, and the sidebar focus that asks for this reveal
+    // does not care which picker the field opens.
     const fieldElement =
-      blockElement && this.getEditableFieldByName(blockElement, fieldName);
+      blockElement && this.editableElementFor(blockElement, fieldName);
     if (fieldElement && !this.isElementHidden(fieldElement)) return false;
     return this.tryMakeBlockVisible(blockId, 0, fieldName);
   }
@@ -11697,25 +11743,27 @@ export class Bridge {
   }
 
   /**
-   * The block's editable fields that live on a handle rather than inside the
+   * The block's editable elements that live on a handle rather than inside the
    * block's own element — a tab's label on the button that reveals its panel,
-   * the wording of a cookie banner built elsewhere on the page. Pass a
-   * `fieldName` to ask for one.
+   * the wording of a cookie banner the design system builds into `<body>`.
+   *
+   * Any kind of field, not just text: a link or an image can be drawn in the
+   * same place, and `attr` says which annotation to look for. Pass a
+   * `fieldName` to ask for one field.
    *
    * The handle's OWN text counts by virtue of advertising the uid (an accordion
    * header carrying both attributes IS the panel's title, and may advertise its
    * children as well); anything nested inside is only this block's if it
    * resolves to it.
    */
-  fieldsOnHandlesFor(uid, fieldName = null) {
+  fieldsOnHandlesFor(uid, { attr = 'data-edit-text', fieldName = null } = {}) {
     const found = [];
-    const wanted = (el) =>
-      fieldName === null || el.getAttribute('data-edit-text') === fieldName;
+    const wanted = (el) => fieldName === null || el.getAttribute(attr) === fieldName;
     for (const handle of this.handlesFor(uid)) {
-      if (handle.hasAttribute('data-edit-text') && wanted(handle) && !found.includes(handle)) {
+      if (handle.hasAttribute(attr) && wanted(handle) && !found.includes(handle)) {
         found.push(handle);
       }
-      for (const field of handle.querySelectorAll('[data-edit-text]')) {
+      for (const field of handle.querySelectorAll(`[${attr}]`)) {
         if (!wanted(field) || found.includes(field)) continue;
         if (this.owningBlockUid(field) === uid) found.push(field);
       }
@@ -11811,9 +11859,19 @@ export class Bridge {
       let parentUid = this.blockPathMap?.[targetUid]?.parentId;
       while (parentUid && !seen.has(parentUid)) {
         seen.add(parentUid);
-        const handle = document.querySelector(
-          `[data-block-selector~="${parentUid}"]`,
-        );
+        // A handle naming the ancestor's REGION counts as naming what is in it:
+        // `uid#field` says where that field is edited, and when the field is a
+        // region — a blocks_layout or an object_list — the blocks inside it are
+        // edited exactly there. A container publishes one handle for the region
+        // rather than enumerating children it cannot know in advance, and the
+        // bare-uid form still works for a container that reveals everything.
+        const childRegion = this.blockPathMap?.[childUid]?.region;
+        const handle =
+          (childRegion &&
+            document.querySelector(
+              `[data-block-selector~="${parentUid}#${childRegion}"]`,
+            )) ||
+          document.querySelector(`[data-block-selector~="${parentUid}"]`);
         if (handle) handles.push({ uid: parentUid, handle, child: childUid });
         childUid = parentUid;
         parentUid = this.blockPathMap?.[parentUid]?.parentId;

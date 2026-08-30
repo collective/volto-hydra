@@ -2233,6 +2233,18 @@ function renderSlideBlock(block) {
     }
     html += `<h4 data-edit-text="title" style="margin: 0 0 8px 0;">${title}</h4>`;
     html += `<p data-edit-text="description" style="margin: 0; color: #666;">${description}</p>`;
+    // The slide's own link. Its `href` is a field of the SLIDE, so it needs an
+    // annotation on the slide's own markup: a teaser nested inside a slide has
+    // an `href` of its own, and borrowing that one would put an author's edit
+    // in the wrong block.
+    if (!block.hideButton) {
+        const slideHref = getLinkUrl(block.href);
+        // The label is annotated inside the link, and the link carries NO
+        // `data-linkable-allow`: with it, a click navigates and tears the editor
+        // down before an edit can happen, which is why an annotation inside such
+        // an anchor is refused. Without it the click is the editor's.
+        html += `<a href="${slideHref || '#'}" data-edit-link="href" style="display: inline-block; margin-top: 8px; color: #007eb1;"><span data-edit-text="buttonText">${escapeHtml(block.buttonText || 'Read more')}</span></a>`;
+    }
 
     return html;
 }

@@ -8,7 +8,7 @@
  *   { hero: { blockSchema: { properties: { ... } } }, slider: { ... } }
  */
 import { expect } from '@playwright/test';
-import type { Page, FrameLocator, Locator } from '@playwright/test';
+import type { Page, FrameLocator, Locator, ElementHandle } from '@playwright/test';
 import { AdminUIHelper } from './AdminUIHelper';
 import { recordSlateFieldContainer, recordFieldEditable } from './field-coverage';
 
@@ -546,27 +546,152 @@ function slateEqualIgnoringIds(a: unknown, b: unknown): boolean {
  * Values are normalised for the leading slash some renderers emit
  * (`data-edit-media="/image"`).
  */
-async function annotationsOn(
-  block: Locator,
-): Promise<Record<string, Set<string>>> {
-  const raw = await block.evaluate((el) => {
+/**
+ * The annotation a schema field is edited through, if any. `image` /
+ * `object_browser` say what kind of picker the field wants; text and textarea
+ * are deliberately absent (an image's `alt` is a sidebar attribute, and a
+ * textarea is not uniformly canvas content).
+ */
+function annotationFor(
+  prop: Record<string, unknown>,
+): { kind: 'text' | 'media' | 'link'; attr: string } | null {
+  const w = prop?.widget;
+  const mode = (prop as { mode?: string })?.mode;
+  if (w === 'image' || (w === 'object_browser' && mode === 'image'))
+    return { kind: 'media', attr: 'data-edit-media' };
+  if (w === 'object_browser' && mode === 'link')
+    return { kind: 'link', attr: 'data-edit-link' };
+  return null;
+}
+
+/** One annotated element: which attribute declares it, which field, and where. */
+interface EditableField {
+  attr: string;
+  field: string;
+  element: ElementHandle<Element>;
+}
+
+/**
+ * Every field of this block that is editable on the canvas, WITH the element it
+ * is edited in — one search, for every kind at once.
+ *
+ * Two things it does that a descendant query cannot:
+ *
+ *   - it asks the BRIDGE for fields drawn where the block ISN'T. A tab's label
+ *     sits on the button that reveals its panel; the wording of a cookie banner
+ *     sits wherever the design system built it. Those elements say which block
+ *     they belong to (`data-block-selector="uid#field"`), and that is as true of
+ *     a link or a picture as it is of text.
+ *   - it returns the ELEMENT, so a caller with a further question about a field
+ *     — the slate round-trip is the only one — asks it of what was found here
+ *     rather than searching again and risking a different answer.
+ */
+async function editableFieldsIn(block: Locator): Promise<EditableField[]> {
+  const collected = await block.evaluateHandle((el) => {
     const attrs = ['data-edit-text', 'data-edit-media', 'data-edit-link'];
+    const bridge = (window as unknown as { __hydraBridge?: any }).__hydraBridge;
     const strip = (v: string | null) => (v || '').replace(/^\//, '');
-    const out: Record<string, string[]> = {};
-    for (const attr of attrs) {
-      const found: string[] = [];
-      if (el.hasAttribute(attr)) found.push(strip(el.getAttribute(attr)));
-      for (const d of Array.from(el.querySelectorAll(`[${attr}]`))) {
-        found.push(strip(d.getAttribute(attr)));
+    const out: Array<{ attr: string; field: string; el: Element }> = [];
+    const add = (node: Element, attr: string, name: string) => {
+      const field = strip(name);
+      if (field && !out.some((o) => o.el === node && o.attr === attr)) {
+        out.push({ attr, field, el: node });
       }
-      out[attr] = found;
+    };
+    for (const attr of attrs) {
+      if (bridge?.collectBlockFields) {
+        // The BRIDGE's own walk, not a second one: every element carrying the
+        // uid (a block can be several), what stands in for the block, minus
+        // what belongs to a nested block or is marked readonly. Asking it is
+        // the point — a check that re-derives "the block's fields" can pass
+        // while the editor disagrees, which is the failure it exists to catch.
+        bridge.collectBlockFields(el, attr, (node: Element, name: string) => add(node, attr, name));
+      } else {
+        // No bridge (a plain-DOM harness): the block's own subtree is all there
+        // is to go on.
+        if (el.hasAttribute(attr)) add(el, attr, el.getAttribute(attr) ?? '');
+        for (const d of Array.from(el.querySelectorAll(`[${attr}]`))) {
+          add(d, attr, d.getAttribute(attr) ?? '');
+        }
+      }
     }
     return out;
   });
-  return Object.fromEntries(
-    Object.entries(raw).map(([attr, values]) => [attr, new Set(values)]),
-  );
+
+  const found: EditableField[] = [];
+  for (const item of (await collected.getProperties()).values()) {
+    const { attr, field } = await item.evaluate(
+      (o: { attr: string; field: string }) => ({ attr: o.attr, field: o.field }),
+    );
+    const element = (await item.getProperty('el')).asElement();
+    if (element) found.push({ attr, field, element });
+  }
+  return found;
 }
+
+/** The found fields as `{ attribute: Set<fieldName> }`, for presence questions. */
+function namesByAttr(found: EditableField[]): Record<string, Set<string>> {
+  const out: Record<string, Set<string>> = {
+    'data-edit-text': new Set(),
+    'data-edit-media': new Set(),
+    'data-edit-link': new Set(),
+  };
+  for (const f of found) out[f.attr]?.add(f.field);
+  return out;
+}
+
+/**
+ * Ask for what is expected but not there, ONCE for the whole block, the way the
+ * editor asks: `revealFieldPlace` — the same call the sidebar makes when an
+ * author's cursor lands in a field, which opens the half that field is edited
+ * in. Any kind of field: a picture or a link can sit in a collapsed panel as
+ * easily as a paragraph.
+ *
+ * It is opt-in at the bridge (nothing happens unless something advertises
+ * `uid#field`), so a block that draws all its fields itself pays one call and
+ * moves on. Then wait for the ask to land — a component that builds its own
+ * markup rebuilds it a beat later — and read again.
+ */
+async function settleAnnotations(
+  block: Locator,
+  found: EditableField[],
+  expected: Array<[string, string]>,
+  settleMs = 3000,
+): Promise<EditableField[]> {
+  const present = namesByAttr(found);
+  const missing = expected.filter(([attr, field]) => !present[attr]?.has(field));
+  if (!missing.length) return found;
+
+  const asked = await block.evaluate(
+    async (el, args) => {
+      const { wanted, settle } = args as { wanted: Array<[string, string]>; settle: number };
+      const bridge = (window as unknown as { __hydraBridge?: any }).__hydraBridge;
+      const uid = el.getAttribute('data-block-uid');
+      // Nothing advertises these fields → nothing to reveal, and nothing that
+      // could arrive later either. Say so rather than spending the block's test
+      // budget waiting (a container multiplies that by every child).
+      const revealed = wanted
+        .map(([, field]) => bridge?.revealFieldPlace?.(uid, field) ?? false)
+        .some(Boolean);
+      if (!revealed) return false;
+
+      const arrived = () =>
+        wanted.every(([attr, field]) => {
+          if (el.querySelector(`[${attr}="${field}"]`)) return true;
+          const onHandles = bridge?.fieldsOnHandlesFor?.(uid, { attr, fieldName: field }) ?? [];
+          return onHandles.length > 0;
+        });
+      for (let waited = 0; !arrived() && waited < settle; waited += 100) {
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      return true;
+    },
+    { wanted: missing, settle: settleMs },
+  ).catch(() => false);
+
+  return asked ? editableFieldsIn(block) : found;
+}
+
 
 /**
  * The fields this block would REVEAL — i.e. the ones that are empty and have an
@@ -655,11 +780,25 @@ export async function checkSlateAnnotations(
   const blockType = (blockData?.['@type'] as string | undefined) ?? '(unknown)';
   const coverageUid = (await block.getAttribute('data-block-uid')) ?? '(no uid)';
 
-  // One read of every annotation on the block (see annotationsOn), then the
+  // ONE search for the block's editable fields (see editableFieldsIn), then the
   // per-field questions are set lookups. Anything absent may simply be an empty
   // optional field, which renders no element until the editor reveals it
   // (#296), so the misses go to a single reveal press below.
-  const present = await annotationsOn(block);
+  // What this block SHOULD be able to edit on the canvas — slate fields plus the
+  // media/link fields their widgets ask for. Gathered before either loop so the
+  // one settle below covers every kind.
+  const annotatedFields: Array<[string, { kind: 'text' | 'media' | 'link'; attr: string }, unknown]> = [];
+  for (const [field, prop] of Object.entries(blockSchema?.properties ?? {})) {
+    const a = annotationFor(prop as Record<string, unknown>);
+    if (a) annotatedFields.push([field, a, prop]);
+  }
+  const expected: Array<[string, string]> = [
+    ...slateFields.map((f) => ['data-edit-text', f] as [string, string]),
+    ...annotatedFields.map(([f, a]) => [a.attr, f] as [string, string]),
+  ];
+
+  const found = await settleAnnotations(block, await editableFieldsIn(block), expected);
+  const present = namesByAttr(found);
   const revealable = await revealableFieldsOf(block);
 
   for (const field of slateFields) {
@@ -667,9 +806,16 @@ export async function checkSlateAnnotations(
     // element itself carrying the attribute (renderers are free to collapse
     // the block wrapper and the edit-text container onto one element).
     const blockHasAttr = (await block.getAttribute('data-edit-text')) === field;
-    const container = blockHasAttr ? block : block.locator(`[data-edit-text="${field}"]`).first();
+    // From the one search — no second look, and so no chance of a different
+    // answer than the coverage question just got.
+    const foundField = found.find((f) => f.attr === 'data-edit-text' && f.field === field);
     const hasContainer =
-      present['data-edit-text'].has(field) || revealable.has(field);
+      !!foundField || present['data-edit-text'].has(field) || revealable.has(field);
+    const container = foundField
+      ? foundField.element
+      : blockHasAttr
+        ? block
+        : block.locator(`[data-edit-text="${field}"]`).first();
 
     // Record editability rather than failing per-instance: a slate field only
     // needs its edit container in ONE example of a block type. Some fields are
@@ -763,24 +909,6 @@ export async function checkSlateAnnotations(
   // for them. Displayed plain text is covered by the DOM-gated check above; slate
   // (always canvas rich-text) is recorded by the loop above.
   if (blockSchema?.properties) {
-    const annotationFor = (
-      prop: Record<string, unknown>,
-    ): { kind: 'text' | 'media' | 'link'; attr: string } | null => {
-      const w = prop?.widget;
-      const mode = (prop as { mode?: string })?.mode;
-      if (w === 'image' || (w === 'object_browser' && mode === 'image'))
-        return { kind: 'media', attr: 'data-edit-media' };
-      if (w === 'object_browser' && mode === 'link')
-        return { kind: 'link', attr: 'data-edit-link' };
-      return null;
-    };
-    // Same two passes as the slate loop, off the same single read: gather what
-    // is missing, then put it all to ONE reveal press.
-    const annotatedFields: Array<[string, { kind: 'text' | 'media' | 'link'; attr: string }, unknown]> = [];
-    for (const [field, prop] of Object.entries(blockSchema.properties)) {
-      const a = annotationFor(prop as Record<string, unknown>);
-      if (a) annotatedFields.push([field, a, prop]);
-    }
     for (const [field, a, prop] of annotatedFields) {
       recordFieldEditable(
         a.kind,
