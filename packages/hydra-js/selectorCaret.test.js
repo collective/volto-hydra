@@ -32,10 +32,13 @@ describe('getEditableFieldByName — a field on the handle is still the block\'s
     return window.document;
   };
 
+  /** A bridge with nothing readonly and no content loaded — just the DOM. */
   const bridgeOn = (document) =>
     Object.assign(Object.create(Bridge.prototype), {
       getAllBlockElements: (uid) => document.querySelectorAll(`[data-block-uid="${uid}"]`),
       isElementHidden: () => false,
+      getBlockData: () => ({}),
+      _readonlyBlocks: new Set(),
     });
 
   const withDocument = (document, fn) => {
