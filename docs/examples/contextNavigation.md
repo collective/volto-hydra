@@ -4,6 +4,8 @@ A vertical navigation list for grouped pages — a left sidebar on desktop and a
 
 This is a **custom** block — register it via `initBridge`. Pair it with `navItem` (a restricted child block).
 
+**Demonstrates:** [blocks_layout: a region in the shared dict](../container-blocks.md#blocks_layout-a-region-in-the-shared-dict) — a region of two allowed types, one of them a listing.
+
 ## Schema
 
 ```json

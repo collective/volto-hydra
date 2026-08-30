@@ -60,6 +60,8 @@ A block can declare several `blocks_layout` regions; they all share the one `blo
 > `blocks_layout`, never at a field named for the region. Renderers must read the
 > ordering from `blocks_layout[<region>]`, not from `<region>.items`.
 
+**Worked examples:** [Grid Block](./examples/grid.md) — one region of free children, narrowed by `allowedBlocks`; [Columns Block](./examples/columns.md) — a `columns` region whose children are themselves regions.
+
 ## Multiple regions
 
 A container (or the page) can declare more than one **region** — each a schema property with its own `allowedBlocks`. The default region is `items`.
@@ -91,6 +93,8 @@ properties: {
 ```
 
 Each blocks field has its own `allowedBlocks` / `maxLength`. A declared field appears in the editor even when empty (it gets a seeded empty block so it is editable and a drop target).
+
+**Worked example:** [Search Block](./examples/search.md) — facets in one region and results in another, on the same block.
 
 ### Why these persist (and separate top-level fields don't)
 
@@ -128,6 +132,8 @@ slides: {
 }
 ```
 
+**Worked examples:** [Accordion Block](./examples/accordion.md) — each panel an inline item holding its own region of child blocks; [Slider Block](./examples/slider.md) — slides as inline items with fields of their own.
+
 ## object_list with allowedBlocks: Typed Items
 
 When `allowedBlocks` is set on an `object_list`, items can have different types (like `blocks_layout`) but are still stored as an array. Each item's type is stored in the field specified by `typeField` (defaults to `'@type'`) and its schema is looked up from `blocks`:
@@ -155,6 +161,8 @@ facets: {
 ```
 
 Both `blocks_layout` and `object_list` look the same in the editing UI and blocks can be dragged between them — data is automatically adapted when moving between formats (ID fields added/stripped, type fields set appropriately).
+
+**Worked example:** [Form Block](./examples/form.md) — one item type per kind of field, chosen by `field_type`.
 
 ## widget: 'object': nesting fields (and containers) inside a block field
 
@@ -267,6 +275,8 @@ table: {
     } },
 }
 ```
+
+**Worked example:** [Table Block](./examples/table.md) — `addMode: "table"` with an `idField`, so every row has the same cells.
 
 ## Empty Blocks
 

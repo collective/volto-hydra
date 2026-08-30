@@ -25,6 +25,8 @@ Example of a fully annotated slide block:
 </div>
 ```
 
+**Worked examples:** [Hero Block](./examples/hero.md) — text, rich text, media and link annotations in one block; [Button Block](./examples/button.md) — `data-edit-text` and `data-edit-link` on the same element.
+
 ## Comment Syntax
 
 If you can't modify the markup (e.g., using a 3rd party component library), use comment syntax to specify block attributes:
@@ -263,6 +265,8 @@ item to a paragraph (`[ul, p]`). Hydra normalizes that immediately:
 A frontend renderer can therefore always assume one top-level node per
 slate field; it never has to handle a multi-node `value`.
 
+**Worked example:** [Table Block](./examples/table.md) — a slate value per cell, each its own field.
+
 ## Complete Slate Rendering Example
 
 Slate data structure (value is an array but always contains a single root node):
@@ -311,3 +315,5 @@ Usage:
   <!-- renderSlate(block.value) output goes here -->
 </div>
 ```
+
+**Worked example:** [Slate (Text) Block](./examples/slate.md) — the block itself, rendered per stack.
