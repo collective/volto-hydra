@@ -590,6 +590,77 @@ function unauthorableSlateStyles(nodes, seen = new Set()) {
   return seen;
 }
 
+// The conversions expandListingBlocks knows (convertFieldValue). A `type` outside
+// this set is a no-op: the raw catalog value reaches the item untouched, which is
+// how a mapping can look right and render nothing.
+const KNOWN_MAPPING_TYPES = new Set([
+  'string', 'textarea', 'slate', 'link', 'image', 'image_link', 'array',
+]);
+
+// A listing's `fieldMapping` is the only thing that decides what its results
+// carry, and every part of it can be wrong in a way nothing else notices: a
+// source the widget never offers (so no author can create or repair the
+// mapping), a target the item block does not have (so the value is dropped), a
+// conversion that mangles the value on the way (`string` over a keyword list
+// joins it into "a, b", and a renderer drawing one pill per entry draws none),
+// or a type that does not exist (silently no conversion at all).
+//
+// The allowed sources come from the listing's OWN schema — hydra hangs
+// `sourceFields` on the fieldMapping field — so this reads the same list the
+// sidebar offers rather than keeping a copy of it.
+function collectFieldMappingIssues(blockData, blockSchema, blocksConfig, issues) {
+  const mapping = blockData?.fieldMapping;
+  if (!mapping || typeof mapping !== 'object' || Array.isArray(mapping)) return;
+
+  const mappingDef = blockSchema?.properties?.fieldMapping;
+  const sourceFields = mappingDef?.sourceFields;
+  const itemTypeField = blockSchema?.properties
+    ? Object.keys(blockSchema.properties).find(
+        (f) => blockSchema.properties[f]?.filterConvertibleFrom,
+      )
+    : undefined;
+  const itemType = itemTypeField ? blockData[itemTypeField] : blockData.variation;
+  const itemProps = itemType
+    ? blocksConfig?.[itemType]?.blockSchema?.properties
+    : undefined;
+
+  for (const [source, entry] of Object.entries(mapping)) {
+    const target = typeof entry === 'string' ? entry : entry?.field;
+    const type = typeof entry === 'object' ? entry?.type : undefined;
+
+    if (!target) {
+      issues.push(`fieldMapping "${source}": no target field — the value goes nowhere.`);
+      continue;
+    }
+    if (sourceFields && !sourceFields[source]) {
+      issues.push(
+        `fieldMapping "${source}": not a source the sidebar offers (${Object.keys(sourceFields).join(', ')}) — ` +
+          `nobody can create or repair this mapping in the editor.`,
+      );
+    }
+    // `href` is where expandListingBlocks puts a result's own address. It is a
+    // convention of the expansion, not a field an author edits, so no item
+    // schema declares it — and it must not read as a missing target.
+    if (itemProps && target !== 'href' && !itemProps[target]) {
+      issues.push(
+        `fieldMapping "${source}" → "${target}": the ${itemType} block has no such field, so the value is dropped.`,
+      );
+    }
+    if (type && !KNOWN_MAPPING_TYPES.has(type)) {
+      issues.push(
+        `fieldMapping "${source}": unknown conversion "${type}" — the raw value is passed through unconverted.`,
+      );
+    }
+    const targetType = itemProps?.[target]?.type;
+    if (targetType === 'array' && type === 'string') {
+      issues.push(
+        `fieldMapping "${source}" → "${target}": "${target}" is a LIST but the mapping converts to a string, ` +
+          `which joins the values into one — use type "array".`,
+      );
+    }
+  }
+}
+
 function collectWidgetShapeIssues(
   blockData, blockSchema, pagePath, blockId, out, blockType, undeclaredFields, blockConfig, blocksConfig,
   effectiveRequired, pathInfo,
@@ -598,6 +669,7 @@ function collectWidgetShapeIssues(
   if (!props || !blockData || typeof blockData !== 'object') return;
 
   const issues = [];
+  collectFieldMappingIssues(blockData, blockSchema, blocksConfig, issues);
 
   for (const [field, def] of Object.entries(props)) {
     if (!(field in blockData)) continue;
@@ -1559,6 +1631,7 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
 }
 
 module.exports = {
+  collectFieldMappingIssues,
   discoverBlocks,
   extractBlocks,
   buildObjectListFieldsMap,

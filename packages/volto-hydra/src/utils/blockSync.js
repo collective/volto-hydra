@@ -1068,6 +1068,12 @@ export const QUERY_RESULT_FIELDS = {
   effective: { title: 'Published', type: 'date' },
   Creator: { title: 'Author', type: 'string' },
   review_state: { title: 'State', type: 'string' },
+  // The keyword index behind tags/topics — a LIST, so `array`: the `string`
+  // conversion joins ['a','b'] into "a, b", and a renderer that draws one pill
+  // per category then draws none. Without this entry the widget offered no way
+  // to map categories at all, so a block whose recipe declared the mapping had
+  // one nobody could change, and every other block had none.
+  Subject: { title: 'Categories', type: 'array' },
 };
 
 /**
@@ -1154,6 +1160,11 @@ export function resolveChildOwnFields(childBlockConfig) {
   return getDefaultMappingTargets(childBlockConfig);
 }
 
+// Target types whose value must be CONVERTED, not copied: a mapping onto one of
+// these keeps its `{ field, type }` form so expandListingBlocks converts. Plain
+// strings and numbers are copied as they are, and stay in the short form.
+const CONVERTED_TARGET_TYPES = new Set(['link', 'image', 'image_link', 'array']);
+
 /**
  * Single source of truth for the parent/child split.
  *
@@ -1209,12 +1220,20 @@ export function computeSmartDefaults(sourceFields, targetSchema, declaredMapping
       const targetField = typeof mapping === 'string' ? mapping : mapping?.field;
       if (targetField && targetSchema.properties[targetField]) {
         const fieldType = getFieldType(targetSchema.properties[targetField]);
-        // Use object format for special types, plain string for simple string fields
-        if (fieldType === 'link' || fieldType === 'image') {
-          validMappings[sourceField] = { field: targetField, type: fieldType };
-        } else {
-          validMappings[sourceField] = targetField;
-        }
+        const declaredType =
+          typeof mapping === 'object' ? mapping?.type : undefined;
+        // Keep the object format wherever the value needs CONVERTING on its way
+        // to the target: a link array, an image object, or a LIST. `array`
+        // belongs here — a keyword index that returns a single value has to be
+        // carried as a one-item list, or a renderer drawing one pill per entry
+        // draws none. A declared type is never discarded: a recipe that asked
+        // for a conversion meant it.
+        const type =
+          declaredType ||
+          (CONVERTED_TARGET_TYPES.has(fieldType) ? fieldType : undefined);
+        validMappings[sourceField] = type
+          ? { field: targetField, type }
+          : targetField;
       }
     }
     return validMappings;
