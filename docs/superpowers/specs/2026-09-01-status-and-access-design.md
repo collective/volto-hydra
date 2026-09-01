@@ -197,10 +197,11 @@ Published — from Tuesday 9 Sept        (not yet visible)
 Published — until 30 Sept
 ```
 
-A scheduled change is the same transition with a timestamp, so
-`state.transition` takes an optional `at`, and the save flow reads *Save &
-publish on Tuesday*. Where a CMS has no expiry the field is not offered, on the
-same principle as every other capability gate: absent, not empty and inert.
+A scheduled change is the same transition with a date attached, so it needs no
+special case in the contract: the date is a field on the publish transition's
+schema (below), and the save flow reads *Save & publish on Tuesday*. Where a
+CMS has no expiry the field is simply not in the schema, on the same principle
+as every other capability gate: absent, not empty and inert.
 
 ### Working copies are transitions
 
@@ -232,6 +233,69 @@ Semantics, stated neutrally so no adapter has to lie:
   session context — an active workspace, like a branch, changing what every
   path resolves to — not as an array of drafts per document.
 
+### A transition may ask for more than confirmation
+
+Publishing is rarely just publishing. WordPress wants a date, a visibility and
+maybe a password; Drupal wants a revision log message; Plone wants effective
+and expiration dates. There is no closed set of these and no reason to invent
+one, so **a transition carries an optional schema of what may be set when
+taking it**:
+
+```ts
+transitions: Array<{
+  id: string;
+  label: string;
+  targetState: string;
+
+  /** Structured — the dialog explains before it fires. */
+  consequence?: {
+    gains: Array<{ id: string; label: string }>;   // 'anonymous', 'Marketing'
+    loses: Array<{ id: string; label: string }>;
+  };
+
+  /** Anything else settable as part of this transition. Rendered with the
+   *  same form component as the sidebar. The adapter validates; the admin
+   *  passes values back untouched. */
+  schema?: Schema;
+}>;
+```
+
+and `state.transition` takes `{ path, transition, data }`.
+
+`Schema` is the type the contract already has, so this adds no machinery: the
+same renderer that draws the sidebar draws the dialog's lower half. Two further
+properties fall out rather than needing design. Transitions are already
+computed per object per user inside `state.get`, so a schema is automatically
+per *(object, user, transition)* — publishing from `draft` can ask for
+different fields than publishing from `pending`. And WordPress's pre-publish
+panel stops being a special case we hardcode; it is just the schema its adapter
+emits.
+
+| transition | schema |
+| --- | --- |
+| WordPress publish | `date`, `visibility`, `password`, `slug` |
+| Drupal publish (Content Moderation) | `revision_log`, plus `publish_on` where Scheduler is installed |
+| Plone publish | `effective`, `expires`, `comment` |
+| Plone check out | none — the dialog is the sentence and a confirm |
+
+**Two things stay out of the schema**, and the boundary matters more than the
+mechanism:
+
+*Consequence is not a schema.* The reason this beats Plone's three screens is
+that it says "this makes it visible to anyone" **before** you commit. A list of
+fields cannot produce that sentence. Let the schema swallow the whole dialog
+and we have rebuilt Plone's publish form with extra steps.
+
+*People are not a form field.* The list with search, a role per row and
+inherited rows greyed is a bespoke widget. It could be expressed as a field
+with `widget: 'shareEntries'`, but then the schema carries a widget name only
+one implementation understands — the general mechanism smuggling a specific one
+back in — and the admin loses the ability to reason about grants at all: no "3
+people" on the toolbar button, no diff, no explanation.
+
+So: **structured for state and access, schema for everything hanging off a
+transition.**
+
 ### Say what a role does in the state it is in
 
 "Reviewer" is meaningless in `published` and decisive in `pending`, and no CMS
@@ -251,9 +315,11 @@ slide-out explaining what a transition will change about who can see this.
 
 ## Open questions
 
-1. **Roles instead of permission tuples** is a breaking change to
-   `PermissionsAndState`. Nothing depends on the current shape yet, so the cost
-   is now or never.
+1. **Two changes to `PermissionsAndState`, both breaking, both free today.**
+   Grants become named roles rather than permission tuples, and transitions
+   gain `consequence` and `schema`. Nothing consumes either field — WordPress
+   and Drupal return `shareEntries: null`, Plone does not implement
+   `permissions.get` at all — so the cost is now or never.
 2. **Which adapter lights it up first.** Plone is the only one that can express
    per-content grants, groups and inheritance — and implementing
    `permissions.get`/`update` there makes the contract suite's existing
