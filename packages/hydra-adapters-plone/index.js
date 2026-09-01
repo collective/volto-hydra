@@ -50,6 +50,13 @@ export class PloneAdapter extends BaseAdapter {
         // it can serve them verbatim. Advertising this keeps those requests on
         // the passthrough; adapters without it get them as semantic intents.
         'http-passthrough',
+        // Plone answers ?expand=breadcrumbs,actions,types,navigation inside
+        // the content response, so the admin's expander bundle rides along in
+        // a request it was making anyway. Adapters without this still SERVE
+        // expansion — the base class emulates it concurrently — but the admin
+        // does not ask them to, because emulation cannot reduce request count
+        // and Volto already caches most of the bundle in its store.
+        'expand-native',
         // Plone's catalog answers both free-text queries and structured
         // path/type filters, so both are real here. Adapters over CMSes with
         // only one (Drupal without search_api, Strapi) must advertise only
@@ -88,7 +95,24 @@ export class PloneAdapter extends BaseAdapter {
     return `${this.cmsBaseUrl}${API_PREFIX}${path}`;
   }
 
-  async fetchJson(path, { method = 'GET', body, headers = {} } = {}) {
+  /**
+   * Reads are served from the current scope; anything else clears it.
+   *
+   * Sits in front of requestJson so EVERY caller benefits, including the ones
+   * that repeat a read indirectly — resolvePath and the ancestor walk repeat
+   * the same lookups across different intents, and that is where most of the
+   * duplication measured in the journey came from.
+   */
+  async fetchJson(path, options = {}) {
+    const method = options.method ?? 'GET';
+    if (method !== 'GET') {
+      this.invalidateReads();
+      return this.requestJson(path, options);
+    }
+    return this.cachedRead(`GET ${path}`, () => this.requestJson(path, options));
+  }
+
+  async requestJson(path, { method = 'GET', body, headers = {} } = {}) {
     const token = this.resolveToken();
     const auth = token ? { Authorization: `Bearer ${token}` } : {};
     const res = await fetch(this.url(path), {
@@ -214,7 +238,9 @@ export class PloneAdapter extends BaseAdapter {
   }
 
   async dispatch(intent, args) {
-    return this.withAuthRetry(() => this.dispatchOnce(intent, args));
+    return this.dispatchWithInvalidation(intent, args, () =>
+      this.withAuthRetry(() => this.dispatchOnce(intent, args)),
+    );
   }
 
   async dispatchOnce(intent, args) {
@@ -225,8 +251,13 @@ export class PloneAdapter extends BaseAdapter {
         return this.fetchJson(path, { method, body: data, headers });
       }
 
-      case 'content.get':
-        return this.toDocument(await this.fetchJson(args.path));
+      case 'content.get': {
+        // Plone can expand natively, but only over its own @components set.
+        // Emulating uniformly keeps one code path and one tested behaviour;
+        // the native fast path is a later optimisation, not a correctness fix.
+        const doc = this.toDocument(await this.fetchJson(args.path));
+        return this.withContext(doc, args.path, args.expand);
+      }
 
       case 'content.update': {
         const body = { ...args.data };
@@ -281,7 +312,23 @@ export class PloneAdapter extends BaseAdapter {
             },
           },
         });
-        return this.toDocument(raw);
+        // An uploaded asset carries the ABSOLUTE url it can be fetched at.
+        //
+        // Everything else in this contract travels as a path, because the
+        // admin resolves paths itself. An image cannot: it ends up in an
+        // <img src>, and a CMS-relative path there resolves against whichever
+        // origin happens to render it — the admin's, which then 404s. Same
+        // rule asset.imageUrl states; the widget reads this one straight after
+        // the upload, before anything asks for a scale.
+        const doc = this.toDocument(raw);
+        return {
+          ...doc,
+          fields: {
+            ...doc.fields,
+            url: raw.image?.download ?? raw['@id'],
+            filename: raw.image?.filename ?? args.filename,
+          },
+        };
       }
 
       case 'asset.imageUrl': {

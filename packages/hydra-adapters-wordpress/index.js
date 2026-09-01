@@ -93,7 +93,7 @@ export function parseBlocks(content) {
 }
 
 export class WordPressAdapter extends BaseAdapter {
-  constructor({ cmsBaseUrl, nonce, postType = 'pages' } = {}) {
+  constructor({ cmsBaseUrl, nonce, credentials, postType = 'pages' } = {}) {
     super({
       name: 'wordpress',
       capabilities: [
@@ -112,8 +112,16 @@ export class WordPressAdapter extends BaseAdapter {
       ],
     });
     this.cmsBaseUrl = cmsBaseUrl;
+    // { username, appPassword } from WordPress's application-password flow.
+    // Sent as Basic auth, which is how WordPress accepts a credential from a
+    // client acting on behalf of a user — and unlike a cookie it works
+    // cross-origin, which a proxy on another origin needs.
+    this.credentials = credentials ?? null;
     this.nonce = nonce ?? null;
     this.postType = postType;
+    // Session-stable SITE metadata: the content types, their field schemas and
+    // the taxonomy list. See cachedMeta.
+    this.metaCache = new Map();
     this.pathCache = new Map();
     // id -> {slug, parent}. Rebuilding a path walks the parent chain one
     // request per ancestor, and a listing repeats that walk for every sibling:
@@ -158,9 +166,64 @@ export class WordPressAdapter extends BaseAdapter {
     return `${this.cmsBaseUrl}/?${qs.toString()}`;
   }
 
-  async fetchJson(route, { method = 'GET', body, params = {} } = {}) {
-    const headers = { Accept: 'application/json' };
-    if (this.nonce) headers['X-WP-Nonce'] = this.nonce;
+  /**
+   * See the Plone adapter. One extra concern here: requestJson records the
+   * collection size in this.lastTotal from the X-WP-Total header, and callers
+   * read it immediately afterwards. A cache hit does not re-run that
+   * assignment, and an unrelated fetch in between would leave the wrong number
+   * standing, so the total is cached WITH the body and restored on every hit.
+   */
+  async fetchJson(route, options = {}) {
+    const method = options.method ?? 'GET';
+    if (method !== 'GET') {
+      this.invalidateReads();
+      return this.requestJson(route, options);
+    }
+    const entry = await this.cachedRead(
+      `GET ${this.scopeKey(route, options.params)}`,
+      async () => {
+        const body = await this.requestJson(route, options);
+        return { body, lastTotal: this.lastTotal };
+      },
+    );
+    this.lastTotal = entry.lastTotal;
+    return entry.body;
+  }
+
+  /**
+   * Read session-stable METADATA through a cache of its own.
+   *
+   * Content types, their field schemas and the taxonomy list describe the
+   * SITE, not the content: editing a page cannot change them. So they are kept
+   * apart from the read cache, which every write clears — otherwise saving a
+   * block would throw away a schema that had not changed and buy back a round
+   * trip for nothing.
+   *
+   * They are re-asked for constantly. The Toolbar fetches the types on mount
+   * AND on every path change to build its "Add" menu, and the edit form asks
+   * for a schema each time it mounts; on PHP-WASM that is about a second each.
+   *
+   * The PROMISE is cached, not the value, so concurrent callers share one
+   * request. A failure is evicted rather than remembered — a schema that could
+   * not be fetched once must not be permanently unavailable.
+   *
+   * Cleared when the credential changes: what a user may create, and which
+   * fields they may see, depend on who they are.
+   */
+  async cachedMeta(key, run) {
+    if (this.metaCache.has(key)) return this.metaCache.get(key);
+    const pending = Promise.resolve().then(run);
+    this.metaCache.set(key, pending);
+    try {
+      return await pending;
+    } catch (err) {
+      this.metaCache.delete(key);
+      throw err;
+    }
+  }
+
+  async requestJson(route, { method = 'GET', body, params = {} } = {}) {
+    const headers = { Accept: 'application/json', ...this.authHeaders() };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
 
     const res = await fetch(this.url(route, params), {
@@ -169,7 +232,7 @@ export class WordPressAdapter extends BaseAdapter {
       // Access-Control-Allow-Origin makes the browser reject a credentialled
       // cross-origin request outright, surfacing only as "Failed to fetch".
       // Same bug the Plone and Drupal adapters had.
-      credentials: this.nonce ? 'omit' : 'include',
+      credentials: this.nonce || this.credentials ? 'omit' : 'include',
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
     });
@@ -314,7 +377,20 @@ export class WordPressAdapter extends BaseAdapter {
 
   /** Walk parent ids up to the root, collecting slugs, so a path can be rebuilt. */
   async ancestryOf(post) {
-    const segments = [];
+    const chain = await this.ancestorChain(post);
+    return chain.map((entry) => entry.path.split('/').pop());
+  }
+
+  /**
+   * The ancestors of a post, root-first, as { path, post } pairs.
+   *
+   * Same single walk as ancestryOf, but it keeps the posts it fetched instead
+   * of throwing them away and letting the caller fetch them again. The walk
+   * itself is irreducibly sequential — a post names only its immediate parent
+   * — but it is the only part that has to be.
+   */
+  async ancestorChain(post) {
+    const chain = [];
     let parentId = post.parent;
     while (parentId) {
       let entry = this.ancestorCache.get(parentId);
@@ -323,13 +399,32 @@ export class WordPressAdapter extends BaseAdapter {
           `/wp/v2/${this.postType}/${parentId}`,
           { params: { context: 'edit' } },
         );
-        entry = { slug: parent.slug, parent: parent.parent };
+        entry = { slug: parent.slug, parent: parent.parent, post: parent };
         this.ancestorCache.set(parentId, entry);
       }
-      segments.unshift(entry.slug);
+      chain.unshift({ id: parentId, entry });
       parentId = entry.parent;
     }
-    return segments;
+
+    // resolvePath populates this cache from a _fields=id,slug,parent query to
+    // keep path resolution cheap, so an entry can legitimately arrive without
+    // its post. Those fetches are independent once the chain is known, so they
+    // go out together instead of one per level.
+    await Promise.all(
+      chain
+        .filter(({ entry }) => !entry.post)
+        .map(async ({ id, entry }) => {
+          entry.post = await this.fetchJson(`/wp/v2/${this.postType}/${id}`, {
+            params: { context: 'edit' },
+          });
+          this.ancestorCache.set(id, entry);
+        }),
+    );
+
+    return chain.map(({ entry }, i) => ({
+      path: `/${chain.slice(0, i + 1).map((e) => e.entry.slug).join('/')}`,
+      post: entry.post,
+    }));
   }
 
   /**
@@ -342,7 +437,7 @@ export class WordPressAdapter extends BaseAdapter {
    */
   async restBaseFor(typeId) {
     if (!this.restBases) {
-      const types = await this.fetchJson('/wp/v2/types');
+      const types = await this.cachedMeta('types', () => this.fetchJson('/wp/v2/types'));
       this.restBases = new Map(
         Object.entries(types ?? {}).map(([id, t]) => [id, t.rest_base ?? id]),
       );
@@ -406,7 +501,37 @@ export class WordPressAdapter extends BaseAdapter {
   }
 
   async dispatch(intent, args) {
-    return this.withAuthRetry(() => this.dispatchOnce(intent, args));
+    return this.dispatchWithInvalidation(intent, args, () =>
+      this.withAuthRetry(() => this.dispatchOnce(intent, args)),
+    );
+  }
+
+  /**
+   * How this adapter proves who it is, wherever it makes a request.
+   *
+   * Centralised because it was not: requestJson learned to send the
+   * application password while asset.upload — a hand-built fetch with its own
+   * headers — kept sending only a nonce. Uploads then went out anonymous and
+   * came back 401, which surfaced as an image that never rendered rather than
+   * as an auth failure.
+   */
+  authHeaders() {
+    return {
+      ...(this.nonce ? { 'X-WP-Nonce': this.nonce } : {}),
+      ...(this.credentials ? { Authorization: this.basicAuth() } : {}),
+    };
+  }
+
+  /** Basic auth from an application password. */
+  basicAuth() {
+    const { username, appPassword } = this.credentials;
+    // Application passwords are issued with spaces for readability; WordPress
+    // accepts them either way, but stripping keeps the header canonical.
+    const raw = `${username}:${String(appPassword).replace(/\s+/g, '')}`;
+    const bytes = new TextEncoder().encode(raw);
+    let binary = '';
+    for (const b of bytes) binary += String.fromCharCode(b);
+    return `Basic ${btoa(binary)}`;
   }
 
   async dispatchOnce(intent, args) {
@@ -416,7 +541,11 @@ export class WordPressAdapter extends BaseAdapter {
         const post = await this.fetchJson(`/wp/v2/${this.postType}/${id}`, {
           params: { context: 'edit' },
         });
-        return this.toDocument(post, args.path);
+        return this.withContext(
+          this.toDocument(post, args.path),
+          args.path,
+          args.expand,
+        );
       }
 
       case 'content.update': {
@@ -583,19 +712,17 @@ export class WordPressAdapter extends BaseAdapter {
         const post = await this.fetchJson(`/wp/v2/${this.postType}/${id}`, {
           params: { context: 'edit' },
         });
-        const ancestry = await this.ancestryOf(post);
         // Canonical breadcrumbs are the ancestors below the root, root-first,
         // including the document itself — matching the Plone adapter.
-        const items = [];
-        for (let i = 0; i < ancestry.length; i++) {
-          const path = `/${ancestry.slice(0, i + 1).join('/')}`;
-          const ancestorId = await this.resolvePath(path);
-          const ancestor = await this.fetchJson(
-            `/wp/v2/${this.postType}/${ancestorId}`,
-            { params: { context: 'edit' } },
-          );
-          items.push(this.toDocument(ancestor, path));
-        }
+        //
+        // The walk up already fetched every ancestor, so build the documents
+        // from what it returns. This used to re-resolve and re-fetch each
+        // ancestor path the walk had just visited: two extra round trips per
+        // level, at ~1.1s each, for posts already in hand.
+        const chain = await this.ancestorChain(post);
+        const items = chain.map((entry) =>
+          this.toDocument(entry.post, entry.path),
+        );
         items.push(this.toDocument(post, args.path));
         return { items };
       }
@@ -629,24 +756,77 @@ export class WordPressAdapter extends BaseAdapter {
       case 'types.getSchema': {
         // The type endpoint describes the post type, not its fields; the field
         // schema comes from an OPTIONS request on the collection.
-        const type = await this.fetchJson(`/wp/v2/types/${args.type}`);
-        const res = await fetch(this.url(`/wp/v2/${type.rest_base}`), {
-          method: 'OPTIONS',
-          // With an explicit nonce we must NOT also send cookies: a wildcard
-      // Access-Control-Allow-Origin makes the browser reject a credentialled
-      // cross-origin request outright, surfacing only as "Failed to fetch".
-      // Same bug the Plone and Drupal adapters had.
-      credentials: this.nonce ? 'omit' : 'include',
-          headers: this.nonce ? { 'X-WP-Nonce': this.nonce } : {},
-        });
-        const described = await res.json();
-        const properties = described.schema?.properties ?? {};
+        const type = await this.cachedMeta(`type:${args.type}`, () =>
+          this.fetchJson(`/wp/v2/types/${args.type}`),
+        );
+        // Cached like the type itself: the field schema is a property of the
+        // SITE. The edit form asks for it on every mount, and this was the one
+        // call issued twice in a single picker interaction.
+        const described = await this.cachedMeta(
+          `schema:${type.rest_base}`,
+          async () => {
+            const res = await fetch(this.url(`/wp/v2/${type.rest_base}`), {
+              method: 'OPTIONS',
+              // With an explicit nonce we must NOT also send cookies: a
+              // wildcard Access-Control-Allow-Origin makes the browser reject
+              // a credentialled cross-origin request outright, surfacing only
+              // as "Failed to fetch". Same bug the Plone and Drupal adapters
+              // had.
+              credentials: this.nonce || this.credentials ? 'omit' : 'include',
+              headers: this.authHeaders(),
+            });
+            return res.json();
+          },
+        );
+
+        // What the editor can SET, not everything the endpoint returns.
+        //
+        // schema.properties describes the read shape — 25 fields for a page,
+        // 9 of them readonly (guid, link, modified, permalink_template…).
+        // Rendering those as form fields put widgets on screen for values
+        // nobody can change, and the computed ones fed the number widget
+        // values it rejected. WordPress already publishes the writable set as
+        // the POST endpoint's args, so use that as the field list and the
+        // schema only to describe the fields in it.
+        const readShape = described.schema?.properties ?? {};
+        const writable =
+          described.endpoints?.find((e) => (e.methods ?? []).includes('POST'))
+            ?.args ?? {};
+
+        const properties = Object.fromEntries(
+          Object.keys(writable).filter(isEditableField).map((name) => [
+            name,
+            canonicalField(name, { ...readShape[name], ...writable[name] }),
+          ]),
+        );
+        // The blocks fields are part of the schema even though WordPress has
+        // no idea they exist: this adapter stores them in post_content (see
+        // serializeBlocks) and content.get returns them, so they are as
+        // writable as any other field.
+        //
+        // Declaring them is not cosmetic. The admin decides whether a type can
+        // be edited VISUALLY by looking for a property whose name ends in
+        // "blocks"; finding none, it drops out of visual mode, unmounts the
+        // preview iframe and re-initialises the sidebar as a plain field form.
+        // Because the schema arrives after the content it depends on, that
+        // happened seconds into the session — tearing down an open object
+        // browser mid-navigation, whose listing then arrived to a component
+        // that no longer existed.
+        const withBlocks = {
+          ...properties,
+          blocks: { title: 'Blocks', type: 'object' },
+          blocks_layout: { title: 'Blocks layout', type: 'object' },
+        };
         return {
-          properties,
+          properties: withBlocks,
           fieldsets: [
-            { id: 'default', title: 'Default', fields: Object.keys(properties) },
+            {
+              id: 'default',
+              title: 'Default',
+              fields: Object.keys(withBlocks),
+            },
           ],
-          required: Object.entries(properties)
+          required: Object.entries(writable)
             .filter(([, v]) => v.required === true)
             .map(([k]) => k),
         };
@@ -660,9 +840,9 @@ export class WordPressAdapter extends BaseAdapter {
       // Access-Control-Allow-Origin makes the browser reject a credentialled
       // cross-origin request outright, surfacing only as "Failed to fetch".
       // Same bug the Plone and Drupal adapters had.
-      credentials: this.nonce ? 'omit' : 'include',
+      credentials: this.nonce || this.credentials ? 'omit' : 'include',
           headers: {
-            ...(this.nonce ? { 'X-WP-Nonce': this.nonce } : {}),
+            ...this.authHeaders(),
             'Content-Type': args.contentType,
             'Content-Disposition': `attachment; filename="${args.filename}"`,
           },
@@ -682,7 +862,10 @@ export class WordPressAdapter extends BaseAdapter {
           title: media.title?.rendered ?? args.filename,
           blocks: {},
           blocksLayout: { items: [] },
-          fields: { link: media.source_url },
+          // `url` is what the image widget reads back after an upload (see
+          // assetToPlone); source_url is already absolute, which is the
+          // requirement — an <img src> cannot resolve a CMS-relative path.
+          fields: { link: media.source_url, url: media.source_url, filename: args.filename },
           state: 'published',
           _adapter: { raw: media },
         };
@@ -854,8 +1037,8 @@ export class WordPressAdapter extends BaseAdapter {
         // would offer a query builder that does not describe this site, which
         // is exactly as useless as offering Plone's portal_type here.
         const [types, taxonomies] = await Promise.all([
-          this.fetchJson('/wp/v2/types'),
-          this.fetchJson('/wp/v2/taxonomies'),
+          this.cachedMeta('types', () => this.fetchJson('/wp/v2/types')),
+          this.cachedMeta('taxonomies', () => this.fetchJson('/wp/v2/taxonomies')),
         ]);
 
         const indexes = {
@@ -983,7 +1166,7 @@ export class WordPressAdapter extends BaseAdapter {
           }
         }
 
-        if (args.sortOn) params.orderby = args.sortOn;
+        if (args.sortOn) params.orderby = sortFieldFor(args.sortOn);
         if (args.sortOrder) {
           // WordPress accepts only asc|desc and 400s on anything else. The
           // canonical value is Plone's long form ("descending"), which passed
@@ -1020,14 +1203,65 @@ export class WordPressAdapter extends BaseAdapter {
         };
       }
 
+      /**
+       * Where to send the user to authorise this application.
+       *
+       * WordPress ships this flow in core: the user lands on their OWN login
+       * page, approves by name, and WordPress redirects to success_url with a
+       * freshly minted application password. The admin never sees a password,
+       * and the credential is per-application and revocable from the user's
+       * profile.
+       *
+       * Gated behind HTTPS by core (wp_is_application_passwords_available), so
+       * over plain http this page 501s unless a site opts in.
+       */
+      case 'auth.begin': {
+        const url = new URL('/wp-admin/authorize-application.php', this.cmsBaseUrl);
+        url.searchParams.set('app_name', args?.appName ?? 'Hydra');
+        if (args?.successUrl) url.searchParams.set('success_url', args.successUrl);
+        return { url: url.href };
+      }
+
+      /**
+       * Turn what WordPress handed back into a usable credential.
+       *
+       * The callback carries user_login and password as query parameters.
+       * Parsing them is the ADAPTER's job — the shape is WordPress's, and the
+       * admin neither knows nor needs to know it.
+       */
+      case 'auth.complete': {
+        const username = args?.params?.user_login;
+        const appPassword = args?.params?.password;
+        if (!username || !appPassword) {
+          throw new AdapterError('WordPress returned no application password', {
+            code: 'AUTH_FAILED',
+            status: 400,
+          });
+        }
+        this.credentials = { username, appPassword };
+        this.nonce = null; // the credential supersedes any cookie session
+        this.invalidateReads();
+        // A different user may create different types and see different
+        // fields, so the site metadata is no longer known to be right.
+        this.metaCache.clear();
+        this.restBases = null;
+        return this.dispatchOnce('auth.whoami', {});
+      }
+
       case 'types.list': {
-        const types = await this.fetchJson('/wp/v2/types');
+        const types = await this.cachedMeta('types', () => this.fetchJson('/wp/v2/types'));
+        // Under a parent, only a HIERARCHICAL type can be created: a WordPress
+        // post has no parent field, so creating one "inside" a page silently
+        // produces a document that is not there.
+        const underParent = Boolean(args?.path && args.path !== '/');
         return {
-          items: Object.entries(types).map(([id, t]) => ({
-            id,
-            title: t.name,
-            addable: true,
-          })),
+          items: Object.entries(types)
+            .filter(([id]) => isContentType(id))
+            .map(([id, t]) => ({
+              id,
+              title: t.name,
+              addable: underParent ? Boolean(t.hierarchical) : true,
+            })),
         };
       }
 
@@ -1038,3 +1272,123 @@ export class WordPressAdapter extends BaseAdapter {
 }
 
 export default WordPressAdapter;
+
+/**
+ * One WordPress REST field, as the canonical contract describes fields.
+ *
+ * Passing WordPress's own schema through was a CMS-shaped leak of exactly the
+ * kind the contract exists to stop. WordPress describes an editable text field
+ * as an OBJECT with `raw` and `rendered` members:
+ *
+ *   "title": { "type": "object", "properties": { "raw": …, "rendered": … } }
+ *
+ * The admin has no idea what that is, so it fell back to rendering a FILE
+ * input for the title — the add form offered a file picker where the title
+ * should be, and the journey could not create a page at all.
+ */
+function canonicalField(name, field) {
+  const base = { title: field.description ? name : name, description: field.description };
+
+  // raw/rendered pairs are text the editor types into.
+  if (field.type === 'object' && field.properties?.raw) {
+    return { ...base, type: 'string', ...(name === 'content' ? { widget: 'richtext' } : {}) };
+  }
+
+  switch (field.type) {
+    case 'string':
+      return {
+        ...base,
+        type: 'string',
+        ...(field.format === 'date-time' ? { widget: 'datetime' } : {}),
+        ...(field.enum ? { choices: field.enum.map((v) => [v, v]) } : {}),
+      };
+    case 'integer':
+    case 'number':
+      return { ...base, type: 'number' };
+    case 'boolean':
+      return { ...base, type: 'boolean' };
+    case 'array':
+      return { ...base, type: 'array' };
+    default:
+      // Anything still unrecognised is described as a plain string rather than
+      // left as a CMS-specific shape: a wrong-but-typed widget is recoverable,
+      // an untyped one silently becomes a file picker.
+      return { ...base, type: 'string' };
+  }
+}
+
+/**
+ * Is this post type something an editor authors, or WordPress plumbing?
+ *
+ * /wp/v2/types lists everything registered with show_in_rest, which includes
+ * attachments (handled by asset.upload, not content.create), menu items, and
+ * the wp_* types backing the block editor — templates, patterns, navigation,
+ * font families. Offering those in the admin's add menu invites creating a
+ * document that is not a document.
+ */
+function isContentType(id) {
+  return id !== 'attachment' && id !== 'nav_menu_item' && !id.startsWith('wp_');
+}
+
+/**
+ * Is this writable arg a field the EDITOR fills in?
+ *
+ * WordPress's POST args mix content with structure. The contract models the
+ * structural parts separately — where a document sits comes from
+ * content.create/content.move, its lifecycle from state.get/state.transition —
+ * so exposing them again as form fields both duplicates them and contradicts
+ * the admin.
+ *
+ * `parent` is the concrete failure: the admin sends it as a reference object,
+ *   "parent": { "@id": "/news" }
+ * while WordPress types it as an integer. The form failed its own validation
+ * and silently refused to submit — Save did nothing, no request was made, and
+ * the journey sat on /add until it timed out.
+ */
+function isEditableField(name) {
+  const STRUCTURAL = new Set([
+    'parent', // hierarchy: content.create's parentPath, content.move
+    'status', // lifecycle: state.get / state.transition
+    'slug', // id derivation is the CMS's business
+    'date',
+    'date_gmt', // creation timestamps
+    'author',
+    'featured_media',
+    'menu_order',
+    'password',
+    'template',
+    'meta',
+    'comment_status',
+    'ping_status',
+  ]);
+  return !STRUCTURAL.has(name);
+}
+
+/**
+ * A WordPress orderby, from whatever index name the admin sent.
+ *
+ * INTERIM. Volto's contents view offers sorting from a hard-coded list of
+ * PLONE index names — id, sortable_title, EffectiveDate, CreationDate,
+ * ModificationDate, portal_type — rather than from querystring.getIndexes,
+ * which is what its own query builder uses and what every adapter answers with
+ * its real indexes. So a click on "sort by modified" arrives here as
+ * `ModificationDate`, which WordPress has never heard of.
+ *
+ * The proper fix is in the admin: drive that menu from the advertised indexes.
+ * Until then this translates the six, so sorting works rather than silently
+ * doing nothing.
+ *
+ * Anything unrecognised is passed through untouched — it is most likely
+ * already a native name, from the query builder — and WordPress rejects what
+ * it cannot sort by, which is louder than quietly ignoring it.
+ */
+function sortFieldFor(index) {
+  const PLONE_TO_WP = {
+    ModificationDate: 'modified',
+    CreationDate: 'date',
+    EffectiveDate: 'date', // WordPress has no separate effective date
+    sortable_title: 'title',
+    id: 'id',
+  };
+  return PLONE_TO_WP[index] ?? index;
+}

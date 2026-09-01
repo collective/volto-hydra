@@ -113,7 +113,20 @@ export class DrupalAdapter extends BaseAdapter {
     return { Authorization: `Basic ${btoa(`${username}:${password}`)}` };
   }
 
-  async fetchJson(route, { method = 'GET', body, params } = {}) {
+  /** See the Plone adapter: reads are scope-cached, writes clear the scope. */
+  async fetchJson(route, options = {}) {
+    const method = options.method ?? 'GET';
+    if (method !== 'GET') {
+      this.invalidateReads();
+      return this.requestJson(route, options);
+    }
+    return this.cachedRead(
+      `GET ${this.scopeKey(route, options.params)}`,
+      () => this.requestJson(route, options),
+    );
+  }
+
+  async requestJson(route, { method = 'GET', body, params } = {}) {
     const qs = params ? `?${params}` : '';
     const headers = {
       Accept: 'application/vnd.api+json',
@@ -197,13 +210,17 @@ export class DrupalAdapter extends BaseAdapter {
   }
 
   async dispatch(intent, args) {
-    return this.withAuthRetry(() => this.dispatchOnce(intent, args));
+    return this.dispatchWithInvalidation(intent, args, () =>
+      this.withAuthRetry(() => this.dispatchOnce(intent, args)),
+    );
   }
 
   async dispatchOnce(intent, args) {
     switch (intent) {
-      case 'content.get':
-        return this.toDocument(await this.nodeByAlias(args.path));
+      case 'content.get': {
+        const doc = this.toDocument(await this.nodeByAlias(args.path));
+        return this.withContext(doc, args.path, args.expand);
+      }
 
       case 'content.update': {
         const node = await this.nodeByAlias(args.path);
@@ -764,7 +781,7 @@ export class DrupalAdapter extends BaseAdapter {
         // this would offer an ordering that silently did nothing.
         if (args.sortOn) {
           const descending = String(args.sortOrder ?? '').startsWith('desc');
-          params.set('sort', `${descending ? '-' : ''}${args.sortOn}`);
+          params.set('sort', `${descending ? '-' : ''}${sortFieldFor(args.sortOn)}`);
         }
         if (args.limit) params.set('page[limit]', String(args.limit));
         const payload = await this.fetchJson(`/jsonapi/node/${this.bundle}`, {
@@ -859,3 +876,25 @@ export class DrupalAdapter extends BaseAdapter {
 }
 
 export default DrupalAdapter;
+
+/**
+ * A JSON:API sort field, from whatever index name the admin sent.
+ *
+ * INTERIM, and the same story as the WordPress adapter: Volto's contents view
+ * hard-codes PLONE index names for its sort menu instead of using
+ * querystring.getIndexes, which is what its own query builder uses. `changed`
+ * is what this adapter actually advertises as its sortable date.
+ *
+ * Unrecognised names pass through — they are most likely already field names
+ * from the query builder — and JSON:API rejects fields it cannot sort by.
+ */
+function sortFieldFor(index) {
+  const PLONE_TO_DRUPAL = {
+    ModificationDate: 'changed',
+    CreationDate: 'created',
+    EffectiveDate: 'created',
+    sortable_title: 'title',
+    id: 'drupal_internal__nid',
+  };
+  return PLONE_TO_DRUPAL[index] ?? index;
+}
