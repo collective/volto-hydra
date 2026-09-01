@@ -65,8 +65,16 @@ export default defineConfig({
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
 
-  /* Opt out of parallel tests on CI */
-  workers: process.env.CI ? undefined : undefined,
+  /* One worker when WordPress is involved.
+   *
+   * WordPress here is PHP-WASM: a single-threaded server answering about one
+   * request a second. The suite is fullyParallel, so a whole journey directory
+   * puts nine specs on it at once and they starve each other — every spec in
+   * the WordPress suite failed on timeouts while each one passed on its own.
+   * Nothing was wrong with them; there was simply one server and nine callers.
+   *
+   * The mock-backed targets are fine in parallel and keep the default. */
+  workers: needsWordPress ? 1 : undefined,
 
   /* Reporter to use */
   reporter: [['html', { open: 'never' }]],

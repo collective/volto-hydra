@@ -699,7 +699,7 @@ export class WordPressAdapter extends BaseAdapter {
             // named as an index the admin uses and mapped to WordPress's own
             // orderby; WordPress can do this itself, so unlike Drupal's
             // menu-derived tree there is nothing to sort client-side.
-            orderby: args.sortOn ? sortFieldFor(args.sortOn) : 'menu_order',
+            orderby: args.sortOn ? orderByFor(args.sortOn) : 'menu_order',
             order: String(args.sortOrder ?? '').startsWith('desc')
               ? 'desc'
               : 'asc',
@@ -1388,6 +1388,15 @@ function isEditableField(name) {
  * already a native name, from the query builder — and WordPress rejects what
  * it cannot sort by, which is louder than quietly ignoring it.
  */
+/**
+ * WordPress's own name for an index the admin asks to sort by.
+ *
+ * `getObjPositionInParent` is the folder's OWN order — the sibling order an
+ * editor arranges by hand — which WordPress keeps in menu_order. It is also
+ * what the contents view sends when nothing else has been chosen, so leaving
+ * it to fall through put a Plone index name into orderby and WordPress
+ * answered 400 for every listing.
+ */
 function sortFieldFor(index) {
   const PLONE_TO_WP = {
     ModificationDate: 'modified',
@@ -1395,6 +1404,34 @@ function sortFieldFor(index) {
     EffectiveDate: 'date', // WordPress has no separate effective date
     sortable_title: 'title',
     id: 'id',
+    getObjPositionInParent: 'menu_order',
   };
   return PLONE_TO_WP[index] ?? index;
+}
+
+/**
+ * What WordPress will actually accept in `orderby` for a page collection.
+ *
+ * An index it does not know is a 400, and a 400 here means no listing at all —
+ * so anything unrecognised falls back to the folder's own order rather than
+ * taking the whole view down. Sorting by something WordPress cannot sort by is
+ * a missing feature; an empty listing is a broken one.
+ */
+const WP_ORDERBY = new Set([
+  'author',
+  'date',
+  'id',
+  'include',
+  'modified',
+  'parent',
+  'relevance',
+  'slug',
+  'include_slugs',
+  'title',
+  'menu_order',
+]);
+
+function orderByFor(index) {
+  const mapped = sortFieldFor(index);
+  return WP_ORDERBY.has(mapped) ? mapped : 'menu_order';
 }
