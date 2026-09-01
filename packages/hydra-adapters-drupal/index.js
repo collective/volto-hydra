@@ -770,9 +770,43 @@ export class DrupalAdapter extends BaseAdapter {
           const subtree = await this.dispatchOnce('tree.list', {
             parent: menuParent,
           });
-          const limited = args.limit
-            ? subtree.items.slice(0, args.limit)
-            : subtree.items;
+
+          // Sorted HERE rather than by the CMS, and only on this branch.
+          //
+          // tree.list answers from the menu, whose order is menu weight — the
+          // sibling order an editor arranges by hand. That is the right answer
+          // for an unsorted listing and the wrong one the moment a sort is
+          // asked for, and because this branch returns early it used to drop
+          // `sortOn` on the floor: the contents view offered orderings that
+          // did nothing. Pushing the sort into JSON:API is not available here,
+          // since the question was answered from menu links rather than a node
+          // query; the subtree is already fetched, so ordering it costs
+          // nothing and must happen BEFORE the limit is applied.
+          let items = subtree.items;
+          if (args.sortOn) {
+            const field = sortFieldFor(args.sortOn);
+            const keyOf = (doc) =>
+              field === 'title'
+                ? (doc.title ?? '')
+                : (doc._adapter?.raw?.attributes?.[field] ?? '');
+            const descending = String(args.sortOrder ?? '').startsWith('desc');
+            items = [...items].sort((a, b) => {
+              const x = keyOf(a);
+              const y = keyOf(b);
+              // Numbers compare as numbers: nid 10 does not sort before nid 2.
+              const both =
+                typeof x === 'number' && typeof y === 'number'
+                  ? x - y
+                  : String(x) < String(y)
+                    ? -1
+                    : String(x) > String(y)
+                      ? 1
+                      : 0;
+              return descending ? -both : both;
+            });
+          }
+
+          const limited = args.limit ? items.slice(0, args.limit) : items;
           return { items: limited, total: subtree.total };
         }
 
