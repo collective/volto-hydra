@@ -29,6 +29,7 @@
 import React from 'react';
 import { defineMessages, useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
+import { blockDisplayTitle } from '../../utils/blockDisplayTitle';
 
 const messages = defineMessages({
   none: {
@@ -83,17 +84,16 @@ function positionOf(info) {
 }
 
 /** What a block should be called in the menu. */
+/**
+ * What one candidate reads as in the menu.
+ *
+ * Deferred to the shared namer, so a block is called the same thing here as in
+ * the sidebar's child list — `labelField` only nominates where this kind of
+ * block keeps its name.
+ */
 export function labelFor(block, labelField) {
   if (!block) return '';
-  const named = labelField && block[labelField];
-  return (
-    named ||
-    block.title ||
-    block.label ||
-    block['@type'] ||
-    block.field_id ||
-    ''
-  );
+  return blockDisplayTitle(block, { labelField, fallback: block.field_id });
 }
 
 const BlockSelectWidget = (props) => {

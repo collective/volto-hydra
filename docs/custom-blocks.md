@@ -291,7 +291,7 @@ show_when_when: {
   direction: 'before',    // only blocks earlier than this one
   blockTypes: ['text', 'select', 'single_choice'],
   valueField: 'field_id', // what to STORE (default: the block's own id)
-  labelField: 'label',    // what to SHOW  (falls back to title, label, @type)
+  labelField: 'label',    // what to SHOW  (optional — see below)
 }
 ```
 
@@ -303,6 +303,19 @@ anything. Name the field the consumer actually resolves.
 `direction: 'before'` is what keeps skip logic honest: a question cannot depend
 on an answer given after it, and the first question has nothing to depend on at
 all (the menu is then empty rather than wrong).
+
+### What a candidate reads as
+
+`labelField` only nominates where THIS kind of block keeps its name. Without it,
+a block is named by the shared `blockDisplayTitle` — `title`, then `label`, then
+`plaintext` (the block's indexed text, which is how a block with no name but
+some words is recognised), then the block type's configured title, then the raw
+type.
+
+That is the same function the sidebar's child list uses, deliberately: a
+question that reads "Your name" in one list and "Text" in another is confusing
+in a way nobody reports. Set `labelField` when a block's name lives somewhere
+the chain would not look — a form question's `label` beats its `plaintext`.
 
 ### Not the same as `schemaFieldSelect`
 
