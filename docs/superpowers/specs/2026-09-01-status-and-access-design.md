@@ -64,39 +64,70 @@ differently. That is what the design has to degrade to.
 
 ## Shape
 
-### Drive-style, not a grid
+### Sharing is a schema too, transposed
 
 All three CMSes think in **named roles** — Plone's Reader/Editor/Contributor/
 Reviewer, WordPress's Subscriber→Administrator, Drupal's roles. A permission
 matrix is a shape none of them speaks; we would invent it, map each CMS into
-it, and map back on save.
-
-This is a contract change. Today a grant is a permission tuple:
+it, and map back on save. Today's grant is exactly that invented shape:
 
 ```ts
 permissions: Array<'read' | 'edit' | 'publish' | 'delete'>;   // grid-shaped
 ```
 
-Drive-style wants one role per principal, plus the CMS's own assignable roles
-so the control is adapter-driven rather than hardcoded:
+The obvious replacement is Drive's: a list of people, each with a role. It is
+the right answer to *"who has access?"*, and the wrong one here, because of
+**where the explanation has to live**. Plone has five-plus roles whose meaning
+nobody carries in their head and which change per state; a typical document has
+a handful of principals. Attach the explanation to a person-row and you repeat
+"Reviewer means X while pending" once per person holding it.
 
-```ts
-assignableRoles: Array<{ id: string; label: string }>;
-entries: Array<{ principal; role: string; inherited: boolean; inheritedFrom?: string }>;
-```
+So transpose. **Roles are the sections, people are the values** — which is a
+schema, and specifically the `Schema` the contract already has:
 
-**The lossy case, to be handled rather than hidden:** Plone allows a principal
-to hold several local roles at once and a single select cannot say that. Drive
-answers this with **Custom** — show the role name when the underlying set maps
-to one, "Custom" with detail when it does not, editable only by replacing it.
-What must not happen is silently collapsing two roles into one and writing that
-back, quietly removing access nobody asked to remove.
+- **one fieldset per role**, its `description` explaining what the role means
+  *here*, in this state, and what changes in the states this document can move
+  to;
+- **one field in it**, a multi-select of principals over the `principals`
+  vocabulary — users and groups together, exactly as the adapter supplies them;
+- **one top-level `inherit` boolean**, because Plone's inheritance is per
+  object, not per role.
+
+Returned by `permissions.get`, written back by `permissions.update`, rendered
+by the same form component as everything else.
+
+This costs no machinery. `vocabulary.get` is already an intent
+(`index.d.ts:42`), already routed (`intentRouter.js:258`), already implemented
+by all three adapters; `principals` is one more vocabulary name, and a CMS
+without groups simply returns none.
+
+**Two small contract additions it does need.** `Schema.fieldsets` has no
+`description` field (`index.d.ts:85`), and without one the explanation has
+nowhere to live. And the admin must be able to tell *which* fields hold
+principals — to count them for the toolbar button and to choose the picker —
+which the well-known vocabulary name gives it without a widget escape hatch.
+
+**What this gives up, deliberately:** the per-person answer. *"What can Alice
+do here?"* means scanning the fieldsets rather than reading one row. With a
+handful of principals that is fine, and the admin can invert the mapping for a
+read-only summary if it ever needs to.
+
+**The multi-role case stops being lossy.** Plone lets a principal hold several
+local roles at once, which a Drive-style single-select cannot say and would
+have had to fudge as "Custom". Role-major says it natively: the principal
+appears in both fieldsets.
+
+**What the inherit checkbox cannot tell you** is how many people inherit
+access. Plone's `@sharing` reports inherited flags only for principals you have
+already searched for; there is no call that counts everyone. Plone's own UI
+does not answer it either. We do not invent a number.
 
 ### One dialog, two halves
 
-- **People with access** — principals and roles, from `shareEntries`. Group
-  rows appear because the adapter returned groups, not because of a separate
-  capability, so a CMS without groups degrades by having none.
+- **People with access** — the role fieldsets from `permissions.get`. Groups
+  appear because the adapter's `principals` vocabulary returned them, not
+  because of a separate capability, so a CMS without groups degrades by having
+  none.
 - **General access** — the audience the current state implies. This is where
   the workflow half lives, in Drive's idiom rather than as a separate panel.
 
@@ -286,40 +317,47 @@ that it says "this makes it visible to anyone" **before** you commit. A list of
 fields cannot produce that sentence. Let the schema swallow the whole dialog
 and we have rebuilt Plone's publish form with extra steps.
 
-*People are not a form field.* The list with search, a role per row and
-inherited rows greyed is a bespoke widget. It could be expressed as a field
-with `widget: 'shareEntries'`, but then the schema carries a widget name only
-one implementation understands — the general mechanism smuggling a specific one
-back in — and the admin loses the ability to reason about grants at all: no "3
-people" on the toolbar button, no diff, no explanation.
+*People are, though.* An earlier draft carved principals out as too bespoke for
+a schema. That was wrong: transposed role-major, the picker is a multi-select
+over a vocabulary — machinery that already exists — and see
+[Sharing is a schema too](#sharing-is-a-schema-too-transposed). What survives
+of the objection is only that the admin must be able to recognise a
+principals-bearing field, which one well-known vocabulary name settles.
 
-So: **structured for state and access, schema for everything hanging off a
-transition.**
+So: **structured for what the dialog reasons about — state, transitions and
+their consequence — and schema for everything it merely renders.**
 
-### Say what a role does in the state it is in
+### The adapter writes the sentence
 
 "Reviewer" is meaningless in `published` and decisive in `pending`, and no CMS
 tells you so; you are expected to know the workflow definition.
 
-> **Alice — Reviewer.** Can approve this while it is *pending*. No effect once
+> **Reviewer** — can approve this while it is *pending*. No effect once
 > published.
 
-This needs a projection the contract does not carry: **state → role → what it
-enables**. Plone can compute it exactly, because that mapping *is* its workflow
-definition. Drupal can partially. WordPress cannot — roles do not vary by
-status — so it degrades to "Editor — can edit anything on this site", still
-truer than a role name with no consequence.
+The tempting design is a projection the frontend computes: roles declare what
+they imply and which states they matter in, and the admin composes prose from
+it. That is a small DSL, and it is the wrong side of the boundary — every
+adapter would encode its workflow into our vocabulary so we could decode it
+back into English.
 
-It earns its keep twice: the same projection writes the sentence in the
-slide-out explaining what a transition will change about who can see this.
+The fieldset `description` removes the need. **The adapter writes the
+sentence**, because the adapter is what knows: Plone computes it from the
+per-state role→permission matrix that *is* its workflow definition; Drupal from
+the transition permissions its roles hold; WordPress writes a static line —
+"can edit anything on this site" — which is still truer than a bare role name.
+
+Same reasoning as `consequence` on a transition, one level down: prose the
+party with the knowledge writes, not structure the party without it decodes.
 
 ## Open questions
 
-1. **Two changes to `PermissionsAndState`, both breaking, both free today.**
-   Grants become named roles rather than permission tuples, and transitions
-   gain `consequence` and `schema`. Nothing consumes either field — WordPress
-   and Drupal return `shareEntries: null`, Plone does not implement
-   `permissions.get` at all — so the cost is now or never.
+1. **Three changes to the contract, all breaking, all free today.**
+   `shareEntries` is replaced by a schema from `permissions.get`; transitions
+   gain `consequence` and `schema`; `Schema.fieldsets` gains `description`.
+   Nothing consumes the first two — WordPress and Drupal return
+   `shareEntries: null`, Plone does not implement `permissions.get` at all — so
+   the cost is now or never.
 2. **Which adapter lights it up first.** Plone is the only one that can express
    per-content grants, groups and inheritance — and implementing
    `permissions.get`/`update` there makes the contract suite's existing
