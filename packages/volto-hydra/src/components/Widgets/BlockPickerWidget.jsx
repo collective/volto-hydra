@@ -73,10 +73,16 @@ export function candidateBlockIds({
   const ordered = siblings.sort((a, b) => positionOf(a[1]) - positionOf(b[1]));
   const ids = ordered.map(([id]) => id);
   const at = ids.indexOf(anchorId);
+  // `direction` is relative to me, so not finding myself among my own siblings
+  // means there is no "before" to compute. Offering the whole list instead —
+  // what this did — is the worst answer available: a menu that looks right,
+  // lets an author pick a question that comes AFTER this one, and produces a
+  // rule that can never be met. Offer nothing, so the emptiness is visible.
+  if (direction && at === -1) return [];
   const trimmed =
-    direction === 'before' && at > -1
+    direction === 'before'
       ? ids.slice(0, at)
-      : direction === 'after' && at > -1
+      : direction === 'after'
         ? ids.slice(at + 1)
         : ids;
   return trimmed.filter((id) => id !== currentBlockId);

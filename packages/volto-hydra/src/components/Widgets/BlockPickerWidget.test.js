@@ -40,6 +40,18 @@ describe('candidateBlockIds', () => {
     expect(ids).toEqual(['q1', 'q3']);
   });
 
+  test('an anchor that is not among its siblings offers nothing', () => {
+    // `direction` is relative to me. If I cannot be found, "before" has no
+    // meaning — and answering with the whole list is the failure that hides
+    // itself: the menu looks right, and the rule it builds can never be met.
+    const ids = candidateBlockIds({
+      blockPathMap: MAP,
+      currentBlockId: 'not-in-this-form',
+      direction: 'before',
+    });
+    expect(ids).toEqual([]);
+  });
+
   test('"before" offers only what comes earlier — a question cannot depend on a later one', () => {
     const ids = candidateBlockIds({
       blockPathMap: MAP,

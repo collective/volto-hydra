@@ -3370,6 +3370,11 @@ export class AdminUIHelper {
     // of quietly picking whatever was highlighted.
     const control = fieldWrapper.locator('.react-select__control');
     if (await control.isVisible()) {
+      const stray = this.page.locator('.react-select__menu');
+      if (await stray.count()) {
+        await this.page.keyboard.press('Escape');
+        await stray.first().waitFor({ state: 'detached', timeout: 5000 });
+      }
       await control.scrollIntoViewIfNeeded();
       await control.click();
       // Wait for the MENU before reaching for an option: react-select renders it
@@ -3377,7 +3382,11 @@ export class AdminUIHelper {
       // nothing and the click lands on the page. Same sequence as
       // block-sync.spec.ts, which is the one gesture in this repo known to
       // commit.
-      const menu = this.page.locator('.react-select__menu');
+      // Scoped to THIS field's wrapper, and only after anything already open
+      // has gone. A page-wide `.react-select__menu` can be another field's menu
+      // — still up, or on its way out — and taking an option from it writes the
+      // value to the wrong field while this one keeps its placeholder.
+      const menu = fieldWrapper.locator('.react-select__menu');
       await menu.waitFor({ state: 'visible', timeout: 10000 });
       const option = menu.locator('.react-select__option', { hasText: value });
       await option.first().click();

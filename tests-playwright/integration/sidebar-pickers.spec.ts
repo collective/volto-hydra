@@ -14,6 +14,7 @@
  */
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
+import { URLS } from '../ports';
 
 /** The form fixture's questions, in the order the page holds them. */
 const FIRST_QUESTION = 'field-name';
@@ -27,6 +28,13 @@ async function selectQuestion(helper: AdminUIHelper, uid: string) {
   });
   await helper.clickBlockInIframe(uid, { waitForToolbar: false });
 }
+
+/**
+ * The entry for choosing nothing, however it is worded: ours (`emptyLabel`) or
+ * Volto's own "No value", which it appends to every non-required select.
+ */
+const isEmptyEntry = (option: string) =>
+  option.includes('—') || option.trim() === 'No value';
 
 /** The options a react-select field is offering, as text. */
 async function openMenu(page, field: string): Promise<string[]> {
@@ -48,6 +56,48 @@ async function openMenu(page, field: string): Promise<string[]> {
 }
 
 test.describe('Sidebar pickers', () => {
+  test('direction: a question in the MIDDLE offers earlier ones and no later ones', async ({
+    page,
+  }) => {
+    // From the LAST question every sibling is "before", so the only exclusion
+    // exercised is itself. The middle is where `direction` has to choose.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/form-test-page');
+    await selectQuestion(helper, 'field-message'); // 4th of 11
+
+    const offered = await openMenu(page, 'show_when_field');
+    const questions = offered.filter((o) => !isEmptyEntry(o));
+    expect(questions, 'exactly the questions above it, in page order').toEqual([
+      'Full Name',
+      'Email Address',
+      'Subject',
+    ]);
+  });
+
+  test('scope: a picker never reaches into another form on the same page', async ({
+    page,
+  }) => {
+    // The second form opens with a question labelled "Full Name" too. A picker
+    // that scopes by region rather than by MY region offers it, and the rule
+    // points at a question this form's visitor never answers — which reads, in
+    // the sidebar, exactly like the right choice.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/form-test-page');
+    await selectQuestion(helper, 'other-topic'); // 2nd question of form TWO
+
+    const offered = await openMenu(page, 'show_when_field');
+    const questions = offered.filter((o) => !isEmptyEntry(o));
+    expect(
+      questions,
+      "only its own form's earlier question, not the other form's",
+    ).toEqual(['Full Name']);
+    // Its own form's "Full Name" is `other-name`; the other form's is
+    // `field-name`. Which one was offered is settled by the stored value in the
+    // valueField test, not by the label.
+  });
+
   test('blockPicker offers the questions BEFORE this one, and nothing else', async ({
     page,
   }) => {
@@ -108,7 +158,64 @@ test.describe('Sidebar pickers', () => {
     ).toContain('— always show —');
   });
 
-  test('blockPicker stores the nominated field, not the block id', async ({
+  test('valueField: what is STORED is the named field, not the block id', async ({
+    page,
+  }) => {
+    // The previous version of this test asserted the sidebar still displayed
+    // the label — which a widget keeping its own state passes. What matters is
+    // the value on the block: a rule is evaluated against what a question
+    // submits, so it has to be `field_id`.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/form-test-page');
+    await selectQuestion(helper, LAST_QUESTION);
+
+    const wrapper = page.locator(
+      '#sidebar-properties .field-wrapper-show_when_field',
+    );
+    await wrapper.locator('.react-select__control').click();
+    const menu = wrapper.locator('.react-select__menu');
+    await menu.waitFor({ state: 'visible', timeout: 10000 });
+    await menu
+      .locator('.react-select__option', { hasText: 'Full Name' })
+      .click();
+    // A second, ordinary edit on the same item: if the label survives the save
+    // and the picked question does not, the fault is this field's, not the
+    // item's.
+    await helper.setSidebarFieldValue('label', 'Attach a file (renamed)');
+    await helper.saveContent();
+
+    // The token the ADMIN saved with, not the one the helper set: Volto trades
+    // the seeded cookie for a real JWT on login, and the mock keeps a save
+    // under whichever token sent it. Reading with the wrong one returns the
+    // untouched page, which looks exactly like a save that did nothing.
+    const cookies = await page.context().cookies();
+    const token = cookies.find((c) => c.name === 'auth_token')?.value;
+    expect(token, 'the admin is logged in and holds a token').toBeTruthy();
+    const saved = await page.request.get(
+      `${URLS.mockApi}/_test_data/form-test-page`,
+      {
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    expect(saved.ok(), 'the page reads back').toBeTruthy();
+    const body = await saved.json();
+    const questions = body.blocks['form-block-1'].subblocks;
+    const stored = questions.find((f) => f.field_id === 'field-file');
+    expect(
+      stored?.label,
+      'an ordinary edit on the same item survives the save',
+    ).toBe('Attach a file (renamed)');
+    expect(
+      stored?.show_when_field,
+      'the field_id of the chosen question — not its label, uid or index',
+    ).toBe('field-name');
+  });
+
+  test('blockPicker keeps the choice when the block is left and reselected', async ({
     page,
   }) => {
     const helper = new AdminUIHelper(page);
@@ -140,6 +247,46 @@ test.describe('Sidebar pickers', () => {
     ).toContainText('Full Name', { timeout: 15000 });
   });
 
+  test('a field revealed by a rule on an ITEM appears once the rule is met', async ({
+    page,
+  }) => {
+    // fieldRules on an object_list item have never been verified against a live
+    // admin — the note left when a table's per-item rule was deferred says
+    // exactly that. This is the combination: the picker sets a value, and a
+    // rule on the SAME item reveals the field that depends on it.
+    //
+    // A consumer hit this as "the rule will not save". If it reproduces here it
+    // is hydra's, with the smallest fixture that shows it; if it passes, the
+    // fault is in the consumer's own schema.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/form-test-page');
+    await selectQuestion(helper, LAST_QUESTION);
+
+    const condition = page.locator(
+      '#sidebar-properties .field-wrapper-show_when_is',
+    );
+    await expect(
+      condition,
+      'the condition is hidden while no question is named',
+    ).toHaveCount(0);
+
+    const wrapper = page.locator(
+      '#sidebar-properties .field-wrapper-show_when_field',
+    );
+    await wrapper.locator('.react-select__control').click();
+    const menu = wrapper.locator('.react-select__menu');
+    await menu.waitFor({ state: 'visible', timeout: 10000 });
+    await menu
+      .locator('.react-select__option', { hasText: 'Full Name' })
+      .click();
+
+    await expect(
+      condition,
+      'naming a question reveals the comparison that depends on it',
+    ).toBeVisible({ timeout: 15000 });
+  });
+
   test('vocabularySelect lists the vocabularies the site keeps', async ({
     page,
   }) => {
@@ -153,7 +300,7 @@ test.describe('Sidebar pickers', () => {
     // the error and renders nothing — so the assertion is that terms arrived.
     const offered = await openMenu(page, 'options_from');
     expect(
-      offered.filter((o) => !o.includes('—')).length,
+      offered.filter((o) => !isEmptyEntry(o)).length,
       'the site lists its vocabularies',
     ).toBeGreaterThan(0);
   });
