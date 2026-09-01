@@ -773,9 +773,11 @@ function buildActionsComponent(cleanPath, baseUrl) {
   return {
     '@id': `${fullUrl}/@actions`,
     document_actions: [],
+    // `url`, not `@id` — that is what Plone 6 emits and what Volto reads. See
+    // tests-adapters/fixtures/plone/live_actions_anon.json.
     object: [
-      { '@id': fullUrl, icon: '', id: 'view', title: 'View' },
-      { '@id': `${fullUrl}/edit`, icon: '', id: 'edit', title: 'Edit' },
+      { url: fullUrl, icon: '', id: 'view', title: 'View' },
+      { url: `${fullUrl}/edit`, icon: '', id: 'edit', title: 'Edit' },
       { id: 'folderContents', title: 'Contents' },
     ],
     object_buttons: [],
@@ -794,12 +796,94 @@ function buildNavigationComponent(cleanPath, baseUrl) {
   };
 }
 
-function buildWorkflowComponent(cleanPath, baseUrl) {
+/**
+ * Plone's simple_publication_workflow.
+ *
+ * Shape comes from tests-adapters/fixtures/plone/workflow_get.resp — a real
+ * recorded response. Note what is NOT in it: a transition names no destination
+ * state, only an @id and a title. Behaviour (which transition leads where) is
+ * simulated here because the workflow definition is not over REST at all.
+ */
+const SPW = {
+  private: [
+    { id: 'publish', title: 'Publish', to: 'published' },
+    { id: 'submit', title: 'Submit for publication', to: 'pending' },
+  ],
+  pending: [
+    { id: 'publish', title: 'Publish', to: 'published' },
+    { id: 'reject', title: 'Reject', to: 'private' },
+    { id: 'retract', title: 'Retract', to: 'private' },
+  ],
+  published: [{ id: 'retract', title: 'Retract', to: 'private' }],
+};
+
+const STATE_TITLES = {
+  private: 'Private',
+  pending: 'Pending review',
+  published: 'Published',
+};
+
+function buildWorkflowComponent(cleanPath, baseUrl, sessionId) {
   const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
+  const content = getContent(cleanPath, sessionId);
+  const state = content?.review_state || 'published';
   return {
     '@id': `${fullUrl}/@workflow`,
-    history: [],
-    transitions: [],
+    history: [
+      {
+        action: null,
+        actor: 'admin',
+        comments: '',
+        review_state: state,
+        time: '1995-07-31T17:30:00+00:00',
+        title: STATE_TITLES[state] ?? state,
+      },
+    ],
+    state: { id: state, title: STATE_TITLES[state] ?? state },
+    // Deliberately {@id, title} only. An adapter that wants a destination
+    // state has to get it somewhere else — which is the finding.
+    transitions: (SPW[state] ?? []).map((t) => ({
+      '@id': `${fullUrl}/@workflow/${t.id}`,
+      title: t.title,
+    })),
+  };
+}
+
+/**
+ * Local roles. Shape from tests-adapters/fixtures/plone/sharing_folder_get.resp.
+ *
+ * Entry-major, with a {Role: bool} map per principal — the grid. Transposing
+ * that into one field per role is the ADAPTER's job, in both directions.
+ */
+const AVAILABLE_ROLES = [
+  { id: 'Contributor', title: 'Can add' },
+  { id: 'Editor', title: 'Can edit' },
+  { id: 'Reader', title: 'Can view' },
+  { id: 'Reviewer', title: 'Can review' },
+];
+
+const sessionSharing = {};
+
+function noRoles() {
+  return Object.fromEntries(AVAILABLE_ROLES.map((r) => [r.id, false]));
+}
+
+function getSharing(cleanPath, sessionId) {
+  const stored = sessionSharing[sessionId]?.[cleanPath];
+  if (stored) return stored;
+  return {
+    available_roles: AVAILABLE_ROLES,
+    entries: [
+      {
+        disabled: false,
+        id: 'AuthenticatedUsers',
+        login: null,
+        roles: noRoles(),
+        title: 'Logged-in users',
+        type: 'group',
+      },
+    ],
+    inherit: true,
   };
 }
 
@@ -2215,7 +2299,79 @@ app.get('/@site', (req, res) => {
  */
 app.get(/.*\/@workflow$/, (req, res) => {
   const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@workflow$/, '') || '/').replace(/\/+$/, '') || '/';
-  res.json(buildWorkflowComponent(cleanPath, `http://localhost:${PORT}`));
+  res.json(buildWorkflowComponent(cleanPath, `http://localhost:${PORT}`, getSessionId(req)));
+});
+
+/**
+ * POST /:path/@workflow/:transition
+ *
+ * The body Plone accepts here is real, not invented — see
+ * tests-adapters/fixtures/plone/workflow_post_with_body.req: comment,
+ * effective, expires, include_children.
+ */
+app.post(/.*\/@workflow\/[^/]+$/, (req, res) => {
+  const raw = req.path.replace('/++api++', '');
+  const transitionId = raw.split('/').pop();
+  const cleanPath = (raw.replace(/\/?@workflow\/[^/]+$/, '') || '/').replace(/\/+$/, '') || '/';
+  const sessionId = getSessionId(req);
+
+  const content = getContent(cleanPath, sessionId);
+  if (!content) return res.status(404).json({ error: { type: 'NotFound' } });
+
+  const from = content.review_state || 'published';
+  const move = (SPW[from] ?? []).find((t) => t.id === transitionId);
+  if (!move) {
+    return res.status(400).json({
+      error: { type: 'BadRequest', message: `Invalid transition '${transitionId}' from '${from}'` },
+    });
+  }
+
+  const patch = { review_state: move.to };
+  for (const field of ['effective', 'expires']) {
+    if (req.body?.[field]) patch[field] = req.body[field];
+  }
+  setSessionContent(sessionId, cleanPath, { ...content, ...patch });
+
+  res.json({
+    action: transitionId,
+    actor: 'admin',
+    comments: req.body?.comment ?? '',
+    review_state: move.to,
+    title: STATE_TITLES[move.to] ?? move.to,
+  });
+});
+
+app.get(/.*\/@sharing$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@sharing$/, '') || '/').replace(/\/+$/, '') || '/';
+  res.json(getSharing(cleanPath, getSessionId(req)));
+});
+
+app.post(/.*\/@sharing$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@sharing$/, '') || '/').replace(/\/+$/, '') || '/';
+  const sessionId = getSessionId(req);
+  const current = getSharing(cleanPath, sessionId);
+
+  const byId = new Map(current.entries.map((e) => [e.id, e]));
+  for (const incoming of req.body?.entries ?? []) {
+    const existing = byId.get(incoming.id);
+    byId.set(incoming.id, {
+      disabled: false,
+      login: null,
+      title: incoming.id,
+      type: incoming.type ?? 'user',
+      ...existing,
+      id: incoming.id,
+      roles: { ...noRoles(), ...(existing?.roles ?? {}), ...incoming.roles },
+    });
+  }
+
+  if (!sessionSharing[sessionId]) sessionSharing[sessionId] = {};
+  sessionSharing[sessionId][cleanPath] = {
+    available_roles: AVAILABLE_ROLES,
+    entries: [...byId.values()],
+    inherit: req.body?.inherit ?? current.inherit,
+  };
+  res.status(204).end();
 });
 
 /**

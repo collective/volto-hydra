@@ -204,7 +204,20 @@ export interface PermissionsAndState {
    * A transition whose `targetState` equals the current state is a no-op; use
    * the reserved `access` form to change who can see this without moving.
    */
-  transitions: Array<{ id: string; label: string; targetState: string }>;
+  transitions: Array<{
+    id: string;
+    label: string;
+    /**
+     * Optional because one of the three cannot answer it. Plone's `@workflow`
+     * returns each transition as `{@id, title}` and nothing else — the
+     * destination state is in the workflow definition, which is not over REST.
+     * WordPress and Drupal both know theirs.
+     *
+     * Where it is absent the menu shows the transition's own label rather than
+     * grouping by destination, which is what Plone's own UI does today.
+     */
+    targetState?: string;
+  }>;
   /** What the current user may do. UI gates visible/enabled controls on this. */
   effective: {
     canEdit: boolean;

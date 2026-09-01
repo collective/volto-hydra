@@ -116,8 +116,12 @@ function permissionsToPlone(pas) {
  * button over — a destination on the CMS, or merely `permitted: false` to
  * withhold it — and any other id is an entry Volto had no concept of.
  *
- * `@id` carries the destination, which is the field Plone's own actions use;
- * an entry without one keeps Volto's screen.
+ * `url` carries the destination. That is the field Plone 6 actually emits and
+ * the one Volto reads (Footer.jsx renders `item.url`); an earlier version of
+ * this wrote `@id`, which the mock was then written to match, so nothing
+ * caught it. Verified against demo.plone.org — see
+ * tests-adapters/fixtures/plone/live_actions_anon.json. An entry without a
+ * destination keeps Volto's own screen.
  */
 function actionsToPlone(pas) {
   const e = pas?.effective ?? {};
@@ -127,10 +131,20 @@ function actionsToPlone(pas) {
   if (e.canDelete) object.push({ id: 'delete', title: 'Delete' });
   if (e.canShare) object.push({ id: 'sharing', title: 'Sharing' });
 
-  const categories = { object, object_buttons: [], user: [], site: [] };
+  // Keys are Plone's own category names, because Volto reads them directly
+  // (state.actions.actions.site_actions). The canonical `site` an adapter
+  // declares maps onto site_actions here.
+  const categories = {
+    object,
+    object_buttons: [],
+    user: [],
+    site_actions: [],
+  };
 
   for (const declared of pas?.actions ?? []) {
-    const category = categories[declared.category ?? 'object'] ?? object;
+    const requested = declared.category ?? 'object';
+    const category =
+      categories[requested === 'site' ? 'site_actions' : requested] ?? object;
     const existing = category.findIndex((a) => a.id === declared.id);
 
     if (declared.permitted === false) {
@@ -142,7 +156,7 @@ function actionsToPlone(pas) {
     const entry = {
       id: declared.id,
       title: declared.title,
-      ...(declared.url ? { '@id': declared.url } : {}),
+      ...(declared.url ? { url: declared.url } : {}),
       // How it opens travels with it; the toolbar decides nothing on its own.
       ...(declared.target ? { target: declared.target } : {}),
       native: Boolean(declared.url),

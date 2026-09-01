@@ -124,7 +124,10 @@ describe('plonify', () => {
         { id: 'edit', title: 'Edit in WordPress', url: 'http://cms/wp-admin/post.php?post=7' },
       ]);
       const edit = p.object.find((a) => a.id === 'edit');
-      expect(edit['@id']).toBe('http://cms/wp-admin/post.php?post=7');
+      // `url` is what Plone 6 emits and what Volto reads. This asserted '@id'
+      // until it was checked against a live Plone; the mock had been written to
+      // agree with the adapter, so both were wrong together.
+      expect(edit.url).toBe('http://cms/wp-admin/post.php?post=7');
       // Marked native so the toolbar leaves the admin rather than routing.
       expect(edit.native).toBe(true);
     });
@@ -146,8 +149,10 @@ describe('plonify', () => {
           target: 'iframe',
         },
       ]);
-      const added = p.site.find((a) => a.id === 'wp-settings');
-      expect(added['@id']).toBe('http://cms/wp-admin/options-general.php');
+      // Volto reads state.actions.actions.site_actions — Plone's own category
+      // name — not `site`.
+      const added = p.site_actions.find((a) => a.id === 'wp-settings');
+      expect(added.url).toBe('http://cms/wp-admin/options-general.php');
       // How it opens travels with the action: the toolbar decides nothing.
       expect(added.target).toBe('iframe');
       expect(p.object.find((a) => a.id === 'wp-settings')).toBeUndefined();

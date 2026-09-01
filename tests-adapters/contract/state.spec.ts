@@ -45,7 +45,9 @@ describe('state.get', () => {
       expect(typeof t.id).toBe('string');
       expect(t.id.length).toBeGreaterThan(0);
       expect(typeof t.label).toBe('string');
-      expect(typeof t.targetState).toBe('string');
+      // Optional: Plone's @workflow names no destination. See
+      // tests-adapters/fixtures/plone/README.md.
+      if (t.targetState !== undefined) expect(typeof t.targetState).toBe('string');
       // Ids address the entry; a duplicate silently overrides its twin.
       expect(ids.has(t.id)).toBe(false);
       ids.add(t.id);
@@ -86,7 +88,13 @@ describe('state.get', () => {
     });
 
     const after: any = await target.adapter.dispatch('state.get', { path: PATH });
-    expect(after.state.name).toBe(move.targetState);
+    if (move.targetState !== undefined) {
+      expect(after.state.name).toBe(move.targetState);
+    } else {
+      // Still must MOVE. An adapter that cannot name the destination is not
+      // excused from reaching one.
+      expect(after.state.name).not.toBe(before.state.name);
+    }
   });
 
   it('rejects cleanly where the capability is absent', async () => {
