@@ -2247,5 +2247,34 @@
         "analyticsPurpose": "Counts visits and pages, so we can see what is worth improving. Never used to identify you."
       }
     }
+  },
+  "suggest": {
+    "blocks": {
+      "suggest": {
+        "blockSchema": {
+          "properties": {
+            "label": {
+              "title": "Question"
+            },
+            "suggestFrom": {
+              "title": "Suggest from",
+              "widget": "vocabularySelect",
+              "vocabularyFilter": "Keywords|Subject"
+            },
+            "value": {
+              "title": "Answer"
+            }
+          }
+        }
+      }
+    },
+    "examples": {
+      "ex-suggest": {
+        "@type": "suggest",
+        "label": "Topic",
+        "suggestFrom": "plone.app.vocabularies.Keywords",
+        "value": ""
+      }
+    }
   }
 }

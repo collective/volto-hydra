@@ -206,6 +206,55 @@ error and no clue in the DOM. Either declare both (`type: 'string', widget:
 to be annotated, and every annotated field has to become editable and take the
 caret when clicked.
 
+## Picking a vocabulary (`vocabularySelect`)
+
+A field can reference a vocabulary — "suggest this answer from the site's
+keywords", "offer these states". Volto has widgets for picking a **term from** a
+vocabulary; it has none for picking **which vocabulary**, and the reason is
+structural rather than an oversight:
+
+- Vocabularies are named utilities, and `GET /@vocabularies` lists them all.
+- But it answers `{"@id", "title"}` per item, while Volto's vocabulary reducer
+  reads `{token, title}` — so a built-in select aimed at the listing shows every
+  name and stores `undefined`.
+
+`vocabularySelect` reads the listing itself and keeps the **name** (the last
+segment of `@id`), which is what every consumer accepts — `@vocabularies/<name>`,
+Volto's `getVocabulary`, a schema's `vocabulary: { "@id": … }`.
+
+```js
+suggest_from: {
+  title: 'Suggest from',
+  widget: 'vocabularySelect',
+  // Optional: only offer vocabularies whose NAME matches this expression.
+  vocabularyFilter: 'Keywords|Subject',
+}
+```
+
+The stored value is a name (`plone.app.vocabularies.Keywords`), not a URL, so
+content does not carry one environment's origin.
+
+### What it deliberately does not offer
+
+**Catalog queries.** A query is not a list of terms. "Content matching these
+criteria" belongs to a listing's `querystring`, which has its own widget.
+
+**Field-bound sources.** In `zope.schema` a vocabulary *is* a source, and
+`@sources/<field>` will even enumerate one when it is `IIterableSource` — the
+same serializer answers both. But a source has no name to store: it is
+identified by a field on an object (`field.bind(context).source`), so nothing
+registers it and nothing can list it. `@sources` and `@querysources` also
+require the `plone.restapi.vocabularies` permission (Manager / Site
+Administrator), while `@vocabularies` is `zope2.View` — so an anonymous visitor
+filling in a form can read a vocabulary and can never read a source.
+
+### Searching a vocabulary
+
+`@vocabularies/<name>` supports `?title=` (a case-insensitive substring filter,
+applied server-side) and `b_start` / `b_size` batching. A type-ahead should send
+`?title=` per keystroke rather than fetch every term — a long vocabulary is
+exactly the case where a list is the wrong control.
+
 ## Schema Enhancers
 
 Schema enhancers modify block schemas dynamically:
