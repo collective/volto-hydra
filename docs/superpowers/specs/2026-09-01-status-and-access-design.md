@@ -17,6 +17,9 @@ Plone's state menu, except:
   is a state change;
 - and an **access-only entry**, for changing permissions without moving state.
 
+Dates belong here too: "published" is not the truth when an effective date puts
+it next week, so status is always shown as the audience that actually applies.
+
 Save stays its own one-tap button. Choosing the current state does nothing.
 
 ## The problem
@@ -167,6 +170,37 @@ twice invites "which of these is authoritative?".
 opposites**: retract takes the page off the site; a working copy leaves it
 exactly as it is. Both exist in Plone. Labelled by consequence, a user cannot
 mistake one for the other.
+
+### When: dates are part of the audience
+
+Audience has a time dimension and all three CMSes express it, so the dialog
+carries it rather than leaving it to a metadata tab nobody opens.
+
+| | publish at | stop publishing at |
+| --- | --- | --- |
+| **WordPress** | scheduled publish (`future` status) | — |
+| **Plone** | effective date | expiration date |
+| **Drupal** | contrib (Scheduler), not core | contrib |
+
+Plone's is the awkward one and the reason this cannot be left out: effective
+and expiration are a **second visibility mechanism running alongside
+workflow**. A document can be `published` and still invisible because its
+effective date is next week — Plone's own UI will cheerfully show "Published"
+while the page 404s for anonymous.
+
+So: **the state name is not the truth, the effective audience is.** Anywhere
+this design shows a status — the toolbar button, the slide-out, the dialog —
+it shows what is actually true now, with the date as the qualifier:
+
+```
+Published — from Tuesday 9 Sept        (not yet visible)
+Published — until 30 Sept
+```
+
+A scheduled change is the same transition with a timestamp, so
+`state.transition` takes an optional `at`, and the save flow reads *Save &
+publish on Tuesday*. Where a CMS has no expiry the field is not offered, on the
+same principle as every other capability gate: absent, not empty and inert.
 
 ### Working copies are transitions
 
