@@ -130,7 +130,12 @@
           "field_type": "text",
           "label": "Second form question"
         }
-      ]
+      ],
+      "default_to": "admin@example.com",
+      "default_from": "noreply@example.com",
+      "default_subject": "Second form submission",
+      "captcha": "honeypot",
+      "submit_label": "Submit"
     }
   },
   "blocks_layout": {
