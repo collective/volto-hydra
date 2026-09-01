@@ -108,6 +108,63 @@ describe('plonify', () => {
     expect(p.description).toBe('hi');
   });
 
+  describe('adapter-declared actions', () => {
+    const permissions = {
+      state: { name: 'published', label: 'Published' },
+      transitions: [],
+      effective: { canEdit: true, canDelete: true, canShare: true },
+    };
+    const actions = (extra) =>
+      plonify('state.get', { ...permissions, actions: extra }, {
+        endpoint: 'actions',
+      });
+
+    it('sends a built-in to the CMS instead of Volto', () => {
+      const p = actions([
+        { id: 'edit', title: 'Edit in WordPress', url: 'http://cms/wp-admin/post.php?post=7' },
+      ]);
+      const edit = p.object.find((a) => a.id === 'edit');
+      expect(edit['@id']).toBe('http://cms/wp-admin/post.php?post=7');
+      // Marked native so the toolbar leaves the admin rather than routing.
+      expect(edit.native).toBe(true);
+    });
+
+    it('withholds one the adapter says is not permitted', () => {
+      const p = actions([{ id: 'sharing', title: 'Sharing', permitted: false }]);
+      expect(p.object.find((a) => a.id === 'sharing')).toBeUndefined();
+      // Only that one: withholding is not a reason to lose the rest.
+      expect(p.object.find((a) => a.id === 'edit')).toBeDefined();
+    });
+
+    it('adds one Volto has no concept of, in the category asked for', () => {
+      const p = actions([
+        {
+          id: 'wp-settings',
+          title: 'Site settings',
+          url: 'http://cms/wp-admin/options-general.php',
+          category: 'site',
+          target: 'iframe',
+        },
+      ]);
+      const added = p.site.find((a) => a.id === 'wp-settings');
+      expect(added['@id']).toBe('http://cms/wp-admin/options-general.php');
+      // How it opens travels with the action: the toolbar decides nothing.
+      expect(added.target).toBe('iframe');
+      expect(p.object.find((a) => a.id === 'wp-settings')).toBeUndefined();
+    });
+
+    it('leaves the built-ins alone when the adapter declares nothing', () => {
+      const p = plonify('state.get', permissions, { endpoint: 'actions' });
+      expect(p.object.map((a) => a.id)).toEqual([
+        'view',
+        'edit',
+        'folderContents',
+        'delete',
+        'sharing',
+      ]);
+    });
+  });
+
   it('renders listings with items_total', () => {
     const p = plonify('tree.list', { items: [doc], total: 1 }, { path: '/news' });
     expect(p.items_total).toBe(1);

@@ -641,6 +641,41 @@ export class WordPressAdapter extends BaseAdapter {
           // Vanilla WordPress has no per-post grants; the sharing half of the
           // panel hides on this rather than showing an empty list.
           shareEntries: null,
+
+          // Screens WordPress would rather show itself.
+          //
+          // These are not reimplementations waiting to be written: wp-admin
+          // already has a media library and a settings page, and the user is
+          // logged into it in their own browser. Delegating means no second
+          // login and no second implementation.
+          //
+          // All open in a new window. wp-admin sends
+          // X-Frame-Options: SAMEORIGIN, and a Hydra admin is never on the
+          // CMS's origin, so an inline frame would come back blank with
+          // nothing to tell the user.
+          actions: [
+            {
+              id: 'wp-edit-native',
+              title: 'Edit in WordPress',
+              url: `${this.cmsBaseUrl}/wp-admin/post.php?post=${id}&action=edit`,
+              category: 'object',
+              target: 'window',
+            },
+            {
+              id: 'wp-media',
+              title: 'Media library',
+              url: `${this.cmsBaseUrl}/wp-admin/upload.php`,
+              category: 'site',
+              target: 'window',
+            },
+            {
+              id: 'wp-settings',
+              title: 'Site settings',
+              url: `${this.cmsBaseUrl}/wp-admin/options-general.php`,
+              category: 'site',
+              target: 'window',
+            },
+          ],
         };
       }
 

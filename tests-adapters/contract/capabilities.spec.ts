@@ -74,3 +74,48 @@ describe('advertised capabilities are real', () => {
     });
   }
 });
+
+/**
+ * Screens the CMS answers for itself.
+ *
+ * An adapter may hand back toolbar entries pointing at its own admin — the
+ * media library, the settings page, an edit form — rather than have Volto
+ * reimplement each one. Optional by design: a CMS content with Volto's screens
+ * declares nothing and this asserts nothing about it.
+ *
+ * What it does insist on is that a declared entry can actually be followed.
+ * These leave the admin entirely, so a relative path or a link back to the
+ * admin's own origin is not a lesser version of the feature — it is a dead end
+ * for the user, and one that would only be discovered by clicking it.
+ */
+describe('native actions', () => {
+  it('point somewhere followable, on the CMS', async () => {
+    const pas: any = await target.adapter.dispatch('state.get', {
+      path: '/news/first-post',
+    });
+
+    const declared = pas.actions ?? [];
+    const seen = new Set<string>();
+
+    for (const action of declared) {
+      expect(typeof action.id).toBe('string');
+      expect(action.id.length).toBeGreaterThan(0);
+      expect(typeof action.title).toBe('string');
+      expect(action.title.length).toBeGreaterThan(0);
+
+      // Ids address the entry — a duplicate silently overrides its twin.
+      expect(seen.has(action.id)).toBe(false);
+      seen.add(action.id);
+
+      if (action.url !== undefined) {
+        expect(action.url).toMatch(/^https?:\/\//);
+      }
+      if (action.target !== undefined) {
+        expect(['window', 'iframe']).toContain(action.target);
+      }
+      if (action.category !== undefined) {
+        expect(['object', 'site', 'user']).toContain(action.category);
+      }
+    }
+  });
+});

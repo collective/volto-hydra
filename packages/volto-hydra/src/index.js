@@ -39,6 +39,8 @@ import frontendPreviewUrl, { viewportPreset } from './reducers';
 import FrontendSwitcherPlug from './components/Toolbar/FrontendSwitcherPlug';
 import SidebarToggleToolbarPlug from './components/Toolbar/SidebarToggleToolbarPlug';
 import FrontendSwitcherPanel from './components/Toolbar/FrontendSwitcherPanel';
+import NativeActionsPlug from './components/Toolbar/NativeActionsPlug';
+import NativeActionsPanel from './components/Toolbar/NativeActionsPanel';
 import MobileSubmenuClose from './components/Toolbar/MobileSubmenuClose';
 import { getIframeUrlCookieName } from './utils/cookieNames';
 import getSavedURLs, { getURlsFromEnv } from './utils/getSavedURLs';
@@ -210,12 +212,19 @@ const applyConfig = (config) => {
       component: FrontendSwitcherPanel,
       wrapper: null,
     },
+    // Screens the CMS answers for itself. The button hides when no adapter
+    // declared any, so a CMS happy with Volto's own screens adds nothing.
+    nativeActions: {
+      component: NativeActionsPanel,
+      wrapper: null,
+    },
   };
 
   // Register the toolbar plug as appExtras so Plug mounts in the App tree
   config.settings.appExtras = [
     ...(config.settings.appExtras || []),
     { match: '/', component: FrontendSwitcherPlug },
+    { match: '/', component: NativeActionsPlug },
     { match: '/', component: SidebarToggleToolbarPlug },
     { match: '/', component: MobileSubmenuClose },
   ];

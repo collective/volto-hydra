@@ -107,6 +107,18 @@ function permissionsToPlone(pas) {
  * show. Derive them from the canonical permissions rather than asking adapters
  * to model Plone's action registry.
  */
+/**
+ * Actions the admin renders, from what the user MAY do plus what the CMS wants
+ * to answer for itself.
+ *
+ * The permission flags below decide which built-ins exist at all. An adapter's
+ * own `actions` list is then folded in by id: an id Volto knows takes that
+ * button over — a destination on the CMS, or merely `permitted: false` to
+ * withhold it — and any other id is an entry Volto had no concept of.
+ *
+ * `@id` carries the destination, which is the field Plone's own actions use;
+ * an entry without one keeps Volto's screen.
+ */
 function actionsToPlone(pas) {
   const e = pas?.effective ?? {};
   const object = [{ id: 'view', title: 'View' }];
@@ -114,7 +126,32 @@ function actionsToPlone(pas) {
   if (e.canEdit) object.push({ id: 'folderContents', title: 'Contents' });
   if (e.canDelete) object.push({ id: 'delete', title: 'Delete' });
   if (e.canShare) object.push({ id: 'sharing', title: 'Sharing' });
-  return { object, object_buttons: [], user: [], site: [] };
+
+  const categories = { object, object_buttons: [], user: [], site: [] };
+
+  for (const declared of pas?.actions ?? []) {
+    const category = categories[declared.category ?? 'object'] ?? object;
+    const existing = category.findIndex((a) => a.id === declared.id);
+
+    if (declared.permitted === false) {
+      // Withheld: the adapter is answering for this button by removing it.
+      if (existing !== -1) category.splice(existing, 1);
+      continue;
+    }
+
+    const entry = {
+      id: declared.id,
+      title: declared.title,
+      ...(declared.url ? { '@id': declared.url } : {}),
+      // How it opens travels with it; the toolbar decides nothing on its own.
+      ...(declared.target ? { target: declared.target } : {}),
+      native: Boolean(declared.url),
+    };
+    if (existing === -1) category.push(entry);
+    else category[existing] = { ...category[existing], ...entry };
+  }
+
+  return categories;
 }
 
 /**

@@ -2,7 +2,7 @@
   "cookies": [
     {
       "name": "wordpress_3be4cc83fec22c4f7debe3e9f742a41a",
-      "value": "admin%7C1788426953%7CuMuWra6NvobrZPnv4oDxRSH3GKWBGOZJwBuytxnzqxj%7C043572139a1c6f8c02aa744ad818ce9d2bf8338c87df97529e6dd94e4b0bff66",
+      "value": "admin%7C1788438441%7Cwgv96uaPTl0B37qLkTJonT9kpA4I3ybdg08CkC7fPsS%7C6c33ec30d4d5a192002788b70e5455b24665b6e595f5f22fb47b0052953111d0",
       "domain": "127.0.0.1",
       "path": "/wp-content/plugins",
       "expires": -1,
@@ -12,7 +12,7 @@
     },
     {
       "name": "wordpress_3be4cc83fec22c4f7debe3e9f742a41a",
-      "value": "admin%7C1788426953%7CuMuWra6NvobrZPnv4oDxRSH3GKWBGOZJwBuytxnzqxj%7C043572139a1c6f8c02aa744ad818ce9d2bf8338c87df97529e6dd94e4b0bff66",
+      "value": "admin%7C1788438441%7Cwgv96uaPTl0B37qLkTJonT9kpA4I3ybdg08CkC7fPsS%7C6c33ec30d4d5a192002788b70e5455b24665b6e595f5f22fb47b0052953111d0",
       "domain": "127.0.0.1",
       "path": "/wp-admin",
       "expires": -1,
@@ -32,7 +32,7 @@
     },
     {
       "name": "auth_token",
-      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImV4cCI6NDEwMjQ0NDgwMH0.fake-signature-c2c8037f-cfcb-4327-acda-65413b5d61ad",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImV4cCI6NDEwMjQ0NDgwMH0.fake-signature-80939479-ccbc-45b2-822d-690c25299c1b",
       "domain": "localhost",
       "path": "/",
       "expires": -1,
@@ -45,7 +45,7 @@
       "value": "en",
       "domain": "localhost",
       "path": "/",
-      "expires": 1803806130.453442,
+      "expires": 1803817618.31215,
       "httpOnly": false,
       "secure": false,
       "sameSite": "Strict"
@@ -62,7 +62,7 @@
     },
     {
       "name": "wordpress_logged_in_3be4cc83fec22c4f7debe3e9f742a41a",
-      "value": "admin%7C1788426953%7CuMuWra6NvobrZPnv4oDxRSH3GKWBGOZJwBuytxnzqxj%7Cb1da8e8a807b0682d15b082907549164a552b261b97c6be0e9417a1cbd325cc9",
+      "value": "admin%7C1788438441%7Cwgv96uaPTl0B37qLkTJonT9kpA4I3ybdg08CkC7fPsS%7C01b01f6483ac9898a95bdefb1dd65fd8ec574f13c17d6237798696892e8d3a0a",
       "domain": "127.0.0.1",
       "path": "/",
       "expires": -1,
@@ -72,10 +72,10 @@
     },
     {
       "name": "wp-settings-time-1",
-      "value": "1788254158",
+      "value": "1788265646",
       "domain": "127.0.0.1",
       "path": "/",
-      "expires": 1819790158.427791,
+      "expires": 1819801646.516045,
       "httpOnly": false,
       "secure": false,
       "sameSite": "Lax"
@@ -87,7 +87,7 @@
       "localStorage": [
         {
           "name": "hydra_credentials:wordpress:http://127.0.0.1:8795",
-          "value": "{\"username\":\"admin\",\"appPassword\":\"5MVO 7Z30 qcRp dr2Q L28o hXaZ\"}"
+          "value": "{\"username\":\"admin\",\"appPassword\":\"d0Ko KTVZ XlPp dNOt t1UX TINv\"}"
         }
       ]
     }

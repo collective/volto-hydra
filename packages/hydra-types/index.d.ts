@@ -181,6 +181,48 @@ export interface PermissionsAndState {
     permissions: Array<'read' | 'edit' | 'publish' | 'delete'>;
     inherited: boolean;
   }> | null;
+  /**
+   * Toolbar entries this CMS wants to answer for itself.
+   *
+   * `effective` above says what the user MAY do; this says where doing it
+   * happens when the CMS would rather show its own screen than have Volto
+   * reimplement one. Three uses, all from the same list:
+   *
+   *  - REPLACE a built-in: give the entry the id Volto already knows (`edit`,
+   *    `sharing`, `history`) and it takes over that button's destination.
+   *  - ADD one Volto has no concept of: any other id.
+   *  - HIDE either: `permitted: false`. The admin gates on this, so an adapter
+   *    can withhold its own entries and Volto's alike.
+   *
+   * Optional and empty by default: a CMS that is happy with Volto's own
+   * screens says nothing and nothing changes.
+   */
+  actions?: Array<{
+    /** Matches a Volto action id to replace it; anything else is a new entry. */
+    id: string;
+    title: string;
+    /**
+     * Where it goes. Absent means Volto's own screen for that id — which is
+     * how an adapter permits or hides a built-in without redirecting it.
+     */
+    url?: string;
+    /** Withheld entries are not rendered. Defaults to true. */
+    permitted?: boolean;
+    /**
+     * How a `url` opens. Defaults to 'window'.
+     *
+     * 'iframe' is opt-in because the CMS decides, not us: admin pages
+     * routinely send X-Frame-Options: SAMEORIGIN or frame-ancestors 'self'
+     * — WordPress does, which is why signing in had to be a popup — and in
+     * Hydra the admin is never on the CMS's origin. There is no way to ask
+     * in advance whether framing will be refused; you find out when the frame
+     * comes back blank. So an adapter opts in only for a CMS it knows allows
+     * it, and everything else opens where it will actually work.
+     */
+    target?: 'window' | 'iframe';
+    /** Which toolbar grouping it belongs to. Defaults to 'object'. */
+    category?: 'object' | 'site' | 'user';
+  }>;
 }
 
 export interface AdapterContext {
