@@ -255,6 +255,46 @@ applied server-side) and `b_start` / `b_size` batching. A type-ahead should send
 `?title=` per keystroke rather than fetch every term — a long vocabulary is
 exactly the case where a list is the wrong control.
 
+## Picking another block (`blockSelect`)
+
+A field that names **another block** — "show this question when THAT one is
+answered" — should offer a menu, not ask for a uid. `blockSelect` reads
+`blockPathMap`, the same container/region map the editor uses, and stores a
+**field of the block chosen**.
+
+```js
+show_when_when: {
+  title: 'Show when',
+  widget: 'blockSelect',
+  scope: 'siblings',      // 'siblings' (default) | '..' (parent's siblings) | '<region>'
+  direction: 'before',    // only blocks earlier than this one
+  blockTypes: ['text', 'select', 'single_choice'],
+  valueField: 'field_id', // what to STORE (default: the block's own id)
+  labelField: 'label',    // what to SHOW  (falls back to title, label, @type)
+}
+```
+
+`valueField` is the part worth understanding. A rule is evaluated against the
+value a field submits — a form question's `field_id` — so storing the block's
+uid would produce a rule that reads correctly in the sidebar and never matches
+anything. Name the field the consumer actually resolves.
+
+`direction: 'before'` is what keeps skip logic honest: a question cannot depend
+on an answer given after it, and the first question has nothing to depend on at
+all (the menu is then empty rather than wrong).
+
+### Not the same as `schemaFieldSelect`
+
+| | `schemaFieldSelect` | `blockSelect` |
+|---|---|---|
+| choices | the CONTENT TYPE's schema fields, from `/@types` | blocks on the page, from `blockPathMap` |
+| scope | the whole type | relative — siblings, `..`, a named region |
+| stores | the field name | any field of the chosen block |
+
+They share only their tail (build choices, hand them to the select). One asks
+the backend what a content type looks like; the other walks the block tree in
+the editor.
+
 ## Schema Enhancers
 
 Schema enhancers modify block schemas dynamically:
