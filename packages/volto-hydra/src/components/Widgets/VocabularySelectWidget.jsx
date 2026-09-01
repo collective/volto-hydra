@@ -27,6 +27,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { defineMessages, useIntl } from 'react-intl';
+import { useSelector } from 'react-redux';
 import config from '@plone/volto/registry';
 
 const messages = defineMessages({
@@ -46,14 +47,22 @@ export function vocabularyNameFrom(item) {
 const VocabularySelectWidget = (props) => {
   const { vocabularyFilter, emptyLabel } = props;
   const intl = useIntl();
+  // The token, the way Volto sends it — an Authorization header, not a cookie.
+  // `credentials: 'include'` is refused outright by a browser when the API
+  // answers `Access-Control-Allow-Origin: *`, which is how the admin and the
+  // API being different origins turned into an empty menu and a CORS error in
+  // the console rather than anything the widget could see.
+  const token = useSelector((state) => state.userSession?.token);
   const [names, setNames] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
     const apiPath = config.settings?.apiPath || '';
     fetch(`${apiPath}/@vocabularies`, {
-      headers: { Accept: 'application/json' },
-      credentials: 'include',
+      headers: {
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
     })
       .then((res) => (res.ok ? res.json() : []))
       .then((body) => {
@@ -69,7 +78,7 @@ const VocabularySelectWidget = (props) => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [token]);
 
   const pattern = vocabularyFilter ? new RegExp(vocabularyFilter) : null;
   const choices = [

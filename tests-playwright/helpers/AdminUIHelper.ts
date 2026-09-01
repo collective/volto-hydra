@@ -3312,6 +3312,21 @@ export class AdminUIHelper {
     const container = options.container || '#sidebar-properties';
     const fieldWrapper = this.page.locator(`${container} .field-wrapper-${fieldName}`);
 
+    // A field can be revealed by another field's value (schemaEnhancer
+    // fieldRules: a form question's "Condition" appears only once the question
+    // it depends on has been named). That reveal is a round trip through the
+    // iframe, so wait for a control to exist before judging the field missing —
+    // the alternative is a race that fails whenever the sidebar is a beat
+    // behind.
+    await fieldWrapper
+      .locator('input, textarea, [contenteditable="true"], .react-select__control')
+      .first()
+      .waitFor({ state: 'visible', timeout: 10000 })
+      .catch(() => {
+        // Genuinely absent fields fall through to the explicit throw below,
+        // which says which field and where to look.
+      });
+
     // Try text input
     const input = fieldWrapper.locator('input[type="text"], input[type="url"], textarea');
     if (await input.isVisible()) {
@@ -3347,6 +3362,49 @@ export class AdminUIHelper {
       await contentEditable.blur(); // Trigger blur to commit the value
       return;
     }
+
+    // A Choice / vocabulary / block picker renders react-select, which has no
+    // fillable input until it is opened. Click the control, type to filter,
+    // then take the option once it is actually listed — waiting on the option
+    // rather than on a timer, so a slow menu fails as a missing option instead
+    // of quietly picking whatever was highlighted.
+    const control = fieldWrapper.locator('.react-select__control');
+    if (await control.isVisible()) {
+      await control.scrollIntoViewIfNeeded();
+      await control.click();
+      const search = fieldWrapper.locator('input').first();
+      await search.fill(value);
+      // Keyboard, not a click on the option: react-select renders its menu in a
+      // portal and closes it on the mousedown that precedes the click, so a
+      // click can land on nothing and leave the field on its placeholder —
+      // silently, which is the failure this helper exists to stop.
+      const option = this.page
+        .locator('.react-select__option', { hasText: value })
+        .first();
+      await option.waitFor({ state: 'visible', timeout: 10000 });
+      await this.page.keyboard.press('Enter');
+      await this.page.evaluate(() =>
+        (document.activeElement as HTMLElement | null)?.blur(),
+      );
+      // It took, or this throws. A dropdown that silently keeps its old value
+      // is the thing that makes a spec assert against a sidebar it never
+      // changed.
+      await expect(
+        fieldWrapper.locator('.react-select__single-value, .react-select__multi-value'),
+        `setSidebarFieldValue("${fieldName}"): the menu closed without taking "${value}"`,
+      ).toContainText(value, { timeout: 5000 });
+      return;
+    }
+
+    // Nothing matched. Saying so is the whole point: this used to return
+    // silently, so a spec that set a dropdown asserted against a sidebar that
+    // had never been touched, and a demo clip recorded a video of nothing
+    // happening.
+    throw new Error(
+      `setSidebarFieldValue("${fieldName}"): no text input, slate editor or ` +
+        `react-select inside ${container} .field-wrapper-${fieldName}. ` +
+        `Check the field name, or that the field is in the open fieldset.`,
+    );
   }
 
   /**
