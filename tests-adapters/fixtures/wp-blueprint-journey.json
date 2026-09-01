@@ -1,7 +1,7 @@
 {
   "$schema": "https://playground.wordpress.net/blueprint-schema.json",
   "landingPage": "/",
-  "login": true,
+  "login": false,
   "steps": [
     {
       "step": "mkdir",
@@ -18,8 +18,9 @@
       "data": "<?php\n/**\n * Let the bridge's adapter talk to WordPress from the iframe.\n *\n * The contract suite runs the adapter under node, where same-origin policy does\n * not exist. The journey runs the SAME adapter inside the iframe, served from\n * the test frontend's origin, so every CMS call is cross-origin and\n * credentialled \u2014 and vanilla WordPress sends no CORS headers at all, so the\n * adapter failed to register with a bare \"TypeError: Failed to fetch\".\n *\n * The Origin is REFLECTED rather than '*': the requests carry cookies, and a\n * wildcard is rejected by the browser for credentialled requests.\n *\n * Content-Disposition is allowed because asset.upload sends the filename\n * in it; leaving it out failed the PREFLIGHT, so the upload surfaced as a\n * bare \"Failed to fetch\" and every request after it timed out.\n *\n * X-WP-Total is exposed because the adapter reads collection sizes from it;\n * without that the header is invisible to script and every total reads as 0.\n */\nadd_action('init', function () {\n  $origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';\n  if ($origin !== '') {\n    header('Access-Control-Allow-Origin: ' . $origin);\n    header('Vary: Origin');\n    header('Access-Control-Allow-Credentials: true');\n    header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');\n    header('Access-Control-Allow-Headers: Content-Type, Content-Disposition, X-WP-Nonce, X-Hydra-Test, Authorization');\n    header('Access-Control-Expose-Headers: X-WP-Total, X-WP-TotalPages, Location');\n  }\n  // Answer only a REAL preflight. A bare OPTIONS is a legitimate REST call \u2014\n  // types.getSchema fetches the field schema with one \u2014 and short-circuiting\n  // every OPTIONS returned an empty 200 for it, which broke two contract tests\n  // that had nothing to do with CORS.\n  if (\n    isset($_SERVER['REQUEST_METHOD'])\n    && $_SERVER['REQUEST_METHOD'] === 'OPTIONS'\n    && isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_METHOD'])\n  ) {\n    status_header(200);\n    exit;\n  }\n}, 0);\n"
     },
     {
-      "step": "runPHP",
-      "code": "<?php\nrequire_once '/wordpress/wp-load.php';\n// Bulk-create the seed vocabulary in ONE request. Creating 10000\n// terms over the REST API would be 10000 round trips; the contract's\n// type-ahead latency assertion needs a vocabulary big enough that\n// fetch-everything-and-filter-in-memory is visibly wrong.\nfor ($i = 0; $i < 10000; $i++) {\n  wp_insert_term('Category ' . $i, 'category', array('slug' => 'cat-' . $i));\n}\necho 'seeded';\n"
+      "step": "writeFile",
+      "path": "/wordpress/wp-content/mu-plugins/hydra-test-apppasswords.php",
+      "data": "<?php\n/**\n * Allow application passwords over plain http, for tests only.\n *\n * WordPress gates the application-password flow behind HTTPS\n * (wp_is_application_passwords_available), so on a local http Playground\n * `wp-admin/authorize-application.php` 501s and the flow cannot run at all.\n *\n * This enables the REAL core feature rather than faking identity. It replaces\n * a determine_current_user filter that treated every request as the admin,\n * which made the suite pass while testing none of the authentication the\n * design depends on. A production install has HTTPS and needs none of this.\n */\nadd_filter('wp_is_application_passwords_available', '__return_true');\n"
     }
   ]
 }

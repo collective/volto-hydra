@@ -38,7 +38,8 @@ export async function setup(): Promise<void> {
     'pnpm',
     [
       'dlx',
-      '@wp-playground/cli@latest',
+      // Pinned; see the note in playwright.config.ts.
+      '@wp-playground/cli@3.1.51',
       'server',
       '--port',
       String(PORT),

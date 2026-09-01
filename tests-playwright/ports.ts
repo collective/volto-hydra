@@ -37,6 +37,10 @@ export const PORTS = {
   wordpress: port('HYDRA_WORDPRESS_PORT', 8795),
   /** Test frontend: HTML + bridge fixture served by Vite (`pnpm start:test-frontend`). */
   testFrontend: port('HYDRA_TEST_FRONTEND_PORT', 8889),
+  // A Plone mock serving the CANONICAL seed, for journey specs that need the
+  // same fixtures as WordPress and Drupal. Separate from the docs-content mock
+  // on mockApi, which the other Plone journey project keeps using.
+  plonSeeded: port('HYDRA_PLONE_SEED_PORT', 8898),
   /** Mock-parent test surface for bridge isolation tests. */
   mockParent: port('HYDRA_MOCK_PARENT_PORT', 8891),
   /** Volto admin SSR server (`pnpm start:test`, PORT). */
@@ -69,7 +73,15 @@ export const PORTS = {
  */
 export const URLS = {
   mockApi: `http://localhost:${PORTS.mockApi}`,
-  testFrontend: `http://localhost:${PORTS.testFrontend}`,
+  // 127.0.0.1, not localhost.
+  //
+  // WordPress refuses `localhost` as an application-password success_url — its
+  // SSRF guard rejects the host, and authorize-application.php 500s rather than
+  // declining cleanly. The sign-in flow redirects back to this origin, so the
+  // frontend has to be addressed as something the CMS will accept. The CMS
+  // mocks already use 127.0.0.1, so this is also the more consistent choice.
+  testFrontend: `http://127.0.0.1:${PORTS.testFrontend}`,
+  plonSeeded: `http://127.0.0.1:${PORTS.plonSeeded}`,
   mockParent: `http://localhost:${PORTS.mockParent}`,
   voltoSsr: `http://localhost:${PORTS.voltoSsr}`,
   voltoWebpack: `http://localhost:${PORTS.voltoWebpack}`,

@@ -501,8 +501,13 @@
                     // Return promise from async render so hydra.js can wait for DOM updates
                     window._formDataCount = 0;
 
+                    // NO adapter here. This is the PREVIEW: it renders, and it
+                    // navigates as the editor moves around. Serving CMS calls
+                    // from a window whose lifetime is driven by what is being
+                    // looked at is what orphaned in-flight requests when it was
+                    // replaced mid-edit. The adapter lives in the proxy frame
+                    // (hydra-proxy.html), which never navigates.
                     window.bridge = initBridge({
-                        adapter: buildAdapter(),
                         cmsBaseUrl:
                             new URLSearchParams(window.location.search).get('cms') ||
                             window._apiOrigin,

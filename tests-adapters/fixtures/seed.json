@@ -58,6 +58,29 @@
       "blocksLayout": {
         "items": []
       }
+    },
+    {
+      "path": "/with-image",
+      "title": "With Image",
+      "state": "published",
+      "blocks": {
+        "img-1": {
+          "@type": "image",
+          "url": "http://127.0.0.1:8889/journey-upload.png",
+          "alt": "seeded image"
+        }
+      },
+      "blocksLayout": {
+        "items": [
+          "img-1"
+        ]
+      }
+    },
+    {
+      "path": "/archive",
+      "title": "Archive",
+      "type": "folder",
+      "state": "published"
     }
   ],
   "assets": [

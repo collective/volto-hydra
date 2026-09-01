@@ -409,6 +409,446 @@ Two consequences recorded so they are not rediscovered:
   fake a path, which is how a contract quietly becomes a description of one
   CMS.
 
+## 8c. Context expansion is part of the contract
+
+Rendering one route makes the admin ask for the document and then, from
+separate components, its breadcrumbs, navigation, available types and query
+indexes. Instrumenting the Drupal journey put the cost in plain numbers: 149
+CMS requests for five steps, most of it this per-route fan-out.
+
+The admin cannot fix this. Those calls originate in different components at
+different times, so nothing up there knows they belong to one route. The
+adapter, handed the list, does know.
+
+So `content.get` takes an `expand` argument:
+
+```js
+content.get(path, { expand: ['breadcrumbs', 'navigation', 'types', 'querystring'] })
+  → Document & { context: { breadcrumbs, navigation, types, querystring } }
+```
+
+**Expansion is a bundling optimisation, never a new capability.** Every
+expansion name stands in for an intent the admin could have called on its own,
+and `EXPANSIONS` in `baseAdapter.js` is exactly that mapping. This is what
+makes emulation legitimate, and the contract suite pins it down: each expanded
+value must `toEqual` what the standalone intent returns. If expansion ever
+became a second source of truth, callers would have to know which one they got.
+
+`actions` maps onto `state.get`, so it is gated on the `state` capability —
+Plone's adapter does not advertise it. The other four are universal.
+
+### Why each adapter emulates rather than expands natively
+
+Only Plone can expand natively, over its own `@components` set. The other two
+were measured, not assumed:
+
+- **WordPress `_embed`** follows resources declared in an object's `_links` —
+  author, featured media, terms. Breadcrumbs, navigation, types and query
+  indexes are not links on a page, and `_links.up` embeds only one level, so
+  it cannot produce a breadcrumb chain.
+- **WordPress `/batch/v1`** rejects reads outright. Asking it for a GET returns
+  `requests[0][method] is not one of POST, PUT, PATCH, and DELETE`. It helps
+  `content.order`, which is PATCHes, and nothing on this path.
+- **Drupal JSON:API `include`** covers entity relationships, not site context.
+
+So `BaseAdapter.expandContext` issues the calls itself, **concurrently**. That
+concurrency is the entire win, and it is only available below the contract.
+The contract suite asserts it by counting in-flight dispatches rather than by
+timing, so a sequential implementation fails the test instead of merely being
+slow.
+
+Measured against WordPress on PHP-WASM, six independent reads:
+
+| | wall clock |
+|---|---|
+| sequential | 7931ms |
+| concurrent | 4038ms |
+
+### GraphQL was measured and not adopted
+
+WPGraphQL can express the whole bundle in one query — page, `ancestors`,
+`menus`, `contentTypes`, `taxonomies` — so it was installed under Playground
+and benchmarked against the same instance:
+
+| | median |
+|---|---|
+| GraphQL, 1 request | 3495ms |
+| REST, 4 concurrent | 4613ms |
+| REST, 4 sequential | 9133ms |
+
+GraphQL beats the concurrent emulation by ~1.3x, not the ~6x a naive
+request-count argument predicts: WPGraphQL's own schema build makes one
+GraphQL request far more expensive than one REST request, and concurrency has
+already taken most of the win. Against that, it costs a plugin dependency, a
+second code path, and — because `Document.fields` carries the raw REST post —
+an expansion result that cannot be made byte-identical to the standalone
+intent without rewriting those intents too.
+
+It is therefore **available but not wired in**. The dependency-free change
+below took the same win.
+
+### Expansion is gated on native support, because emulation costs more
+
+Turning the admin's expanders back on for an EMULATING adapter made things
+worse, not better: the Drupal journey went from 190 CMS requests to 217. The
+reason is that expansion cannot reduce request count when the adapter answers
+it by issuing the same intents — and Volto's reducers already cache navigation,
+types and actions in the store and skip re-fetching them, while expansion
+re-requests the whole bundle on every content GET.
+
+So the admin asks for expansion only when the adapter advertises
+`expand-native` (today: Plone, via passthrough), where the bundle rides along
+in a request being made anyway and five route requests collapse into one. That
+decision is made when the adapter announces itself, not at config time — at
+config time no adapter has spoken yet.
+
+## 8d. Duplicate reads, and the cache that could not be written
+
+Instrumenting the journey found the real cost, and it was not expansion:
+
+```
+150 GETs, 94 were a repeat of an identical earlier GET with no write between
+  28  /jsonapi/menu_link_content   22  resolvePath('/news')   10  node_type
+```
+
+63% of reads were redundant. The admin cannot dedupe them: they come from
+different components, and several are issued INSIDE one intent, below anything
+it can see.
+
+**What shipped.** Coalescing reads that are in flight at the same moment. Two
+callers asking for the same URL simultaneously get one request — exactly what
+they would have got had one asked a millisecond earlier. Journey: 190 requests
+to 109.
+
+**What is written but parked.** Retaining completed reads, keyed by URL and
+invalidated whenever this admin writes, takes it further: 190 to 83. It needs
+no scope and no attribution — an earlier per-route version foundered on that,
+because dispatches interleave and the browser has no async-local storage to
+tell them apart, whereas "until we write" is a lifetime that needs neither. Its
+staleness assumption is the one Volto's own store already makes by holding
+navigation and types for the session.
+
+It is off, and NOT because it is broken. Instrumented, the adapter is right
+every time:
+
+```
+[TREE] /news -> /news/first-post,/news/draft-post,/news/journey-1787984899268
+```
+
+The newly created page IS in the listing the adapter returns, and the contract
+suite covers the semantics including a read overtaken by a write. What fails,
+about two runs in five, is the admin: the Contents view does not render the row
+it was handed within 20 seconds. Retention exposes that by answering fast
+enough to change the ordering. Turning it on before the admin-side race is
+understood buys 26 requests and an unstable editor, so the next piece of work
+is in Volto, not in the adapters.
+
+Invalidation lives on the WRITE INTENTS rather than in fetchJson, because
+uploads are built by hand with FormData and a raw fetch (WordPress
+/wp/v2/media, Drupal's two-step file + media create) and never pass through it.
+
+**Expansion was retested here.** The theory was that expansion only looked
+expensive because reads were not cached, and that a real cache would make the
+extra breadcrumbs/navigation/types free. It does not: ungated, the Drupal
+journey went from 1.5 minutes to 6.9 and failed. Caching removes duplicate
+READS, but expansion still fans every content GET into four more intents, which
+on an emulating adapter is four more things to go wrong per route. The
+capability gate stays.
+
+### The iframe aborts its own reads
+
+Chasing the above surfaced a bug that predated all of it, and explains why the
+journey's back-to-the-listing step had always been flaky: **the adapter runs
+inside the iframe**, so anything that navigates that window — a back
+navigation, a reload, following a link — aborts its in-flight fetches. The
+listing's own data arrived correctly; a sibling read died with the navigation
+and the view rendered empty.
+
+`fetch()` reports that as a TypeError with no status, which is not the CMS
+refusing: it is nobody having answered. Reads are retried once on it. Only
+reads — a write aborted mid-flight may already have been applied, and
+re-sending it would be the adapter deciding on its own to do it twice.
+
+The journey no longer walks browser history to get back to the listing; it
+navigates client-side, and history restore is asked directly in
+`back-navigation.spec.ts` where it is the assertion rather than the noise.
+
+Net effect on the Drupal journey: **190 CMS requests to 110**, and the
+back-to-the-listing step from 80 requests to 19.
+
+### The sequential walk was the real cost
+
+`breadcrumbs.get` on WordPress used to re-resolve and re-fetch every ancestor
+that the parent walk had *just* fetched — two extra round trips per level, at
+~1.1s each, for posts already in hand. `ancestorChain()` now keeps them.
+
+Discovering the chain stays sequential, because a post names only its
+immediate parent; that part is irreducible. Everything after it is free.
+
+## 8e. The proxy frame, and how credentials reach it
+
+### The adapter is in the wrong window
+
+The adapter has been hosted in the PREVIEW iframe — the one showing the page
+being edited. That couples the CMS connection to what the editor happens to be
+looking at, and it does not survive contact with the admin's own routing.
+
+Traced in a WordPress run, with the admin sitting still on `.../edit`:
+
+```
+[ADMIN NAV]  /news/upload-probe-…/edit
+[IFRAME NAV] /news/upload-probe-…?_edit=true     <- correct
+[IFRAME NAV] http://localhost:8889/?_edit=false  <- reverted to VIEW, at the site root
+[IFRAME_SRC] Skipping - state matches and iframeSrc already set
+```
+
+The admin never asked for that navigation — its own src logic logged a skip —
+but from that moment the window answering the bridge was a different one. Every
+request already sent was owed a reply by a window that no longer existed, so
+`asset.upload`, `types.list`, `types.getSchema`, `state.get` and
+`querystring.getIndexes` all expired at their 30s timeout. No `/wp/v2/media`
+request was ever made. The symptom looked like a slow or broken upload; the
+cause was the host window being replaced.
+
+Three further consequences of the same coupling:
+
+- **Routes without a preview have no proxy at all.** The iframe is mounted by
+  the view and edit forms. The contents listing and the control panels are not
+  those routes.
+- **Every navigation discards the adapter's caches** — `resolvePath`,
+  `restBases`, the read cache — which is most of what makes an editing session
+  affordable against a CMS charging ~1.1s per request.
+- **In-flight requests are silently orphaned.** Volto awaits a reply, so the
+  bridge must always produce one; going quiet for 30s is the one thing it must
+  not do.
+
+### A dedicated proxy frame
+
+A hidden iframe, created ONCE at admin boot, outside the router:
+
+```
+window.name = "hydra-proxy:<adminOrigin>"
+```
+
+It never routes and never renders. It loads a minimal document whose only job
+is to host the adapter — no app bootstrap, no router, no DOM, no editing
+chrome, nothing that can navigate it:
+
+```html
+<!doctype html>
+<script type="module">
+  import { connectProxy } from '/hydra.js';
+  import adapter from './my-cms-adapter.js';
+  connectProxy(adapter);
+</script>
+```
+
+`window.name` is already how a frontend learns it is inside Hydra and which
+origin the admin is (`hydra-edit:` / `hydra-view:`), so the third role costs no
+new integration surface — and unlike a query parameter it survives navigation.
+It takes NO `_edit`-style query fallback: a normal page must never be able to
+promote itself to the proxy.
+
+The preview iframe keeps its own channel for selection and block chrome, and
+may navigate as freely as it likes. It no longer serves CMS calls, so only one
+adapter instance exists and there is no question about which owns the caches.
+
+If the proxy frame never announces, the admin says so plainly — the frontend
+does not serve a Hydra proxy page — rather than falling back to the preview and
+quietly reproducing the coupling.
+
+### Authentication is a capability, not a mechanism
+
+The credential must never originate in the admin. It is issued by the CMS to a
+client acting on behalf of a user, which is what these APIs are built for — but
+what they offer differs, so it is modelled the way every other difference in
+this contract is:
+
+- `auth.begin()` — a URL to send the user to, top-level, or `null` when the
+  adapter is already authenticated by ambient means.
+- `auth.complete(params)` — exchange whatever came back into a stored,
+  origin-scoped credential.
+- `auth.whoami()` — who we are now. Already in the contract.
+
+| CMS | Delegated flow | Requirement |
+|---|---|---|
+| Plone | `@login` returns a JWT | `plone.restapi` |
+| WordPress | `wp-admin/authorize-application.php?app_name=…&success_url=…` returns an application password | core 5.6+, **HTTPS** |
+| Drupal | OAuth2 authorize endpoint | **`simple_oauth` is required** |
+
+Drupal core's JSON:API has no token flow at all, and its session + CSRF pair is
+cookie-based and therefore dead cross-site. Requiring `simple_oauth` is the
+only honest option, and sits alongside the Media entity requirement already in
+§8b.
+
+The user always logs in at the CMS's own login page. The admin never sees a
+password, and never handles one.
+
+### How the user logs in
+
+Login happens BEFORE the editor exists, so there is no unsaved work to protect
+and nothing to resume. That makes the sequence simpler than it first appears.
+
+**The CMS login cannot be framed.** Measured against WordPress:
+
+```
+/wp-login.php                        x-frame-options: SAMEORIGIN
+                                     content-security-policy: frame-ancestors 'self'
+/wp-admin/authorize-application.php  x-frame-options: SAMEORIGIN
+                                     content-security-policy: frame-ancestors 'self'
+```
+
+So showing the CMS's login inside the proxy frame is not a design choice we
+get to make; the browser refuses to render it. Authentication must happen in a
+top-level context — which is also the only place the user can see an address
+bar and know what they are typing a password into.
+
+The sequence:
+
+1. Admin boots and mounts the proxy frame, VISIBLE, filling a login shell.
+   Before the editor exists there is nothing to overlay, so the login screen
+   simply IS the proxy frame.
+2. Proxy announces `ADAPTER_READY { user: null }`.
+3. The frame renders its own sign-in button. The user clicks INSIDE the frame,
+   which is what gives that frame the user activation it needs — activation is
+   per-frame, so a click in the admin would not do.
+4. The frame opens `auth.begin()`'s URL in a popup.
+5. The user authenticates and consents on the CMS's own pages.
+6. The CMS redirects the popup to a callback at the PROXY origin, which
+   `postMessage`s the result to `window.opener` — the frame — and closes.
+7. The frame runs `auth.complete(params)`, stores the credential, re-runs
+   `whoami`, and announces `ADAPTER_READY { user }`.
+8. The admin hides the frame and starts the editor.
+
+On later visits the frame finds its stored credential and step 2 already
+carries a user, so the login screen never appears.
+
+### Why the admin never touches the credential
+
+The admin COULD relay it. The callback's raw parameters would pass to
+`auth.complete(params)` and the adapter would parse them — Plone's JWT string,
+WordPress's user_login plus application password, Drupal's access/refresh/
+expiry triple are all just `params` to an admin that never inspects them. That
+is the same division of knowledge as everywhere else here: the adapter owns
+CMS-specific shapes.
+
+Which is precisely the argument against it. The admin would carry a secret it
+cannot interpret — all of the risk, none of the benefit — and carry it badly:
+
+- a redirect puts the credential in a URL at the ADMIN's origin, so it lands in
+  browser history, and in server logs too when it arrives as a query parameter
+  rather than a fragment;
+- it sits in admin JS memory, reachable by any addon or third-party script on
+  that page.
+
+The popup keeps it in a `postMessage` between two windows of the proxy's own
+origin: never in a URL at the admin origin, never in admin memory, and written
+directly into the storage the frame will read from next time.
+
+So the admin observes exactly two things — `user: null`, then `user: {…}`.
+
+### The assumption to re-test
+
+The simpler handoff would be for the top-level callback to write the credential
+to the proxy origin's storage and let the embedded frame read it back. This
+design assumes that does NOT work, because browsers partition storage for
+third-party contexts: a frame of origin P embedded in admin origin A gets a
+different bucket from a top-level page at origin P.
+
+That assumption is why the credential travels by message rather than through
+storage, and why the popup is opened by the frame rather than by the admin. It
+is documented browser behaviour but has NOT been exercised here, unlike the
+framing headers above, which were measured. If partitioning turned out not to
+apply, the shared-storage handoff would become available — but it would still
+be the weaker option, since the message path is what keeps the credential out
+of the admin entirely.
+
+### Where the proxy may be served, and by whom
+
+Token auth removes the cookie constraint, and with it any need for the proxy to
+be same-origin with the CMS or with the frontend. It may be served by the
+frontend, by the CMS, or by a self-hosted Hydra.
+
+**But the proxy origin is the trust boundary.** Whoever serves that page
+controls the code holding the credential. So it must be an origin the site
+owner trusts with CMS access. A self-hosted Hydra qualifies. A SHARED hosted
+Hydra editing many sites does not: putting the proxy there would place every
+site's credential in the vendor's origin, which is the thing this inversion
+exists to prevent.
+
+Consequences:
+
+- The proxy URL is admin CONFIGURATION, not a convention derived from the
+  frontend URL.
+- The CMS must allow-list that origin twice: for CORS, and as an OAuth redirect
+  URI (`success_url` on WordPress). Ordinary client registration.
+- Cross-origin means **CORS preflights**. Every request carrying an
+  `Authorization` header is non-simple and earns an `OPTIONS` first. Against
+  WordPress at ~1.1s per request that roughly doubles everything unless the CMS
+  sends `Access-Control-Max-Age` so the browser caches the preflight. That is a
+  requirement, not a nicety: it is the difference between the measured
+  83-request journey and one twice as slow.
+
+### Two things this unlocks
+
+**Control panels can delegate to the CMS.** Authorising the application means
+the user logs in on the CMS's own pages, which leaves them with an ordinary
+first-party session at that origin. A control-panel link can therefore point
+straight at `wp-admin`, Drupal's admin, or Plone's control panel and simply
+work — no reimplementation of every CMS's settings UI in Volto, and no second
+login. `BaseAdapter.getAdminUrl()` is already the seam for this; it returns
+null today.
+
+The caveat to remember: the browser SESSION and the stored credential expire
+independently. The token may outlive the session, so a control-panel link
+followed weeks later can still land on the CMS's login page. That is the right
+behaviour — it is the CMS's own login, which is the point of delegating — but
+it means "the user will already be logged in" is true right after authorising,
+not forever.
+
+**More than one backend.** Eventually a site may route different sections to
+different systems — a proprietary store for some sections alongside the main
+CMS. Not designed here, but worth recording that this change is what makes it
+tractable at all: with the adapter hosted in the preview there was one preview
+and therefore one adapter, and no amount of routing would have given a second.
+With proxy frames mounted at App level, N backends are N frames.
+
+The seams that would have to become plural, none of which are load-bearing
+today:
+
+- `bridgeIframe()` looks up one element by id; it would become a lookup by
+  backend id.
+- `readyWindow` is a single window; it would become a map.
+- `window.name` would carry the backend: `hydra-proxy:<adminOrigin>:<backendId>`.
+- Capabilities are answered once per session; they would become per-backend,
+  so the admin's UI gating becomes per-route rather than global.
+- Each backend authenticates independently, so the login screen would have to
+  handle several — including the case where one is authorised and another is
+  not.
+
+Deliberately deferred. Recorded so the single-backend assumptions above are
+known choices rather than accidents.
+
+### What this retires
+
+- `access_token` passed in the iframe URL, then copied into `sessionStorage`.
+  It is Plone-shaped — it assumes the admin's own token is meaningful to the
+  CMS, which is true only when they share an auth system. Against WordPress and
+  Drupal the value was literally a forged `fake-signature-…`. Credentials move
+  to postMessage after the frame announces, and never appear in a URL, where
+  they would leak into history, referrers and server logs.
+- The `always-admin` test mu-plugin, which exists only because there was no
+  real login path. With the authorise-application flow the fixture can hold a
+  genuine application password and exercise the real auth path instead of
+  bypassing it.
+- The cross-site cookie dead end, and the CORS and `SameSite` workarounds that
+  came with hosting the adapter on the frontend origin.
+
+`BridgeRPC.peerReplaced()` stays — a frontend can still crash or reload — but
+it becomes a genuine edge case rather than something load-bearing on every
+navigation.
+
+
 ## 9. Out of scope
 
 Unchanged from `hydra-plan.md`: history diff, comments, relations, content

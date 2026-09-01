@@ -87,5 +87,31 @@ export async function resolveTarget(): Promise<Target> {
     );
   }
   const mod = await load();
-  return mod.default;
+  const target = mod.default;
+
+  // Seeding rewrites the CMS behind the adapter's back — new documents, new
+  // ids — so anything the adapter read before it is now about content that no
+  // longer exists. Without this the suite tests a cache that was never told,
+  // and the first symptom is a 404 for an id from the previous test's fixture.
+  //
+  // This is the same condition as another user editing in production: the
+  // adapter caches until IT writes, and an out-of-band change has to announce
+  // itself. Here the harness is that other writer.
+  if (!seedInvalidatesReads.has(target)) {
+    seedInvalidatesReads.add(target);
+    const seed = target.seed.bind(target);
+    target.seed = async () => {
+      await seed();
+      target.adapter.invalidateReads();
+    };
+  }
+
+  return target;
 }
+
+/**
+ * resolveTarget() is called per spec file (and again at module scope for
+ * capability gating) but returns one shared target, so the wrapper has to be
+ * applied exactly once or seeding would nest it deeper on every call.
+ */
+const seedInvalidatesReads = new WeakSet<Target>();

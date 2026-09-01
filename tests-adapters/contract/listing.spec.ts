@@ -26,6 +26,76 @@ beforeEach(async () => {
  * straight through.
  */
 
+/**
+ * Sorting by the index names the ADMIN actually sends.
+ *
+ * Volto's contents view offers sorting from a hard-coded list of PLONE index
+ * names — ModificationDate, sortable_title and friends — rather than from
+ * querystring.getIndexes, which is what its own query builder uses and what
+ * every adapter answers with its real indexes. So `ModificationDate` arrives
+ * at a WordPress adapter that knows only `modified`, and at a Drupal one that
+ * knows only `changed`.
+ *
+ * Each adapter translates the six as an interim measure; the proper fix is to
+ * drive that menu from the advertised indexes. Tested HERE rather than through
+ * the contents UI because this is a claim about the adapter, and driving
+ * Volto's sort popup tests the popup.
+ */
+describe('sorting by the admin\'s index names', () => {
+  it('orders by modification date under Plone\'s name for it', async () => {
+    const descending: any = await target.adapter.dispatch('querystringSearch', {
+      query: [
+        { i: target.queryIndexes.path, o: 'string.absolutePath', v: '/news' },
+      ],
+      // The name the ADMIN sends, not the one this CMS uses.
+      sortOn: 'ModificationDate',
+      sortOrder: 'descending',
+    });
+    const ascending: any = await target.adapter.dispatch('querystringSearch', {
+      query: [
+        { i: target.queryIndexes.path, o: 'string.absolutePath', v: '/news' },
+      ],
+      sortOn: 'ModificationDate',
+      sortOrder: 'ascending',
+    });
+
+    const down = descending.items.map((i: any) => i.path);
+    const up = ascending.items.map((i: any) => i.path);
+    expect(down.length).toBeGreaterThan(1);
+
+    // Reversed, not merely different: an index name the CMS does not
+    // understand is typically ignored, and then both orders come back
+    // identical — which is exactly what happened before the translation.
+    expect(down).toEqual([...up].reverse());
+  });
+
+  it('orders by title under Plone\'s name for it', async () => {
+    const ascending: any = await target.adapter.dispatch('querystringSearch', {
+      query: [
+        { i: target.queryIndexes.path, o: 'string.absolutePath', v: '/news' },
+      ],
+      sortOn: 'sortable_title',
+      sortOrder: 'ascending',
+    });
+    const descending: any = await target.adapter.dispatch('querystringSearch', {
+      query: [
+        { i: target.queryIndexes.path, o: 'string.absolutePath', v: '/news' },
+      ],
+      sortOn: 'sortable_title',
+      sortOrder: 'descending',
+    });
+
+    const up = ascending.items.map((i: any) => i.title);
+    const down = descending.items.map((i: any) => i.title);
+    expect(up.length).toBeGreaterThan(1);
+
+    // Sorted by TITLE, and reversed. Checking it is actually alphabetical
+    // catches an adapter that reverses a list it never ordered.
+    expect(up).toEqual([...up].sort((a: string, b: string) => a.localeCompare(b)));
+    expect(down).toEqual([...up].reverse());
+  });
+});
+
 describe('querystring.getIndexes', () => {
   it('describes each queryable index', async () => {
     const res: any = await target.adapter.dispatch(

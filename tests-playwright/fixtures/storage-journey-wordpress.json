@@ -2,7 +2,7 @@
  "cookies": [
   {
    "name": "iframe_url_3001",
-   "value": "http://localhost:8889/?adapter=wordpress&cms=http://127.0.0.1:8795",
+   "value": "http://127.0.0.1:8889/?adapter=wordpress&cms=http://127.0.0.1:8795",
    "domain": "localhost",
    "path": "/"
   }

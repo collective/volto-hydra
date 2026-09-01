@@ -1,5 +1,15 @@
 import { test, expect, type Page } from '@playwright/test';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
+import { fixtureFor } from './fixtures';
+import { seedWordPress } from './seedWordPress';
+import {
+  addImageBlockAndUpload,
+  browseListing,
+  createPage,
+  moveViaCutPaste,
+  pickLinkTarget,
+  returnToListing,
+} from './steps';
 import { PORTS } from '../ports';
 
 /**
@@ -39,8 +49,12 @@ function countCmsRequests(page: Page, projectName: string) {
   const steps: Array<{ label: string; count: number }> = [];
   let total = 0;
   let sinceMark = 0;
+  let markedAt = Date.now();
 
   const byEndpoint = new Map<string, number>();
+  // Full URL + arrival time, to size how much of the traffic is the SAME read
+  // repeated inside one burst — i.e. what an action-scoped cache could remove.
+  const trace: Array<{ url: string; method: string; at: number }> = [];
 
   page.on('request', (request) => {
     if (!port || !request.url().includes(`:${port}`)) return;
@@ -49,6 +63,11 @@ function countCmsRequests(page: Page, projectName: string) {
 
     // Group by endpoint SHAPE, so ids and query strings collapse together and
     // the fan-out per route is visible rather than buried in 149 distinct URLs.
+    trace.push({
+      url: request.url(),
+      method: request.method(),
+      at: Date.now(),
+    });
     const { pathname } = new URL(request.url());
     const shape = pathname
       .replace(/\/[0-9a-f-]{8,}/gi, '/{id}')
@@ -59,7 +78,16 @@ function countCmsRequests(page: Page, projectName: string) {
   return {
     mark(label: string) {
       steps.push({ label, count: sinceMark });
+      // Logged as it happens, not only in report(). A journey that fails at
+      // step 4 still measured steps 1-3, and that data is exactly what you
+      // want when comparing request counts across a change.
+      // eslint-disable-next-line no-console
+      console.log(
+        `[CMS REQUESTS] ${String(sinceMark).padStart(4)} reqs` +
+          ` ${String(Date.now() - markedAt).padStart(6)}ms  ${label}`,
+      );
       sinceMark = 0;
+      markedAt = Date.now();
     },
     report() {
       const rows = steps
@@ -70,10 +98,45 @@ function countCmsRequests(page: Page, projectName: string) {
         .slice(0, 12)
         .map(([shape, n]) => `  ${String(n).padStart(4)}  ${shape}`)
         .join('\n');
+      // How much of this is repetition? A GET repeated with no write in
+      // between is a read an action-scoped cache could have served, provided
+      // the repeat falls inside one burst of activity.
+      const GAP_MS = 2_000;
+      let repeats = 0;
+      let repeatsInBurst = 0;
+      const lastSeen = new Map<string, number>();
+      let lastWriteAt = 0;
+      for (const r of trace) {
+        if (r.method !== 'GET') {
+          lastWriteAt = r.at;
+          lastSeen.clear();
+          continue;
+        }
+        const prev = lastSeen.get(r.url);
+        if (prev !== undefined && prev > lastWriteAt) {
+          repeats += 1;
+          if (r.at - prev <= GAP_MS) repeatsInBurst += 1;
+        }
+        lastSeen.set(r.url, r.at);
+      }
+      const gets = trace.filter((r) => r.method === 'GET').length;
+      const dupes = [...trace.filter((r) => r.method === 'GET')].reduce(
+        (acc, r) => acc.set(r.url, (acc.get(r.url) ?? 0) + 1),
+        new Map<string, number>(),
+      );
+      const worst = [...dupes.entries()]
+        .filter(([, n]) => n > 1)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([u, n]) => `  ${String(n).padStart(4)}  ${u.slice(-90)}`)
+        .join('\n');
       // eslint-disable-next-line no-console
       console.log(
         `\n[CMS REQUESTS] ${projectName} — ${total} total\n${rows}\n` +
-          `\n[BY ENDPOINT]\n${top}\n`,
+          `\n[BY ENDPOINT]\n${top}\n` +
+          `\n[REPEATS] ${gets} GETs, ${repeats} were a repeat of an earlier` +
+          ` identical GET with no write in between` +
+          ` (${repeatsInBurst} of them within ${GAP_MS}ms)\n${worst}\n`,
       );
     },
   };
@@ -132,55 +195,16 @@ const TITLE = `Journey ${STAMP}`;
  * behaviour — the same distinction the contract suite draws with Target.types.
  * Every CMS seeds a different tree; none of the STEPS differ.
  */
-const FIXTURES: Record<
-  string,
-  { root: string; target: string; lastEditedLabel: string }
-> = {
-  // Plone's mock serves the site's own test tree; the others seed the shared
-  // canonical fixture (/news, /about). Playwright cannot set process.env per
-  // project, so the run names its own fixture.
-  'journey-plone': {
-    root: '/_test_data',
-    target: '/_test_data/context-navigation-forced-folder',
-    // Plone names its own indexes, so the query builder shows ITS label. The
-    // steps are identical across CMSes; only this environment data differs,
-    // the same way target.queryIndexes handles it in the contract suite.
-    lastEditedLabel: 'Modification date',
-  },
-  // The target must be a CHILD of the root — the journey picks it out of the
-  // root's own listing, so a sibling like /about can never appear there.
-  // Drupal and WordPress both build hierarchy from menu links and parent ids
-  // rather than a distinct folder type, so any node can receive children and
-  // an existing child of /news is the natural target.
-  'journey-drupal': {
-    root: '/news',
-    target: '/news/first-post',
-    lastEditedLabel: 'Last edited',
-  },
-  'journey-wordpress': {
-    root: '/news',
-    target: '/news/first-post',
-    lastEditedLabel: 'Last edited',
-  },
-};
+// Real WordPress boots empty; the mocks do not. Seeded here rather than in a
+// shared global setup so the cost lands only on the project that needs it.
+test.beforeAll(async ({}, testInfo) => {
+  if (testInfo.project.name !== 'journey-wordpress') return;
+  // Seeding real WordPress is dozens of writes at ~1.1s each on PHP-WASM,
+  // comfortably past the suite's 45s default, which applies to hooks too.
+  testInfo.setTimeout(240_000);
+  await seedWordPress();
+});
 
-function fixtureFor(projectName: string) {
-  const fixture = FIXTURES[projectName];
-  // A new CMS must declare where it seeds content; defaulting would silently
-  // run the journey against a tree that does not exist and report empty.
-  if (!fixture) throw new Error(`No journey fixture declared for ${projectName}`);
-  return {
-    root: process.env.JOURNEY_ROOT ?? fixture.root,
-    target: process.env.JOURNEY_TARGET_FOLDER ?? fixture.target,
-    lastEditedLabel: fixture.lastEditedLabel,
-  };
-}
-
-async function waitForRows(page: Page, timeout = 60_000) {
-  await expect
-    .poll(() => page.locator('tbody tr').count(), { timeout })
-    .toBeGreaterThan(0);
-}
 
 test('create a page, link to another, then move it', async ({ page }, testInfo) => {
   // The journey now browses, creates, uploads, links, saves, moves, then
@@ -192,6 +216,7 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
     root: ROOT,
     target: TARGET_FOLDER,
     lastEditedLabel: LAST_EDITED,
+    moveTarget: MOVE_TARGET,
   } = fixtureFor(testInfo.project.name);
   const ploneCalls = forbidPloneApi(page, testInfo.project.name);
   const reqs = countCmsRequests(page, testInfo.project.name);
@@ -199,36 +224,14 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
   await helper.login();
 
   // --- 1. browse existing content ---------------------------------------
-  await page.goto(`${helper.adminUrl}${ROOT}/contents`);
-  await waitForRows(page);
+  await browseListing(page, helper, ROOT);
 
   reqs.mark("1. browse the listing");
 
   // --- 2. create a page --------------------------------------------------
-  await page.locator('#toolbar-add').click();
-  // Whatever addable type this CMS offers first: the submenu ids encode the
-  // TYPE NAME (#toolbar-add-document on Plone, #toolbar-add-page elsewhere),
-  // so naming one would quietly make this a single-CMS test.
-  await page.locator('[id^="toolbar-add-"]').first().click();
-  await page.waitForURL(/\/add\?type=/, { timeout: 15_000 });
-
-  const titleField = page.locator('input[id="field-title"]').first();
-  await expect(titleField).toBeVisible({ timeout: 25_000 });
-  await titleField.fill(TITLE);
-
-  await page.locator('#toolbar-save, button:has-text("Save")').first().click();
-
-  // The CMS assigned the document its own address, which it can only do if
-  // the write succeeded. Deliberately NOT asserting that address contains the
-  // title: how an id is derived is CMS-specific, and the contract suite had
-  // this exact over-specification corrected out of it.
-  await page.waitForURL((url) => !url.pathname.includes('/add'), {
-    timeout: 30_000,
-  });
-  await expect(page).toHaveURL(new RegExp(`${ROOT}/[^/]+(/edit)?$`), {
-    timeout: 25_000,
-  });
-  const createdPath = new URL(page.url()).pathname.replace(/\/edit$/, '');
+  // Every step below runs the SAME code as its focused spec (steps.ts): the
+  // journey is the sequence, not a second implementation of it.
+  const createdPath = await createPage(page, helper, ROOT, TITLE);
 
   reqs.mark("2. create the page");
 
@@ -264,134 +267,16 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
     { timeout: 25_000 },
   );
 
-  // The frontend renders blocks only once it has the document over the bridge,
-  // so this is a condition to wait for, not a state to assert immediately.
-  await expect
-    .poll(
-      async () => {
-        try {
-          return (await helper.getBlockOrder()).length;
-        } catch {
-          // Reading the iframe mid-navigation throws "Execution context was
-          // destroyed". That is the poll catching the route in transit, not a
-          // failure — returning 0 lets it retry, and it still fails for real
-          // if blocks never arrive.
-          return 0;
-        }
-      },
-      { timeout: 30_000 },
-    )
-    .toBeGreaterThan(0);
-  const initialBlocks = await helper.getBlockOrder();
-
-  // There is something to select. The COUNT is legitimately CMS-dependent and
-  // must not be pinned: config.blocks.initialBlocks is keyed by content type,
-  // and only Plone's 'Document' has an entry, so a new Plone page starts with
-  // title + slate while Drupal and WordPress — both reporting 'page' — fall
-  // back to the container seeding one 'empty' picker. Asserting Drupal's count
-  // here made this a single-CMS test, which is the exact failure mode this
-  // journey exists to avoid.
-  expect(initialBlocks.length).toBeGreaterThan(0);
-
-  await helper.clickBlockInIframe(initialBlocks[initialBlocks.length - 1]);
-  await helper.clickAddBlockButton();
-  await helper.selectBlockType('image');
-  await helper.waitForBlockCountToBe(initialBlocks.length + 1);
-
-  const withImage = await helper.getBlockOrder();
-  const imageBlock = withImage.find((uid) => !initialBlocks.includes(uid))!;
-  expect(imageBlock).toBeTruthy();
-
-  // Assert the block is what we asked for, rather than inferring it later from
-  // a screenshot. A block count that went up only proves SOMETHING was added:
-  // when this step actually inserted a slate block instead of an image, the
-  // count assertion passed and the failure surfaced eight steps downstream as
-  // "no img with that src", which said nothing about the cause.
-  //
-  // .parent-nav carries the selected block's title, which is the same signal a
-  // human reads off the sidebar.
-  await expect(
-    page.locator('#sidebar-properties, .sidebar-container').locator('.parent-nav').first(),
-  ).toContainText(/image/i, { timeout: 15_000 });
-
-  // --- the image: an UPLOAD, not a URL ------------------------------------
-  // The contract already proves asset.upload and asset.imageUrl against all
-  // three CMSes, but it calls the adapter directly — no browser, no bridge.
-  // What only this test can cover is an editor dropping a file into a block
-  // and that upload travelling admin -> bridge -> adapter. Setting an external
-  // URL instead, as this step first did, exercises none of that: the adapter
-  // never sees an asset at all.
-  // The drop target is the picker in the ADMIN's overlay, not the <img> in the
-  // iframe. dragDropImageFile runs document.elementFromPoint in the admin
-  // document, so iframe coordinates there resolve to the <iframe> element and
-  // the drop never reaches the block — which is why no asset.upload was ever
-  // dispatched. Asserted rather than assumed this time.
-  const imageOverlay = page.locator('.empty-image-overlay');
-  await expect(imageOverlay).toBeVisible({ timeout: 20_000 });
-
-  const dropzone = imageOverlay.locator('.hydra-image-picker-inline');
-  await expect(dropzone).toBeVisible({ timeout: 15_000 });
-
-  await helper.dragDropImageFile(dropzone, 'journey-upload.png');
-
-  // The image the preview renders is OUR upload, matched by filename. Asserting
-  // merely "some img with a non-data src" would pass on any other image the
-  // page happens to render — the same vacuous shape as a filter test that
-  // passes against an ignored filter.
-  await expect
-    .poll(
-      async () => {
-        try {
-          return await helper
-            .getIframe()
-            .locator('img[src*="journey-upload"]')
-            .count();
-        } catch {
-          return 0; // preview remounting
-        }
-      },
-      { timeout: 45_000 },
-    )
-    .toBeGreaterThan(0);
-
-  // The overlay closes once the upload lands — the editor's own signal that it
-  // finished, rather than us deciding it must have.
-  await expect(imageOverlay).not.toBeVisible({ timeout: 15_000 });
+  // Adding the image block and uploading into it, via the SAME code the
+  // focused spec runs. These two had drifted: image-upload.spec.ts passed
+  // while this failed on what looked like the same sequence, and comparing
+  // them by eye cost several six-minute runs without explaining it.
+  await addImageBlockAndUpload(page, helper);
 
   // --- the link, chosen by browsing ---------------------------------------
-  // The object browser is how an editor picks a link target, and it is the
-  // interesting half: the reference must be stored by the target's stable id,
-  // not its path, or the move in step 5 would break it.
-  const linkField = page
-    .locator('#sidebar-properties')
-    .locator('.field-wrapper-href, #field-href')
-    .first();
-  await expect(linkField).toBeVisible({ timeout: 20_000 });
+  // Same code the focused spec runs; see steps.ts for why they are shared.
+  const targetName = await pickLinkTarget(page, helper, ROOT, TARGET_FOLDER);
 
-  const objectBrowser = await helper.openObjectBrowserFromField(linkField);
-  // The browser lists TITLES ("First Post"), while the fixture names paths
-  // ("first-post"). Match either: the id-to-title relationship is the CMS's
-  // business, and asserting one shape would tie this to a single CMS.
-  const targetSlug = TARGET_FOLDER.split('/').pop()!;
-  const targetName = new RegExp(targetSlug.replace(/-/g, '[ -]?'), 'i');
-
-  // The browser opens at the CURRENT page's context, which is the page we just
-  // created and which has no children — so the target is not in that listing.
-  // Navigate into the folder that CONTAINS the target, the way an editor
-  // would. Passing the target's own name here navigates nowhere: the helper
-  // looks for a folder to enter, and first-post is the item we want to pick.
-  const containingFolder = ROOT.split('/').filter(Boolean).pop()!;
-  await helper.objectBrowserNavigateToFolder(objectBrowser, containingFolder);
-
-  // Assert we are looking at a listing that actually contains the target
-  // before selecting, rather than discovering it from a select timeout.
-  await expect(
-    page.locator('.object-listing li').filter({ hasText: targetName }).first(),
-  ).toBeVisible({ timeout: 15_000 });
-
-  await helper.objectBrowserSelectItem(objectBrowser, targetName);
-
-  await expect(linkField).toContainText(targetName, { timeout: 15_000 });
 
   // --- 4. add a listing: filter by keyword, sort by last edited ----------
   // NOT YET WORKING, deliberately left out rather than left failing.
@@ -428,91 +313,15 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
   reqs.mark("3. image upload + link");
 
   // --- 4. it is listed under its parent ----------------------------------
-  // Navigate within the SPA: a full page load is served under a different
-  // session by the mock, so it would land in a world that never saw the
-  // create.
-  // Saving lands on the new document's EDIT view, whose toolbar is Save and
-  // Cancel — no Back, no Contents. Leave edit mode first, then go up to the
-  // parent, then into its listing. Every hop stays inside the SPA because the
-  // mock scopes content to the session and a page load would start a new one.
-  // Back to the listing through browser history.
-  //
-  // Not via the toolbar: after client-side navigation Volto's toolbar has no
-  // Contents control here, because actions are fetched server-side and the
-  // store still holds the previous route's. And not via page.goto: a full
-  // load is served under a different session by the mock, which would land in
-  // a world that never saw the create — verified, not assumed (49 rows, none
-  // of them this page).
-  //
-  // History back is client-side, so the session and the new page both survive.
-  // Each hop is awaited by URL; the listing then refetches on arrival, so
-  // there is nothing to settle in between. It used to render restored-but-
-  // unfetched because route data was only ever loaded server-side, which is
-  // what bridge mode now does on the client.
-  // Walk BACK until the listing is reached, however deep the history is.
-  //
-  // This used to pop a fixed number of entries — back to /add, then back to
-  // /contents. That encoded the history depth of an earlier version of this
-  // test: step 3 now opens the object browser and the image picker, each of
-  // which pushes entries, so one hop no longer lands on /add and the run died
-  // 20s later at a URL nobody had predicted. Popping until the URL matches
-  // depends on where we are going rather than on how we got here.
-  const listingUrl = new RegExp(`${ROOT}/contents$`);
-  for (let hop = 0; hop < 8; hop++) {
-    if (listingUrl.test(page.url())) break;
-    if (page.url() === 'about:blank') {
-      throw new Error(
-        'Walked back past the start of history without finding the listing — ' +
-          'the journey pushed a different set of entries than expected.',
-      );
-    }
-    await page.goBack();
-    // WAIT for arrival after each hop rather than reading the URL straight
-    // away. goBack() resolves before the SPA finishes routing, so checking
-    // immediately sees the previous URL, decides it has not arrived, and pops
-    // again — overshooting the listing and eventually landing on about:blank.
-    await page.waitForURL(listingUrl, { timeout: 4_000 }).catch(() => {});
-  }
-  await expect(page).toHaveURL(listingUrl, { timeout: 25_000 });
-  await waitForRows(page);
-
-  const created = page.getByRole('row', { name: createdPath, exact: true });
-  await expect(created).toHaveCount(1, { timeout: 20_000 });
+  await returnToListing(page, ROOT);
+  await expect(
+    page.getByRole('row', { name: createdPath, exact: true }),
+  ).toHaveCount(1, { timeout: 20_000 });
 
   reqs.mark("4. back to the listing");
 
   // --- 5. move it with cut and paste -------------------------------------
-  await created.locator('td').nth(1).locator('button').click();
-  const cut = page.getByRole('button', { name: 'Cut', exact: true });
-  await expect(cut).toBeEnabled();
-  await cut.click();
-
-  const folder = page.getByRole('row', { name: TARGET_FOLDER, exact: true });
-  await folder.getByRole('link').first().click();
-  await expect(page).toHaveURL(new RegExp(`${TARGET_FOLDER}/contents$`), {
-    timeout: 20_000,
-  });
-  await waitForRows(page);
-
-  const paste = page.getByRole('button', { name: 'Paste', exact: true });
-  await expect(paste).toBeEnabled();
-  await paste.click();
-
-  // It is now listed under its new parent — that is the claim, and it holds
-  // for every CMS.
-  //
-  // Matched on the page's own id segment, NOT on a rewritten full path. Plone
-  // moves the object and its path follows; Drupal and WordPress build
-  // hierarchy from menu links and parent ids, so re-parenting deliberately
-  // leaves the URL alias alone (design spec §8b) and the row still reads
-  // /news/journey-xxx. Asserting the Plone-shaped path would demand behaviour
-  // the other adapters are specified not to have. We are looking at the target
-  // folder's own listing, so a match here means it is under the new parent
-  // whichever way that CMS models it.
-  const idSegment = createdPath.split('/').pop() as string;
-  await expect(
-    page.getByRole('row', { name: new RegExp(`/${idSegment}$`) }),
-  ).toHaveCount(1, { timeout: 30_000 });
+  await moveViaCutPaste(page, createdPath, MOVE_TARGET, TITLE);
 
   // --- 6. the content survived the move ----------------------------------
   // PARKED, not deleted: this is the assertion the journey has been setting up
