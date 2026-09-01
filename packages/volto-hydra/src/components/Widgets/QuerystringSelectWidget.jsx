@@ -22,7 +22,9 @@
  *   - indexes: 'sortable' (default) offers only indexes the catalog can sort on;
  *       'all' offers every queryable index.
  *   - multiple: true stores an array — a chosen SUBSET, in the author's order,
- *       which is what a "sort by" menu is.
+ *       which is what a "sort by" menu is. false (the default) stores one name.
+ *   - emptyLabel: wording of the "none" entry in single mode (default
+ *       "— no sorting —"). Ignored when multiple, where empty says it already.
  *
  * The stored value is the index NAME (`effective`, `sortable_title`), because
  * that is what a query is built from; the title is only what the author reads.
@@ -39,16 +41,25 @@ import config from '@plone/volto/registry';
  * uses it directly rather than filtering `indexes` on a flag that means
  * something subtly different.
  */
-export function indexChoices(querystring, which) {
+export function indexChoices(querystring, which, emptyLabel) {
   const source =
     which === 'all' ? querystring?.indexes : querystring?.sortable_indexes;
-  return Object.entries(source || {})
+  const choices = Object.entries(source || {})
     .map(([name, index]) => [name, index?.title || name])
     .sort((a, b) => a[1].localeCompare(b[1]));
+  // Picking ONE index needs a way to pick none — for a sort field that is
+  // "whatever order the catalog returns", a real answer and usually the
+  // default. A multiple field says the same thing by being empty, so it needs
+  // no such entry.
+  return emptyLabel ? [['', emptyLabel], ...choices] : choices;
 }
 
 const QuerystringSelectWidget = (props) => {
-  const { indexes = 'sortable', multiple = false } = props;
+  const {
+    indexes = 'sortable',
+    multiple = false,
+    emptyLabel = '— no sorting —',
+  } = props;
   const dispatch = useDispatch();
   const querystring = useSelector((state) => state.querystring);
 
@@ -59,7 +70,7 @@ const QuerystringSelectWidget = (props) => {
     }
   }, [dispatch, querystring]);
 
-  const choices = indexChoices(querystring, indexes);
+  const choices = indexChoices(querystring, indexes, multiple ? null : emptyLabel);
   const Widget = multiple
     ? config.widgets.widget.array
     : config.widgets.widget.select;

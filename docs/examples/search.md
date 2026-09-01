@@ -13,19 +13,17 @@ which is the clearest example of when to reach for Volto's and when not to.
 
 | field | widget | why |
 |---|---|---|
-| a facet's `field` | `select_querystring_field` | ONE index to filter on. Volto's, registered, passed straight through |
-| `sortOn` | `query_sort_on` | ONE index the results come back in. Also Volto's |
-| `sortOnOptions` | `querystringSelect` | a chosen SUBSET, in the author's order — the menu a visitor re-sorts with |
+| a facet's `field` | `select_querystring_field` | ONE index to filter on. Volto's own, registered, passed straight through |
+| `sortOn` | `querystringSelect` | ONE index the results come back in — `multiple` off, with a "no sorting" entry |
+| `sortOnOptions` | `querystringSelect` (`multiple`) | a chosen SUBSET, in the author's order — the menu a visitor re-sorts with |
 
-Only the third needs a hydra widget. Volto builds that field imperatively in
-`SearchBlockEdit`, which a JSON schema cannot reach; the first two are Volto's
-own widgets doing exactly what they were written for.
-
-One caveat if you use `query_sort_on` on its own: it reads
-`state.querystring.sortable_indexes` but never asks for it. In Volto's listing
-sidebar the `QueryWidget` beside it does the asking — alone in a hydra schema it
-renders an empty menu and no error. `querystringSelect` asks for itself, so a
-schema with only `sortOnOptions` is fine.
+The same widget serves both sort fields; `multiple` is the only difference.
+Volto's `query_sort_on` would also serve `sortOn`, with a menu grouped by the
+registry's `group`, and is the better pick in a schema that already carries a
+`querystring` field. This schema does not, and there is the catch:
+`query_sort_on` reads `state.querystring.sortable_indexes` but never asks for
+it — in Volto's listing sidebar the `QueryWidget` beside it does the asking, so
+alone here it would render an empty menu and no error.
 
 ## Schema
 
@@ -62,9 +60,11 @@ schema with only `sortOnOptions` is fine.
         },
         "sortOn": {
           "title": "Sort results by",
-          "description": "The index the results come back in. Volto's own widget — one index, grouped menu.",
+          "description": "The index the results come back in. One index; empty means the catalog's own order.",
           "type": "string",
-          "widget": "query_sort_on"
+          "widget": "querystringSelect",
+          "indexes": "sortable",
+          "emptyLabel": "— no sorting —"
         },
         "sortOnOptions": {
           "title": "Sort-by options offered",

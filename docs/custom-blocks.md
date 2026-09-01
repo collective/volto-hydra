@@ -301,25 +301,39 @@ A field that names a catalog index — what a listing sorts on, what a facet
 filters by — should offer the site's indexes, not a text box. A typo in a text
 box produces a sort option that appears in the menu and silently sorts nothing.
 
-**Reach for Volto's own widgets first.** Two are registered and pass straight
+One widget covers both shapes: `multiple: false` (the default) stores one index
+name, `multiple: true` stores a chosen subset in the author's order.
+
+`indexes: "sortable"` (also the default) offers only what the catalog can sort
+on. That list is worth taking as given rather than deriving: index type sets the
+floor — a KeywordIndex like `Subject` is multi-valued and has no single key to
+sort by, a ZCTextIndex is ranked text — but Plone layers judgment on top. In its
+registry `portal_type` and `review_state` are both `FieldIndex`, and only
+`review_state` is flagged sortable. Filtering an index list by type would offer
+things Plone deliberately does not.
+
+**Volto's own widgets, for comparison.** Both are registered and pass straight
 through a hydra schema:
 
 | widget | for |
 |---|---|
-| [`query_sort_on`](https://github.com/plone/volto/blob/main/packages/volto/src/components/manage/Widgets/QuerySortOnWidget.jsx) | ONE index to sort by — grouped menu, stores the index name |
+| [`query_sort_on`](https://github.com/plone/volto/blob/main/packages/volto/src/components/manage/Widgets/QuerySortOnWidget.jsx) | ONE index to sort by — a menu grouped by the registry's `group` |
 | `select_querystring_field` | ONE index to query on (what the facet examples use) |
 
-`querystringSelect` is for what those two do not cover: a chosen **subset** of
-indexes — the "sort by" menu a search block offers its visitors. Volto builds
-that one imperatively, in `SearchBlockEdit`, which writes
-`sortOnOptions.items.choices` before rendering; a hydra frontend has no Edit
-component, so that route is closed.
+Prefer `query_sort_on` for a single sort field in a schema that also carries a
+`querystring` field, where its grouped menu is nicer and the data is already
+loaded. Prefer this widget otherwise, and for every `multiple` case.
 
-It also fixes a smaller trap. `query_sort_on` reads
+The reason for "already loaded": `query_sort_on` reads
 `state.querystring.sortable_indexes` but never dispatches `getQuerystring()` —
-in Volto's listing sidebar the `QueryWidget` beside it does. Alone in a hydra
-schema it renders an empty menu with no error. This widget asks for the data
+in Volto's listing sidebar the `QueryWidget` beside it does the asking. Alone in
+a hydra schema it renders an empty menu with no error. This widget asks for
 itself.
+
+Volto has no declarative answer at all for the `multiple` case: its search block
+builds that field imperatively in `SearchBlockEdit`, which writes
+`sortOnOptions.items.choices` before rendering — a route a JSON schema cannot
+take.
 
 ```json
 "sortOnOptions": {
@@ -335,6 +349,7 @@ itself.
 |---|---|
 | `indexes` | `"sortable"` (default) offers only what the catalog can sort on; `"all"` offers every queryable index |
 | `multiple` | `true` stores an array — a chosen subset, in the author's order, which is what a "sort by" menu is |
+| `emptyLabel` | wording of the "none" entry in single mode (default `— no sorting —`). Single mode needs one: no sorting is a real answer, usually the default. Ignored when `multiple`, where an empty list says it already |
 
 The stored value is the index NAME (`effective`, `sortable_title`), because that
 is what a query is built from; the title is only what the author reads.

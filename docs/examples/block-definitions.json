@@ -796,9 +796,11 @@
             },
             "sortOn": {
               "title": "Sort results by",
-              "description": "The index the results come back in. Volto's own widget \u2014 one index, grouped menu.",
+              "description": "The index the results come back in. One index; empty means the catalog's own order.",
               "type": "string",
-              "widget": "query_sort_on"
+              "widget": "querystringSelect",
+              "indexes": "sortable",
+              "emptyLabel": "\u2014 no sorting \u2014"
             },
             "sortOnOptions": {
               "title": "Sort-by options offered",

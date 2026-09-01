@@ -57,6 +57,19 @@ describe('indexChoices', () => {
     expect(choices).toEqual([['created', 'created']]);
   });
 
+  test('picking ONE index offers a way to pick none', () => {
+    // "No sorting" is a real answer for a sort field — usually the default —
+    // and without an entry for it there is no way back to it.
+    const choices = indexChoices(QUERYSTRING, 'sortable', '— no sorting —');
+    expect(choices[0]).toEqual(['', '— no sorting —']);
+    expect(choices.map(([name]) => name)).toEqual(['', 'effective', 'Title']);
+  });
+
+  test('picking SEVERAL needs no none entry — empty already says it', () => {
+    const choices = indexChoices(QUERYSTRING, 'sortable', null);
+    expect(choices.map(([name]) => name)).toEqual(['effective', 'Title']);
+  });
+
   test('an empty menu rather than a crash before @querystring has loaded', () => {
     expect(indexChoices(undefined, 'sortable')).toEqual([]);
     expect(indexChoices({}, 'all')).toEqual([]);
