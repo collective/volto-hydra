@@ -84,7 +84,9 @@ test.describe('Sidebar pickers', () => {
     await wrapper.locator('.react-select__control').click();
     const menu = page.locator('.react-select__menu');
     await menu.waitFor({ state: 'visible', timeout: 10000 });
-    await menu.locator('.react-select__option', { hasText: 'Full Name' }).click();
+    await menu
+      .locator('.react-select__option', { hasText: 'Full Name' })
+      .click();
 
     // Kept, rather than shown and dropped: leave the block and come back, so
     // the value has to have survived the form data rather than living in the
