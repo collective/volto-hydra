@@ -30,9 +30,17 @@
  * that is what a query is built from; the title is only what the author reads.
  */
 import React, { useEffect } from 'react';
+import { defineMessages, useIntl } from 'react-intl';
 import { useDispatch, useSelector } from 'react-redux';
 import { getQuerystring } from '@plone/volto/actions';
 import config from '@plone/volto/registry';
+
+const messages = defineMessages({
+  noSorting: {
+    id: 'no sorting',
+    defaultMessage: '— no sorting —',
+  },
+});
 
 /**
  * `[name, title]` pairs for the menu.
@@ -55,11 +63,8 @@ export function indexChoices(querystring, which, emptyLabel) {
 }
 
 const QuerystringSelectWidget = (props) => {
-  const {
-    indexes = 'sortable',
-    multiple = false,
-    emptyLabel = '— no sorting —',
-  } = props;
+  const { indexes = 'sortable', multiple = false, emptyLabel } = props;
+  const intl = useIntl();
   const dispatch = useDispatch();
   const querystring = useSelector((state) => state.querystring);
 
@@ -76,7 +81,9 @@ const QuerystringSelectWidget = (props) => {
   const choices = indexChoices(
     querystring,
     indexes,
-    multiple ? null : emptyLabel,
+    // A schema-supplied `emptyLabel` is the author's own wording and is used as
+    // written; only our default is translated.
+    multiple ? null : emptyLabel || intl.formatMessage(messages.noSorting),
   );
   const Widget = multiple
     ? config.widgets.widget.array

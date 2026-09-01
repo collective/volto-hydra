@@ -27,7 +27,15 @@
  *   - emptyLabel: the first, empty option's text.
  */
 import React from 'react';
+import { defineMessages, useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
+
+const messages = defineMessages({
+  none: {
+    id: 'no block selected',
+    defaultMessage: '— none —',
+  },
+});
 import { useHydraSchemaContext } from '../../context/HydraSchemaContext';
 import { getBlockById } from '../../utils/blockPath';
 
@@ -95,8 +103,9 @@ const BlockSelectWidget = (props) => {
     blockTypes,
     valueField,
     labelField,
-    emptyLabel = '— none —',
+    emptyLabel,
   } = props;
+  const intl = useIntl();
   const ctx = useHydraSchemaContext();
   const { blockPathMap, currentBlockId, formData } = ctx || {};
 
@@ -108,7 +117,9 @@ const BlockSelectWidget = (props) => {
   });
 
   const choices = [
-    ['', emptyLabel],
+    // A schema-supplied `emptyLabel` is the author's own wording ("— always
+    // show —") and is used as written; only our default is translated.
+    ['', emptyLabel || intl.formatMessage(messages.none)],
     ...ids
       .map((id) => ({ id, block: getBlockById(formData, blockPathMap, id) }))
       .filter(({ block }) => block)

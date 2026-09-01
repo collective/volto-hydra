@@ -26,7 +26,15 @@
  * a list of terms, and belongs to the search block's criteria instead.
  */
 import React, { useEffect, useState } from 'react';
+import { defineMessages, useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
+
+const messages = defineMessages({
+  none: {
+    id: 'no vocabulary',
+    defaultMessage: '— none —',
+  },
+});
 
 /** The vocabulary NAME from a listing item's `@id`. */
 export function vocabularyNameFrom(item) {
@@ -36,7 +44,8 @@ export function vocabularyNameFrom(item) {
 }
 
 const VocabularySelectWidget = (props) => {
-  const { vocabularyFilter } = props;
+  const { vocabularyFilter, emptyLabel } = props;
+  const intl = useIntl();
   const [names, setNames] = useState([]);
 
   useEffect(() => {
@@ -64,7 +73,9 @@ const VocabularySelectWidget = (props) => {
 
   const pattern = vocabularyFilter ? new RegExp(vocabularyFilter) : null;
   const choices = [
-    ['', '— none —'],
+    // A schema-supplied `emptyLabel` is the author's own wording and is used as
+    // written; only our default is translated.
+    ['', emptyLabel || intl.formatMessage(messages.none)],
     ...names
       .filter((name) => !pattern || pattern.test(name))
       .map((name) => [name, name]),
