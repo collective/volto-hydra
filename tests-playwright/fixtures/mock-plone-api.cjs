@@ -2956,6 +2956,31 @@ app.get('*/@search', (req, res) => {
       .map((content) => formatSearchItem(content, baseUrl));
   }
 
+  // GET @search honours sort_on / sort_order, as the catalog does.
+  //
+  // It did not, so anything ordering a listing through this endpoint — the
+  // contents view's "Rearrange by", above all — came back in whatever order
+  // the items were assembled. Ascending and descending were byte-identical,
+  // which is indistinguishable from a sort the ADMIN failed to send, and hid
+  // the question of whether the admin sends it at all.
+  //
+  // getObjPositionInParent is the folder's own order, which is how the items
+  // already arrive; every other index sorts on the metadata field of that
+  // name, and sort_order: descending reverses the whole result, as in the
+  // querystring-search handler above.
+  const sortOn = req.query.sort_on;
+  if (sortOn && sortOn !== 'getObjPositionInParent') {
+    items = [...items].sort((a, b) => {
+      const x = a[sortOn] ?? '';
+      const y = b[sortOn] ?? '';
+      if (typeof x === 'number' && typeof y === 'number') return x - y;
+      return String(x) < String(y) ? -1 : String(x) > String(y) ? 1 : 0;
+    });
+  }
+  if (req.query.sort_order === 'descending' || req.query.sort_order === 'reverse') {
+    items = [...items].reverse();
+  }
+
   const searchUrl = searchPath === '' || searchPath === '/'
     ? `http://localhost:${PORT}/@search`
     : `http://localhost:${PORT}${searchPath}/@search`;

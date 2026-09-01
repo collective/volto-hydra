@@ -87,19 +87,24 @@ test('the listing can be sorted', async ({ page }, testInfo) => {
   await expect(configure).toHaveCount(1, { timeout: 15_000 });
 
   const sortBy = async (direction: 'ascending' | 'descending') => {
-    // force: the trigger is an inline SVG inside a table header, which
-    // Playwright's actionability checks refuse to consider clickable even
-    // though a user can click it perfectly well. No scrollIntoViewIfNeeded
-    // first — click scrolls by itself, and that extra wait was where the test
-    // spent its budget while the listing re-rendered around it.
-    await configure.click({ force: true, timeout: 30_000 });
+    await configure.click({ timeout: 30_000 });
     const item = page.locator(`[class*="_${direction}"]`).first();
     await item.waitFor({ state: 'visible', timeout: 10_000 });
-    // force, for the same reason as the trigger above: the popup this item
-    // lives in is itself an overlay, so Playwright sees the menu intercepting
-    // pointer events and waits for a stability that never comes, even though
-    // the item is exactly where a user would click it.
-    await item.click({ force: true });
+
+    // dispatchEvent, not click, and NOT a forced click.
+    //
+    // The popup this item lives in overlays the table. A forced click skips
+    // the "does this element receive the event" check and fires at the
+    // coordinates regardless — which landed on the ROW BEHIND the menu and
+    // navigated to /news/draft-post, so the next step found no listing and no
+    // trigger, and the failure surfaced as the sort control vanishing. A
+    // normal click has the opposite problem: the item never registers as
+    // receiving events, so it waits out its timeout.
+    //
+    // The element IS the intended target; only the hit-testing is unreliable.
+    // Dispatching the event calls its handler directly and leaves the page
+    // where it is.
+    await item.dispatchEvent('click');
     await waitForRows(page);
     return page.locator('tbody tr').allInnerTexts();
   };

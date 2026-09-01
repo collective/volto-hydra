@@ -5,6 +5,7 @@ import { seedWordPress } from './seedWordPress';
 import {
   addImageBlockAndUpload,
   browseListing,
+  nameLike,
   createPage,
   moveViaCutPaste,
   pickLinkTarget,
@@ -314,8 +315,12 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
 
   // --- 4. it is listed under its parent ----------------------------------
   await returnToListing(page, ROOT);
+  // By TITLE: the listing renders titles, and a CMS derives an id from one
+  // however it likes — Drupal's alias for a page titled "Journey 1788…" is not
+  // the string this test typed. Matching the path found no row and read as
+  // "the created page is not listed under its parent".
   await expect(
-    page.getByRole('row', { name: createdPath, exact: true }),
+    page.locator('tbody tr').filter({ hasText: nameLike(TITLE) }),
   ).toHaveCount(1, { timeout: 20_000 });
 
   reqs.mark("4. back to the listing");

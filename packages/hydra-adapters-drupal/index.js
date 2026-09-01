@@ -32,6 +32,41 @@ const MEDIA_FILE_FIELD = 'field_media_image';
 
 const STATE_MAP = { true: 'published', false: 'draft' };
 
+/**
+ * Order documents the admin's way, on the client.
+ *
+ * Used where the answer came from the MENU rather than a node query — the
+ * menu's own order is menu weight, the sibling order an editor arranges by
+ * hand, which is the right answer only until a sort is asked for. JSON:API
+ * cannot be asked to sort a set it did not select, and the documents are
+ * already in hand, so ordering them here costs nothing. Callers must apply any
+ * limit AFTER this, or a first page is chosen by one order and shown in
+ * another.
+ */
+function orderDocuments(items, sortOn, sortOrder) {
+  if (!sortOn) return items;
+  const field = sortFieldFor(sortOn);
+  const keyOf = (doc) =>
+    field === 'title'
+      ? (doc.title ?? '')
+      : (doc._adapter?.raw?.attributes?.[field] ?? '');
+  const descending = String(sortOrder ?? '').startsWith('desc');
+  return [...items].sort((a, b) => {
+    const x = keyOf(a);
+    const y = keyOf(b);
+    // Numbers compare as numbers: nid 10 does not sort before nid 2.
+    const order =
+      typeof x === 'number' && typeof y === 'number'
+        ? x - y
+        : String(x) < String(y)
+          ? -1
+          : String(x) > String(y)
+            ? 1
+            : 0;
+    return descending ? -order : order;
+  });
+}
+
 export class DrupalAdapter extends BaseAdapter {
   constructor({ cmsBaseUrl, credentials, bundle = 'page' } = {}) {
     super({
@@ -403,7 +438,12 @@ export class DrupalAdapter extends BaseAdapter {
           if (!nodeId) continue;
           items.push(this.toDocument(await this.nodeByUuid(nodeId)));
         }
-        return { items, total: items.length };
+        // Menu weight above is the folder's OWN order, which is what a listing
+        // gets when nothing else is asked for. An explicit sort replaces it.
+        return {
+          items: orderDocuments(items, args.sortOn, args.sortOrder),
+          total: items.length,
+        };
       }
 
       case 'breadcrumbs.get': {
@@ -782,30 +822,7 @@ export class DrupalAdapter extends BaseAdapter {
           // since the question was answered from menu links rather than a node
           // query; the subtree is already fetched, so ordering it costs
           // nothing and must happen BEFORE the limit is applied.
-          let items = subtree.items;
-          if (args.sortOn) {
-            const field = sortFieldFor(args.sortOn);
-            const keyOf = (doc) =>
-              field === 'title'
-                ? (doc.title ?? '')
-                : (doc._adapter?.raw?.attributes?.[field] ?? '');
-            const descending = String(args.sortOrder ?? '').startsWith('desc');
-            items = [...items].sort((a, b) => {
-              const x = keyOf(a);
-              const y = keyOf(b);
-              // Numbers compare as numbers: nid 10 does not sort before nid 2.
-              const both =
-                typeof x === 'number' && typeof y === 'number'
-                  ? x - y
-                  : String(x) < String(y)
-                    ? -1
-                    : String(x) > String(y)
-                      ? 1
-                      : 0;
-              return descending ? -both : both;
-            });
-          }
-
+          const items = orderDocuments(subtree.items, args.sortOn, args.sortOrder);
           const limited = args.limit ? items.slice(0, args.limit) : items;
           return { items: limited, total: subtree.total };
         }

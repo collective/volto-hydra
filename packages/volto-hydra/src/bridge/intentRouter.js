@@ -190,15 +190,32 @@ export function routeToIntent({ op, path, data }) {
 
       const query = normaliseSearchText(params.get('SearchableText'));
 
-      // A folder listing is tree.list — but only while it is UNFILTERED.
+      // A folder listing is tree.list — but only while it is UNFILTERED and
+      // UNSORTED.
       //
       // The contents view always sends path.depth=1, including when the editor
       // has typed in its filter box, so routing on depth alone threw the search
       // term away and returned the whole folder. Typing in the filter narrowed
       // nothing, on every CMS, and looked like a broken adapter rather than a
       // dropped parameter.
+      //
+      // A requested ORDER travels WITH it. tree.list is the folder listing,
+      // and a folder listing can be ordered; getObjPositionInParent names the
+      // folder's own order, the sibling order an editor arranges by hand,
+      // which is what an adapter returns when nothing else is asked for.
+      //
+      // Not routed to `search` instead: that is full-text search, and asking
+      // it for an empty query scoped to a path returned nothing at all.
+      const sortOn = params.get('sort_on');
       if (params.get('path.depth') === '1' && !query) {
-        return { intent: 'tree.list', args: { parent: scope } };
+        return {
+          intent: 'tree.list',
+          args: {
+            parent: scope,
+            sortOn: sortOn || undefined,
+            sortOrder: params.get('sort_order') || undefined,
+          },
+        };
       }
       return {
         intent: 'search',
@@ -216,6 +233,11 @@ export function routeToIntent({ op, path, data }) {
           // Plone-shaped REST into a canonical intent.
           query,
           path: scope === '/' ? undefined : scope,
+          // The ordering the editor asked for, named as an index the way the
+          // contents view names it; each adapter maps it to whatever its CMS
+          // calls that field.
+          sortOn: sortOn || undefined,
+          sortOrder: params.get('sort_order') || undefined,
           limit: params.get('b_size') ? Number(params.get('b_size')) : undefined,
         },
       };

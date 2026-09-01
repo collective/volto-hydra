@@ -694,9 +694,15 @@ export class WordPressAdapter extends BaseAdapter {
             status: 'any',
             context: 'edit',
             per_page: '100',
-            // Without this the ordering set by content.order is invisible.
-            orderby: 'menu_order',
-            order: 'asc',
+            // menu_order is the folder's OWN order — without it the ordering
+            // set by content.order is invisible. An explicit sort replaces it,
+            // named as an index the admin uses and mapped to WordPress's own
+            // orderby; WordPress can do this itself, so unlike Drupal's
+            // menu-derived tree there is nothing to sort client-side.
+            orderby: args.sortOn ? sortFieldFor(args.sortOn) : 'menu_order',
+            order: String(args.sortOrder ?? '').startsWith('desc')
+              ? 'desc'
+              : 'asc',
           },
         });
         const parentSegments =
