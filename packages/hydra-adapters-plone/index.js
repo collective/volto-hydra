@@ -66,6 +66,11 @@ export class PloneAdapter extends BaseAdapter {
         'vocabulary',
         'schema',
         'asset',
+        'state',
+        // The only one of the three that can say WHO, per document: local
+        // roles assigned on an object and inherited down the tree.
+        'per-content-permissions',
+        'hierarchical-permissions',
       ],
     });
     this.cmsBaseUrl = cmsBaseUrl;
@@ -235,6 +240,117 @@ export class PloneAdapter extends BaseAdapter {
       state: STATE_MAP[raw.review_state] ?? raw.review_state,
       _adapter: { raw },
     };
+  }
+
+  /**
+   * The transition body Plone accepts, from its own recorded example —
+   * tests-adapters/fixtures/plone/workflow_post_with_body.req. Nothing here is
+   * invented: comment, effective, expires and include_children are what
+   * POST @workflow/<id> already takes.
+   */
+  transitionSchema() {
+    return {
+      fieldsets: [
+        {
+          id: 'default',
+          title: 'Default',
+          fields: ['comment', 'effective', 'expires', 'include_children'],
+        },
+      ],
+      properties: {
+        comment: {
+          title: 'Comment',
+          description: 'Recorded in this item\u2019s workflow history.',
+          type: 'string',
+          widget: 'textarea',
+        },
+        effective: {
+          title: 'Publishing date',
+          description:
+            'Before this date the item stays invisible even once published \u2014 the state alone is not the whole story.',
+          type: 'string',
+          widget: 'datetime',
+        },
+        expires: {
+          title: 'Expiration date',
+          description: 'After this date the item stops being visible.',
+          type: 'string',
+          widget: 'datetime',
+        },
+        include_children: {
+          title: 'Include contained items',
+          description: 'Apply the same change to everything inside this item.',
+          type: 'boolean',
+        },
+      },
+      required: [],
+    };
+  }
+
+  /**
+   * Sharing, transposed.
+   *
+   * Plone's @sharing is entry-major — `entries[].roles` is a {Role: bool} map,
+   * the grid. Role-major is what the dialog needs, so one field per role with
+   * the principals holding it, and back again on write. See
+   * tests-adapters/fixtures/plone/sharing_folder_get.resp.
+   */
+  async accessForm(path) {
+    const sharing = await this.fetchJson(`${path}/@sharing`);
+    const roles = sharing.available_roles ?? [];
+
+    const properties = {};
+    const data = {};
+    for (const role of roles) {
+      properties[role.id] = {
+        // Plone already writes the phrase: "Can view", "Can edit", "Can add".
+        title: role.title,
+        description: `The ${role.id} role, local to this item. Exactly what it permits varies by state, and Plone does not expose that mapping over REST.`,
+        type: 'array',
+        vocabulary: 'principals',
+      };
+      data[role.id] = (sharing.entries ?? [])
+        .filter((e) => e.roles?.[role.id])
+        .map((e) => e.id);
+    }
+
+    properties.inherit = {
+      title: 'Inherit permissions from parent',
+      description:
+        'On, people given access further up the tree also have it here. How many that is, Plone cannot say \u2014 @sharing reports inherited roles only for principals you have already named.',
+      type: 'boolean',
+    };
+    data.inherit = sharing.inherit ?? true;
+
+    return {
+      schema: {
+        fieldsets: [
+          {
+            id: 'default',
+            title: 'Default',
+            fields: [...roles.map((r) => r.id), 'inherit'],
+          },
+        ],
+        properties,
+        required: [],
+      },
+      data,
+    };
+  }
+
+  async transitionForms(path) {
+    const wf = await this.fetchJson(`${path}/@workflow`);
+    const forms = {};
+    for (const t of wf.transitions ?? []) {
+      forms[t['@id'].split('/').pop()] = {
+        schema: this.transitionSchema(),
+        data: {},
+      };
+    }
+    // Changing who can reach this without moving it. A transition in the menu
+    // like any other; its target state is the one it is already in.
+    forms.access = await this.accessForm(path);
+    return forms;
   }
 
   async dispatch(intent, args) {
@@ -522,6 +638,90 @@ export class PloneAdapter extends BaseAdapter {
           items: (raw.items ?? []).map((i) => this.toBrief(i)),
           total: raw.items_total ?? 0,
         };
+      }
+
+      case 'state.get': {
+        const [wf, actions] = await Promise.all([
+          this.fetchJson(`${args.path}/@workflow`),
+          this.fetchJson(`${args.path}/@actions`),
+        ]);
+
+        // Anonymous gets history/transitions with no `state` key at all (see
+        // live_workflow_anon.json). The admin is always authenticated, so an
+        // absent state means the session is not what we think it is — say so
+        // rather than invent a review state.
+        if (!wf.state) {
+          throw new AdapterError('plone: @workflow returned no state', {
+            code: 'UNAUTHORIZED',
+            status: 401,
+          });
+        }
+
+        const object = actions.object ?? [];
+        const has = (id) => object.some((a) => a.id === id);
+        const transitions = (wf.transitions ?? []).map((t) => ({
+          id: t['@id'].split('/').pop(),
+          label: t.title,
+          // Deliberately no targetState: @workflow does not name one.
+        }));
+
+        return {
+          state: { name: wf.state.id, label: wf.state.title },
+          transitions,
+          effective: {
+            canEdit: has('edit'),
+            canPublish: transitions.some((t) => t.id === 'publish'),
+            canDelete: has('delete'),
+            canShare: has('sharing') || has('local_roles'),
+            canComment: has('discussion'),
+          },
+        };
+      }
+
+      case 'state.getForms':
+        return this.transitionForms(args.path);
+
+      case 'state.transition': {
+        const forms = await this.transitionForms(args.path);
+        this.assertDeclared(args.data, forms[args.id]?.schema, args.id);
+        const d = args.data ?? {};
+
+        if (args.id === 'access') {
+          // Transpose back: role-major fields become Plone's entry-major
+          // {Role: bool} maps. Principals not named in any field keep whatever
+          // they had — this posts only what the dialog actually touched.
+          const sharing = await this.fetchJson(`${args.path}/@sharing`);
+          const roles = (sharing.available_roles ?? []).map((r) => r.id);
+          const known = new Map(
+            (sharing.entries ?? []).map((e) => [e.id, e.type ?? 'user']),
+          );
+          const named = new Set(roles.flatMap((r) => d[r] ?? []));
+          for (const e of sharing.entries ?? []) named.add(e.id);
+
+          const entries = [...named].map((id) => ({
+            id,
+            type: known.get(id) ?? 'user',
+            roles: Object.fromEntries(
+              roles.map((r) => [r, (d[r] ?? []).includes(id)]),
+            ),
+          }));
+
+          await this.fetchJson(`${args.path}/@sharing`, {
+            method: 'POST',
+            body: { entries, inherit: d.inherit ?? sharing.inherit },
+          });
+          return null;
+        }
+
+        const body = {};
+        for (const field of ['comment', 'effective', 'expires', 'include_children']) {
+          if (d[field] !== undefined) body[field] = d[field];
+        }
+        await this.fetchJson(`${args.path}/@workflow/${args.id}`, {
+          method: 'POST',
+          body,
+        });
+        return null;
       }
 
       case 'breadcrumbs.get': {
