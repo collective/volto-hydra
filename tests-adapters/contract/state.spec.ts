@@ -175,3 +175,52 @@ describe('state.getForms', () => {
     ).rejects.toMatchObject({ code: 'NOT_IMPLEMENTED' });
   });
 });
+
+/**
+ * Taking a transition, carrying its form's answers.
+ *
+ * This has to work with no content edit involved. The state menu is in view
+ * mode as well as edit mode, so publishing must not require going through a
+ * save — `state.transition` is the standalone carrier, and `content.update`
+ * the one used when there IS a body to save at the same time.
+ */
+describe('state.transition with data', () => {
+  it('accepts the values its own form asked for', async () => {
+    if (!advertises('state')) return;
+    const forms: any = await target.adapter.dispatch('state.getForms', {
+      path: PATH,
+    });
+    const [id, form] =
+      Object.entries<any>(forms).find(
+        ([, f]) => Object.keys(f.schema.properties).length > 0,
+      ) ?? [];
+    if (!id) return; // nothing this CMS asks for; covered by the plain case
+
+    await target.adapter.dispatch('state.transition', {
+      path: PATH,
+      id,
+      data: form.data,
+    });
+
+    const after: any = await target.adapter.dispatch('state.get', { path: PATH });
+    expect(typeof after.state.name).toBe('string');
+  });
+
+  it('refuses a field its form did not declare', async () => {
+    if (!advertises('state')) return;
+    const pas: any = await target.adapter.dispatch('state.get', { path: PATH });
+    const move = pas.transitions[0];
+    if (!move) return;
+
+    // Silently dropping it is the failure mode worth preventing: the dialog
+    // would report success for a setting that never took, and nobody finds
+    // out until the wrong audience sees the document.
+    await expect(
+      target.adapter.dispatch('state.transition', {
+        path: PATH,
+        id: move.id,
+        data: { notAFieldAnyoneDeclared: 'x' },
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+});

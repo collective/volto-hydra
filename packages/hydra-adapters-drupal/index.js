@@ -244,6 +244,38 @@ export class DrupalAdapter extends BaseAdapter {
     return this.dispatch('auth.whoami', {});
   }
 
+  /**
+   * Core Drupal, no Content Moderation: publishing is a status flip, so the
+   * only thing worth asking for is the revision log message every node carries
+   * anyway. With Content Moderation enabled this is where the workflow's own
+   * transitions and their permissions would appear.
+   */
+  async transitionForms(path) {
+    const node = await this.nodeByAlias(path);
+    const published = node.attributes.status === true;
+    const id = published ? 'unpublish' : 'publish';
+    return {
+      [id]: {
+        schema: {
+          fieldsets: [
+            { id: 'default', title: 'Default', fields: ['revision_log'] },
+          ],
+          properties: {
+            revision_log: {
+              title: 'Revision log message',
+              description:
+                'Recorded against this revision. Visible to anyone who can see the revision history.',
+              type: 'string',
+              widget: 'textarea',
+            },
+          },
+          required: [],
+        },
+        data: {},
+      },
+    };
+  }
+
   async dispatch(intent, args) {
     return this.dispatchWithInvalidation(intent, args, () =>
       this.withAuthRetry(() => this.dispatchOnce(intent, args)),
@@ -580,38 +612,25 @@ export class DrupalAdapter extends BaseAdapter {
         };
       }
 
-      case 'state.getForms': {
-        // Core Drupal, no Content Moderation: publishing is a status flip, so
-        // the only thing worth asking for is the revision log message every
-        // node carries anyway. With Content Moderation enabled this is where
-        // the workflow's own transitions and their permissions would appear.
-        const node = await this.nodeByAlias(args.path);
-        const published = node.attributes.status === true;
-        const id = published ? 'unpublish' : 'publish';
-        return {
-          [id]: {
-            schema: {
-              fieldsets: [
-                { id: 'default', title: 'Default', fields: ['revision_log'] },
-              ],
-              properties: {
-                revision_log: {
-                  title: 'Revision log message',
-                  description:
-                    'Recorded against this revision. Visible to anyone who can see the revision history.',
-                  type: 'string',
-                  widget: 'textarea',
-                },
-              },
-              required: [],
-            },
-            data: {},
-          },
-        };
-      }
+      case 'state.getForms':
+        return this.transitionForms(args.path);
 
       case 'state.transition': {
         const node = await this.nodeByAlias(args.path);
+        const forms = await this.transitionForms(args.path);
+        this.assertDeclared(args.data, forms[args.id]?.schema, args.id);
+        if (args.data?.revision_log) {
+          await this.fetchJson(`/jsonapi/node/${this.bundle}/${node.id}`, {
+            method: 'PATCH',
+            body: {
+              data: {
+                type: `node--${this.bundle}`,
+                id: node.id,
+                attributes: { revision_log: args.data.revision_log },
+              },
+            },
+          });
+        }
         await this.fetchJson(`/jsonapi/node/${this.bundle}/${node.id}`, {
           method: 'PATCH',
           body: {

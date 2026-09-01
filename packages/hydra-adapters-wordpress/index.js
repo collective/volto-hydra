@@ -500,6 +500,86 @@ export class WordPressAdapter extends BaseAdapter {
     return this.dispatch('auth.whoami', {});
   }
 
+  /**
+   * WordPress's pre-publish panel, as data.
+   */
+  async transitionForms(path) {
+    const id = await this.resolvePath(path);
+    const post = await this.fetchJson(`/wp/v2/${this.postType}/${id}`, {
+      params: { context: 'edit' },
+    });
+
+    // This is WordPress's pre-publish panel, as data. It was never a
+    // special case worth hardcoding in the admin — it is just what this
+    // CMS asks for when you publish, the way Plone asks for effective and
+    // expiration dates.
+    const publishSchema = {
+      fieldsets: [
+        {
+          id: 'default',
+          title: 'Default',
+          fields: ['date', 'visibility', 'password', 'slug'],
+        },
+      ],
+      properties: {
+        date: {
+          title: 'Publish',
+          description:
+            'Leave empty to publish immediately. A future date schedules it — the post stays invisible until then.',
+          type: 'string',
+          widget: 'datetime',
+        },
+        visibility: {
+          title: 'Visibility',
+          description:
+            'Private is visible to editors and administrators only. Password-protected is visible to anyone who has the password.',
+          type: 'string',
+          choices: [
+            ['public', 'Public'],
+            ['private', 'Private'],
+            ['password', 'Password protected'],
+          ],
+        },
+        password: {
+          title: 'Password',
+          description: 'Used only when visibility is password-protected.',
+          type: 'string',
+        },
+        slug: {
+          title: 'URL slug',
+          description: 'The last part of this post\u2019s address.',
+          type: 'string',
+        },
+      },
+      required: [],
+    };
+
+    const current = {
+      date: post.status === 'future' ? post.date : '',
+      visibility:
+        post.status === 'private'
+          ? 'private'
+          : post.password
+            ? 'password'
+            : 'public',
+      password: post.password ?? '',
+      slug: post.slug,
+    };
+
+    const empty = { fieldsets: [], properties: {}, required: [] };
+    const forms = {};
+    for (const t of TRANSITIONS[post.status] ?? []) {
+      // Only becoming visible asks anything. Going back to draft or
+      // pending takes it away from an audience; there is nothing to
+      // configure about that.
+      forms[t.id] =
+        t.targetState === 'published' || t.targetState === 'private'
+          ? { schema: publishSchema, data: current }
+          : { schema: empty, data: {} };
+    }
+    return forms;
+  }
+
   async dispatch(intent, args) {
     return this.dispatchWithInvalidation(intent, args, () =>
       this.withAuthRetry(() => this.dispatchOnce(intent, args)),
@@ -686,88 +766,32 @@ export class WordPressAdapter extends BaseAdapter {
         };
       }
 
-      case 'state.getForms': {
-        const id = await this.resolvePath(args.path);
-        const post = await this.fetchJson(`/wp/v2/${this.postType}/${id}`, {
-          params: { context: 'edit' },
-        });
-
-        // This is WordPress's pre-publish panel, as data. It was never a
-        // special case worth hardcoding in the admin — it is just what this
-        // CMS asks for when you publish, the way Plone asks for effective and
-        // expiration dates.
-        const publishSchema = {
-          fieldsets: [
-            {
-              id: 'default',
-              title: 'Default',
-              fields: ['date', 'visibility', 'password', 'slug'],
-            },
-          ],
-          properties: {
-            date: {
-              title: 'Publish',
-              description:
-                'Leave empty to publish immediately. A future date schedules it — the post stays invisible until then.',
-              type: 'string',
-              widget: 'datetime',
-            },
-            visibility: {
-              title: 'Visibility',
-              description:
-                'Private is visible to editors and administrators only. Password-protected is visible to anyone who has the password.',
-              type: 'string',
-              choices: [
-                ['public', 'Public'],
-                ['private', 'Private'],
-                ['password', 'Password protected'],
-              ],
-            },
-            password: {
-              title: 'Password',
-              description: 'Used only when visibility is password-protected.',
-              type: 'string',
-            },
-            slug: {
-              title: 'URL slug',
-              description: 'The last part of this post\u2019s address.',
-              type: 'string',
-            },
-          },
-          required: [],
-        };
-
-        const current = {
-          date: post.status === 'future' ? post.date : '',
-          visibility:
-            post.status === 'private'
-              ? 'private'
-              : post.password
-                ? 'password'
-                : 'public',
-          password: post.password ?? '',
-          slug: post.slug,
-        };
-
-        const empty = { fieldsets: [], properties: {}, required: [] };
-        const forms = {};
-        for (const t of TRANSITIONS[post.status] ?? []) {
-          // Only becoming visible asks anything. Going back to draft or
-          // pending takes it away from an audience; there is nothing to
-          // configure about that.
-          forms[t.id] =
-            t.targetState === 'published' || t.targetState === 'private'
-              ? { schema: publishSchema, data: current }
-              : { schema: empty, data: {} };
-        }
-        return forms;
-      }
+      case 'state.getForms':
+        return this.transitionForms(args.path);
 
       case 'state.transition': {
         const id = await this.resolvePath(args.path);
+        const forms = await this.transitionForms(args.path);
+        this.assertDeclared(args.data, forms[args.id]?.schema, args.id);
+        const d = args.data ?? {};
+
+        // WordPress has no transition call: state, schedule and visibility are
+        // all fields on the post, set in the one write. Which is the same
+        // reason its pre-publish panel exists — this IS the transition.
+        const body = { status: args.id };
+        if (d.date) body.date = d.date;
+        if (d.slug) body.slug = d.slug;
+        if (d.visibility === 'private') body.status = 'private';
+        // Sent unconditionally when visibility was answered: clearing a
+        // password is how you make a protected post public again, and skipping
+        // an empty value would silently leave it protected.
+        if (d.visibility !== undefined) {
+          body.password = d.visibility === 'password' ? d.password : '';
+        }
+
         await this.fetchJson(`/wp/v2/${this.postType}/${id}`, {
           method: 'POST',
-          body: { status: args.id },
+          body,
         });
         return null;
       }

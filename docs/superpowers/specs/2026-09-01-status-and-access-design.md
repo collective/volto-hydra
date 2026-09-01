@@ -93,8 +93,10 @@ schema, and specifically the `Schema` the contract already has:
 - **one top-level `inherit` boolean**, because Plone's inheritance is per
   object, not per role.
 
-Returned by `permissions.get`, written back by `permissions.update`, rendered
-by the same form component as everything else.
+Returned by `state.getForms` under the reserved id `access` — a transition
+whose target state is the state it is already in — and written back by
+`state.transition` like any other. There is no separate permissions intent,
+because there is no separate permissions concept.
 
 This costs no machinery. `vocabulary.get` is already an intent
 (`index.d.ts:42`), already routed (`intentRouter.js:258`), already implemented
@@ -269,63 +271,46 @@ Semantics, stated neutrally so no adapter has to lie:
 Publishing is rarely just publishing. WordPress wants a date, a visibility and
 maybe a password; Drupal wants a revision log message; Plone wants effective
 and expiration dates. There is no closed set of these and no reason to invent
-one, so **a transition carries an optional schema of what may be set when
-taking it**:
+one, so **a transition carries a schema of what may be set when taking it**,
+fetched by a second intent:
 
 ```ts
-transitions: Array<{
-  id: string;
-  label: string;
-  targetState: string;
-
-  /** Structured — the dialog explains before it fires. */
-  consequence?: {
-    gains: Array<{ id: string; label: string }>;   // 'anonymous', 'Marketing'
-    loses: Array<{ id: string; label: string }>;
-  };
-
-  /** Anything else settable as part of this transition. Rendered with the
-   *  same form component as the sidebar. The adapter validates; the admin
-   *  passes values back untouched. */
-  schema?: Schema;
-}>;
+| 'state.get'         // hot path, per content view: state + transitions only
+| 'state.getForms'    // on menu open: every transition -> { schema, data }
+| 'state.transition'  // takes `data`
 ```
 
-and `state.transition` takes `{ path, transition, data }`.
+Split because `state.get` is hot — Plone's `@actions` maps to it and the admin
+requests that on every content view — so schemas riding along would make the
+common path pay for the rare one. All transitions come back together rather
+than one per click because the expensive part, the current grants, is shared
+between them.
 
 `Schema` is the type the contract already has, so this adds no machinery: the
-same renderer that draws the sidebar draws the dialog's lower half. Two further
-properties fall out rather than needing design. Transitions are already
-computed per object per user inside `state.get`, so a schema is automatically
-per *(object, user, transition)* — publishing from `draft` can ask for
-different fields than publishing from `pending`. And WordPress's pre-publish
-panel stops being a special case we hardcode; it is just the schema its adapter
-emits.
+same renderer that draws the sidebar draws the dialog. Two further properties
+fall out rather than needing design. Transitions are already computed per
+object per user, so a schema is automatically per *(object, user,
+transition)* — publishing from `draft` can ask for different fields than
+publishing from `pending`. And WordPress's pre-publish panel stops being a
+special case we hardcode; it is just the schema its adapter emits.
 
 | transition | schema |
 | --- | --- |
 | WordPress publish | `date`, `visibility`, `password`, `slug` |
-| Drupal publish (Content Moderation) | `revision_log`, plus `publish_on` where Scheduler is installed |
+| Drupal publish | `revision_log`; with Content Moderation, the workflow's own |
 | Plone publish | `effective`, `expires`, `comment` |
 | Plone check out | none — the dialog is the sentence and a confirm |
 
-**Two things stay out of the schema**, and the boundary matters more than the
-mechanism:
+**Undeclared values are refused, not dropped.** A field the schema did not
+declare fails the transition with `BAD_REQUEST`. Silently discarding it is the
+dangerous version: the dialog reports success for a setting that never took,
+and the first sign of trouble is the wrong audience seeing the document.
 
-*Consequence is not a schema.* The reason this beats Plone's three screens is
-that it says "this makes it visible to anyone" **before** you commit. A list of
-fields cannot produce that sentence. Let the schema swallow the whole dialog
-and we have rebuilt Plone's publish form with extra steps.
-
-*People are, though.* An earlier draft carved principals out as too bespoke for
-a schema. That was wrong: transposed role-major, the picker is a multi-select
-over a vocabulary — machinery that already exists — and see
-[Sharing is a schema too](#sharing-is-a-schema-too-transposed). What survives
-of the objection is only that the admin must be able to recognise a
-principals-bearing field, which one well-known vocabulary name settles.
-
-So: **structured for what the dialog reasons about — state, transitions and
-their consequence — and schema for everything it merely renders.**
+**Two carriers, because the menu is in view mode too.** Publishing must not
+require going through a save, so `state.transition` takes the form's answers
+standalone. When there IS a body to save at the same time, the same values ride
+on `content.update` instead — which is what two of the three CMSes do natively
+in one request anyway.
 
 ### The adapter writes the sentence
 
@@ -367,6 +352,14 @@ party with the knowledge writes, not structure the party without it decodes.
    revisions; fixtures would need re-capturing against a real Drupal with
    Content Moderation enabled. This is the §2.1 mock-drift risk, which already
    bit once when the adapter and the mock disagreed about sorting.
-4. **Whether the sharing half applies immediately in edit mode** while state is
+4. **What happens to images when a working copy is activated.** Check out,
+   edit, upload new images, check in — and it is unclear whether images added
+   to the working copy survive. Plone's `plone.app.iterate` copies the object,
+   but an image uploaded as its own content object lives at the working copy's
+   path, and a reference stored by uid may resolve to something about to be
+   discarded. The failure is silent and looks like a broken image after a
+   successful publish. Needs establishing per CMS before working-copy
+   transitions ship, not before they are designed.
+5. **Whether the sharing half applies immediately in edit mode** while state is
    deferred to the save. Recommended, since access does not depend on the body
    — but the dialog must say which half is which rather than leave it inferred.

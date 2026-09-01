@@ -248,6 +248,25 @@ export class BaseAdapter {
     return null;
   }
 
+  /**
+   * Refuse form values the transition's own schema did not declare.
+   *
+   * Dropping them silently is the dangerous version: the dialog reports
+   * success for a setting that never took, and the first sign of trouble is
+   * the wrong audience seeing the document.
+   */
+  assertDeclared(data, schema, transitionId) {
+    if (!data) return;
+    const declared = schema?.properties ?? {};
+    const undeclared = Object.keys(data).filter((k) => !(k in declared));
+    if (undeclared.length) {
+      throw new AdapterError(
+        `${this.name}: '${transitionId}' does not take ${undeclared.join(', ')}`,
+        { code: 'BAD_REQUEST', status: 400 },
+      );
+    }
+  }
+
   async dispatch(intent) {
     throw new AdapterError(`${this.name} does not implement '${intent}'`, {
       code: 'NOT_IMPLEMENTED',

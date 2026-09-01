@@ -90,6 +90,12 @@ describe('advertised capabilities are real', () => {
  */
 describe('native actions', () => {
   it('point somewhere followable, on the CMS', async () => {
+    // Declared actions currently ride on PermissionsAndState, so an adapter
+    // without `state` has nowhere to put them and this asserts nothing about
+    // it. (That they live there at all is a wart: a CMS can have its own
+    // screens without having workflow.)
+    if (!target.adapter.capabilities.includes('state' as never)) return;
+
     const pas: any = await target.adapter.dispatch('state.get', {
       path: '/news/first-post',
     });
