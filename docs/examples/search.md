@@ -4,7 +4,28 @@ A search interface with faceted filtering. Contains a child listing block for re
 
 This is a **built-in** block. The facet types are custom sub-blocks.
 
-**Demonstrates:** [Multiple regions](../container-blocks.md#multiple-regions) — facets and results as two regions of one block.
+**Demonstrates:** [Multiple regions](../container-blocks.md#multiple-regions) — facets and results as two regions of one block; [`querystringSelect`](../custom-blocks.md#picking-a-catalog-index-querystringselect) beside Volto's own `query_sort_on` and `select_querystring_field`.
+
+## Three fields that name a catalog index
+
+This block names indexes three times, and each one wants a different widget —
+which is the clearest example of when to reach for Volto's and when not to.
+
+| field | widget | why |
+|---|---|---|
+| a facet's `field` | `select_querystring_field` | ONE index to filter on. Volto's, registered, passed straight through |
+| `sortOn` | `query_sort_on` | ONE index the results come back in. Also Volto's |
+| `sortOnOptions` | `querystringSelect` | a chosen SUBSET, in the author's order — the menu a visitor re-sorts with |
+
+Only the third needs a hydra widget. Volto builds that field imperatively in
+`SearchBlockEdit`, which a JSON schema cannot reach; the first two are Volto's
+own widgets doing exactly what they were written for.
+
+One caveat if you use `query_sort_on` on its own: it reads
+`state.querystring.sortable_indexes` but never asks for it. In Volto's listing
+sidebar the `QueryWidget` beside it does the asking — alone in a hydra schema it
+renders an empty menu and no error. `querystringSelect` asks for itself, so a
+schema with only `sortOnOptions` is fine.
 
 ## Schema
 
@@ -38,6 +59,20 @@ This is a **built-in** block. The facet types are custom sub-blocks.
           "allowedBlocks": [
             "listing"
           ]
+        },
+        "sortOn": {
+          "title": "Sort results by",
+          "description": "The index the results come back in. Volto's own widget — one index, grouped menu.",
+          "type": "string",
+          "widget": "query_sort_on"
+        },
+        "sortOnOptions": {
+          "title": "Sort-by options offered",
+          "description": "The indexes a visitor may re-sort by, in the order the menu should read.",
+          "type": "array",
+          "widget": "querystringSelect",
+          "indexes": "sortable",
+          "multiple": true
         }
       }
     }
@@ -168,7 +203,12 @@ This is a **built-in** block. The facet types are custom sub-blocks.
     "listing": [
       "listing-1"
     ]
-  }
+  },
+  "sortOn": "effective",
+  "sortOnOptions": [
+    "effective",
+    "sortable_title"
+  ]
 }
 ```
 

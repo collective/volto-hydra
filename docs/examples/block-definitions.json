@@ -793,6 +793,20 @@
               "allowedBlocks": [
                 "listing"
               ]
+            },
+            "sortOn": {
+              "title": "Sort results by",
+              "description": "The index the results come back in. Volto's own widget \u2014 one index, grouped menu.",
+              "type": "string",
+              "widget": "query_sort_on"
+            },
+            "sortOnOptions": {
+              "title": "Sort-by options offered",
+              "description": "The indexes a visitor may re-sort by, in the order the menu should read.",
+              "type": "array",
+              "widget": "querystringSelect",
+              "indexes": "sortable",
+              "multiple": true
             }
           }
         }
@@ -918,7 +932,12 @@
           "listing": [
             "listing-1"
           ]
-        }
+        },
+        "sortOn": "effective",
+        "sortOnOptions": [
+          "effective",
+          "sortable_title"
+        ]
       }
     }
   },

@@ -301,10 +301,25 @@ A field that names a catalog index — what a listing sorts on, what a facet
 filters by — should offer the site's indexes, not a text box. A typo in a text
 box produces a sort option that appears in the menu and silently sorts nothing.
 
-Volto fills such a field imperatively: its search block's Edit component writes
-`sortOnOptions.items.choices` from `@querystring` before rendering. A hydra
-frontend has no Edit component — its schema is JSON sent over the bridge — so
-that route is closed. This widget is the declarative equivalent.
+**Reach for Volto's own widgets first.** Two are registered and pass straight
+through a hydra schema:
+
+| widget | for |
+|---|---|
+| [`query_sort_on`](https://github.com/plone/volto/blob/main/packages/volto/src/components/manage/Widgets/QuerySortOnWidget.jsx) | ONE index to sort by — grouped menu, stores the index name |
+| `select_querystring_field` | ONE index to query on (what the facet examples use) |
+
+`querystringSelect` is for what those two do not cover: a chosen **subset** of
+indexes — the "sort by" menu a search block offers its visitors. Volto builds
+that one imperatively, in `SearchBlockEdit`, which writes
+`sortOnOptions.items.choices` before rendering; a hydra frontend has no Edit
+component, so that route is closed.
+
+It also fixes a smaller trap. `query_sort_on` reads
+`state.querystring.sortable_indexes` but never dispatches `getQuerystring()` —
+in Volto's listing sidebar the `QueryWidget` beside it does. Alone in a hydra
+schema it renders an empty menu with no error. This widget asks for the data
+itself.
 
 ```json
 "sortOnOptions": {
@@ -328,10 +343,7 @@ is what a query is built from; the title is only what the author reads.
 only if nothing else has, and shows an empty menu — not a crash — while it is
 still in flight.
 
-Use `select_querystring_field` instead when the field names ONE index to query
-on: that is Volto's own widget, already registered, and hydra passes it through.
-This one exists for the cases Volto only solves in JavaScript — chosen subsets,
-and sortable-only lists.
+
 
 ## Schema Enhancers
 

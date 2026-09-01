@@ -2,8 +2,17 @@
  * QuerystringSelectWidget — choices are the SITE'S CATALOG INDEXES, as
  * `@querystring` reports them.
  *
- * Volto fills a field like this imperatively: its search block's Edit component
- * reaches into the schema and writes `sortOnOptions.items.choices` from
+ * Volto has `query_sort_on` for the SINGLE-index case, and hydra passes it
+ * through like any registered widget — use that when a field names one index to
+ * sort by. It comes with a catch worth knowing: it reads
+ * `state.querystring.sortable_indexes` but never dispatches `getQuerystring()`,
+ * so it only fills up when something else in the sidebar has already asked
+ * (in Volto's listing that is the `QueryWidget` beside it). Alone in a hydra
+ * schema it renders an empty menu. This widget asks for itself.
+ *
+ * What Volto has no declarative answer for is a chosen SUBSET of indexes — the
+ * "sort by" menu a search block offers its visitors. Volto builds that
+ * imperatively: `SearchBlockEdit` writes `sortOnOptions.items.choices` from
  * `sortable_indexes` before rendering. A hydra frontend has no Edit component —
  * its schema is JSON sent over the bridge — so that route is closed, and the
  * field falls back to a free-text list where an author types index names from
