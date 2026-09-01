@@ -2031,6 +2031,10 @@ app.get('/@types/:typeName', (req, res) => {
  */
 const VOCAB_ITEMS = {
   'plone.app.vocabularies.Keywords': ['news', 'plone', 'events'],
+  // A second one, so a picker that lists vocabularies has something to choose
+  // BETWEEN — with one entry, "offers the right list" and "offers any list at
+  // all" are the same assertion.
+  'plone.app.vocabularies.ReallyUserFriendlyTypes': ['Document', 'News Item'],
 };
 /**
  * GET /@vocabularies — the LISTING: every vocabulary this site has, the shape

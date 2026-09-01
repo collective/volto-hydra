@@ -1039,8 +1039,7 @@ export const sharedBlocksConfig = {
                         'default_to', 'default_from', 'default_subject',
                         'submit_label', 'show_cancel', 'cancel_label',
                         'mail_header', 'mail_footer',
-                        'captcha', 'email_otp_verification',
-                    ],
+                        'captcha', 'email_otp_verification', 'sortOn', 'sortOnOptions', 'optionsFrom'],
                 },
                 {
                     id: 'manage_data',
@@ -1049,6 +1048,28 @@ export const sharedBlocksConfig = {
                 },
             ],
             properties: {
+                // Three custom widgets, on a block whose schema this
+                // fixture owns — the built-in search block's schema is Volto's,
+                // so a widget declared there never reaches the sidebar.
+                sortOn: {
+                    title: 'Sort results by',
+                    type: 'string',
+                    widget: 'querystringSelect',
+                    indexes: 'sortable',
+                    emptyLabel: '— no sorting —',
+                },
+                sortOnOptions: {
+                    title: 'Sort-by options',
+                    type: 'array',
+                    widget: 'querystringSelect',
+                    indexes: 'sortable',
+                    multiple: true,
+                },
+                optionsFrom: {
+                    title: 'Options from',
+                    type: 'string',
+                    widget: 'vocabularySelect',
+                },
                 send_email: { title: 'Send email', type: 'boolean' },
                 title: {
                     title: 'Title',

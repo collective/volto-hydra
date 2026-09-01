@@ -20,6 +20,44 @@ import { URLS } from '../ports';
 const FIRST_QUESTION = 'field-name';
 const LAST_QUESTION = 'field-file';
 
+/**
+ * A block as it was SAVED, read with the token the admin saved under: Volto
+ * trades the seeded cookie for a JWT on login, and the mock keys a save by
+ * whichever token sent it. Reading with the other one returns the untouched
+ * page — indistinguishable from a save that did nothing.
+ */
+async function readBlock(page, path: string, blockUid: string) {
+  const cookies = await page.context().cookies();
+  const token = cookies.find((c) => c.name === 'auth_token')?.value;
+  expect(token, 'the admin is logged in and holds a token').toBeTruthy();
+  const res = await page.request.get(`${URLS.mockApi}/_test_data${path}`, {
+    headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+  });
+  expect(res.ok(), `${path} reads back`).toBeTruthy();
+  return (await res.json()).blocks[blockUid];
+}
+
+/**
+ * Open the FORM block's own sidebar form — the block carrying the three custom
+ * widgets. Not the built-in search block: its schema belongs to Volto, so a
+ * widget declared for it in this fixture never reaches the sidebar.
+ *
+ * Clicking the block WRAPPER selects nothing here — the click has to land on an
+ * element the frontend annotated, which for this block is its headline (the
+ * same gesture block-sync.spec.ts uses). Waiting for the toolbar is what proves
+ * the selection happened; without it the sidebar is still the page's, and every
+ * field lookup fails as "not found" rather than as "not selected".
+ */
+async function selectFormBlock(helper: AdminUIHelper, page) {
+  await helper.clickBlockInIframe('form-block-1', {
+    selector: 'h2[data-edit-text="title"]',
+  });
+  await expect(page.locator('.quanta-toolbar')).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('#sidebar-properties')).toBeVisible({
+    timeout: 15000,
+  });
+}
+
 /** Open a question's own sidebar form. */
 async function selectQuestion(helper: AdminUIHelper, uid: string) {
   const iframe = helper.getIframe();
@@ -42,11 +80,8 @@ async function openMenu(page, field: string): Promise<string[]> {
   // another field's, still up) returns a list that has nothing to do with the
   // field being asked about — which reads as a failure of the widget rather
   // than of the reading.
-  const open = page.locator('.react-select__menu');
-  if (await open.count()) {
-    await page.keyboard.press('Escape');
-    await open.first().waitFor({ state: 'detached', timeout: 5000 });
-  }
+  // Not Escape: it leaves block mode and deselects the block, taking the
+  // sidebar with it. Clicking the target control closes any other menu anyway.
   const wrapper = page.locator(`#sidebar-properties .field-wrapper-${field}`);
   await expect(wrapper).toBeVisible({ timeout: 15000 });
   await wrapper.locator('.react-select__control').click();
@@ -303,5 +338,132 @@ test.describe('Sidebar pickers', () => {
       offered.filter((o) => !isEmptyEntry(o)).length,
       'the site lists its vocabularies',
     ).toBeGreaterThan(0);
+  });
+
+  test('vocabularySelect: the NAME is stored, not the title or the URL', async ({
+    page,
+  }) => {
+    // `@vocabularies` answers `{'@id', title}` — no token — so the value has to
+    // be cut from the @id. Storing the URL would bake this site's origin into
+    // content; storing the title happens to look identical here, because
+    // plone.restapi uses the name as the title.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/form-test-page');
+    await selectFormBlock(helper, page);
+
+    const offered = await openMenu(page, 'optionsFrom');
+    expect(
+      offered.filter((o) => !isEmptyEntry(o)).sort(),
+      'every vocabulary the site lists',
+    ).toEqual([
+      'plone.app.vocabularies.Keywords',
+      'plone.app.vocabularies.ReallyUserFriendlyTypes',
+    ]);
+
+    // Set through the helper, which asserts the control actually took the value
+    // before moving on — so "the save lost it" and "the click never landed"
+    // stay distinguishable.
+    await helper.setSidebarFieldValue(
+      'optionsFrom',
+      'plone.app.vocabularies.Keywords',
+    );
+    // An ordinary field on the same block, changed in the same session: if this
+    // survives and the vocabulary does not, the loss belongs to that field.
+    await helper.setSidebarFieldValue('title', 'Renamed by the test');
+
+    // Is it in the FORM DATA, or only in the widget? Leaving the block and
+    // coming back re-renders the sidebar from the stored data, so a value that
+    // never left the widget disappears here — which separates "the widget did
+    // not report it" from "the save dropped it".
+    await selectQuestion(helper, FIRST_QUESTION);
+    await selectFormBlock(helper, page);
+    await expect(
+      page.locator(
+        '#sidebar-properties .field-wrapper-optionsFrom .react-select__single-value',
+      ),
+      'the chosen vocabulary is in the block data, not just on screen',
+    ).toContainText('Keywords', { timeout: 15000 });
+
+    await helper.saveContent();
+
+    const stored = await readBlock(page, '/form-test-page', 'form-block-1');
+    expect(
+      stored.title,
+      'an ordinary edit on the same block survives the save',
+    ).toBe('Renamed by the test');
+    expect(
+      stored.optionsFrom,
+      `the vocabulary NAME — usable as @vocabularies/<name> anywhere. Stored keys: ${''}`,
+    ).toBe('plone.app.vocabularies.Keywords');
+  });
+
+  test('querystringSelect: offers SORTABLE indexes and stores the index name', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/form-test-page');
+    await selectFormBlock(helper, page);
+
+    const offered = await openMenu(page, 'sortOn');
+    const indexes = offered.filter((o) => !isEmptyEntry(o));
+    expect(indexes, 'the catalog says these can be sorted on').toContain(
+      'Effective date',
+    );
+    expect(
+      indexes,
+      'and not one it only allows filtering on — portal_type is sortable: false',
+    ).not.toContain('Type');
+    expect(offered.some(isEmptyEntry), 'no sorting is a real answer').toBe(
+      true,
+    );
+
+    await page
+      .locator('#sidebar-properties .field-wrapper-sortOn .react-select__menu')
+      .locator('.react-select__option', { hasText: 'Effective date' })
+      .click();
+    await helper.saveContent();
+
+    const stored = await readBlock(page, '/form-test-page', 'form-block-1');
+    expect(
+      stored.sortOn,
+      'the index NAME a query is built from, not the title an author reads',
+    ).toBe('effective');
+  });
+
+  test('querystringSelect: `multiple` stores a chosen subset, in order', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/form-test-page');
+    await selectFormBlock(helper, page);
+
+    // Through the helper for each pick: it knows a control toggles, and it
+    // asserts the value took — a hand-rolled loop clicks the control a second
+    // time and closes the menu it is about to read.
+    for (const label of ['Title', 'Creation date']) {
+      await helper.setSidebarFieldValue('sortOnOptions', label);
+    }
+
+    // In the block data, or only on screen? Leaving and returning re-renders
+    // the sidebar from what the block holds.
+    await selectQuestion(helper, FIRST_QUESTION);
+    await selectFormBlock(helper, page);
+    await expect(
+      page.locator(
+        '#sidebar-properties .field-wrapper-sortOnOptions .react-select__value-container',
+      ),
+      'both chosen indexes are in the block data',
+    ).toContainText('Title', { timeout: 15000 });
+
+    await helper.saveContent();
+
+    const stored = await readBlock(page, '/form-test-page', 'form-block-1');
+    expect(
+      stored.sortOnOptions,
+      'an array of index names, in the order the author picked them',
+    ).toEqual(['sortable_title', 'created']);
   });
 });

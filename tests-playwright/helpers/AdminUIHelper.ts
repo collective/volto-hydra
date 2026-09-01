@@ -3327,18 +3327,28 @@ export class AdminUIHelper {
         // which says which field and where to look.
       });
 
+    // A react-select is checked FIRST, and its own branch is below. Its search
+    // box is an `input[type="text"]`, so the text branch below matches it — and
+    // typing into a search box then blurring selects NOTHING. The field keeps
+    // its placeholder, the helper returns as if it had worked, and the value is
+    // silently never set. That is what made a picker look like it stored
+    // nothing.
+    const asSelect = fieldWrapper.locator('.react-select__control');
+    const isSelect = await asSelect.isVisible().catch(() => false);
+
     // Try text input
     const input = fieldWrapper.locator('input[type="text"], input[type="url"], textarea');
-    if (await input.isVisible()) {
+    if (!isSelect && (await input.isVisible())) {
       await input.fill(value);
       await input.blur(); // Trigger blur to commit the value
       return;
     }
 
-    // Try contenteditable (Slate editors)
+    // Try contenteditable (Slate editors)  — also not a select
+
     // Note: fill() doesn't reliably clear Slate editors, use select-all + type
     const contentEditable = fieldWrapper.locator('[contenteditable="true"]');
-    if (await contentEditable.isVisible()) {
+    if (!isSelect && (await contentEditable.isVisible())) {
       // Get current text to verify selection
       const currentText = await contentEditable.textContent() || '';
 
@@ -3368,15 +3378,21 @@ export class AdminUIHelper {
     // then take the option once it is actually listed — waiting on the option
     // rather than on a timer, so a slow menu fails as a missing option instead
     // of quietly picking whatever was highlighted.
-    const control = fieldWrapper.locator('.react-select__control');
-    if (await control.isVisible()) {
-      const stray = this.page.locator('.react-select__menu');
-      if (await stray.count()) {
-        await this.page.keyboard.press('Escape');
-        await stray.first().waitFor({ state: 'detached', timeout: 5000 });
-      }
+    const control = asSelect;
+    if (isSelect) {
+      // No Escape to dismiss another field's open menu: in the admin, Escape
+      // leaves block mode and DESELECTS the block, so the sidebar reverts to
+      // the page form and the field being set disappears. Clicking this
+      // control is enough — react-select closes any other menu on the
+      // outside mousedown that precedes the click.
       await control.scrollIntoViewIfNeeded();
-      await control.click();
+      // Clicking a control TOGGLES its menu, so clicking one that is already
+      // open closes it and the wait below never resolves. Open it only if it
+      // is shut.
+      const own = fieldWrapper.locator('.react-select__menu');
+      if (!(await own.isVisible().catch(() => false))) {
+        await control.click();
+      }
       // Wait for the MENU before reaching for an option: react-select renders it
       // in a portal, so an option located before the menu exists resolves to
       // nothing and the click lands on the page. Same sequence as
@@ -3396,8 +3412,12 @@ export class AdminUIHelper {
       // It took, or this throws. A dropdown that silently keeps its old value
       // is the thing that makes a spec assert against a sidebar it never
       // changed.
+      // The value CONTAINER, not the value nodes: a multi-select has one node
+      // per chosen entry, and a locator that matches several trips strict mode
+      // — reporting "the menu closed without taking it" for a field that took
+      // it twice over.
       await expect(
-        fieldWrapper.locator('.react-select__single-value, .react-select__multi-value'),
+        fieldWrapper.locator('.react-select__value-container'),
         `setSidebarFieldValue("${fieldName}"): the menu closed without taking "${value}"`,
       ).toContainText(value, { timeout: 5000 });
       return;
