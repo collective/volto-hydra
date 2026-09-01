@@ -624,7 +624,14 @@ export class WordPressAdapter extends BaseAdapter {
         const post = await this.fetchJson(`/wp/v2/${this.postType}/${id}`, {
           params: { context: 'edit' },
         });
-        const canPublish = true; // refined below by user capabilities
+        // WordPress answers "may this user publish this post" per object, in
+        // the edit-context response we already have: the presence of
+        // wp:action-publish IS the answer. A Contributor holds edit_posts
+        // without publish_posts, and hardcoding true here put a Publish button
+        // in front of them that the REST API then refused.
+        const canPublish = Boolean(
+          post._links?.['https://api.w.org/action-publish'],
+        );
         return {
           state: {
             name: STATE_MAP[post.status] ?? post.status,
@@ -677,6 +684,83 @@ export class WordPressAdapter extends BaseAdapter {
             },
           ],
         };
+      }
+
+      case 'state.getForms': {
+        const id = await this.resolvePath(args.path);
+        const post = await this.fetchJson(`/wp/v2/${this.postType}/${id}`, {
+          params: { context: 'edit' },
+        });
+
+        // This is WordPress's pre-publish panel, as data. It was never a
+        // special case worth hardcoding in the admin — it is just what this
+        // CMS asks for when you publish, the way Plone asks for effective and
+        // expiration dates.
+        const publishSchema = {
+          fieldsets: [
+            {
+              id: 'default',
+              title: 'Default',
+              fields: ['date', 'visibility', 'password', 'slug'],
+            },
+          ],
+          properties: {
+            date: {
+              title: 'Publish',
+              description:
+                'Leave empty to publish immediately. A future date schedules it — the post stays invisible until then.',
+              type: 'string',
+              widget: 'datetime',
+            },
+            visibility: {
+              title: 'Visibility',
+              description:
+                'Private is visible to editors and administrators only. Password-protected is visible to anyone who has the password.',
+              type: 'string',
+              choices: [
+                ['public', 'Public'],
+                ['private', 'Private'],
+                ['password', 'Password protected'],
+              ],
+            },
+            password: {
+              title: 'Password',
+              description: 'Used only when visibility is password-protected.',
+              type: 'string',
+            },
+            slug: {
+              title: 'URL slug',
+              description: 'The last part of this post\u2019s address.',
+              type: 'string',
+            },
+          },
+          required: [],
+        };
+
+        const current = {
+          date: post.status === 'future' ? post.date : '',
+          visibility:
+            post.status === 'private'
+              ? 'private'
+              : post.password
+                ? 'password'
+                : 'public',
+          password: post.password ?? '',
+          slug: post.slug,
+        };
+
+        const empty = { fieldsets: [], properties: {}, required: [] };
+        const forms = {};
+        for (const t of TRANSITIONS[post.status] ?? []) {
+          // Only becoming visible asks anything. Going back to draft or
+          // pending takes it away from an audience; there is nothing to
+          // configure about that.
+          forms[t.id] =
+            t.targetState === 'published' || t.targetState === 'private'
+              ? { schema: publishSchema, data: current }
+              : { schema: empty, data: {} };
+        }
+        return forms;
       }
 
       case 'state.transition': {

@@ -580,6 +580,36 @@ export class DrupalAdapter extends BaseAdapter {
         };
       }
 
+      case 'state.getForms': {
+        // Core Drupal, no Content Moderation: publishing is a status flip, so
+        // the only thing worth asking for is the revision log message every
+        // node carries anyway. With Content Moderation enabled this is where
+        // the workflow's own transitions and their permissions would appear.
+        const node = await this.nodeByAlias(args.path);
+        const published = node.attributes.status === true;
+        const id = published ? 'unpublish' : 'publish';
+        return {
+          [id]: {
+            schema: {
+              fieldsets: [
+                { id: 'default', title: 'Default', fields: ['revision_log'] },
+              ],
+              properties: {
+                revision_log: {
+                  title: 'Revision log message',
+                  description:
+                    'Recorded against this revision. Visible to anyone who can see the revision history.',
+                  type: 'string',
+                  widget: 'textarea',
+                },
+              },
+              required: [],
+            },
+            data: {},
+          },
+        };
+      }
+
       case 'state.transition': {
         const node = await this.nodeByAlias(args.path);
         await this.fetchJson(`/jsonapi/node/${this.bundle}/${node.id}`, {

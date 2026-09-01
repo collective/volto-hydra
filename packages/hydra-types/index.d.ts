@@ -61,8 +61,17 @@ export type Intent =
   | 'querystringSearch'
   /** Lifecycle position, available transitions and effective permissions. */
   | 'state.get'
+  /**
+   * Every transition's form, fetched once when the state menu opens.
+   *
+   * Deliberately not part of `state.get`: Plone's `@actions` maps to that
+   * intent and the admin requests it on every content view, so schemas riding
+   * along would make the common path pay for the rare one. All transitions
+   * come back together rather than one per click because the expensive part —
+   * the current grants — is shared between them.
+   */
+  | 'state.getForms'
   | 'state.transition'
-  | 'permissions.update'
   | 'http';
 
 export interface Document {
@@ -86,6 +95,32 @@ export interface Schema {
   fieldsets: Array<{ id: string; title: string; fields: string[] }>;
   properties: Record<string, unknown>;
   required: string[];
+}
+
+/**
+ * What a transition asks for before it fires, keyed by transition id.
+ *
+ * There is no separate permissions concept: who may do what is fields in this
+ * schema like any other, one per role — `title: 'Editors'`,
+ * `description: 'Will be able to update when published'` — over the
+ * `principals` vocabulary. A CMS with nothing to ask returns an empty schema
+ * and the dialog is a sentence and a confirm.
+ *
+ * Two reserved ids beyond the adapter's own transitions:
+ *  - `access` — change who can see this WITHOUT moving state.
+ *  - `inherit` — a boolean field, where `hierarchical-permissions` is
+ *    advertised.
+ *
+ * Per object and per user, not per type: which roles exist is site config, and
+ * what a role MEANS depends on the state being moved into, which is what the
+ * field descriptions say.
+ */
+export interface TransitionForms {
+  [transitionId: string]: {
+    schema: Schema;
+    /** Current values — grants as they stand, defaults for everything else. */
+    data: Record<string, unknown>;
+  };
 }
 
 export interface User {
@@ -158,8 +193,16 @@ export interface PermissionsAndState {
   /** Lifecycle position. Always present. */
   state: { name: string; label: string };
   /**
-   * Transitions available to the current user right now. The Publish / Submit
-   * / Reject buttons render from this — there is no separate workflow concept.
+   * Transitions available to the current user right now. The state menu
+   * renders from this — there is no separate workflow concept.
+   *
+   * The adapter decides what belongs here, so working-copy entries (Plone's
+   * check out / check in) are transitions like any other: checking out a copy
+   * IS a state change. Cheap by design — ids and labels only. What each one
+   * asks for before it fires comes from `state.getForms` when the menu opens.
+   *
+   * A transition whose `targetState` equals the current state is a no-op; use
+   * the reserved `access` form to change who can see this without moving.
    */
   transitions: Array<{ id: string; label: string; targetState: string }>;
   /** What the current user may do. UI gates visible/enabled controls on this. */
@@ -170,17 +213,6 @@ export interface PermissionsAndState {
     canShare: boolean;
     canComment: boolean;
   };
-  /**
-   * Per-document principal grants. Only adapters advertising
-   * `per-content-permissions` return this; others return null and the sharing
-   * half of the panel hides. `inherited` is always false unless the adapter
-   * also advertises `hierarchical-permissions`.
-   */
-  shareEntries?: Array<{
-    principal: { type: 'user' | 'group' | 'role'; id: string; label: string };
-    permissions: Array<'read' | 'edit' | 'publish' | 'delete'>;
-    inherited: boolean;
-  }> | null;
   /**
    * Toolbar entries this CMS wants to answer for itself.
    *
