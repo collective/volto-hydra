@@ -4,7 +4,49 @@ A multi-field form with configurable field types, validation, and email submissi
 
 This is a **custom** block — register it via `initBridge`.
 
-**Demonstrates:** [object_list with allowedBlocks: Typed Items](../container-blocks.md#object_list-with-allowedblocks-typed-items) — a typed item per kind of field.
+**Demonstrates:** [object_list with allowedBlocks: Typed Items](../container-blocks.md#object_list-with-allowedblocks-typed-items) — a typed item per kind of field; [`vocabularySelect`](../custom-blocks.md#picking-a-vocabulary-vocabularyselect) and [`blockPicker`](../custom-blocks.md#picking-a-block-and-a-value-from-it-blockpicker) — two fields an author picks rather than types.
+
+## Two things the author picks
+
+A form schema is where the cost of making people type identifiers shows up
+fastest, so this example uses a picker for both.
+
+**Where a question's options come from.** A `select` has an `input_values` list
+the author types out. That list is a copy, and copies go stale — the site's
+departments change and the form goes on offering last year's. So `options_from`
+uses `vocabularySelect` to name a vocabulary the site already keeps, and a
+`fieldRules` entry hides the typed list while one is chosen:
+
+```json
+"input_values": { "when": { "options_from": { "isNotSet": true } }, "else": false }
+```
+
+Only one of the two can be true at a time, and the sidebar shows only the one
+that is. Picking no vocabulary opens the typed list back up — which is still the
+right answer when the options belong to this question alone ("How did you hear
+about us?").
+
+The block stores only the vocabulary's name; the terms themselves are fetched
+from `@vocabularies/<name>` by the frontend. Resolve them where the page's data
+is assembled rather than inside the block — a `<select>` whose options arrive
+with JavaScript is an empty `<select>` without it, and the server has to know
+the allowed values anyway to validate what was submitted.
+
+**Which earlier question a rule watches.** `show_when_field` uses `blockPicker`
+to offer the questions *before* this one (`scope: "subblocks"`,
+`direction: "before"`), so the first question's menu is empty — nothing precedes
+it — and no rule can point forwards at an answer that has not been given yet.
+
+The detail worth copying is `valueField: "field_id"`. The rule is evaluated
+against what a question *submits*, so the stored value has to be the submitting
+name, not the item's `@id`:
+
+```json
+{ "field_id": "order_number", "show_when_field": "department", "show_when_is": "Sales" }
+```
+
+Store the `@id` instead and the sidebar looks right while the rule never fires —
+the failure is invisible in the editor and only shows up on the live form.
 
 ## Schema
 
@@ -141,6 +183,33 @@ This is a **custom** block — register it via `initBridge`.
           "title": "Required",
           "type": "boolean",
           "default": false
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -166,6 +235,33 @@ This is a **custom** block — register it via `initBridge`.
           "title": "Required",
           "type": "boolean",
           "default": false
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -191,6 +287,33 @@ This is a **custom** block — register it via `initBridge`.
           "title": "Required",
           "type": "boolean",
           "default": false
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -251,7 +374,8 @@ This is a **custom** block — register it via `initBridge`.
         "label": "label",
         "description": "description",
         "required": "required"
-      }
+      },
+      "select": {}
     },
     "blockSchema": {
       "properties": {
@@ -260,6 +384,12 @@ This is a **custom** block — register it via `initBridge`.
         },
         "description": {
           "title": "Description"
+        },
+        "options_from": {
+          "title": "Options from",
+          "description": "A vocabulary this site keeps. Leave empty to write the options out below.",
+          "type": "string",
+          "widget": "vocabularySelect"
         },
         "input_values": {
           "title": "Possible values",
@@ -270,6 +400,41 @@ This is a **custom** block — register it via `initBridge`.
           "title": "Required",
           "type": "boolean",
           "default": false
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "input_values": {
+          "when": {
+            "options_from": {
+              "isNotSet": true
+            }
+          },
+          "else": false
+        },
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -301,6 +466,33 @@ This is a **custom** block — register it via `initBridge`.
           "title": "Required",
           "type": "boolean",
           "default": false
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -332,6 +524,33 @@ This is a **custom** block — register it via `initBridge`.
           "title": "Required",
           "type": "boolean",
           "default": false
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -357,6 +576,33 @@ This is a **custom** block — register it via `initBridge`.
           "title": "Required",
           "type": "boolean",
           "default": false
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -382,6 +628,33 @@ This is a **custom** block — register it via `initBridge`.
           "title": "Required",
           "type": "boolean",
           "default": false
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -417,6 +690,33 @@ This is a **custom** block — register it via `initBridge`.
           "title": "Required",
           "type": "boolean",
           "default": false
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -436,6 +736,33 @@ This is a **custom** block — register it via `initBridge`.
         },
         "description": {
           "title": "Description"
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -457,6 +784,33 @@ This is a **custom** block — register it via `initBridge`.
         },
         "value": {
           "title": "Value for field"
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -482,6 +836,33 @@ This is a **custom** block — register it via `initBridge`.
           "title": "Required",
           "type": "boolean",
           "default": false
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -522,12 +903,8 @@ This is a **custom** block — register it via `initBridge`.
       "field_id": "department",
       "field_type": "select",
       "label": "Department",
-      "input_values": [
-        "Sales",
-        "Support",
-        "General"
-      ],
-      "required": false
+      "required": false,
+      "options_from": "plone.app.vocabularies.Keywords"
     },
     {
       "@id": "field-4",
@@ -535,6 +912,15 @@ This is a **custom** block — register it via `initBridge`.
       "field_type": "textarea",
       "label": "Message",
       "required": true
+    },
+    {
+      "@id": "field-5",
+      "field_id": "order_number",
+      "field_type": "text",
+      "label": "Order number",
+      "show_when_field": "department",
+      "show_when_is": "Sales",
+      "required": false
     }
   ]
 }

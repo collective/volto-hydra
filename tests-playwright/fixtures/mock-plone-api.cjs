@@ -2031,9 +2031,33 @@ app.get('/@types/:typeName', (req, res) => {
  */
 const VOCAB_ITEMS = {
   'plone.app.vocabularies.Keywords': ['news', 'plone', 'events'],
+  // A second one, so a picker that lists vocabularies has something to choose
+  // BETWEEN — with one entry, "offers the right list" and "offers any list at
+  // all" are the same assertion.
+  'plone.app.vocabularies.ReallyUserFriendlyTypes': ['Document', 'News Item'],
 };
+/**
+ * GET /@vocabularies — the LISTING: every vocabulary this site has, the shape
+ * plone.restapi answers with (`@id` + `title`, no token). A field that picks
+ * WHICH vocabulary to use reads this.
+ */
+app.get('/@vocabularies', (req, res) => {
+  res.json(
+    Object.keys(VOCAB_ITEMS).map((name) => ({
+      '@id': `http://localhost:${PORT}/@vocabularies/${name}`,
+      title: name,
+    })),
+  );
+});
+
 app.get('/@vocabularies/:vocab', (req, res) => {
-  const values = VOCAB_ITEMS[req.params.vocab] || [];
+  const all = VOCAB_ITEMS[req.params.vocab] || [];
+  // `?title=` is a case-insensitive substring filter in plone.restapi's
+  // serializer — what a type-ahead sends so the server does the narrowing.
+  const title = String(req.query.title || '').toLowerCase();
+  const values = title
+    ? all.filter((v) => v.toLowerCase().includes(title))
+    : all;
   res.json({
     '@id': `http://localhost:${PORT}/@vocabularies/${req.params.vocab}`,
     items: values.map((v) => ({ token: v, title: v })),

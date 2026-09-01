@@ -48,7 +48,11 @@
           "label": "Subject",
           "plaintext": "Subject",
           "required": true,
-          "input_values": ["General Inquiry", "Bug Report", "Feature Request"]
+          "input_values": [
+            "General Inquiry",
+            "Bug Report",
+            "Feature Request"
+          ]
         },
         {
           "field_id": "field-message",
@@ -63,7 +67,11 @@
           "label": "Priority",
           "plaintext": "Priority",
           "required": false,
-          "input_values": ["Low", "Medium", "High"]
+          "input_values": [
+            "Low",
+            "Medium",
+            "High"
+          ]
         },
         {
           "field_id": "field-agree",
@@ -107,10 +115,35 @@
           "required": false
         }
       ]
+    },
+    "form-block-2": {
+      "@type": "form",
+      "title": "A second form on the same page",
+      "subblocks": [
+        {
+          "field_id": "other-name",
+          "field_type": "text",
+          "label": "Full Name"
+        },
+        {
+          "field_id": "other-topic",
+          "field_type": "text",
+          "label": "Second form question"
+        }
+      ],
+      "default_to": "admin@example.com",
+      "default_from": "noreply@example.com",
+      "default_subject": "Second form submission",
+      "captcha": "honeypot",
+      "submit_label": "Submit"
     }
   },
   "blocks_layout": {
-    "items": ["title-block", "form-block-1"]
+    "items": [
+      "title-block",
+      "form-block-1",
+      "form-block-2"
+    ]
   },
   "review_state": "published",
   "is_folderish": false,

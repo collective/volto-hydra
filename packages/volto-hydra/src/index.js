@@ -52,6 +52,9 @@ import FieldMappingWidget from './components/Widgets/FieldMappingWidget';
 import BlockTypeSelectWidget from './components/Widgets/BlockTypeSelectWidget';
 import CopyFromTargetField from './components/Widgets/CopyFromTargetField';
 import SchemaFieldSelectWidget from './components/Widgets/SchemaFieldSelectWidget';
+import VocabularySelectWidget from './components/Widgets/VocabularySelectWidget';
+import BlockPickerWidget from './components/Widgets/BlockPickerWidget';
+import QuerystringSelectWidget from './components/Widgets/QuerystringSelectWidget';
 import TableSchema, { TableBlockSchema } from '@plone/volto-slate/blocks/Table/schema';
 // Volto-slate ships TWO schemas for the slate block:
 //   ./schema.js          → "Block tab" form (override_toc / level / entry_text)
@@ -192,6 +195,16 @@ const applyConfig = (config) => {
   // See README "Synchronised block types in a container".
   config.widgets.widget.blockTypeSelect = BlockTypeSelectWidget;
   config.widgets.widget.schemaFieldSelect = SchemaFieldSelectWidget;
+  // Pick WHICH vocabulary, not a term from one — see the widget's own note for
+  // why Volto's vocabulary widgets cannot do this.
+  config.widgets.widget.vocabularySelect = VocabularySelectWidget;
+  // Pick another BLOCK and store a field of it — a form's skip logic naming the
+  // question it depends on, by label rather than by uid.
+  config.widgets.widget.blockPicker = BlockPickerWidget;
+  // Pick catalog indexes from what @querystring reports. Volto's search block
+  // fills the same field imperatively from its Edit component, which a
+  // JSON-schema frontend has no way to do.
+  config.widgets.widget.querystringSelect = QuerystringSelectWidget;
 
   // Copy-from-target: mapped fields (via fieldMappings['@target']) are swapped
   // to this wrapper by installCopyFromTargetEnhancers, which renders the field's

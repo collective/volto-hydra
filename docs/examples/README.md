@@ -39,6 +39,7 @@ These blocks demonstrate common patterns. Register them via `initBridge({ blocks
 | [RSS Feed Block](./rssFeed.md) | Renders entries from an external RSS feed. Its items are fetched at render time (by a fetcher you provide) and shown with a configurable item type (variation). |
 | [Search Shortcuts Block](./searchShortcuts.md) | Renders a set of values as links into a faceted search — a "tag cloud" of shortcuts. Each value links to a search page with `?facet.<index>=<value>` pre-set, which a [Search block](./search.md) reads from the URL. |
 | [Slider Block](./slider.md) | A carousel/slider that cycles through slides. Slides are stored as an `object_list` — each slide has a title, description, image, and optional button. |
+| [Suggest Block](./suggest.md) | A question whose answer is completed from a vocabulary the author picked. |
 ## Page Structure
 
 Each block doc page follows this template:
@@ -102,6 +103,7 @@ searchShortcuts
 separator
 slate
 slider
+suggest
 table
 teaser
 toc

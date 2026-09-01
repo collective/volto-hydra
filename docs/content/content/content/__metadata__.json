@@ -112,6 +112,7 @@
     "docs/examples/separator/data.json",
     "docs/examples/slate/data.json",
     "docs/examples/slider/data.json",
+    "docs/examples/suggest/data.json",
     "docs/examples/table/data.json",
     "docs/examples/teaser/data.json",
     "docs/examples/toc/data.json",
@@ -969,6 +970,13 @@
       }
     },
     "docs-examples-cookie-consent-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-examples-suggest-001": {
       "local_roles": {
         "admin": [
           "Owner"
