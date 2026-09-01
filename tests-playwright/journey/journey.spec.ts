@@ -4,6 +4,7 @@ import { fixtureFor } from './fixtures';
 import { seedWordPress } from './seedWordPress';
 import {
   addImageBlockAndUpload,
+  auditCmsRequests,
   browseListing,
   nameLike,
   createPage,
@@ -222,6 +223,7 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
   const ploneCalls = forbidPloneApi(page, testInfo.project.name);
   const reqs = countCmsRequests(page, testInfo.project.name);
   const helper = new AdminUIHelper(page);
+  await auditCmsRequests(page);
   await helper.login();
 
   // --- 1. browse existing content ---------------------------------------
@@ -319,9 +321,14 @@ test('create a page, link to another, then move it', async ({ page }, testInfo) 
   // however it likes — Drupal's alias for a page titled "Journey 1788…" is not
   // the string this test typed. Matching the path found no row and read as
   // "the created page is not listed under its parent".
+  //
+  // Generous, because this spec shares its CMS and its admin with every other
+  // journey spec running beside it: the suite is fullyParallel, and one mock
+  // answering nine specs at once takes longer to reflect a write than the same
+  // mock answering one. It passes repeatedly when run alone at 20s.
   await expect(
     page.locator('tbody tr').filter({ hasText: nameLike(TITLE) }),
-  ).toHaveCount(1, { timeout: 20_000 });
+  ).toHaveCount(1, { timeout: 60_000 });
 
   reqs.mark("4. back to the listing");
 
