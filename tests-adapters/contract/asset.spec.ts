@@ -38,6 +38,42 @@ describe('asset.upload', () => {
     expect(doc.id.length).toBeGreaterThan(0);
     expect(doc.path.startsWith('/')).toBe(true);
   });
+
+  /**
+   * A second upload is as ordinary as the first.
+   *
+   * An editor adding two images to a page is the base case, not an edge one.
+   * This is asked of the ADAPTER, with no admin and no browser in the way,
+   * because the symptom appears far from the cause: in the journey the second
+   * upload came back 500, the block therefore rendered no image, and the
+   * spec's ninety-second poll expired — reported as "the uploaded image does
+   * not render", which is true and useless.
+   *
+   * Distinct filenames, so this cannot be read as a question about name
+   * collisions: that was the first hypothesis and it was wrong — the second
+   * upload failed whatever it was called.
+   */
+  it('accepts a second upload as readily as the first', async () => {
+    const first: any = await target.adapter.dispatch('asset.upload', {
+      parentPath: '/news',
+      filename: 'first-upload.png',
+      contentType: 'image/png',
+      data: PNG_1X1,
+    });
+
+    const second: any = await target.adapter.dispatch('asset.upload', {
+      parentPath: '/news',
+      filename: 'second-upload.png',
+      contentType: 'image/png',
+      data: PNG_1X1,
+    });
+
+    expect(second.type).toBe(target.types.image);
+    // Two uploads, two distinct assets — not one silently overwriting the
+    // other, which would pass a "did it succeed" check while losing an image.
+    expect(second.id).not.toBe(first.id);
+    expect(second.path).not.toBe(first.path);
+  });
 });
 
 describe('asset.imageUrl', () => {

@@ -855,10 +855,14 @@ export class WordPressAdapter extends BaseAdapter {
           body: binary,
         });
         if (!res.ok) {
-          throw new AdapterError(`Upload failed: ${res.status}`, {
-            code: 'UPLOAD_FAILED',
-            status: res.status,
-          });
+          // Say what the CMS said. A status on its own is unactionable: this
+          // one surfaced as a bare "Upload failed: 500" and cost several runs
+          // of guessing, while WordPress had a reason it was willing to give.
+          const detail = await res.text().catch(() => '');
+          throw new AdapterError(
+            `Upload failed: ${res.status}${detail ? ` — ${detail.slice(0, 400)}` : ''}`,
+            { code: 'UPLOAD_FAILED', status: res.status, data: detail },
+          );
         }
         const media = await res.json();
         return {
