@@ -5,6 +5,20 @@
 today, so the sharing half is hidden on all three CMSes and `shareEntries` is
 `null` everywhere.
 
+## Short version
+
+Plone's state menu, except:
+
+- it is in **view mode as well as edit mode**, so publishing does not require
+  editing;
+- a transition does not fire immediately — it opens a dialog naming what the
+  change does to who can see this, with people and roles underneath;
+- the list carries **working-copy transitions** too, since checking out a copy
+  is a state change;
+- and an **access-only entry**, for changing permissions without moving state.
+
+Save stays its own one-tap button. Choosing the current state does nothing.
+
 ## The problem
 
 Plone puts three answers to one question in three places: the workflow menu,
