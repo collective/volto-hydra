@@ -12,17 +12,26 @@ vi.mock('../../context/HydraSchemaContext', () => ({
   useHydraSchemaContext: () => ({}),
 }));
 
-import {
-  candidateBlockIds,
-  labelFor,
-} from './BlockSelectWidget';
+import { candidateBlockIds, labelFor } from './BlockSelectWidget';
 
 // form → three questions, in order.
 const MAP = {
   form: { path: ['blocks', 'form'], parentId: null, region: null },
-  q1: { path: ['blocks', 'form', 'subblocks', '0'], parentId: 'form', region: 'subblocks' },
-  q2: { path: ['blocks', 'form', 'subblocks', '1'], parentId: 'form', region: 'subblocks' },
-  q3: { path: ['blocks', 'form', 'subblocks', '2'], parentId: 'form', region: 'subblocks' },
+  q1: {
+    path: ['blocks', 'form', 'subblocks', '0'],
+    parentId: 'form',
+    region: 'subblocks',
+  },
+  q2: {
+    path: ['blocks', 'form', 'subblocks', '1'],
+    parentId: 'form',
+    region: 'subblocks',
+  },
+  q3: {
+    path: ['blocks', 'form', 'subblocks', '2'],
+    parentId: 'form',
+    region: 'subblocks',
+  },
 };
 
 describe('candidateBlockIds', () => {
@@ -62,7 +71,11 @@ describe('candidateBlockIds', () => {
   test('a region scope offers that region only', () => {
     const mixed = {
       ...MAP,
-      other: { path: ['blocks', 'form', 'footer', '0'], parentId: 'form', region: 'footer' },
+      other: {
+        path: ['blocks', 'form', 'footer', '0'],
+        parentId: 'form',
+        region: 'footer',
+      },
     };
     const ids = candidateBlockIds({
       blockPathMap: mixed,
@@ -81,7 +94,9 @@ describe('candidateBlockIds', () => {
 
 describe('labelFor', () => {
   test('prefers the named field, so a question reads as its question', () => {
-    expect(labelFor({ label: 'Your topic', title: 'x' }, 'label')).toBe('Your topic');
+    expect(labelFor({ label: 'Your topic', title: 'x' }, 'label')).toBe(
+      'Your topic',
+    );
   });
 
   test('falls back through title, label, type', () => {

@@ -53,7 +53,10 @@ describe('indexChoices', () => {
   });
 
   test('an index with no title falls back to its name, never blank', () => {
-    const choices = indexChoices({ sortable_indexes: { created: {} } }, 'sortable');
+    const choices = indexChoices(
+      { sortable_indexes: { created: {} } },
+      'sortable',
+    );
     expect(choices).toEqual([['created', 'created']]);
   });
 

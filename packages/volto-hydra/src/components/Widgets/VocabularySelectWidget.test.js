@@ -14,7 +14,8 @@ describe('vocabularyNameFrom', () => {
   test('takes the name out of a listing item', () => {
     expect(
       vocabularyNameFrom({
-        '@id': 'http://localhost:8080/Plone/@vocabularies/plone.app.vocabularies.Keywords',
+        '@id':
+          'http://localhost:8080/Plone/@vocabularies/plone.app.vocabularies.Keywords',
         title: 'plone.app.vocabularies.Keywords',
       }),
     ).toBe('plone.app.vocabularies.Keywords');
@@ -27,9 +28,9 @@ describe('vocabularyNameFrom', () => {
   });
 
   test('falls back to the title when there is no @id to read', () => {
-    expect(vocabularyNameFrom({ title: 'plone.app.vocabularies.Weekdays' })).toBe(
-      'plone.app.vocabularies.Weekdays',
-    );
+    expect(
+      vocabularyNameFrom({ title: 'plone.app.vocabularies.Weekdays' }),
+    ).toBe('plone.app.vocabularies.Weekdays');
   });
 
   test('an item with neither is not offered', () => {

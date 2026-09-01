@@ -56,9 +56,7 @@ export function candidateBlockIds({
     );
 
   // Page order: the path's last segment is the position within the parent.
-  const ordered = siblings.sort(
-    (a, b) => positionOf(a[1]) - positionOf(b[1]),
-  );
+  const ordered = siblings.sort((a, b) => positionOf(a[1]) - positionOf(b[1]));
   const ids = ordered.map(([id]) => id);
   const at = ids.indexOf(anchorId);
   const trimmed =
@@ -81,7 +79,12 @@ export function labelFor(block, labelField) {
   if (!block) return '';
   const named = labelField && block[labelField];
   return (
-    named || block.title || block.label || block['@type'] || block.field_id || ''
+    named ||
+    block.title ||
+    block.label ||
+    block['@type'] ||
+    block.field_id ||
+    ''
   );
 }
 
@@ -115,7 +118,7 @@ const BlockSelectWidget = (props) => {
       .map(({ id, block }) => [
         // What to STORE: a named field of the chosen block (a form question's
         // `field_id`), or the block's own id when the consumer wants that.
-        valueField ? (block[valueField] ?? id) : id,
+        valueField ? block[valueField] ?? id : id,
         labelFor(block, labelField),
       ])
       .filter(([value, label]) => value !== '' && label !== ''),

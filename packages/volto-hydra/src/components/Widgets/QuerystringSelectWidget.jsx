@@ -65,12 +65,19 @@ const QuerystringSelectWidget = (props) => {
 
   useEffect(() => {
     // Volto loads this once for the whole editor; ask only if nobody has.
-    if (!Object.keys(querystring?.indexes || {}).length && !querystring?.loading) {
+    if (
+      !Object.keys(querystring?.indexes || {}).length &&
+      !querystring?.loading
+    ) {
       dispatch(getQuerystring());
     }
   }, [dispatch, querystring]);
 
-  const choices = indexChoices(querystring, indexes, multiple ? null : emptyLabel);
+  const choices = indexChoices(
+    querystring,
+    indexes,
+    multiple ? null : emptyLabel,
+  );
   const Widget = multiple
     ? config.widgets.widget.array
     : config.widgets.widget.select;

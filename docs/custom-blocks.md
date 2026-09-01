@@ -206,6 +206,27 @@ error and no clue in the DOM. Either declare both (`type: 'string', widget:
 to be annotated, and every annotated field has to become editable and take the
 caret when clicked.
 
+## Widgets hydra registers
+
+A schema names a widget by string, so anything in `config.widgets.widget` is
+available — Volto's own included (`select_querystring_field`, `query_sort_on`,
+`object_browser`, …). These are the ones hydra adds:
+
+| widget | picks | documented |
+|---|---|---|
+| `blockTypeSelect` | which block type a container's item is | [container blocks](container-blocks.md#blocktypeselect-widget-options) |
+| `schemaFieldSelect` | a field of a CONTENT TYPE, from `/@types` | [listings](listings.md) |
+| `vocabularySelect` | WHICH vocabulary (not a term from one) | below |
+| `blockSelect` | another BLOCK on the page, storing a field of it | below |
+| `querystringSelect` | catalog indexes, one or several | below |
+| `field_mapping` | how one block's fields map onto another's | [fieldMappings](#block-conversion--fieldmappings) |
+
+Three more are swapped in rather than named: `url`, `blocks_layout` and
+`object_list` replace Volto's own so the bridge can handle them.
+
+Reach for a Volto widget first where one fits; each section below says when it
+does.
+
 ## Picking a vocabulary (`vocabularySelect`)
 
 A field can reference a vocabulary — "suggest this answer from the site's
