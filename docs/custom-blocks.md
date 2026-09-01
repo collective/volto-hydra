@@ -295,6 +295,44 @@ They share only their tail (build choices, hand them to the select). One asks
 the backend what a content type looks like; the other walks the block tree in
 the editor.
 
+## Picking a catalog index (`querystringSelect`)
+
+A field that names a catalog index — what a listing sorts on, what a facet
+filters by — should offer the site's indexes, not a text box. A typo in a text
+box produces a sort option that appears in the menu and silently sorts nothing.
+
+Volto fills such a field imperatively: its search block's Edit component writes
+`sortOnOptions.items.choices` from `@querystring` before rendering. A hydra
+frontend has no Edit component — its schema is JSON sent over the bridge — so
+that route is closed. This widget is the declarative equivalent.
+
+```json
+"sortOnOptions": {
+  "title": "Sort-by options",
+  "type": "array",
+  "widget": "querystringSelect",
+  "indexes": "sortable",
+  "multiple": true
+}
+```
+
+| option | meaning |
+|---|---|
+| `indexes` | `"sortable"` (default) offers only what the catalog can sort on; `"all"` offers every queryable index |
+| `multiple` | `true` stores an array — a chosen subset, in the author's order, which is what a "sort by" menu is |
+
+The stored value is the index NAME (`effective`, `sortable_title`), because that
+is what a query is built from; the title is only what the author reads.
+
+`@querystring` is loaded once for the whole editor, so the widget asks for it
+only if nothing else has, and shows an empty menu — not a crash — while it is
+still in flight.
+
+Use `select_querystring_field` instead when the field names ONE index to query
+on: that is Volto's own widget, already registered, and hydra passes it through.
+This one exists for the cases Volto only solves in JavaScript — chosen subsets,
+and sortable-only lists.
+
 ## Schema Enhancers
 
 Schema enhancers modify block schemas dynamically:

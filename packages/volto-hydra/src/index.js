@@ -54,6 +54,7 @@ import CopyFromTargetField from './components/Widgets/CopyFromTargetField';
 import SchemaFieldSelectWidget from './components/Widgets/SchemaFieldSelectWidget';
 import VocabularySelectWidget from './components/Widgets/VocabularySelectWidget';
 import BlockSelectWidget from './components/Widgets/BlockSelectWidget';
+import QuerystringSelectWidget from './components/Widgets/QuerystringSelectWidget';
 import TableSchema, { TableBlockSchema } from '@plone/volto-slate/blocks/Table/schema';
 // Volto-slate ships TWO schemas for the slate block:
 //   ./schema.js          → "Block tab" form (override_toc / level / entry_text)
@@ -200,6 +201,10 @@ const applyConfig = (config) => {
   // Pick another BLOCK and store a field of it — a form's skip logic naming the
   // question it depends on, by label rather than by uid.
   config.widgets.widget.blockSelect = BlockSelectWidget;
+  // Pick catalog indexes from what @querystring reports. Volto's search block
+  // fills the same field imperatively from its Edit component, which a
+  // JSON-schema frontend has no way to do.
+  config.widgets.widget.querystringSelect = QuerystringSelectWidget;
 
   // Copy-from-target: mapped fields (via fieldMappings['@target']) are swapped
   // to this wrapper by installCopyFromTargetEnhancers, which renders the field's
