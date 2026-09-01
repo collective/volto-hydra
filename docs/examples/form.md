@@ -4,7 +4,7 @@ A multi-field form with configurable field types, validation, and email submissi
 
 This is a **custom** block — register it via `initBridge`.
 
-**Demonstrates:** [object_list with allowedBlocks: Typed Items](../container-blocks.md#object_list-with-allowedblocks-typed-items) — a typed item per kind of field; [`vocabularySelect`](../custom-blocks.md#picking-a-vocabulary-vocabularyselect) and [`blockSelect`](../custom-blocks.md#picking-another-block-blockselect) — two fields an author picks rather than types.
+**Demonstrates:** [object_list with allowedBlocks: Typed Items](../container-blocks.md#object_list-with-allowedblocks-typed-items) — a typed item per kind of field; [`vocabularySelect`](../custom-blocks.md#picking-a-vocabulary-vocabularyselect) and [`blockPicker`](../custom-blocks.md#picking-a-block-and-a-value-from-it-blockpicker) — two fields an author picks rather than types.
 
 ## Two things the author picks
 
@@ -32,7 +32,7 @@ is assembled rather than inside the block — a `<select>` whose options arrive
 with JavaScript is an empty `<select>` without it, and the server has to know
 the allowed values anyway to validate what was submitted.
 
-**Which earlier question a rule watches.** `show_when_field` uses `blockSelect`
+**Which earlier question a rule watches.** `show_when_field` uses `blockPicker`
 to offer the questions *before* this one (`scope: "subblocks"`,
 `direction: "before"`), so the first question's menu is empty — nothing precedes
 it — and no rule can point forwards at an answer that has not been given yet.
@@ -188,7 +188,7 @@ the failure is invisible in the editor and only shows up on the live form.
           "title": "Only show when",
           "description": "An earlier question in this form. Leave empty to always show this one.",
           "type": "string",
-          "widget": "blockSelect",
+          "widget": "blockPicker",
           "scope": "subblocks",
           "direction": "before",
           "valueField": "field_id",
@@ -240,7 +240,7 @@ the failure is invisible in the editor and only shows up on the live form.
           "title": "Only show when",
           "description": "An earlier question in this form. Leave empty to always show this one.",
           "type": "string",
-          "widget": "blockSelect",
+          "widget": "blockPicker",
           "scope": "subblocks",
           "direction": "before",
           "valueField": "field_id",
@@ -292,7 +292,7 @@ the failure is invisible in the editor and only shows up on the live form.
           "title": "Only show when",
           "description": "An earlier question in this form. Leave empty to always show this one.",
           "type": "string",
-          "widget": "blockSelect",
+          "widget": "blockPicker",
           "scope": "subblocks",
           "direction": "before",
           "valueField": "field_id",
@@ -405,7 +405,7 @@ the failure is invisible in the editor and only shows up on the live form.
           "title": "Only show when",
           "description": "An earlier question in this form. Leave empty to always show this one.",
           "type": "string",
-          "widget": "blockSelect",
+          "widget": "blockPicker",
           "scope": "subblocks",
           "direction": "before",
           "valueField": "field_id",
@@ -471,7 +471,7 @@ the failure is invisible in the editor and only shows up on the live form.
           "title": "Only show when",
           "description": "An earlier question in this form. Leave empty to always show this one.",
           "type": "string",
-          "widget": "blockSelect",
+          "widget": "blockPicker",
           "scope": "subblocks",
           "direction": "before",
           "valueField": "field_id",
@@ -529,7 +529,7 @@ the failure is invisible in the editor and only shows up on the live form.
           "title": "Only show when",
           "description": "An earlier question in this form. Leave empty to always show this one.",
           "type": "string",
-          "widget": "blockSelect",
+          "widget": "blockPicker",
           "scope": "subblocks",
           "direction": "before",
           "valueField": "field_id",
@@ -581,7 +581,7 @@ the failure is invisible in the editor and only shows up on the live form.
           "title": "Only show when",
           "description": "An earlier question in this form. Leave empty to always show this one.",
           "type": "string",
-          "widget": "blockSelect",
+          "widget": "blockPicker",
           "scope": "subblocks",
           "direction": "before",
           "valueField": "field_id",
@@ -633,7 +633,7 @@ the failure is invisible in the editor and only shows up on the live form.
           "title": "Only show when",
           "description": "An earlier question in this form. Leave empty to always show this one.",
           "type": "string",
-          "widget": "blockSelect",
+          "widget": "blockPicker",
           "scope": "subblocks",
           "direction": "before",
           "valueField": "field_id",
@@ -695,7 +695,7 @@ the failure is invisible in the editor and only shows up on the live form.
           "title": "Only show when",
           "description": "An earlier question in this form. Leave empty to always show this one.",
           "type": "string",
-          "widget": "blockSelect",
+          "widget": "blockPicker",
           "scope": "subblocks",
           "direction": "before",
           "valueField": "field_id",
@@ -741,7 +741,7 @@ the failure is invisible in the editor and only shows up on the live form.
           "title": "Only show when",
           "description": "An earlier question in this form. Leave empty to always show this one.",
           "type": "string",
-          "widget": "blockSelect",
+          "widget": "blockPicker",
           "scope": "subblocks",
           "direction": "before",
           "valueField": "field_id",
@@ -789,7 +789,7 @@ the failure is invisible in the editor and only shows up on the live form.
           "title": "Only show when",
           "description": "An earlier question in this form. Leave empty to always show this one.",
           "type": "string",
-          "widget": "blockSelect",
+          "widget": "blockPicker",
           "scope": "subblocks",
           "direction": "before",
           "valueField": "field_id",
@@ -841,7 +841,7 @@ the failure is invisible in the editor and only shows up on the live form.
           "title": "Only show when",
           "description": "An earlier question in this form. Leave empty to always show this one.",
           "type": "string",
-          "widget": "blockSelect",
+          "widget": "blockPicker",
           "scope": "subblocks",
           "direction": "before",
           "valueField": "field_id",

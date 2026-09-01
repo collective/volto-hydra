@@ -12,7 +12,7 @@ vi.mock('../../context/HydraSchemaContext', () => ({
   useHydraSchemaContext: () => ({}),
 }));
 
-import { candidateBlockIds, labelFor } from './BlockSelectWidget';
+import { candidateBlockIds, labelFor } from './BlockPickerWidget';
 
 // form → three questions, in order.
 const MAP = {

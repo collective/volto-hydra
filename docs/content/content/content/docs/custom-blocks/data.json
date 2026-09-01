@@ -2187,7 +2187,7 @@
                         "type": "code",
                         "children": [
                           {
-                            "text": "blockSelect"
+                            "text": "blockPicker"
                           }
                         ]
                       }
@@ -2203,7 +2203,7 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "another BLOCK on the page, storing a field of it"
+                        "text": "a block, storing a named field value from it"
                       }
                     ]
                   }
@@ -2921,19 +2921,19 @@
     },
     "h-55": {
       "@type": "slate",
-      "plaintext": "Picking another block (blockSelect)",
+      "plaintext": "Picking a block, and a value from it (blockPicker)",
       "value": [
         {
           "type": "h2",
           "children": [
             {
-              "text": "Picking another block ("
+              "text": "Picking a block, and a value from it ("
             },
             {
               "type": "code",
               "children": [
                 {
-                  "text": "blockSelect"
+                  "text": "blockPicker"
                 }
               ]
             },
@@ -2946,7 +2946,7 @@
     },
     "p-56": {
       "@type": "slate",
-      "plaintext": "A field that names **another block** — \"show this question when THAT one is answered\" — should offer a menu, not ask for a uid. `blockSelect` reads `blockPathMap`, the same container/region map the editor uses, and stores a **field of the block chosen**.",
+      "plaintext": "A field that names **another block** — \"show this question when THAT one is answered\" — should offer a menu, not ask for a uid. `blockPicker` reads `blockPathMap`, the same container/region map the editor uses, and stores a **field of the block chosen**.",
       "value": [
         {
           "type": "p",
@@ -2969,7 +2969,7 @@
               "type": "code",
               "children": [
                 {
-                  "text": "blockSelect"
+                  "text": "blockPicker"
                 }
               ]
             },
@@ -3009,7 +3009,7 @@
           "@id": "ce-57-js-a28d1c",
           "label": "Js",
           "language": "js",
-          "code": "show_when_when: {\n  title: 'Show when',\n  widget: 'blockSelect',\n  scope: 'siblings',      // 'siblings' (default) | '..' (parent's siblings) | '<region>'\n  direction: 'before',    // only blocks earlier than this one\n  blockTypes: ['text', 'select', 'single_choice'],\n  valueField: 'field_id', // what to STORE (default: the block's own id)\n  labelField: 'label',    // what to SHOW  (optional — see below)\n}"
+          "code": "show_when_when: {\n  title: 'Show when',\n  widget: 'blockPicker',\n  scope: 'siblings',      // 'siblings' (default) | '..' (parent's siblings) | '<region>'\n  direction: 'before',    // only blocks earlier than this one\n  blockTypes: ['text', 'select', 'single_choice'],\n  valueField: 'field_id', // what to STORE (default: the block's own id)\n  labelField: 'label',    // what to SHOW  (optional — see below)\n}"
         }
       ]
     },
@@ -3321,7 +3321,7 @@
                         "type": "code",
                         "children": [
                           {
-                            "text": "blockSelect"
+                            "text": "blockPicker"
                           }
                         ]
                       }

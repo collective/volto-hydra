@@ -1,18 +1,20 @@
 /**
- * BlockSelectWidget — a select whose choices are OTHER BLOCKS, and whose value
- * is a field taken from the one picked.
+ * BlockPickerWidget — pick a block, store a FIELD VALUE from it.
+ *
+ * The author chooses a block; what gets written is one named field of that
+ * block. Usually that is its id, but it does not have to be — `valueField` says
+ * which field to take, and any field of the chosen block will do.
  *
  * Not the same job as `schemaFieldSelect`, which offers the CONTENT TYPE's
  * schema fields from `/@types`. This offers blocks on the page, read from
- * `blockPathMap` — the same container/region map the editor uses — and stores
- * whatever field of the chosen block the consumer names.
+ * `blockPathMap` — the same container/region map the editor uses.
  *
  * The motivating case is a form's skip logic: "show this question when THAT one
  * is answered". The author should pick the other question by its label; what
  * gets stored is that question's `field_id`, because that is what the rule is
  * evaluated against — a uid would look right in the sidebar and never match.
  *
- * Field options (alongside `widget: 'blockSelect'`):
+ * Field options (alongside `widget: 'blockPicker'`):
  *   - scope: 'siblings' (default) — blocks sharing my parent
  *            '..'                 — my parent's siblings
  *            '<region>'           — that region of my parent
@@ -20,8 +22,11 @@
  *       question cannot depend on one that comes after it, so skip logic uses
  *       'before'.
  *   - blockTypes: ['text', 'select'] — only these `@type`s.
- *   - valueField: 'field_id' — the field of the chosen block to STORE.
- *       Defaults to the block's own id.
+ *   - valueField: 'field_id' — WHICH field of the chosen block to store.
+ *       Defaults to the block's own id, but the point of the option is that the
+ *       useful value often lives in another field: a form question is referred
+ *       to by its `field_id`, because that is the name its answer arrives
+ *       under.
  *   - labelField: 'label' — the field to SHOW. Falls back to title, then label,
  *       then the block type, then the id.
  *   - emptyLabel: the first, empty option's text.
@@ -96,7 +101,7 @@ export function labelFor(block, labelField) {
   return blockDisplayTitle(block, { labelField, fallback: block.field_id });
 }
 
-const BlockSelectWidget = (props) => {
+const BlockPickerWidget = (props) => {
   const {
     scope = 'siblings',
     direction,
@@ -139,4 +144,4 @@ const BlockSelectWidget = (props) => {
   return <SelectWidget {...props} choices={choices} />;
 };
 
-export default BlockSelectWidget;
+export default BlockPickerWidget;

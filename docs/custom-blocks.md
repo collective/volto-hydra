@@ -217,7 +217,7 @@ available — Volto's own included (`select_querystring_field`, `query_sort_on`,
 | `blockTypeSelect` | which block type a container's item is | [container blocks](container-blocks.md#blocktypeselect-widget-options) |
 | `schemaFieldSelect` | a field of a CONTENT TYPE, from `/@types` | [listings](listings.md) |
 | `vocabularySelect` | WHICH vocabulary (not a term from one) | below |
-| `blockSelect` | another BLOCK on the page, storing a field of it | below |
+| `blockPicker` | a block, storing a named field value from it | below |
 | `querystringSelect` | catalog indexes, one or several | below |
 | `field_mapping` | how one block's fields map onto another's | [fieldMappings](#block-conversion--fieldmappings) |
 
@@ -276,17 +276,17 @@ applied server-side) and `b_start` / `b_size` batching. A type-ahead should send
 `?title=` per keystroke rather than fetch every term — a long vocabulary is
 exactly the case where a list is the wrong control.
 
-## Picking another block (`blockSelect`)
+## Picking a block, and a value from it (`blockPicker`)
 
 A field that names **another block** — "show this question when THAT one is
-answered" — should offer a menu, not ask for a uid. `blockSelect` reads
+answered" — should offer a menu, not ask for a uid. `blockPicker` reads
 `blockPathMap`, the same container/region map the editor uses, and stores a
 **field of the block chosen**.
 
 ```js
 show_when_when: {
   title: 'Show when',
-  widget: 'blockSelect',
+  widget: 'blockPicker',
   scope: 'siblings',      // 'siblings' (default) | '..' (parent's siblings) | '<region>'
   direction: 'before',    // only blocks earlier than this one
   blockTypes: ['text', 'select', 'single_choice'],
@@ -324,7 +324,7 @@ the chain would not look — a form question's `label` beats its `plaintext`.
 
 ### Not the same as `schemaFieldSelect`
 
-| | `schemaFieldSelect` | `blockSelect` |
+| | `schemaFieldSelect` | `blockPicker` |
 |---|---|---|
 | choices | the CONTENT TYPE's schema fields, from `/@types` | blocks on the page, from `blockPathMap` |
 | scope | the whole type | relative — siblings, `..`, a named region |
