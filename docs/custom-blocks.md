@@ -308,9 +308,14 @@ all (the menu is then empty rather than wrong).
 
 `labelField` only nominates where THIS kind of block keeps its name. Without it,
 a block is named by the shared `blockDisplayTitle` — `title`, then `label`, then
-`plaintext` (the block's indexed text, which is how a block with no name but
-some words is recognised), then the block type's configured title, then the raw
-type.
+the block's own rich text read live, then the stored `plaintext`, then the block
+type's configured title, then the raw type.
+
+Live text comes before `plaintext` on purpose. Nothing in the editor writes
+`plaintext`: the backend serializer does, at save time. Preferring it would name
+a heading by its previous wording for as long as the author kept typing, so the
+slate value is read directly (`slateNodesText`) and the stored text is the
+fallback for blocks whose words are not slate.
 
 That is the same function the sidebar's child list uses, deliberately: a
 question that reads "Your name" in one list and "Text" in another is confusing

@@ -465,9 +465,10 @@ const ChildBlocksWidget = ({
             const childPathInfo = blockPathMap[childId];
             const childData = getBlockById(formData, blockPathMap, childId);
             const blockType = childPathInfo?.blockType || 'unknown';
-            const blockConfig = config.blocks?.blocksConfig?.[blockType];
-            const title =
-              childData?.plaintext || blockConfig?.title || blockType;
+            const title = blockDisplayTitle(
+              { '@type': blockType, ...childData },
+              { fallback: blockType },
+            );
             return { id: childId, type: blockType, title, data: childData };
           });
 
