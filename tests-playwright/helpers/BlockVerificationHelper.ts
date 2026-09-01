@@ -167,7 +167,19 @@ export async function checkDataEditTextClicks(
     // previous selection had something to scroll.
     await new AdminUIHelper(page).waitForPositionStable(el).catch(() => {});
 
-    await el.click();
+    // Playwright resolves a <label> to the control it labels, so a label whose
+    // control is DISABLED counts as disabled and `.click()` refuses to act on
+    // it. That is a false negative here: the browser still delivers the click
+    // to the label, and the bridge still promotes the field — a disabled
+    // control means the ANSWER cannot be given, not that the question's text
+    // cannot be edited. (A form field disabled by a rule is exactly this: the
+    // author must still be able to rename it.)
+    //
+    // So the actionability veto is bypassed only for that case; everywhere else
+    // the ordinary checks — visible, stable, receives the event — keep their
+    // value.
+    const actionable = await el.isEnabled().catch(() => true);
+    await el.click(actionable ? {} : { force: true });
     // The warning below is asserted ABSENT, so give the bridge its frame to
     // raise one — see nextFrame. (Was a 300ms sleep.)
     await nextFrame(iframe);
