@@ -18,7 +18,7 @@ const isFolderish = (doc) =>
 
 export function documentToPlone(doc) {
   if (!doc) return doc;
-  const { blocks, blocksLayout, fields, _adapter, id, path, type, title, state, ...rest } = doc;
+  const { blocks, blocksLayout, fields, _adapter, id, path, type, title, state, context, ...rest } = doc;
   return {
     ...fields,
     ...rest,
@@ -30,8 +30,40 @@ export function documentToPlone(doc) {
     blocks: blocks ?? {},
     blocks_layout: blocksLayout ?? { items: [] },
     ...(state !== undefined ? { review_state: state } : {}),
+    ...(context ? { '@components': componentsToPlone(context, path) } : {}),
     is_folderish: isFolderish(doc),
   };
+}
+
+/**
+ * A canonical context bundle as Plone's '@components'.
+ *
+ * Runs each value through the SAME converter the standalone endpoint uses, so
+ * the expanded and separately-fetched forms cannot drift. Volto's reducers
+ * read both — breadcrumbs.js populates from action.result['@components']
+ * .breadcrumbs on GET_CONTENT and from the endpoint's own response otherwise —
+ * and a difference between them would surface as a component that renders
+ * correctly on one navigation and wrongly on the next.
+ */
+function componentsToPlone(context, path) {
+  const AS = {
+    breadcrumbs: (value) => plonify('breadcrumbs.get', value, { path }),
+    navigation: (value) => plonify('navigation.get', value, { path }),
+    types: (value) => plonify('types.list', value, { path }),
+    actions: (value) => actionsToPlone(value),
+    querystring: (value) => plonify('querystring.getIndexes', value, { path }),
+  };
+  return Object.fromEntries(
+    Object.entries(context).map(([name, value]) => {
+      const as = AS[name];
+      if (!as) {
+        throw new Error(
+          `bridge: adapter returned an unknown expansion '${name}'`,
+        );
+      }
+      return [name, as(value)];
+    }),
+  );
 }
 
 /** Listings, search and folder contents share one envelope in Plone. */

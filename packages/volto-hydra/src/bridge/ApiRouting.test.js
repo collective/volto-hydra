@@ -74,12 +74,24 @@ describe('Api transport selection', () => {
     expect(() => api.get('/news')).not.toThrow();
   });
 
-  it('keeps SSR on the direct path — there is no iframe at render time', () => {
+  /**
+   * SSR used to be allowed onto the direct path, on the grounds that there is
+   * no iframe at render time. But "no iframe" does not make a direct fetch
+   * correct — it just means there is nobody to ask, and answering from
+   * `apiPath` sends the admin to the wrong CMS: one that does not exist for a
+   * WordPress or Drupal site, and for a Plone site a DIFFERENT Plone, which
+   * answers 200 and is indistinguishable from working.
+   *
+   * In a bridge session every route has its server-side prefetch stripped, so
+   * nothing should be asking. If something does, that is the bug to fix, and
+   * it has to be audible.
+   */
+  it('refuses to fetch during SSR rather than reaching for apiPath', () => {
     config.settings.useBridgeBackend = true;
     const request = vi.fn();
     window.__hydraBridgeRpc = { request };
     const api = new Api({ universalCookies: { get: () => null } });
-    api.get('/news');
+    expect(() => api.get('/news')).toThrow(/server-side rendering/);
     expect(request).not.toHaveBeenCalled();
   });
 });

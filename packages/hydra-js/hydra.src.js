@@ -173,6 +173,25 @@ export class Bridge {
    *   - debug: Enable verbose logging (default: false)
    *   - pathToApiPath: Function to transform frontend path to API/admin path
    */
+  /**
+   * Tell the admin the user changed, WITHOUT registering again.
+   *
+   * Signing in changes one field of a handshake that has already happened.
+   * Re-running connectProxy to convey that re-served the adapter and re-asked
+   * the CMS who the user was; this re-posts the announcement the bridge
+   * already built, with the new user in it.
+   */
+  announceUser(user) {
+    if (!this.adapterReadyMessage) {
+      throw new Error(
+        '[hydra] announceUser() before the adapter announced itself — there ' +
+          'is no registration to update.',
+      );
+    }
+    this.adapterReadyMessage = { ...this.adapterReadyMessage, user };
+    window.parent.postMessage(this.adapterReadyMessage, this.adminOrigin);
+  }
+
   constructor(adminOrigin, options = {}) {
     this.adminOrigin = adminOrigin;
     // Backend RPC rides the same postMessage channel but gets its own
@@ -3665,6 +3684,16 @@ export class Bridge {
   init(options = {}) {
     if (typeof window === 'undefined') {
       return; // Exit if not in a browser environment
+    }
+
+    // The PROXY role stops here. Everything below is preview behaviour —
+    // keyboard handlers, selection chrome, mutation observers, navigation
+    // detection — and the proxy has no document to edit and must never
+    // navigate. The RPC transport it does need was wired in the constructor,
+    // before this call.
+    if (options.proxy) {
+      log('Bridge: proxy role, skipping preview setup');
+      return;
     }
 
     // Register document-level keyboard handlers early so no keystrokes are lost
@@ -13258,7 +13287,16 @@ function registerAdapter(bridge, options, adminOrigin) {
     );
 
   return Promise.resolve(adapter.init({ cmsBaseUrl, emit }))
-    .then(() => adapter.whoami())
+    .then(() =>
+      // Not being logged in yet is a STATE, not a failed handshake. The admin
+      // needs ADAPTER_READY either way: with a user it starts the editor, and
+      // without one it shows a login. Treating anonymous as an error left the
+      // bridge permanently unready, so nothing could ever offer to log in.
+      Promise.resolve(adapter.whoami()).catch((err) => {
+        if (err?.code === 'UNAUTHORIZED' || err?.status === 401) return null;
+        throw err;
+      }),
+    )
     .then((user) => {
       bridge.adapterReadyMessage = {
         type: 'ADAPTER_READY',
@@ -13269,6 +13307,11 @@ function registerAdapter(bridge, options, adminOrigin) {
         user,
       };
       window.parent.postMessage(bridge.adapterReadyMessage, adminOrigin);
+      // Handed back so the frontend can render its own signed-in/out state
+      // from the answer already obtained. Asking whoami() again is a second
+      // round trip for a question just answered — on WordPress, a second
+      // second.
+      return user;
     })
     .catch((err) => {
       // A failed handshake must surface as an auth challenge, not a blank
@@ -13279,6 +13322,63 @@ function registerAdapter(bridge, options, adminOrigin) {
         message: err?.message,
       });
     });
+}
+
+/**
+ * Host an adapter, and nothing else.
+ *
+ * This is the PROXY role: a hidden frame the admin mounts once at boot, whose
+ * only job is to answer CMS calls. It never routes and never renders, so it
+ * cannot be navigated out from under the admin.
+ *
+ * That matters because the adapter used to live in the PREVIEW iframe, whose
+ * lifetime is driven by whatever the editor is looking at. When that window was
+ * replaced mid-edit every in-flight request was owed a reply by a window that
+ * no longer existed, and they expired one by one at their timeouts — an upload
+ * that never reached the CMS looked like a slow upload rather than a lost peer.
+ * It also meant admin routes with no preview (the contents listing, control
+ * panels) had no way to reach the CMS at all, and that every navigation threw
+ * away the adapter's caches.
+ *
+ * Deliberately does NOT call initBridge: no editing chrome, no selection, no
+ * navigation detection, no PATH_CHANGE. Those belong to the preview.
+ *
+ * The role is taken from window.name, which is already how a frontend learns it
+ * is inside Hydra, and unlike a query parameter it survives navigation. There is
+ * no `_edit`-style fallback: a normal page must never be able to promote itself
+ * to the proxy.
+ */
+export function connectProxy(adapter, options = {}) {
+  const PREFIX = 'hydra-proxy:';
+  if (typeof window === 'undefined') return null;
+
+  if (!window.name.startsWith(PREFIX)) {
+    log('connectProxy: not a hydra proxy frame (window.name is', window.name, ')');
+    return null;
+  }
+  const adminOrigin = window.name.slice(PREFIX.length);
+  if (!adminOrigin) {
+    throw new Error('[hydra] hydra-proxy: window.name carries no admin origin');
+  }
+
+  // ONCE per frame. Calling this again built a second Bridge over the same
+  // window, served a second adapter and re-ran init() and whoami() — the
+  // handshake repeated for what was only ever a change of user. Frontends
+  // reached for it because re-announcing was the only way to tell the admin
+  // about a sign-in; that is what announceUser() is for.
+  if (window.__hydraBridge?.isProxy) {
+    log('connectProxy: already connected to', adminOrigin, '— reusing it');
+    return window.__hydraBridge;
+  }
+
+  const bridge = new Bridge(adminOrigin, { ...options, adapter, proxy: true });
+  bridge.isProxy = true;
+  if (typeof window !== 'undefined') window.__hydraBridge = bridge;
+
+  // Resolves to the announced user, so the caller can render sign-in state
+  // without asking the CMS again.
+  bridge.ready = registerAdapter(bridge, { ...options, adapter }, adminOrigin);
+  return bridge;
 }
 
 export function initBridge(adminOriginOrOptions, options = {}) {

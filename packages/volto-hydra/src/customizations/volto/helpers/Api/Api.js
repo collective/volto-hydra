@@ -88,15 +88,28 @@ class Api {
      * panel that should be delegating to the CMS's own admin via
      * adapter.getAdminUrl() instead of calling an API at all.
      *
-     * SSR is the one exception, and only until the editor routes are made
-     * client-only: there is no iframe at render time, so there is nothing to
-     * ask.
+     * SSR is not an exception. In a bridge session `withoutServerPrefetch`
+     * strips the server-side prefetch from every route, so nothing should be
+     * asking for CMS content while rendering on the server. If something does,
+     * it must say so: silently answering it from `apiPath` sends the admin to
+     * whatever CMS that happens to point at — for a WordPress or Drupal site,
+     * a Plone that does not exist, and for a Plone site the WRONG Plone, which
+     * returns 200 and looks entirely correct.
      */
     const bridgeFor = () => {
-      if (!config.settings.useBridgeBackend || typeof window === 'undefined') {
-        return null;
+      // Plain Volto, no bridge in play: superagent below is the real client.
+      if (!config.settings.useBridgeBackend) return null;
+      // Bridge session. `typeof window === 'undefined'` is the server, and it
+      // is checked HERE rather than above so it cannot short-circuit into the
+      // fallback: on the server there is no iframe and therefore no CMS.
+      if (req || typeof window === 'undefined') {
+        throw new Error(
+          '[hydra] a CMS request was made during server-side rendering, but a ' +
+            'bridge session has no server-side CMS to answer it. The route ' +
+            'that issued it needs its prefetch stripped (withoutServerPrefetch) ' +
+            'or its data loaded client-side.',
+        );
       }
-      if (req) return null; // SSR — see above
       const rpc = window.__hydraBridgeRpc;
       if (!rpc) {
         // Published at App mount, before any route can dispatch, so this
@@ -125,8 +138,10 @@ class Api {
           attach = [],
         } = {},
       ) => {
-        // HYDRA: bridge if one is live right now, stock superagent otherwise.
-          const bridge = bridgeFor();
+        // HYDRA: in a bridge session EVERY call crosses the bridge — bridgeFor()
+        // throws rather than answer one itself. Stock superagent below serves
+        // only a non-bridge (plain Volto) session.
+        const bridge = bridgeFor();
         if (bridge) {
           return bridge[method](path, { params, data, type, headers, attach });
         }

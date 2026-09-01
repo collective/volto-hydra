@@ -2189,9 +2189,19 @@ const Iframe = (props) => {
 
       switch (type) {
         case 'PATH_CHANGE': { // PATH change from the iframe (SPA navigation)
-          // A new document means a new adapter registration is coming; hold
-          // requests until it announces itself.
-          rpcRef.current.markNotReady();
+          // NOT markNotReady() any more. That dated from when the adapter
+          // lived in this preview iframe, so navigating it really did cost us
+          // the adapter and everything had to be held until a new one
+          // announced. The adapter now lives in the proxy frame, which is
+          // mounted for the whole session and never navigates — gating here
+          // just held requests the proxy could already serve.
+          //
+          // What a navigation DOES mean is that reads for the previous
+          // document are no longer wanted. Discard them rather than letting
+          // them finish and resolve into unmounted components.
+          rpcRef.current.discardReads(
+            'the preview navigated to another document',
+          );
           // Check if this is in-page navigation (e.g., paging) - just resend form data
           if (event.data.inPage) {
             log('PATH_CHANGE: in-page navigation (paging), resending form data');

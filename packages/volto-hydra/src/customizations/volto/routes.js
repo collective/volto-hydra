@@ -3,7 +3,6 @@
  * Combined "/" and "/**" View routes into single entry to prevent remount on navigation
  * @module routes
  */
-import React from 'react';
 import debug from 'debug';
 import compact from 'lodash/compact';
 
@@ -57,6 +56,7 @@ import BlockTypesControlpanel from '@plone/volto/components/manage/Controlpanels
 import BlockTypeControlpanel from '@plone/volto/components/manage/Controlpanels/BlockType';
 
 import withClientSideContent from '@plone/volto/helpers/Content/withClientSideContent';
+import withClientSideAsyncConnect from '../../bridge/withClientSideAsyncConnect';
 
 import App from '@plone/volto/components/theme/App/App';
 import View from '@plone/volto/components/theme/View/View';
@@ -266,7 +266,9 @@ export const defaultRoutes = [
   },
   {
     path: ['/contents', '/**/contents'],
-    component: Contents,
+    // Its asyncConnect fetches the object actions, which it refuses to render
+    // without; in a bridge session no server pass runs it. See the HOC.
+    component: withClientSideAsyncConnect(Contents),
   },
   {
     path: ['/sharing', '/**/sharing'],
@@ -360,36 +362,38 @@ const routes = [
 ];
 
 /**
- * Strip server-side data prefetching when the admin is bridge-backed.
+ * Render nothing on the server when the admin is bridge-backed.
  *
- * asyncConnect prefetches content during SSR, where the bridge cannot exist —
- * the adapter lives in an iframe that has not been created yet. The direct
- * fetch it falls back to goes to whichever CMS the admin was built against,
- * which for a WordPress or Drupal site is the wrong server: the Drupal journey
- * 404'd on the server because the admin asked Plone for a path only Drupal
- * had, so the view never mounted and the browser never got as far as asking
- * the adapter.
+ * Volto server-renders because its usual job is being a public frontend, where
+ * prefetching the page for anonymous visitors and search engines is the whole
+ * point. A Hydra admin is not that. Its content comes from the adapter in an
+ * iframe that does not exist until the browser makes one, so there is nothing
+ * the server can render and nothing it can fetch — and every attempt to try
+ * has been a bug: asyncConnect prefetching from whichever CMS the admin was
+ * built against (the Drupal journey 404'd because the admin asked Plone for a
+ * path only Drupal had), and a token-renewal timer POSTing to the same place.
  *
- * loadOnServer decides what to prefetch by looking for `reduxAsyncConnect` on
- * each matched route's component, so removing it here removes the prefetch.
- * Wrapping only happens in the server bundle; the client keeps the originals
- * and loads everything over the bridge, which is the only place it can.
+ * So the server bundle swaps every route component for one that renders
+ * nothing. `loadOnServer` finds no `reduxAsyncConnect` to prefetch, and
+ * `renderToString` produces an empty body — the document still carries the
+ * scripts, styles and serialised store, and the client mounts the real app.
  *
- * This is not a degraded render. The editor cannot function without the
- * iframe, so there was never any content the server could usefully produce.
+ * This is only correct because the client MOUNTS rather than hydrates in
+ * bridge mode; see the start-client customization. Making one of these changes
+ * without the other gives React an empty container to hydrate against.
+ *
+ * Server-side redirects and status codes go with it: nothing renders, so
+ * nothing sets StaticRouter's context. The client decides both instead, which
+ * for an authenticated editor it had to anyway.
  */
-function withoutServerPrefetch(routeList) {
+const RendersNothing = () => null;
+RendersNothing.displayName = 'NoServerRender';
+
+function withoutServerRender(routeList) {
   return routeList.map((route) => {
     const stripped = { ...route };
-    if (route.component?.reduxAsyncConnect) {
-      const Component = route.component;
-      const Passthrough = (props) => React.createElement(Component, props);
-      Passthrough.displayName = `NoPrefetch(${
-        Component.displayName || Component.name || 'Component'
-      })`;
-      stripped.component = Passthrough;
-    }
-    if (route.routes) stripped.routes = withoutServerPrefetch(route.routes);
+    if (route.component) stripped.component = RendersNothing;
+    if (route.routes) stripped.routes = withoutServerRender(route.routes);
     return stripped;
   });
 }
@@ -397,5 +401,5 @@ function withoutServerPrefetch(routeList) {
 const isServer = typeof window === 'undefined';
 
 export default config.settings.useBridgeBackend && isServer
-  ? withoutServerPrefetch(routes)
+  ? withoutServerRender(routes)
   : routes;

@@ -1,81 +1,66 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
-import { useLocation } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import config from '@plone/volto/registry';
 import { getIframeUrlCookieName } from '../utils/cookieNames';
+import { subscribeAdapter } from './client';
 import { getURlsFromEnv } from '../utils/getSavedURLs';
-import {
-  getBridgeRpc,
-  isEditingIframeMounted,
-  subscribeEditingIframe,
-} from './client';
 
 /**
- * A hidden iframe whose only job is to host the frontend's adapter.
+ * The PROXY frame: a hidden iframe that hosts the frontend's adapter, always.
  *
- * The editing iframe cannot serve this purpose. Several core editing routes
- * render no iframe at all — the contents view is one, and it is where an
- * editor browses and reorganises a site — so on those routes there would be
- * no adapter, every CMS call would queue behind the readiness gate, and the
- * page would come up empty. That is not a control-panel edge case; it is
- * ordinary editing.
+ * It never stands down. This used to hand the adapter over to the preview
+ * iframe whenever the editor mounted one, and that handoff was the bug: the
+ * preview's lifetime is driven by what the editor is LOOKING at, so when it
+ * was replaced mid-edit every in-flight request was owed a reply by a window
+ * that no longer existed. They expired one by one at their timeouts, and an
+ * upload that never reached the CMS looked like a slow upload rather than a
+ * lost peer. Traced with the admin sitting still on .../edit while the preview
+ * reverted to view mode at the site root.
  *
- * Kept deliberately dumb: it renders an iframe at the frontend URL and
- * nothing else. Whatever the frontend registers at initBridge answers the
- * admin's requests, on the frontend's origin with the frontend's
- * credentials — unchanged from the visible-iframe case.
+ * Never handing over also removes what the handoff needed: no gate to close
+ * between hosts, no race about which iframe has announced, no cache thrown
+ * away on every navigation. Adapter caches now live as long as the session.
+ *
+ * It loads a MINIMAL proxy page, not the frontend's rendering page: no router,
+ * no DOM, nothing that can navigate it out from under the admin. See §8e of
+ * the design doc.
  */
 export default function AdapterHost() {
   const [isClient, setIsClient] = useState(false);
   useEffect(() => setIsClient(true), []);
 
-  // Which routes get a host is decided by the ROUTE, not by timing.
-  //
-  // Two timing-based attempts failed here, both racy in the same way: this
-  // component sits above the editor in App's tree, so anything based on "has
-  // the editor mounted yet" is a guess about render order, and a delay long
-  // enough to be safe on one route is too long on another. The route is known
-  // synchronously and cannot race.
-  //
-  // Deliberately narrow: it covers the contents view, which is the editing
-  // route that renders no iframe. It is not a general answer for every
-  // adapter-less route, and control panels still need their own delegation to
-  // the CMS's own admin.
-  const { pathname } = useLocation();
+  // Who, if anyone, is signed in to the CMS. Null adapter means it has not
+  // announced yet; an announced adapter with no user means sign-in is needed.
+  const [adapter, setAdapter] = useState(null);
+  useEffect(() => subscribeAdapter(setAdapter), []);
+  const needsSignIn = Boolean(adapter) && !adapter.user;
 
-  // Every route, until the editor takes over.
+  // Start the admin over once someone signs in.
   //
-  // Narrowing this to /contents and /add was wrong: a plain content view
-  // deadlocks the same way. App fetches the content over the bridge, no
-  // adapter has registered, the request queues, so the route never renders —
-  // and therefore never renders the iframe that would have hosted the
-  // adapter. On a full page load SSR hides this (it fetches directly), which
-  // is why it only appears on SPA navigation, exactly as an editor moving
-  // between pages would experience it.
-  const adapterlessRoute = true;
-
-  // Stand down once the editor owns an iframe, so the frontend is loaded once.
-  // The handoff gap this used to race against is now covered by the RPC's
-  // canSend(): requests queue while no transport exists.
-  const [editing, setEditing] = useState(isEditingIframeMounted());
-  useEffect(() => subscribeEditingIframe(setEditing), []);
-
-  const needsHost = adapterlessRoute && !editing;
-
-  // Close the gate whenever this host goes away.
+  // Everything the admin fetched while anonymous came back empty, and nothing
+  // would refetch it: the contents listing had already decided it had no rows.
+  // Since login precedes the editor there is no work to lose, and reloading
+  // after signing in is what a user expects anyway.
   //
-  // Leaving /contents for /add swaps WHICH iframe hosts the adapter. The gate
-  // would still say "ready" from this host's announcement while requests were
-  // already being sent to the editor's iframe, which has not registered yet —
-  // so they went to an iframe with no adapter and were simply dropped. Closing
-  // the gate makes them queue until the new host announces itself.
+  // Guarded by a ref rather than reloading whenever a user appears, so a normal
+  // authenticated start — credential already stored, no sign-in shown — does
+  // not reload at all.
+  const wasSignedOut = useRef(false);
   useEffect(() => {
-    if (!needsHost) return undefined;
-    return () => {
-      getBridgeRpc().markNotReady();
-    };
-  }, [needsHost]);
+    if (needsSignIn) {
+      wasSignedOut.current = true;
+      return;
+    }
+    if (wasSignedOut.current && adapter?.user) {
+      wasSignedOut.current = false;
+      window.location.reload();
+    }
+  }, [needsSignIn, adapter]);
+
+  // EVERY route, for the whole session. There is no condition here on purpose:
+  // the moment this frame's presence depends on what the editor is doing, the
+  // adapter's lifetime does too, and that is the coupling being removed.
 
   const frontendUrl =
     useSelector((state) => state.frontendPreviewUrl?.url) ||
@@ -92,44 +77,61 @@ export default function AdapterHost() {
   // Only meaningful in a bridge session, and only on the client: there is no
   // iframe at render time on the server.
   if (!config.settings.useBridgeBackend || !isClient || !frontendUrl) return null;
-  if (!needsHost) return null;
 
   const src = (() => {
     const url = new URL(frontendUrl, window.location.origin);
+    // The frontend's own parameters (which adapter, which CMS) are carried
+    // over; only the PATH changes, to the page that hosts an adapter and
+    // renders nothing.
+    url.pathname = '/hydra-proxy.html';
     if (token) url.searchParams.set('access_token', token);
-    // Explicitly NOT edit mode: this host renders nothing, and edit mode would
-    // start selection chrome and mutation observers for no document.
-    url.searchParams.set('_edit', 'false');
+    url.searchParams.delete('_edit');
     return url.toString();
   })();
 
-  // The frontend decides whether it is inside Hydra by reading window.name,
-  // which an iframe inherits from this attribute at creation. Without it the
-  // frontend concludes it is being viewed normally and skips bridge setup
-  // altogether — the iframe loads, and no adapter ever registers.
+  // The frontend reads window.name to learn it is inside Hydra and in WHICH
+  // role, and an iframe inherits the name from this attribute at creation.
   //
-  // "view" rather than "edit": this host renders nothing and must not put the
-  // frontend into edit mode, where it would set up selection chrome and
-  // mutation observers for a document nobody is editing.
+  // "proxy", not "view": the proxy page serves the adapter and renders
+  // nothing. A view-role frame would boot the whole frontend — router,
+  // rendering, navigation detection — every part of which can move it.
   const adminOrigin =
     typeof window !== 'undefined' ? window.location.origin : '';
 
+  // Hidden while it is only a transport; VISIBLE when it needs to sign in.
+  //
+  // The sign-in has to happen inside this frame: the credential must not pass
+  // through the admin, and only a click in this frame gives it the user
+  // activation to open the CMS's login window. Since login precedes the
+  // editor, there is nothing to overlay — the login screen simply IS this
+  // frame.
+  const hidden = {
+    position: 'absolute',
+    width: 1,
+    height: 1,
+    opacity: 0,
+    pointerEvents: 'none',
+    border: 0,
+  };
+  const visible = {
+    position: 'fixed',
+    inset: 0,
+    width: '100%',
+    height: '100%',
+    border: 0,
+    zIndex: 9999,
+    background: '#fff',
+  };
+
   return (
     <iframe
-      id="hydraAdapterHost"
-      title="Adapter host"
-      name={`hydra-view:${adminOrigin}`}
+      id="hydraProxyFrame"
+      title={needsSignIn ? 'Sign in' : 'Hydra CMS proxy'}
+      name={`hydra-proxy:${adminOrigin}`}
       src={src}
-      aria-hidden="true"
-      tabIndex={-1}
-      style={{
-        position: 'absolute',
-        width: 1,
-        height: 1,
-        opacity: 0,
-        pointerEvents: 'none',
-        border: 0,
-      }}
+      aria-hidden={needsSignIn ? undefined : 'true'}
+      tabIndex={needsSignIn ? undefined : -1}
+      style={needsSignIn ? visible : hidden}
     />
   );
 }

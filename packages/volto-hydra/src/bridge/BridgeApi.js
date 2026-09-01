@@ -34,24 +34,56 @@ export class BridgeApi {
     // Without this the first request decides the transport for good, before
     // the adapter has said a word.
     this.whenAdapterReady = whenAdapterReady ?? (() => Promise.resolve(null));
+    // Reads currently on their way, by intent+args. See the note in dispatch.
+    this.inFlightReads = new Map();
     METHODS.forEach((op) => {
       this[op] = (path, { params, data, headers } = {}) =>
         this.dispatch({ op, path, data, headers, params });
     });
   }
 
-  supportsPassthrough() {
-    const info = this.getAdapterInfo();
-    // Before an adapter announces itself we cannot know what it speaks. Treat
-    // that as passthrough: it is the status quo, and semantic routing here
-    // would silently change behaviour for every caller that races readiness.
-    if (!info?.capabilities) return true;
-    return info.capabilities.includes('http-passthrough');
+  supportsPassthrough(info) {
+    // Passthrough means "this CMS speaks Plone's REST dialect". Only an
+    // adapter that SAYS so gets it.
+    //
+    // This used to default to true when no adapter had announced, on the
+    // reasoning that passthrough was the status quo. Against WordPress that
+    // guess sent /@types, /@actions, /@breadcrumbs and the content GET itself
+    // down a passthrough the adapter does not implement: six 501s, a schema
+    // that never arrived, and an edit form with no fields — while the calls
+    // made after the announcement worked perfectly, which made it look
+    // intermittent rather than wrong.
+    return Boolean(info?.capabilities?.includes('http-passthrough'));
   }
 
   async dispatch({ op, path, data, headers, params }) {
+    // Volto renews its auth token on a timer and once at startup. In bridge
+    // mode the admin holds no CMS credentials at all — the adapter owns the
+    // session — so there is nothing to renew. Routed like any other POST this
+    // became content.create for a document called "@login-renew", which 404s
+    // on every CMS, and a failed renewal reads to the admin as a dead session.
+    //
+    // Answering with the token the admin already has is what a successful
+    // renewal returns, and leaves its state exactly as it was.
+    if (op === 'post' && String(path).split('?')[0].endsWith('@login-renew')) {
+      return { token: currentAuthToken() };
+    }
+
+    // Wait for the announcement, then read what is CURRENTLY known: the wait
+    // is about not deciding too early, and the answer is whatever the adapter
+    // has since told us.
     await this.whenAdapterReady();
-    if (this.supportsPassthrough()) {
+    const info = this.getAdapterInfo();
+    if (!info) {
+      // Nothing ever announced. Routing on a guess is what produced the 501
+      // storm above; say so instead, naming the call that could not be routed.
+      throw new Error(
+        `[hydra] No adapter announced itself, so ${op.toUpperCase()} ${path} ` +
+          `cannot be routed. The frontend either failed to load or never ` +
+          `registered an adapter.`,
+      );
+    }
+    if (this.supportsPassthrough(info)) {
       return this.rpc.request('http', { op, path, data, headers, params });
     }
 
@@ -71,12 +103,83 @@ export class BridgeApi {
       );
     }
 
-    const result = await this.rpc.request(routed.intent, routed.args);
-    return plonify(routed.intent, result, {
+    // JOIN a read that is already on its way, rather than asking again.
+    //
+    // Volto loads the same document from more than one place: the App-level
+    // loaders (which a bridge session runs on the CLIENT, having no server to
+    // run them on) and the route's own asyncConnect. In stock Volto the first
+    // set runs during SSR, so only one client fetch happens; here both do.
+    //
+    // The cost is not just the extra request. Edit re-dispatches getSchema on
+    // every content loading -> loaded transition, so a second, later fetch
+    // re-runs the schema and re-initialises the form — tearing down whatever
+    // is mounted inside it. On WordPress that landed while the object browser
+    // was open: it unmounted mid-navigation and its listing arrived to a
+    // component that no longer existed.
+    //
+    // Sharing one promise makes both callers settle together, so the store
+    // sees a single loading -> loaded transition and the schema runs once.
+    // Reads only: two writes are two intentions, never one.
+    const readKey =
+      op === 'get' ? `${routed.intent}:${JSON.stringify(routed.args)}` : null;
+    if (readKey && this.inFlightReads.has(readKey)) {
+      return this.inFlightReads.get(readKey);
+    }
+
+    let result;
+    const pending = this.rpc.request(routed.intent, routed.args);
+    try {
+      if (readKey) {
+        this.inFlightReads.set(
+          readKey,
+          pending.then((r) =>
+            plonify(routed.intent, r, {
+              path: fullPath,
+              endpoint: routed.endpoint,
+            }),
+          ),
+        );
+      }
+      result = await pending;
+    } catch (err) {
+      // A request that THROWS is invisible in the success log below, which is
+      // how a silently-empty panel looks identical to one nobody asked for.
+      if (typeof window !== 'undefined' && window.__HYDRA_AUDIT) {
+        // eslint-disable-next-line no-console
+        console.log(
+          `[AUDIT-INTENT] FAILED ${op.toUpperCase()} ${fullPath} -> ` +
+            `${routed.intent} ${JSON.stringify(routed.args)} | ${err?.code ?? ''} ${err?.message ?? err}`,
+        );
+      }
+      throw err;
+    } finally {
+      if (readKey) this.inFlightReads.delete(readKey);
+    }
+    const plonified = plonify(routed.intent, result, {
       path: fullPath,
       endpoint: routed.endpoint,
     });
+    if (typeof window !== 'undefined' && window.__HYDRA_AUDIT) {
+      const count = (v) => (Array.isArray(v?.items) ? v.items.length : '-');
+      // eslint-disable-next-line no-console
+      console.log(
+        `[AUDIT-INTENT] ${op.toUpperCase()} ${fullPath} -> ${routed.intent} ` +
+          `${JSON.stringify(routed.args)} | adapter items=${count(result)} ` +
+          `plonified items=${count(plonified)}`,
+      );
+    }
+    return plonified;
   }
+}
+
+/**
+ * The auth token the admin is currently carrying, straight from the cookie
+ * Volto stores it in. Undefined outside a browser, where nothing renews.
+ */
+function currentAuthToken() {
+  if (typeof document === 'undefined') return undefined;
+  const match = document.cookie.match(/(?:^|;\s*)auth_token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : undefined;
 }
 
 function withParams(path, params) {

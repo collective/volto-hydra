@@ -17,6 +17,28 @@ const DEFAULT_TIMEOUT_MS = 30_000;
  */
 const INTENT_TIMEOUTS = { 'asset.upload': 120_000 };
 
+/**
+ * Can this intent be re-sent safely if the peer disappears mid-flight?
+ *
+ * Reads can: asking twice costs a round trip and nothing else. Writes cannot,
+ * because the adapter may already have applied one.
+ */
+const WRITE_INTENTS = new Set([
+  'content.create',
+  'content.update',
+  'content.delete',
+  'content.move',
+  'content.order',
+  'asset.upload',
+  'state.transition',
+  'permissions.update',
+]);
+
+function isRetryableIntent(intent, args) {
+  if (intent === 'http') return (args?.op ?? 'get').toLowerCase() === 'get';
+  return !WRITE_INTENTS.has(intent);
+}
+
 export class BridgeRPC {
   /**
    * @param {Object} opts
@@ -73,6 +95,43 @@ export class BridgeRPC {
     for (const entry of queued) entry.dispatch();
   }
 
+  /**
+   * The window that owed us replies is gone; settle everything it owed.
+   *
+   * Every request here was already SENT, so a reply can only come from a
+   * window that no longer exists. Left alone they sat until their 30s timeout
+   * — which is indistinguishable from a slow CMS, and is why a preview reload
+   * mid-edit looked like WordPress being slow rather than the peer vanishing.
+   *
+   * A caller awaiting this bridge must always get an answer, the same way an
+   * HTTP caller gets either a response or a connection error. Never silence.
+   *
+   * Reads are re-sent to the new window: they are idempotent, and re-asking is
+   * exactly what a browser does when a connection drops mid-GET. Writes are
+   * NOT — the old adapter may have received and applied one, and re-sending
+   * would be this layer deciding on its own to do it twice. Those reject, so
+   * the caller finds out immediately instead of thirty seconds later.
+   */
+  peerReplaced(reason = 'the preview window was replaced') {
+    const orphaned = [...this.pending.entries()];
+    this.pending.clear();
+
+    for (const [requestId, entry] of orphaned) {
+      clearTimeout(entry.timer);
+      if (entry.retryable && this.canSend()) {
+        entry.redispatch();
+        continue;
+      }
+      const err = new Error(
+        `Bridge request '${entry.intent}' was lost: ${reason}.`,
+      );
+      err.code = 'PEER_GONE';
+      err.intent = entry.intent;
+      err.requestId = requestId;
+      entry.reject(err);
+    }
+  }
+
   /** Give up on an adapter that never arrived, and say so plainly. */
   failQueued() {
     const queued = this.queue;
@@ -91,6 +150,56 @@ export class BridgeRPC {
   /** The iframe is navigating; whatever was serving us is gone. */
   markNotReady() {
     if (this.gated) this.ready = false;
+  }
+
+  /**
+   * Abandon in-flight READS whose requester has gone away.
+   *
+   * The preview navigating away does not cost us the adapter any more — it
+   * lives in the proxy frame, which never navigates — but it does mean the
+   * document those reads were for is no longer on screen. Left alone they run
+   * to completion, get re-sent by peerReplaced, and resolve into components
+   * that have since unmounted: work whose only effect is to make a slow CMS
+   * slower, and the shape of bug where a listing arrives after the panel that
+   * asked for it has closed.
+   *
+   * Reads only. A write may already have been applied by the adapter, so
+   * abandoning one would leave the caller unable to find out what happened —
+   * the same reasoning that makes writes non-retryable in peerReplaced.
+   *
+   * Discarded callers are REJECTED, not silently dropped: anything awaiting
+   * this bridge gets an answer.
+   */
+  discardReads(reason = 'the requester navigated away') {
+    const settle = (entry, requestId) => {
+      const err = new Error(
+        `Bridge request '${entry.intent}' was discarded: ${reason}.`,
+      );
+      err.code = 'DISCARDED';
+      err.intent = entry.intent;
+      if (requestId) err.requestId = requestId;
+      entry.reject(err);
+    };
+
+    // Queued: never sent, so nothing to correlate — just drop them.
+    const stillWanted = [];
+    for (const entry of this.queue) {
+      if (entry.intent && !isRetryableIntent(entry.intent, entry.args)) {
+        stillWanted.push(entry);
+        continue;
+      }
+      settle(entry);
+    }
+    this.queue = stillWanted;
+
+    // In flight: forget the id, so a late reply is ignored by handleMessage
+    // rather than resolving something nobody is listening to.
+    for (const [requestId, entry] of [...this.pending.entries()]) {
+      if (!entry.retryable) continue; // a write; leave it alone
+      this.pending.delete(requestId);
+      clearTimeout(entry.timer);
+      settle(entry, requestId);
+    }
   }
 
   timeoutFor(intent) {
@@ -116,7 +225,15 @@ export class BridgeRPC {
           err.intent = intent;
           reject(err);
         }, ms);
-        this.pending.set(requestId, { resolve, reject, timer });
+        this.pending.set(requestId, {
+          resolve,
+          reject,
+          timer,
+          intent,
+          // Only reads may be re-sent; see peerReplaced().
+          retryable: isRetryableIntent(intent, args),
+          redispatch: dispatch,
+        });
         this.send({
           type: 'BACKEND_REQUEST',
           requestId,
@@ -129,7 +246,9 @@ export class BridgeRPC {
       if (this.dispatchable) {
         dispatch();
       } else {
-        this.queue.push({ dispatch, reject });
+        // intent/args ride along so a discard can tell a read from a write
+        // without having sent the request yet.
+        this.queue.push({ dispatch, reject, intent, args });
         if (!this.adapterTimer) {
           this.adapterTimer = setTimeout(
             () => this.failQueued(),
@@ -192,12 +311,13 @@ export class BridgeRPC {
     this.pending.delete(msg.requestId);
     clearTimeout(entry.timer);
     if (msg.ok) {
-      // Last-write-wins rather than per-request state: the only reader is the
-      // synchronous plonify() decision immediately after the await, and
-      // threading a wrapper through the Api shadow's five methods would buy
-      // nothing behaviourally. Promote to a { result, raw } tuple if a real
-      // concurrency bug ever shows up.
-      this.lastResponseWasRaw = msg.raw === true;
+      // No per-connection "was that raw?" flag here. It was last-write-wins
+      // shared state, so with several requests in flight the value a caller
+      // read could belong to somebody else's response. Nothing needs it:
+      // BridgeApi decides passthrough-vs-canonical from the adapter's
+      // CAPABILITIES, before the request is even sent. If a caller ever does
+      // need it, it belongs in the resolved value, correlated by requestId
+      // like everything else.
       entry.resolve(msg.result);
     } else {
       const e = msg.error ?? {};

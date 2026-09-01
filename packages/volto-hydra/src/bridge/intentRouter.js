@@ -21,6 +21,19 @@ function queryOf(path) {
   return new URLSearchParams(q || '');
 }
 
+/**
+ * A plain search string, from whatever Plone-flavoured text Volto sent.
+ *
+ * Only the trailing wildcard is removed: it is what the contents filter always
+ * appends, and it is unambiguous. Anything more elaborate — field:value, AND/OR
+ * — is left alone rather than half-translated, so an adapter that cannot honour
+ * it fails visibly instead of quietly searching for the wrong thing.
+ */
+function normaliseSearchText(raw) {
+  if (!raw) return undefined;
+  return raw.replace(/\*+$/, '') || undefined;
+}
+
 /** Volto addresses content by path; everything after the last @foo is the verb. */
 function splitEndpoint(path) {
   const clean = stripQuery(path);
@@ -64,7 +77,21 @@ export function routeToIntent({ op, path, data }) {
 
   // Plain content operations: no @endpoint at all.
   if (!endpoint) {
-    if (op === 'get') return { intent: 'content.get', args: { path: contextPath } };
+    if (op === 'get') {
+      // Volto's api middleware serialises expanders as ?expand=a,b,c. Passed
+      // through verbatim rather than filtered to a known list: an expansion no
+      // adapter implements must fail loudly as UNKNOWN_EXPANSION, because the
+      // component that asked for it has already skipped its own fetch and
+      // would otherwise just never receive the data.
+      const expand = (params.get('expand') ?? '')
+        .split(',')
+        .map((name) => name.trim())
+        .filter(Boolean);
+      return {
+        intent: 'content.get',
+        args: { path: contextPath, ...(expand.length ? { expand } : {}) },
+      };
+    }
     if (op === 'patch') {
       const { blocks, blocks_layout: blocksLayout, ...fields } = data ?? {};
       return {
@@ -123,7 +150,13 @@ export function routeToIntent({ op, path, data }) {
     case 'types':
       return rest.length
         ? { intent: 'types.getSchema', args: { type: decodeURIComponent(rest[0]) } }
-        : { intent: 'types.list', args: {} };
+        : // The PATH matters: Volto asks /news/@types to mean "what can be
+          // created HERE", and dropping it left the adapter answering with
+          // every registered type. On WordPress the first of those was `post`,
+          // which is non-hierarchical and cannot take a parent at all, so the
+          // journey's add step created something that could never appear under
+          // the folder it was added to.
+          { intent: 'types.list', args: { path: contextPath } };
 
     case 'querystring':
       return { intent: 'querystring.getIndexes', args: {} };
@@ -147,14 +180,42 @@ export function routeToIntent({ op, path, data }) {
     case 'search': {
       // path.depth=1 is a folder listing, not a search — the contents view and
       // the object browser both use it that way.
-      if (params.get('path.depth') === '1') {
-        return { intent: 'tree.list', args: { parent: contextPath } };
+      // WHICH folder is named in path.query, not in the URL. Volto's object
+      // browser asks /@search?path.query=/news&path.depth=1 from whatever
+      // route it happens to be on, so reading only the URL context listed the
+      // SITE ROOT no matter where the editor navigated: the breadcrumb said
+      // /news while the items were the root's children, and picking a link
+      // target was impossible.
+      const scope = params.get('path.query') || contextPath;
+
+      const query = normaliseSearchText(params.get('SearchableText'));
+
+      // A folder listing is tree.list — but only while it is UNFILTERED.
+      //
+      // The contents view always sends path.depth=1, including when the editor
+      // has typed in its filter box, so routing on depth alone threw the search
+      // term away and returned the whole folder. Typing in the filter narrowed
+      // nothing, on every CMS, and looked like a broken adapter rather than a
+      // dropped parameter.
+      if (params.get('path.depth') === '1' && !query) {
+        return { intent: 'tree.list', args: { parent: scope } };
       }
       return {
         intent: 'search',
         args: {
-          query: params.get('SearchableText') ?? undefined,
-          path: contextPath === '/' ? undefined : contextPath,
+          // Stripped of Plone's trailing wildcard.
+          //
+          // The contents view's filter box sends SearchableText as
+          // `${filter}*` — catalog syntax, which Plone's own passthrough is
+          // welcome to, but which means nothing to anyone else. Passed through
+          // verbatim it reached the adapters as a literal asterisk: filtering
+          // the listing for "first" searched for "first*", matched nothing on
+          // WordPress and Drupal, and the listing silently did not narrow.
+          //
+          // Translating it here is exactly this router's job — turning
+          // Plone-shaped REST into a canonical intent.
+          query,
+          path: scope === '/' ? undefined : scope,
           limit: params.get('b_size') ? Number(params.get('b_size')) : undefined,
         },
       };

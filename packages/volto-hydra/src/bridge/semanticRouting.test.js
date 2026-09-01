@@ -179,9 +179,24 @@ describe('BridgeApi transport selection', () => {
     expect(rpc.request).not.toHaveBeenCalled();
   });
 
-  it('treats an unannounced adapter as passthrough', async () => {
+  /**
+   * This used to assert the opposite — that an unannounced adapter was treated
+   * as passthrough, on the reasoning that passthrough was the status quo.
+   *
+   * It is not a safe default, it is a guess about which CMS is connected. On
+   * WordPress, whose frontend takes longer to register than the announce
+   * timeout allowed, that guess sent the content GET and /@types, /@actions
+   * and /@breadcrumbs down a passthrough the adapter does not implement. Six
+   * 501s, no schema, and an edit form with no fields — while every call made
+   * after the announcement worked, which made it read as flakiness.
+   *
+   * Refusing to route is worse for nobody and names the actual problem.
+   */
+  it('refuses to route rather than guess at an unannounced adapter', async () => {
     const rpc = { request: vi.fn().mockResolvedValue({}) };
-    await new BridgeApi(rpc, { getAdapterInfo: () => null }).get('/anything');
-    expect(rpc.request).toHaveBeenCalledWith('http', expect.objectContaining({ op: 'get' }));
+    await expect(
+      new BridgeApi(rpc, { getAdapterInfo: () => null }).get('/anything'),
+    ).rejects.toThrow(/No adapter announced itself/);
+    expect(rpc.request).not.toHaveBeenCalled();
   });
 });

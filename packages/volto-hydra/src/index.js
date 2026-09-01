@@ -87,17 +87,40 @@ const applyConfig = (config) => {
     process.env.RAZZLE_USE_BRIDGE_BACKEND === 'true';
 
   if (config.settings.useBridgeBackend) {
-    // Volto's apiExpanders declare that breadcrumbs, actions, types, navroot
-    // and navigation arrive embedded in the content response, so it skips
-    // fetching them and reads content['@components']. That is a Plone REST
-    // optimisation — one request instead of five — and no other CMS has an
-    // equivalent. Left on, the toolbar waits forever for types that were never
-    // requested, which is why the add menu came up empty on Drupal.
+    // Expanders are decided from the adapter's CAPABILITIES, not statically
+    // here: at config time no adapter has announced itself yet, and baking in
+    // a default that never gets revisited is exactly how every request once
+    // ended up on the passthrough regardless of which CMS was connected.
     //
-    // The canonical contract has a distinct intent for each of these, so the
-    // adapters answer them individually. Five round trips over an in-page
-    // postMessage bridge cost nothing like five HTTP requests.
+    // Off until the frontend says it can expand natively — see
+    // bridge/expanders.js for why that gate exists and what it measured.
     config.settings.apiExpanders = [];
+
+    // Guarantee the server can resolve a UI language without asking a CMS.
+    //
+    // server.jsx picks the render language from
+    //   cookie || state.site.data['plone.default_language'] || accept-language
+    // and in a bridge session the middle term is always absent — site info is
+    // a CMS read the server cannot make. A request that also carries no
+    // Accept-Language (health checks, curl, monitors) therefore left the
+    // language undefined, and toReactIntlLang() called .includes() on it. That
+    // throw lands in server.jsx's .catch(errorHandler), so the response was an
+    // ERROR PAGE with an error status rather than the admin.
+    //
+    // Naming the language the admin is built with is not a fallback for CMS
+    // data: it is a UI preference the CMS never owned in the first place.
+    const language =
+      config.settings.supportedLanguages?.[0] ?? 'en';
+    const ensureLanguage = (req, res, next) => {
+      if (!req.headers['accept-language']) {
+        req.headers['accept-language'] = language;
+      }
+      next();
+    };
+    config.settings.expressMiddleware = [
+      ...(config.settings.expressMiddleware ?? []),
+      ensureLanguage,
+    ];
   }
 
   // Inject the Volto-config-derived values the pure block-path / schema utils
@@ -829,15 +852,29 @@ const applyConfig = (config) => {
   // Initial call to set the blocks based on the initial state
   updateAllowedBlocks();
 
-  // Initial block for Document content type
+  // What a new document starts with.
+  //
+  // Keyed by CONTENT TYPE, and every key here used to be a Plone type name, so
+  // a new document on any other CMS started with no blocks at all — both
+  // WordPress and Drupal report their page type as 'page'. The admin is meant
+  // to be CMS-agnostic, so the same starting blocks are registered for the
+  // page types the other adapters report.
+  //
+  // Still a gap: this is a list of known type names rather than a default for
+  // any type, so a CMS whose page type is called something else is back to
+  // starting empty. Fixing that properly means a fallback in Volto's
+  // initialBlocks lookup, which is core behaviour rather than config.
+  const INITIAL_BLOCKS = [
+    { '@type': 'title' },
+    {
+      '@type': 'slate',
+      value: [{ type: 'p', children: [{ text: '' }] }],
+    },
+  ];
   config.blocks.initialBlocks = {
-    Document: [
-      { '@type': 'title' },
-      {
-        '@type': 'slate',
-        value: [{ type: 'p', children: [{ text: '' }] }],
-      },
-    ],
+    Document: INITIAL_BLOCKS,
+    page: INITIAL_BLOCKS,
+    post: INITIAL_BLOCKS,
   };
 
   // Generic block actions registry

@@ -84,7 +84,7 @@ test('rejects with a structured error when ok is false', async () => {
   });
 });
 
-test('exposes the raw flag alongside the result', async () => {
+test('resolves a passthrough response with its result untouched', async () => {
   const sent = [];
   const rpc = new BridgeRPC({ send: (m) => sent.push(m) });
   const promise = rpc.request('http', { op: 'get', path: '/news' });
@@ -96,8 +96,11 @@ test('exposes the raw flag alongside the result', async () => {
     result: { '@id': 'http://x/news' },
   });
   const res = await promise;
+  // The payload is handed back exactly as the adapter sent it. There is
+  // deliberately no side-channel flag saying "that one was raw": see
+  // handleMessage.
   expect(res).toEqual({ '@id': 'http://x/news' });
-  expect(rpc.lastResponseWasRaw).toBe(true);
+  expect(rpc.lastResponseWasRaw).toBeUndefined();
 });
 
 const fakeAdapter = {
@@ -322,5 +325,202 @@ describe('readiness means an adapter AND somewhere to send', () => {
     rpc.markReady();
     expect(sent).toHaveLength(0);
     expect(rpc.queue.length).toBe(1);
+  });
+});
+
+describe('a replaced peer', () => {
+  const clientFor = (canSend = () => true) => {
+    const sent = [];
+    const rpc = new BridgeRPC({ send: (m) => sent.push(m), canSend });
+    return { rpc, sent };
+  };
+
+  it('rejects an in-flight WRITE instead of letting it expire', async () => {
+    const { rpc } = clientFor();
+    const inFlight = rpc.request('content.update', { path: '/news' });
+
+    rpc.peerReplaced();
+
+    // A write may already have been applied by the old adapter, so re-sending
+    // it would be this layer deciding on its own to do it twice.
+    await expect(inFlight).rejects.toMatchObject({ code: 'PEER_GONE' });
+  });
+
+  it('re-sends an in-flight READ to the new window', async () => {
+    const { rpc, sent } = clientFor();
+    const inFlight = rpc.request('content.get', { path: '/news' });
+    expect(sent).toHaveLength(1);
+
+    rpc.peerReplaced();
+
+    // Idempotent, so asking again is what a browser does when a connection
+    // drops mid-GET — and the caller never learns anything went wrong.
+    expect(sent).toHaveLength(2);
+    expect(sent[1].intent).toBe('content.get');
+
+    rpc.handleMessage({
+      type: 'BACKEND_RESPONSE',
+      requestId: sent[1].requestId,
+      ok: true,
+      result: { path: '/news' },
+    });
+    await expect(inFlight).resolves.toMatchObject({ path: '/news' });
+  });
+
+  it('rejects a read when there is nowhere to re-send it', async () => {
+    let alive = true;
+    const { rpc } = clientFor(() => alive);
+    const inFlight = rpc.request('content.get', { path: '/news' });
+
+    alive = false;
+    rpc.peerReplaced();
+
+    await expect(inFlight).rejects.toMatchObject({ code: 'PEER_GONE' });
+  });
+});
+
+/**
+ * Concurrency: the admin has several reads in flight at once — the object
+ * browser's listing, the type schema, breadcrumbs — and against a slow CMS
+ * they finish in a different order than they were sent. Correlation is by
+ * requestId, so this must hold regardless of arrival order; resolving "the
+ * oldest pending" would hand the object browser the schema's payload.
+ */
+test('settles concurrent requests by id, whatever order they arrive in', async () => {
+  const sent = [];
+  const rpc = new BridgeRPC({ send: (msg) => sent.push(msg) });
+
+  const listing = rpc.request('tree.list', { parent: '/news' });
+  const schema = rpc.request('types.getSchema', { type: 'page' });
+  const crumbs = rpc.request('breadcrumbs.get', { path: '/news' });
+
+  expect(sent).toHaveLength(3);
+  const ids = sent.map((m) => m.requestId);
+  expect(new Set(ids).size).toBe(3); // ids are unique, or nothing else matters
+
+  // Reverse order: last sent settles first.
+  rpc.handleMessage({
+    type: 'BACKEND_RESPONSE',
+    requestId: ids[2],
+    ok: true,
+    result: { items: ['crumb'] },
+  });
+  rpc.handleMessage({
+    type: 'BACKEND_RESPONSE',
+    requestId: ids[0],
+    ok: true,
+    result: { items: ['first-post', 'draft-post'] },
+  });
+  rpc.handleMessage({
+    type: 'BACKEND_RESPONSE',
+    requestId: ids[1],
+    ok: true,
+    result: { properties: { title: {} } },
+  });
+
+  await expect(listing).resolves.toEqual({
+    items: ['first-post', 'draft-post'],
+  });
+  await expect(schema).resolves.toEqual({ properties: { title: {} } });
+  await expect(crumbs).resolves.toEqual({ items: ['crumb'] });
+});
+
+/**
+ * A failure among concurrent requests settles only its own caller. One CMS
+ * call 401ing must not reject the listing that was in flight beside it.
+ */
+test('an error settles only the request it belongs to', async () => {
+  const sent = [];
+  const rpc = new BridgeRPC({ send: (msg) => sent.push(msg) });
+
+  const listing = rpc.request('tree.list', { parent: '/news' });
+  const actions = rpc.request('state.get', { path: '/news' });
+  const ids = sent.map((m) => m.requestId);
+
+  rpc.handleMessage({
+    type: 'BACKEND_RESPONSE',
+    requestId: ids[1],
+    ok: false,
+    error: { code: 'UNAUTHORIZED', message: 'Unauthorized' },
+  });
+  rpc.handleMessage({
+    type: 'BACKEND_RESPONSE',
+    requestId: ids[0],
+    ok: true,
+    result: { items: ['first-post'] },
+  });
+
+  await expect(actions).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+  await expect(listing).resolves.toEqual({ items: ['first-post'] });
+});
+
+describe('discarding abandoned work', () => {
+  test('rejects in-flight reads and ignores their late replies', async () => {
+    const sent = [];
+    const rpc = new BridgeRPC({ send: (m) => sent.push(m) });
+
+    const listing = rpc.request('tree.list', { parent: '/news' });
+    rpc.discardReads('the preview navigated away');
+
+    await expect(listing).rejects.toMatchObject({ code: 'DISCARDED' });
+
+    // The adapter still answers; nobody is listening, so it must be ignored
+    // rather than resolving a promise that has already been settled.
+    const handled = rpc.handleMessage({
+      type: 'BACKEND_RESPONSE',
+      requestId: sent[0].requestId,
+      ok: true,
+      result: { items: ['first-post'] },
+    });
+    expect(handled).toBe(false);
+  });
+
+  test('leaves writes alone — the adapter may already have applied one', async () => {
+    const sent = [];
+    const rpc = new BridgeRPC({ send: (m) => sent.push(m) });
+
+    const save = rpc.request('content.update', { path: '/news', data: {} });
+    const listing = rpc.request('tree.list', { parent: '/news' });
+
+    rpc.discardReads();
+
+    await expect(listing).rejects.toMatchObject({ code: 'DISCARDED' });
+
+    rpc.handleMessage({
+      type: 'BACKEND_RESPONSE',
+      requestId: sent[0].requestId,
+      ok: true,
+      result: { saved: true },
+    });
+    await expect(save).resolves.toEqual({ saved: true });
+  });
+
+  test('drops queued reads that were never sent', async () => {
+    const sent = [];
+    const rpc = new BridgeRPC({ send: (m) => sent.push(m), gated: true });
+
+    const listing = rpc.request('tree.list', { parent: '/news' });
+    expect(sent).toHaveLength(0); // still gated: nothing went out
+
+    rpc.discardReads();
+    await expect(listing).rejects.toMatchObject({ code: 'DISCARDED' });
+
+    // Releasing the gate must not resurrect it.
+    rpc.markReady();
+    expect(sent).toHaveLength(0);
+  });
+
+  test('a discarded read is not re-sent when the peer is replaced', async () => {
+    const sent = [];
+    const rpc = new BridgeRPC({ send: (m) => sent.push(m) });
+
+    const listing = rpc.request('tree.list', { parent: '/news' });
+    expect(sent).toHaveLength(1);
+
+    rpc.discardReads();
+    await expect(listing).rejects.toMatchObject({ code: 'DISCARDED' });
+
+    rpc.peerReplaced();
+    expect(sent).toHaveLength(1); // no redispatch
   });
 });
