@@ -866,6 +866,38 @@ export async function expandListingBlocks(inputItems, options = {}) {
 // ploneFetchItems (+ hierarchicalSortByPosition helper)
 ////////////////////////////////////////////////////////////////////////////////
 
+// A page can ask the SAME question many times: a doc page showing eleven filter
+// arrangements over one query, a layout repeating a list. Each caller is its own
+// block with its own ids, so nothing upstream can tell they match — only the
+// request can, and here it is built.
+//
+// Identical requests IN FLIGHT AT THE SAME MOMENT share one response. In flight
+// only: the next render asks again, so an edited query, a new page or fresh
+// content is never served from a stale entry.
+//
+// The key includes the Authorization header, not just the body. Today the token
+// is read from the browser's session (getAccessToken), so a server process is
+// always anonymous and every caller there would get the same rows anyway — this
+// is defence for the day that changes: two identical queries carrying different
+// credentials can legitimately return different rows, and sharing them would
+// hand one person another's results. It is not covered by a test, because the
+// test environment's storage is inert and the token cannot be driven from one.
+const inFlightSearches = new Map();
+
+async function fetchQuerystringSearch(url, headers, payload) {
+  const key = `${url}\n${headers.Authorization || ''}\n${payload}`;
+  const running = inFlightSearches.get(key);
+  if (running) return running;
+  const started = (async () => {
+    const res = await fetch(url, { method: 'POST', headers, body: payload });
+    return res.json();
+  })().finally(() => {
+    inFlightSearches.delete(key);
+  });
+  inFlightSearches.set(key, started);
+  return started;
+}
+
 /**
  * Create a fetchItems callback for Plone's @querystring-search endpoint.
  *
@@ -898,12 +930,9 @@ export function ploneFetchItems({
     headers['Content-Type'] = 'application/json';
 
     const path = `${contextPath}/++api++/@querystring-search`;
-    const res = await fetch(`${apiUrl}${path}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    });
-    const response = await res.json();
+    const url = `${apiUrl}${path}`;
+    const payload = JSON.stringify(body);
+    const response = await fetchQuerystringSearch(url, headers, payload);
 
     const rawItems = response.items || [];
     // Normalize: package image_field + image_scales into a self-contained image
