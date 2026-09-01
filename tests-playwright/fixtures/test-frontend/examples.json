@@ -403,7 +403,12 @@
         "listing": [
           "listing-1"
         ]
-      }
+      },
+      "sortOn": "effective",
+      "sortOnOptions": [
+        "effective",
+        "sortable_title"
+      ]
     },
     "ex-form": {
       "@type": "form",
