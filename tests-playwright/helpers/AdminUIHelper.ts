@@ -3372,20 +3372,18 @@ export class AdminUIHelper {
     if (await control.isVisible()) {
       await control.scrollIntoViewIfNeeded();
       await control.click();
-      const search = fieldWrapper.locator('input').first();
-      await search.fill(value);
-      // Keyboard, not a click on the option: react-select renders its menu in a
-      // portal and closes it on the mousedown that precedes the click, so a
-      // click can land on nothing and leave the field on its placeholder —
-      // silently, which is the failure this helper exists to stop.
-      const option = this.page
-        .locator('.react-select__option', { hasText: value })
-        .first();
-      await option.waitFor({ state: 'visible', timeout: 10000 });
-      await this.page.keyboard.press('Enter');
-      await this.page.evaluate(() =>
-        (document.activeElement as HTMLElement | null)?.blur(),
-      );
+      // Wait for the MENU before reaching for an option: react-select renders it
+      // in a portal, so an option located before the menu exists resolves to
+      // nothing and the click lands on the page. Same sequence as
+      // block-sync.spec.ts, which is the one gesture in this repo known to
+      // commit.
+      const menu = this.page.locator('.react-select__menu');
+      await menu.waitFor({ state: 'visible', timeout: 10000 });
+      const option = menu.locator('.react-select__option', { hasText: value });
+      await option.first().click();
+      // Deliberately NO blur afterwards. Blurring the control once the value is
+      // chosen loses it — the field reads back empty a second later, which is
+      // what made a dropdown look impossible to set from a test.
       // It took, or this throws. A dropdown that silently keeps its old value
       // is the thing that makes a spec assert against a sidebar it never
       // changed.
