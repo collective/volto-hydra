@@ -120,7 +120,9 @@ describe('native actions', () => {
         expect(['window', 'iframe']).toContain(action.target);
       }
       if (action.category !== undefined) {
-        expect(['object', 'site', 'user']).toContain(action.category);
+        expect(['object', 'object-buttons', 'site', 'user']).toContain(
+          action.category,
+        );
       }
     }
   });

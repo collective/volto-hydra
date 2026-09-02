@@ -276,7 +276,17 @@ export interface PermissionsAndState {
      */
     target?: 'window' | 'iframe';
     /** Which toolbar grouping it belongs to. Defaults to 'object'. */
-    category?: 'object' | 'site' | 'user';
+    /**
+     * Which of Volto's toolbar groups this belongs to.
+     *
+     * `object-buttons` is where Volto looks for the entries it treats as
+     * optional per site rather than per user — URL aliases and content rules.
+     * They are off unless something declares them, which is the right default:
+     * Plone has both, Drupal has aliases but no rules, and vanilla WordPress
+     * has neither. A CMS turns on what it actually has instead of the admin
+     * guessing from a capability that would have to mean two things.
+     */
+    category?: 'object' | 'object-buttons' | 'site' | 'user';
   }>;
 }
 

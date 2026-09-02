@@ -134,17 +134,23 @@ function actionsToPlone(pas) {
   // Keys are Plone's own category names, because Volto reads them directly
   // (state.actions.actions.site_actions). The canonical `site` an adapter
   // declares maps onto site_actions here.
+  // Keys are Plone's own category names, because Volto reads them directly
+  // (state.actions.actions.site_actions, .object_buttons). The canonical names
+  // an adapter declares map onto them here.
   const categories = {
     object,
     object_buttons: [],
     user: [],
     site_actions: [],
   };
+  const CATEGORY_NAMES = {
+    site: 'site_actions',
+    'object-buttons': 'object_buttons',
+  };
 
   for (const declared of pas?.actions ?? []) {
     const requested = declared.category ?? 'object';
-    const category =
-      categories[requested === 'site' ? 'site_actions' : requested] ?? object;
+    const category = categories[CATEGORY_NAMES[requested] ?? requested] ?? object;
     const existing = category.findIndex((a) => a.id === declared.id);
 
     if (declared.permitted === false) {

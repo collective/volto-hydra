@@ -787,9 +787,16 @@ function buildActionsComponent(cleanPath, baseUrl, sessionId) {
     ],
     // Where Volto reads whether a working copy is possible, and now where the
     // adapter reads it too. iterate_checkin only appears on a copy.
-    object_buttons: workingCopyOf(cleanPath, sessionId)
-      ? [{ id: 'iterate_checkin', title: 'Check in' }]
-      : [{ id: 'iterate_checkout', title: 'Check out' }],
+    object_buttons: [
+      // Real Plone lists these for a Manager, and Volto gates its URL-alias
+      // and content-rules entries on exactly these ids. Absent, those entries
+      // hide — which is what happens on a CMS that has neither.
+      { id: 'redirection', title: 'URL Management' },
+      { id: 'contentrules', title: 'Rules' },
+      ...(workingCopyOf(cleanPath, sessionId)
+        ? [{ id: 'iterate_checkin', title: 'Check in' }]
+        : [{ id: 'iterate_checkout', title: 'Check out' }]),
+    ],
     portal_tabs: [],
     site_actions: [],
     user: [],
