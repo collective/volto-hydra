@@ -1,4 +1,3 @@
-import { Plug } from '@plone/volto/components/manage/Pluggable';
 import StateMenu from '../../../../../components/Toolbar/StateMenu';
 
 /**
@@ -20,28 +19,14 @@ import StateMenu from '../../../../../components/Toolbar/StateMenu';
  *    More menu inherits that split, carrying `state`, `sharing` and four
  *    working-copy buttons as unrelated entries.
  *
- * So this withdraws the other two rather than sit beside them. `setPlug`
- * replaces by id (Pluggable/index.js), and a plug registered later wins: More's
- * own plugs register when More mounts, and this renders through the pluggable
- * it registered, so this effect runs afterwards. That is why it can withdraw
- * them from here instead of shadowing all 450 lines of More.jsx — the component
- * that absorbs the entries is the one that withholds them, and they cannot
- * drift apart.
+ * The old `sharing` and working-copy entries are gone from the menu itself —
+ * see the More.jsx shadow, which had to exist anyway because Volto's crashes
+ * when content is still loading.
  *
  * Renders nothing when the adapter does not advertise `state`, matching what
  * Volto does for content with no workflow — in which case the withdrawn entries
  * would be the only way to reach either, so they stay.
  */
-const Workflow = ({ pathname }) => (
-  <>
-    <StateMenu pathname={pathname} />
-    <Plug pluggable="toolbar-more-menu-list" id="sharing">
-      {() => null}
-    </Plug>
-    <Plug pluggable="toolbar-more-manage-content" id="workingcopy">
-      {() => null}
-    </Plug>
-  </>
-);
+const Workflow = ({ pathname }) => <StateMenu pathname={pathname} />;
 
 export default Workflow;

@@ -4,7 +4,7 @@ import { useHistory } from 'react-router-dom';
 import InlineForm from '@plone/volto/components/manage/Form/InlineForm';
 import { getContent } from '@plone/volto/actions';
 import { useContentState } from './useContentState';
-import { menuEntriesFrom, ACCESS_ID } from './stateMenu';
+import { menuEntriesFrom, ACCESS_ID } from './menuEntries';
 
 /**
  * Status and access, in one list.

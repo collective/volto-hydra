@@ -43,8 +43,14 @@ export function useContentState(path) {
   }, [path]);
 
   const loadForms = useCallback(async () => {
-    if (!path || !hasState()) return;
+    if (!path) return;
+    // Readiness FIRST, capability second. Reversed, this asked whether the
+    // adapter does `state` before the adapter had said anything at all, so it
+    // was always false on mount and the access entry never loaded — while
+    // state.get, which awaits first, worked. The menu then showed transitions
+    // and silently nothing else.
     await whenAdapterReady();
+    if (!hasState()) return;
     try {
       setForms(await getBridgeRpc().request('state.getForms', { path }));
     } catch (err) {

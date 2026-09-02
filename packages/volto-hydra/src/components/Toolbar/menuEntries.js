@@ -1,6 +1,12 @@
 /**
- * The state menu: one list of things that change what this document is and who
- * can reach it.
+ * The state menu's entries: one list of things that change what this document
+ * is and who can reach it.
+ *
+ * Named to not collide with StateMenu.jsx. It was `stateMenu.js`, which differs
+ * from the component only by case — fine on Linux, and on macOS webpack
+ * resolved `./StateMenu` to THIS file, because .js is tried before .jsx. The
+ * component then had no default export and the build broke in a way that named
+ * neither file as the problem.
  *
  * Plone keeps workflow, sharing and working copies in three separate screens.
  * They answer one question — who can do what, when — so they are one list here,

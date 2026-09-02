@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { menuEntriesFrom } from './stateMenu';
+import { menuEntriesFrom } from './menuEntries';
 
 const forms = {
   publish: { schema: { fieldsets: [], properties: { comment: {} }, required: [] }, data: {} },
