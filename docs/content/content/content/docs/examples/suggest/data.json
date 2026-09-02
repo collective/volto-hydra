@@ -74,6 +74,26 @@
           "code": ""
         }
       ]
+    },
+    "suggest-live-heading": {
+      "@type": "slate",
+      "plaintext": "Try it",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Try it"
+            }
+          ]
+        }
+      ]
+    },
+    "suggest-live-1": {
+      "@type": "suggest",
+      "label": "Topic",
+      "suggestFrom": "plone.app.vocabularies.Keywords",
+      "value": ""
     }
   },
   "blocks_layout": {
@@ -82,7 +102,9 @@
       "ref-suggest-description",
       "ref-suggest-schema",
       "ref-suggest-json-data",
-      "ref-suggest-rendering"
+      "ref-suggest-rendering",
+      "suggest-live-heading",
+      "suggest-live-1"
     ]
   },
   "contributors": [],
