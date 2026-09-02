@@ -40,9 +40,7 @@ import FrontendSwitcherPlug from './components/Toolbar/FrontendSwitcherPlug';
 import SidebarToggleToolbarPlug from './components/Toolbar/SidebarToggleToolbarPlug';
 import FrontendSwitcherPanel from './components/Toolbar/FrontendSwitcherPanel';
 import NativeActionsPlug from './components/Toolbar/NativeActionsPlug';
-import StatePlug from './components/Toolbar/StatePlug';
 import NativeActionsPanel from './components/Toolbar/NativeActionsPanel';
-import StatePanel from './components/Toolbar/StatePanel';
 import MobileSubmenuClose from './components/Toolbar/MobileSubmenuClose';
 import { getIframeUrlCookieName } from './utils/cookieNames';
 import getSavedURLs, { getURlsFromEnv } from './utils/getSavedURLs';
@@ -220,12 +218,6 @@ const applyConfig = (config) => {
       component: NativeActionsPanel,
       wrapper: null,
     },
-    // Status and access in one list. Hidden when the adapter does not do
-    // state at all, rather than shown empty.
-    contentState: {
-      component: StatePanel,
-      wrapper: null,
-    },
   };
 
   // Register the toolbar plug as appExtras so Plug mounts in the App tree
@@ -233,7 +225,6 @@ const applyConfig = (config) => {
     ...(config.settings.appExtras || []),
     { match: '/', component: FrontendSwitcherPlug },
     { match: '/', component: NativeActionsPlug },
-    { match: '/', component: StatePlug },
     { match: '/', component: SidebarToggleToolbarPlug },
     { match: '/', component: MobileSubmenuClose },
   ];
