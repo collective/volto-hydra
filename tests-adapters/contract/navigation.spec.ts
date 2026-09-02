@@ -69,6 +69,45 @@ describe('navigation.get', () => {
     expect(doc.path).toBe(victim.path);
   });
 
+  it('a document kept out of the menu is still findable and editable', async () => {
+    if (!advertises('navigation-exclusion')) return;
+
+    const before: any = await target.adapter.dispatch('navigation.get', { path: '/' });
+    const victim = before.items[0];
+    expect(victim).toBeDefined();
+
+    const doc: any = await target.adapter.dispatch('content.get', {
+      path: victim.path,
+    });
+
+    await target.adapter.dispatch('navigation.setExcluded', {
+      path: victim.path,
+      excluded: true,
+    });
+
+    // Out of the menu is not out of the CMS. An editor has to be able to reach
+    // it — otherwise "hide from navigation" is a one-way door, and the only way
+    // back is whatever native screen we were trying not to send them to.
+    if (advertises('search-fulltext')) {
+      const found: any = await target.adapter.dispatch('search', {
+        query: doc.title,
+      });
+      expect(found.items.map((i: any) => i.path)).toContain(victim.path);
+    }
+
+    // And still writable, which is the half that would fail quietly: on a CMS
+    // where the menu IS the hierarchy, a document with no link can lose the
+    // place edits are addressed to.
+    await target.adapter.dispatch('content.update', {
+      path: victim.path,
+      data: { title: `${doc.title} (edited while hidden)` },
+    });
+    const after: any = await target.adapter.dispatch('content.get', {
+      path: victim.path,
+    });
+    expect(after.title).toBe(`${doc.title} (edited while hidden)`);
+  });
+
   it('can call a document something else in the menu', async () => {
     if (!advertises('navigation-title')) return;
 
