@@ -358,7 +358,14 @@ export class PloneAdapter extends BaseAdapter {
 
     // Changing who can reach this without moving it. A transition in the menu
     // like any other; its target state is the one it is already in.
-    forms.access = await this.accessForm(path);
+    //
+    // Gated on the same flag the UI gates the control on. Offering the form
+    // while `effective.canShare` says no is a menu entry that argues with
+    // itself, and the user finds out which half was right by clicking it.
+    const { effective } = await this.dispatch('state.get', { path });
+    if (effective.canShare) {
+      forms.access = await this.accessForm(path);
+    }
     return forms;
   }
 

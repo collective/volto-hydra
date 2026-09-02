@@ -779,6 +779,11 @@ function buildActionsComponent(cleanPath, baseUrl, sessionId) {
       { url: fullUrl, icon: '', id: 'view', title: 'View' },
       { url: `${fullUrl}/edit`, icon: '', id: 'edit', title: 'Edit' },
       { id: 'folderContents', title: 'Contents' },
+      // Real Plone lists these for anyone who may use them; the session here is
+      // a Manager. Their absence made effective.canDelete/canShare false while
+      // the adapter was handing back a sharing form.
+      { url: `${fullUrl}/delete_confirmation`, id: 'delete', title: 'Delete' },
+      { url: `${fullUrl}/@@sharing`, id: 'local_roles', title: 'Sharing' },
     ],
     // Where Volto reads whether a working copy is possible, and now where the
     // adapter reads it too. iterate_checkin only appears on a copy.

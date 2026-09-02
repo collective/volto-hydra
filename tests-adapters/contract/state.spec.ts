@@ -152,6 +152,8 @@ describe('state.getForms', () => {
       path: PATH,
     });
 
+    const pas: any = await target.adapter.dispatch('state.get', { path: PATH });
+
     if (!advertises('per-content-permissions')) {
       // Not a shortcoming to paper over: a CMS whose permissions are site-wide
       // has nothing to offer here, and an empty people list would read as
@@ -159,6 +161,12 @@ describe('state.getForms', () => {
       expect(forms.access).toBeUndefined();
       return;
     }
+
+    // The form and the flag have to agree. Offering it while effective.canShare
+    // says no is a menu entry that argues with itself, and the user finds out
+    // which half was right by clicking it.
+    expect(Boolean(forms.access)).toBe(pas.effective.canShare);
+    if (!pas.effective.canShare) return;
 
     expect(forms.access).toBeDefined();
     const props: any = forms.access.schema.properties;
