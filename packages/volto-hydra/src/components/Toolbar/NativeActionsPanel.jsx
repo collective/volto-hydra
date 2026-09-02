@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSelector, shallowEqual } from 'react-redux';
-import { nativeActionsFrom } from './NativeActionsPlug';
+import { nativeActionsFrom } from './nativeActions';
 
 /**
  * The CMS's own screens, listed.
@@ -32,7 +32,7 @@ const NativeActionsPanel = ({ closeMenu }) => {
               <a
                 className="native-action"
                 data-action-id={action.id}
-                href={action['@id']}
+                href={action.url}
                 target={action.target === 'iframe' ? '_self' : '_blank'}
                 rel="noopener noreferrer"
                 onClick={() => closeMenu?.()}
