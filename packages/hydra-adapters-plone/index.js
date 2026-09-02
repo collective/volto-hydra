@@ -248,16 +248,44 @@ export class PloneAdapter extends BaseAdapter {
    * invented: comment, effective, expires and include_children are what
    * POST @workflow/<id> already takes.
    */
-  transitionSchema() {
+  transitionSchema({ visibility = false } = {}) {
+    // Curated per transition, not "everything the endpoint takes". The moment
+    // something becomes visible is the moment its address and whether it is
+    // listed actually matter — WordPress has always asked for both here, and
+    // Plone burying short name in a metadata accordion is the reason nobody
+    // sets it until the URL is already wrong. Retracting asks for none of it.
+    const visibilityFields = visibility ? ['id', 'exclude_from_nav'] : [];
     return {
       fieldsets: [
         {
           id: 'default',
           title: 'Default',
-          fields: ['comment', 'effective', 'expires', 'include_children'],
+          fields: [
+            ...visibilityFields,
+            'comment',
+            'effective',
+            'expires',
+            'include_children',
+          ],
         },
       ],
       properties: {
+        ...(visibility
+          ? {
+              id: {
+                title: 'Short name',
+                description:
+                  'The last part of this item\u2019s address. Changing it after people have linked here breaks those links.',
+                type: 'string',
+              },
+              exclude_from_nav: {
+                title: 'Exclude from navigation',
+                description:
+                  'Still readable by anyone who has the address \u2014 just not listed in menus.',
+                type: 'boolean',
+              },
+            }
+          : {}),
         comment: {
           title: 'Comment',
           description: 'Recorded in this item\u2019s workflow history.',
@@ -340,11 +368,26 @@ export class PloneAdapter extends BaseAdapter {
 
   async transitionForms(path) {
     const wf = await this.fetchJson(`${path}/@workflow`);
+    const ids = (wf.transitions ?? []).map((t) => t['@id'].split('/').pop());
+
+    // Only fetched when something here actually asks for the document's own
+    // fields, so the common case stays one request.
+    const doc = ids.includes('publish')
+      ? await this.fetchJson(path)
+      : null;
+
     const forms = {};
     for (const t of wf.transitions ?? []) {
-      forms[t['@id'].split('/').pop()] = {
-        schema: this.transitionSchema(),
-        data: {},
+      const id = t['@id'].split('/').pop();
+      const visibility = id === 'publish';
+      forms[id] = {
+        schema: this.transitionSchema({ visibility }),
+        data: visibility
+          ? {
+              id: doc?.id ?? path.split('/').pop(),
+              exclude_from_nav: Boolean(doc?.exclude_from_nav),
+            }
+          : {},
       };
     }
     // Working copies take no body at all (neither PATCH nor DELETE @workingcopy
@@ -785,6 +828,28 @@ export class PloneAdapter extends BaseAdapter {
           method: 'POST',
           body,
         });
+
+        // The document's own fields go in a second write, because @workflow
+        // does not take them. Transition first so this one addresses a path
+        // that still exists: renaming changes it.
+        const docFields = {};
+        for (const field of ['exclude_from_nav']) {
+          if (d[field] !== undefined) docFields[field] = d[field];
+        }
+        const current = args.path.split('/').pop();
+        const renamed = d.id !== undefined && d.id !== current;
+        if (renamed) docFields.id = d.id;
+
+        if (Object.keys(docFields).length) {
+          await this.fetchJson(args.path, { method: 'PATCH', body: docFields });
+        }
+
+        // A rename moves the document, so the session has to follow it or the
+        // editor is left looking at an address that no longer resolves.
+        if (renamed) {
+          const parent = args.path.slice(0, args.path.lastIndexOf('/'));
+          return { redirect: `${parent}/${d.id}` };
+        }
         return null;
       }
 

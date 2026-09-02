@@ -301,6 +301,24 @@ special case we hardcode; it is just the schema its adapter emits.
 | Plone publish | `effective`, `expires`, `comment` |
 | Plone check out | none — the dialog is the sentence and a confirm |
 
+**What goes in a transition's form is the adapter's curation, not a rule about
+endpoints.** The question each field answers is *what matters about where and
+how this appears, at this moment* — so it may be metadata the document already
+carries, repeated here because this is when anyone actually thinks about it.
+Plone's short name lives in a metadata accordion and is therefore set only
+after the URL is already wrong; WordPress has always asked for the slug in its
+pre-publish panel, and is right to. Retracting asks for neither.
+
+That some of these persist independently of state is not an argument against
+them: so do sharing and effective dates, which nobody doubts belong here.
+
+The cost is the adapter's to carry. Plone's `@workflow` takes only `comment`,
+`effective`, `expires` and `include_children`, so anything else is a second
+write against the document — transition first, so the second call addresses a
+path that still exists, since renaming changes it. A rename then answers
+`{ redirect }` for the same reason a checkout does: the editor must not be left
+looking at an address that no longer resolves.
+
 **Undeclared values are refused, not dropped.** A field the schema did not
 declare fails the transition with `BAD_REQUEST`. Silently discarding it is the
 dangerous version: the dialog reports success for a setting that never took,
