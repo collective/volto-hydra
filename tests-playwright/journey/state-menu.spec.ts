@@ -149,3 +149,70 @@ test('sharing and working copy no longer sit beside it', async ({
     page.getByRole('button', { name: /working copy/i }),
   ).toHaveCount(0);
 });
+
+/**
+ * The working-copy round trip, through the menu.
+ *
+ * This is the design's sharpest claim: checking out a draft is a STATE CHANGE,
+ * not a separate screen. So it has to behave like every other entry — open a
+ * dialog, change nothing until committed — and then do the one thing no other
+ * transition does, which is leave you somewhere else.
+ *
+ * Only Plone has working copies of the three, so this asserts nothing where
+ * they are absent rather than being skipped.
+ */
+test('checking out a draft moves the session to it, and back again', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(180_000);
+  const { root: ROOT } = fixtureFor(testInfo.project.name);
+
+  const helper = new AdminUIHelper(page);
+  await helper.login();
+  await page.goto(`${helper.adminUrl}${ROOT}`);
+  await openMore(page);
+
+  const checkout = page.locator('[data-entry-id="checkout"]');
+  const offered = await checkout
+    .waitFor({ state: 'visible', timeout: 20_000 })
+    .then(() => true)
+    .catch(() => false);
+
+  // eslint-disable-next-line no-console
+  console.log(`[working-copy] checkout offered: ${offered}`);
+  if (!offered) return;
+
+  await checkout.click();
+
+  // Said before it happens, not discovered after.
+  await expect(page.locator('.state-relocates')).toBeVisible({
+    timeout: 10_000,
+  });
+  // Still on the original: opening the dialog must not have checked anything
+  // out.
+  expect(new URL(page.url()).pathname).toBe(ROOT);
+
+  await page.locator('.state-commit').click();
+
+  // The copy lives somewhere else and the editor follows it there.
+  await page.waitForURL((url) => url.pathname !== ROOT, { timeout: 30_000 });
+  const copyPath = new URL(page.url()).pathname;
+  // eslint-disable-next-line no-console
+  console.log(`[working-copy] landed on ${copyPath}`);
+  expect(copyPath).not.toBe(ROOT);
+
+  // And on the copy the menu offers the other half of the round trip, which is
+  // how we know the adapter is reading the CMS rather than remembering what it
+  // just did.
+  await openMore(page);
+  const discard = page.locator('[data-entry-id="cancel-checkout"]');
+  await expect(discard).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('[data-entry-id="checkin"]')).toBeVisible();
+
+  await discard.click();
+  await page.locator('.state-commit').click();
+
+  // Discarding ends the draft, so the session goes back to what it was a copy
+  // of.
+  await page.waitForURL((url) => url.pathname === ROOT, { timeout: 30_000 });
+});

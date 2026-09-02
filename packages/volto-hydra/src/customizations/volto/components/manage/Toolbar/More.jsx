@@ -257,7 +257,7 @@ const More = (props) => {
             {content?.['@type'] !== 'Plone Site' && (
               // Plone Site does not have workflow
               <li className="state-select">
-                <Workflow pathname={path} />
+                <Workflow pathname={path} closeMenu={props.closeMenu} />
               </li>
             )}
           </Plug>

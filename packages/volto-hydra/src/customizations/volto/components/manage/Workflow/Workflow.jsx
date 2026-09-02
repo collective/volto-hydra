@@ -27,6 +27,8 @@ import StateMenu from '../../../../../components/Toolbar/StateMenu';
  * Volto does for content with no workflow — in which case the withdrawn entries
  * would be the only way to reach either, so they stay.
  */
-const Workflow = ({ pathname }) => <StateMenu pathname={pathname} />;
+const Workflow = ({ pathname, closeMenu }) => (
+  <StateMenu pathname={pathname} closeMenu={closeMenu} />
+);
 
 export default Workflow;

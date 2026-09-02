@@ -23,7 +23,7 @@ import { menuEntriesFrom, ACCESS_ID } from './menuEntries';
  * Nothing fires on the click that opened this. That is the whole difference
  * from the component it replaces.
  */
-const StateMenu = ({ pathname }) => {
+const StateMenu = ({ pathname, closeMenu }) => {
   const dispatch = useDispatch();
   const history = useHistory();
   const { pas, forms, error, loadForms, transition } = useContentState(pathname);
@@ -65,6 +65,10 @@ const StateMenu = ({ pathname }) => {
     try {
       const result = await transition(chosen.id, formData);
       setChosen(null);
+      // Volto closed this menu after acting, and so must we — it survives a
+      // route change, so leaving it open means the next thing the user opens
+      // is a menu describing the document they just left.
+      closeMenu?.();
       if (result?.redirect) {
         // Checking out a copy puts the draft at a different path. Staying here
         // would show the published version while the draft sat elsewhere
