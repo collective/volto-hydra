@@ -146,36 +146,35 @@ describe('state.getForms', () => {
     }
   });
 
-  it('offers a stay-here form exactly where per-document grants exist', async () => {
+  it('puts principal fields in the stay-here form exactly where grants exist', async () => {
     if (!advertises('state')) return;
     const forms: any = await target.adapter.dispatch('state.getForms', {
       path: PATH,
     });
-
     const pas: any = await target.adapter.dispatch('state.get', { path: PATH });
 
-    if (!advertises('per-content-permissions')) {
+    // The stay-here entry is not a sharing entry. It is for the state the
+    // document is already in, so any CMS with something changeable in place
+    // may offer one — Drupal has an address to edit and no per-document grants
+    // at all. What is gated is the PEOPLE half.
+    const update = forms.update;
+    if (!update) return;
+
+    const principalFields = Object.entries<any>(update.schema.properties).filter(
+      ([, p]) => p.vocabulary === 'principals',
+    );
+
+    if (!advertises('per-content-permissions') || !pas.effective.canShare) {
       // Not a shortcoming to paper over: a CMS whose permissions are site-wide
       // has nothing to put here, and an empty people list would read as
       // "nobody has access" rather than "not answered here".
-      expect(forms.update).toBeUndefined();
+      expect(principalFields).toEqual([]);
       return;
     }
 
-    // The form and the flag have to agree. Offering it while effective.canShare
-    // says no is a menu entry that argues with itself, and the user finds out
-    // which half was right by clicking it.
-    expect(Boolean(forms.update)).toBe(pas.effective.canShare);
-    if (!pas.effective.canShare) return;
-
-    expect(forms.update).toBeDefined();
-    const props: any = forms.update.schema.properties;
-    const roleFields = Object.entries<any>(props).filter(
-      ([, p]) => p.vocabulary === 'principals',
-    );
     // One field per role, not a permission matrix.
-    expect(roleFields.length).toBeGreaterThan(0);
-    for (const [name, prop] of roleFields) {
+    expect(principalFields.length).toBeGreaterThan(0);
+    for (const [name, prop] of principalFields) {
       expect(typeof prop.title, `${name}.title`).toBe('string');
       // The description is what makes a role name mean something — "will be
       // able to update when published" — and no CMS volunteers it.

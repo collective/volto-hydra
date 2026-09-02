@@ -255,30 +255,78 @@ export class DrupalAdapter extends BaseAdapter {
    * anyway. With Content Moderation enabled this is where the workflow's own
    * transitions and their permissions would appear.
    */
+  /**
+   * Drupal's alias is what Plone calls the short name — except it is the WHOLE
+   * address, not a segment, because nothing here comes from a hierarchy. Same
+   * argument for putting it here either way: the moment a document becomes
+   * visible is the moment its address matters, and a field nobody sees until
+   * afterwards gets set once the URL is already wrong.
+   */
+  aliasField() {
+    return {
+      title: 'Address',
+      description:
+        'The whole path, and it carries no structure — moving this document in the menu will not change it. Changing it after people have linked here breaks those links.',
+      type: 'string',
+    };
+  }
+
+  revisionLogField() {
+    return {
+      title: 'Revision log message',
+      description:
+        'Recorded against this revision. Visible to anyone who can see the revision history.',
+      type: 'string',
+      widget: 'textarea',
+    };
+  }
+
   async transitionForms(path) {
     const node = await this.nodeByAlias(path);
     const published = node.attributes.status === true;
     const id = published ? 'unpublish' : 'publish';
-    return {
-      [id]: {
-        schema: {
-          fieldsets: [
-            { id: 'default', title: 'Default', fields: ['revision_log'] },
-          ],
-          properties: {
-            revision_log: {
-              title: 'Revision log message',
-              description:
-                'Recorded against this revision. Visible to anyone who can see the revision history.',
-              type: 'string',
-              widget: 'textarea',
-            },
+
+    const withAddress = {
+      schema: {
+        fieldsets: [
+          {
+            id: 'default',
+            title: 'Default',
+            fields: ['path_alias', 'revision_log'],
           },
-          required: [],
+        ],
+        properties: {
+          path_alias: this.aliasField(),
+          revision_log: this.revisionLogField(),
         },
-        data: {},
+        required: [],
       },
+      data: { path_alias: path, revision_log: '' },
     };
+
+    const forms = {
+      // Unpublishing takes an audience away; there is nothing to configure
+      // about that beyond saying why.
+      [id]: published
+        ? {
+            schema: {
+              fieldsets: [
+                { id: 'default', title: 'Default', fields: ['revision_log'] },
+              ],
+              properties: { revision_log: this.revisionLogField() },
+              required: [],
+            },
+            data: { revision_log: '' },
+          }
+        : withAddress,
+
+      // Staying where it is, and changing what matters here. Drupal needs this
+      // as much as Plone does and has nothing to do with permissions: the
+      // address is editable whatever state the document is in, and an already
+      // published document has no publish transition to reach it through.
+      update: withAddress,
+    };
+    return forms;
   }
 
   async dispatch(intent, args) {
@@ -639,6 +687,28 @@ export class DrupalAdapter extends BaseAdapter {
         const node = await this.nodeByAlias(args.path);
         const forms = await this.transitionForms(args.path);
         this.assertDeclared(args.data, forms[args.id]?.schema, args.id);
+
+        const nextAlias = args.data?.path_alias;
+        const moved = nextAlias !== undefined && nextAlias !== args.path;
+        if (moved) {
+          await this.fetchJson(`/jsonapi/node/${this.bundle}/${node.id}`, {
+            method: 'PATCH',
+            body: {
+              data: {
+                type: `node--${this.bundle}`,
+                id: node.id,
+                attributes: { path: { alias: nextAlias } },
+              },
+            },
+          });
+        }
+
+        // `update` keeps the document where it is. Flipping status here would
+        // make the one entry that promises not to change state the one that
+        // silently does.
+        if (args.id === 'update') {
+          return moved ? { redirect: nextAlias } : null;
+        }
         if (args.data?.revision_log) {
           await this.fetchJson(`/jsonapi/node/${this.bundle}/${node.id}`, {
             method: 'PATCH',
