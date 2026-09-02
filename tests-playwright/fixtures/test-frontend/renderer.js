@@ -356,6 +356,9 @@ async function renderBlock(blockId, block) {
         case 'heading':
             wrapper.innerHTML = renderHeadingBlock(block);
             break;
+        case 'suggest':
+            wrapper.innerHTML = renderSuggestBlock(block, blockId);
+            break;
         case 'separator':
             wrapper.innerHTML = renderSeparatorBlock(block);
             break;
@@ -1023,6 +1026,21 @@ function renderIntroductionBlock(block) {
  * @param {Object} block - Heading block data
  * @returns {string} HTML string
  */
+/**
+ * Render a suggest block: a labelled text box whose answer a vocabulary
+ * completes (the live fetch is the docs example's job — the fixture renders
+ * the resting markup: label, input, empty suggestion list).
+ */
+function renderSuggestBlock(block, blockId) {
+    const label = block.label || '';
+    const value = block.value || '';
+    return `<div class="suggest">` +
+        `<label for="${blockId}-input" data-edit-text="label">${label}</label>` +
+        `<input id="${blockId}-input" name="answer" type="text" value="${value}" aria-autocomplete="list" autocomplete="off">` +
+        `<ul class="suggest__list" hidden></ul>` +
+        `</div>`;
+}
+
 function renderHeadingBlock(block) {
     const tag = block.tag || 'h2';
     const text = block.heading || '';

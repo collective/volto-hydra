@@ -554,6 +554,12 @@
   </div>
 
   <!-- Code Example (using F7 tabs) -->
+  <div v-else-if="block['@type'] == 'suggest'" :data-block-uid="block_uid" class="suggest">
+    <label :for="block_uid + '-input'" data-edit-text="label">{{ block.label }}</label>
+    <input :id="block_uid + '-input'" name="answer" type="text" :value="block.value"
+      aria-autocomplete="list" autocomplete="off">
+    <ul class="suggest__list" hidden></ul>
+  </div>
   <div v-else-if="block['@type'] == 'codeExample'" :data-block-uid="block_uid"
        data-block-container='{"add":"horizontal"}' style="margin:1rem 0">
     <div style="border-radius:0.5rem; overflow:hidden; background:#111827">

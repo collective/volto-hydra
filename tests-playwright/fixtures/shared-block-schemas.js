@@ -766,6 +766,30 @@ export const sharedBlocksConfig = {
             inheritSchemaFrom: { typeField: 'variation', mappingField: 'fieldMapping', defaultsField: 'itemDefaults' },
         },
     },
+    // The vocabularySelect worked example (#321): a question whose answer is
+    // completed from a vocabulary the author picked. Registered here so EVERY
+    // example frontend carries it — the docs frontends already register it via
+    // block-definitions.json, and a type only some frontends know is a type
+    // block-sanity rightly flags on the others.
+    suggest: {
+        id: 'suggest',
+        title: 'Suggest',
+        blockSchema: {
+            fieldsets: [
+                { id: 'default', title: 'Default', fields: ['label', 'suggestFrom', 'value'] },
+            ],
+            properties: {
+                label: { title: 'Question' },
+                suggestFrom: {
+                    title: 'Suggest from',
+                    widget: 'vocabularySelect',
+                    vocabularyFilter: 'Keywords|Subject',
+                },
+                value: { title: 'Answer' },
+            },
+            required: [],
+        },
+    },
     searchShortcuts: {
         id: 'searchShortcuts',
         title: 'Search Shortcuts',
