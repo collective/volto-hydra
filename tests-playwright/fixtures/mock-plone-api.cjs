@@ -2030,7 +2030,17 @@ app.get('/@types/:typeName', (req, res) => {
  * Shortcuts block reads Keywords (Subject) unique values in site-wide mode.
  */
 const VOCAB_ITEMS = {
-  'plone.app.vocabularies.Keywords': ['news', 'plone', 'events'],
+  // Five, not three, and three of them share a prefix on purpose: a type-ahead
+  // is the one caller that asks this endpoint a real question ("what starts
+  // with `new`?"), and with no two terms alike every answer was the whole list —
+  // which cannot tell a working filter from an ignored one.
+  'plone.app.vocabularies.Keywords': [
+    'news',
+    'newsletter',
+    'newsroom',
+    'plone',
+    'events',
+  ],
   // A second one, so a picker that lists vocabularies has something to choose
   // BETWEEN — with one entry, "offers the right list" and "offers any list at
   // all" are the same assertion.
@@ -2470,19 +2480,38 @@ app.get('*/@search', (req, res) => {
   const pathDepth = req.query['path.depth'];
   const pathQuery = req.query['path.query'];
   const searchableText = req.query['SearchableText'];
+  const titleQuery = req.query['Title'];
   const portalType = req.query['portal_type'];
   const baseUrl = `http://localhost:${PORT}`;
 
   let items;
 
-  // Handle SearchableText (used by ObjectBrowser search input). Plone 6.2
-  // (plone.app.querystring 3.0.0) appends a wildcard to each word and ANDs
-  // the parts — matchSearchableText replicates that on title/description/id.
-  if (searchableText) {
+  // Text queries: SearchableText (used by ObjectBrowser search input) and/or
+  // the Title INDEX alone (`@search?Title=` — what a title autocomplete asks).
+  // Plone 6.2 (plone.app.querystring 3.0.0) appends a wildcard to each word of
+  // SearchableText and ANDs the parts — matchSearchableText replicates that on
+  // title/description/id. The Title index is ZCTextIndex: whole words, with
+  // optional right-truncation (`sea*`) — replicated on the title only.
+  if (searchableText || titleQuery) {
     items = Object.keys(contentDirMap)
       .filter((itemPath) => itemPath !== '/')
-      .map((itemPath) => formatSearchItem(loadContentFromDisk(itemPath), baseUrl))
-      .filter((item) => matchSearchableText(searchableText, item));
+      .map((itemPath) => formatSearchItem(loadContentFromDisk(itemPath), baseUrl));
+    if (searchableText) {
+      items = items.filter((item) => matchSearchableText(searchableText, item));
+    }
+    if (titleQuery) {
+      const terms = String(titleQuery)
+        .toLowerCase()
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((t) => (t.endsWith('*') ? t.slice(0, -1) : t));
+      items = items.filter((item) => {
+        const words = String(item.title || '')
+          .toLowerCase()
+          .split(/\W+/);
+        return terms.every((t) => words.some((w) => w.startsWith(t)));
+      });
+    }
     // Filter by portal_type if specified
     if (portalType) {
       const types = Array.isArray(portalType) ? portalType : [portalType];
@@ -2490,8 +2519,7 @@ app.get('*/@search', (req, res) => {
     }
   }
   // Handle path.query with path.depth=0 (exact match for specific content)
-  else
-  if (pathQuery && pathDepth === '0') {
+  else if (pathQuery && pathDepth === '0') {
     const content = loadContentFromDisk(pathQuery);
     if (content) {
       items = [formatSearchItem(content, baseUrl)];

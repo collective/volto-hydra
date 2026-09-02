@@ -1370,6 +1370,28 @@ function Block({ block, id, data, apiUrl, contextPath }) {
       );
     }
 
+    // ── Suggest — the vocabularySelect worked example. The live type-ahead
+    // is the docs' SuggestBlock; here the resting markup renders and stays
+    // editable. ──
+    case "suggest": {
+      return (
+        <div data-block-uid={id} className="suggest">
+          <label htmlFor={`${id}-input`} data-edit-text="label">
+            {block.label || ""}
+          </label>
+          <input
+            id={`${id}-input`}
+            name="answer"
+            type="text"
+            defaultValue={block.value || ""}
+            aria-autocomplete="list"
+            autoComplete="off"
+          />
+          <ul className="suggest__list" hidden></ul>
+        </div>
+      );
+    }
+
     // ── Heading ──
     case "heading": {
       const Tag = block.tag || "h2";

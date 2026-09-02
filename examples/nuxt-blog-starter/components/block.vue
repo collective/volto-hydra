@@ -3,6 +3,12 @@
     <RichText v-for="node in block['value']" :key="node" :node="node" />
   </div>
 
+  <div v-else-if="block['@type'] == 'suggest'" :data-block-uid="block_uid" class="suggest">
+    <label :for="block_uid + '-input'" data-edit-text="label">{{ block.label }}</label>
+    <input :id="block_uid + '-input'" name="answer" type="text" :value="block.value"
+      aria-autocomplete="list" autocomplete="off">
+    <ul class="suggest__list" hidden></ul>
+  </div>
   <div v-else-if="block['@type'] == 'introduction'" :data-block-uid="block_uid"
        data-edit-text="value" class="text-xl text-gray-600 leading-relaxed my-6 border-t border-b border-gray-200 py-4">
     <RichText v-for="node in block.value || []" :key="node" :node="node" />
