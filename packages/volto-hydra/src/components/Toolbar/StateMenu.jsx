@@ -5,6 +5,7 @@ import InlineForm from '@plone/volto/components/manage/Form/InlineForm';
 import { getContent } from '@plone/volto/actions';
 import { useContentState } from './useContentState';
 import { menuEntriesFrom, ACCESS_ID } from './menuEntries';
+import './StateMenu.css';
 
 /**
  * Status and access, in one list.
@@ -62,6 +63,7 @@ const StateMenu = ({ pathname, closeMenu }) => {
   const commit = async () => {
     setBusy(true);
     setFailure(null);
+
     try {
       const result = await transition(chosen.id, formData);
       setChosen(null);

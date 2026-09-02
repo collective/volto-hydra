@@ -30,6 +30,7 @@ const needsF7 = projectArg?.includes('f7');
 // started, because booting all three costs minutes for no benefit.
 const needsDrupal = projectArg?.includes('journey-drupal');
 const needsWordPress = projectArg?.includes('journey-wordpress');
+const needsJourney = projectArgs.some((p) => p.startsWith('journey'));
 // The bridge-mock project runs the admin with the backend inversion on. It is
 // an env var rather than a test fixture because the Api helper is constructed
 // by Volto's start-client before any test code runs.
@@ -73,8 +74,18 @@ export default defineConfig({
    * the WordPress suite failed on timeouts while each one passed on its own.
    * Nothing was wrong with them; there was simply one server and nine callers.
    *
-   * The mock-backed targets are fine in parallel and keep the default. */
-  workers: needsWordPress ? 1 : undefined,
+   * And one worker for the journey suites generally, whatever the CMS.
+   *
+   * These specs share ONE backend and walk a real editorial tree — creating,
+   * moving, checking out and transitioning documents in it. Run in parallel
+   * they are not independent tests of the same world, they are concurrent
+   * writers to it: a listing assertion in one spec fails because another spec
+   * moved something mid-request, which reads as a flake and is not one. That
+   * stayed hidden only while no spec mutated shared content; the working-copy
+   * round trip is the first that does.
+   *
+   * The non-journey suites hold no shared state and keep the default. */
+  workers: needsWordPress || needsJourney ? 1 : undefined,
 
   /* Reporter to use */
   reporter: [['html', { open: 'never' }]],

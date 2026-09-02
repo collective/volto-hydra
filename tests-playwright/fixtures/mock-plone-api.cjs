@@ -2400,6 +2400,15 @@ function endWorkingCopy(req, res) {
     });
   }
   delete sessionWorkingCopies[sessionId][cleanPath];
+
+  // The copy stops existing. Applying it merges it into the baseline and
+  // discarding it throws it away — either way there is no document left at
+  // this path, and leaving one behind put a stray `copy_of_*` in every listing
+  // for the rest of the session.
+  if (sessionContent[sessionId]) delete sessionContent[sessionId][cleanPath];
+  if (!sessionDeletions[sessionId]) sessionDeletions[sessionId] = new Set();
+  sessionDeletions[sessionId].add(cleanPath);
+
   res.json({
     working_copy_of: { '@id': `http://localhost:${PORT}${baseline}` },
   });
