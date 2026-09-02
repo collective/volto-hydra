@@ -146,7 +146,7 @@ describe('state.getForms', () => {
     }
   });
 
-  it('offers an access-only form exactly where per-document grants exist', async () => {
+  it('offers a stay-here form exactly where per-document grants exist', async () => {
     if (!advertises('state')) return;
     const forms: any = await target.adapter.dispatch('state.getForms', {
       path: PATH,
@@ -156,20 +156,20 @@ describe('state.getForms', () => {
 
     if (!advertises('per-content-permissions')) {
       // Not a shortcoming to paper over: a CMS whose permissions are site-wide
-      // has nothing to offer here, and an empty people list would read as
+      // has nothing to put here, and an empty people list would read as
       // "nobody has access" rather than "not answered here".
-      expect(forms.access).toBeUndefined();
+      expect(forms.update).toBeUndefined();
       return;
     }
 
     // The form and the flag have to agree. Offering it while effective.canShare
     // says no is a menu entry that argues with itself, and the user finds out
     // which half was right by clicking it.
-    expect(Boolean(forms.access)).toBe(pas.effective.canShare);
+    expect(Boolean(forms.update)).toBe(pas.effective.canShare);
     if (!pas.effective.canShare) return;
 
-    expect(forms.access).toBeDefined();
-    const props: any = forms.access.schema.properties;
+    expect(forms.update).toBeDefined();
+    const props: any = forms.update.schema.properties;
     const roleFields = Object.entries<any>(props).filter(
       ([, p]) => p.vocabulary === 'principals',
     );

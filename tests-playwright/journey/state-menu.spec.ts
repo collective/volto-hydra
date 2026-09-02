@@ -56,8 +56,8 @@ test('the state menu shows what the adapter offered', async ({
   // entry arrives with state.getForms, which is deliberately a second request
   // made when the menu opens. Reading the list before it lands sees only half
   // the menu — which is what this spec did first time out.
-  const access = page.locator('[data-entry-id="access"]');
-  const hasAccess = await access
+  const update = page.locator('[data-entry-id="update"]');
+  const hasUpdate = await update
     .waitFor({ state: 'visible', timeout: 15_000 })
     .then(() => true)
     .catch(() => false);
@@ -73,9 +73,9 @@ test('the state menu shows what the adapter offered', async ({
   // answer rather than a failure — but if it is there it must open like any
   // other entry, because it IS one.
   // eslint-disable-next-line no-console
-  console.log(`[state-menu] access entry: ${hasAccess}`);
-  if (hasAccess) {
-    await access.click();
+  console.log(`[state-menu] stay-here entry: ${hasUpdate}`);
+  if (hasUpdate) {
+    await update.click();
     await expect(page.locator('.state-commit')).toBeVisible({ timeout: 15_000 });
   }
 });

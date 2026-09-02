@@ -81,6 +81,11 @@ export class DrupalAdapter extends BaseAdapter {
         'schema',
         'asset',
         'state',
+        // A Drupal menu link carries an enabled flag and a title of its own,
+        // so it can keep a document out of the menu and label it differently
+        // there. Neither is a property of the node.
+        'navigation-exclusion',
+        'navigation-title',
       ],
     });
     this.cmsBaseUrl = cmsBaseUrl;
@@ -499,11 +504,26 @@ export class DrupalAdapter extends BaseAdapter {
 
       case 'navigation.get': {
         const links = await this.allMenuLinks();
-        const top = links.filter((l) => !l.relationships.parent?.id);
+        const top = links.filter(
+          (l) =>
+            !l.relationships.parent?.id &&
+            // A disabled link is Drupal's "keep this out of the menu". The
+            // document is untouched and still readable by anyone with its
+            // address — it is simply not listed, which is a different claim
+            // from being unpublished.
+            l.attributes?.enabled !== false,
+        );
         const items = [];
         for (const l of top) {
           const nodeId = l.relationships.node?.id;
-          if (nodeId) items.push(this.toDocument(await this.nodeByUuid(nodeId)));
+          if (!nodeId) continue;
+          const doc = this.toDocument(await this.nodeByUuid(nodeId));
+          // The LINK's title wins where it has one. Drupal stores it
+          // separately precisely so a menu can say "About" while the page says
+          // "About our organisation" — Plone has no equivalent at all.
+          items.push(
+            l.attributes?.title ? { ...doc, title: l.attributes.title } : doc,
+          );
         }
         return { items };
       }
@@ -911,6 +931,38 @@ export class DrupalAdapter extends BaseAdapter {
           url: `${this.cmsBaseUrl}${path}`,
           title: flat.attributes.title,
         };
+      }
+
+      case 'navigation.setExcluded':
+      case 'navigation.setTitle': {
+        // Both live on the LINK, not the node — which is what makes them
+        // different from anything workflow does. A node with no link is not in
+        // the menu to begin with, and saying so beats silently doing nothing.
+        const linkId = await this.linkIdForPath(args.path);
+        if (!linkId) {
+          throw new AdapterError(
+            `drupal: ${args.path} has no menu link, so it is not in the menu`,
+            { code: 'NOT_FOUND', status: 404 },
+          );
+        }
+        const attributes =
+          intent === 'navigation.setExcluded'
+            ? { enabled: !args.excluded }
+            : { title: args.title };
+        await this.fetchJson(
+          `/jsonapi/menu_link_content/menu_link_content/${linkId}`,
+          {
+            method: 'PATCH',
+            body: {
+              data: {
+                type: 'menu_link_content--menu_link_content',
+                id: linkId,
+                attributes,
+              },
+            },
+          },
+        );
+        return null;
       }
 
       default:

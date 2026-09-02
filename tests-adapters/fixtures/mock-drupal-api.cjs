@@ -500,7 +500,15 @@ app.get('/jsonapi/menu_link_content/menu_link_content', (req, res) => {
       list.map((l) => ({
         type: 'menu_link_content--menu_link_content',
         id: l.uuid,
-        attributes: { weight: l.weight, enabled: true },
+        // A Drupal menu link carries its OWN title and an enabled flag,
+        // independent of the node it points at. That is how Drupal expresses
+        // "call it something shorter in the menu" and "keep this out of the
+        // menu" — neither of which the node knows about.
+        attributes: {
+          weight: l.weight,
+          enabled: l.enabled !== false,
+          title: l.title ?? null,
+        },
         relationships: {
           node: { data: { type: 'node--page', id: l.nodeUuid } },
           parent: {
@@ -526,9 +534,10 @@ app.patch('/jsonapi/menu_link_content/menu_link_content/:uuid', (req, res) => {
     const rel = relationships.parent?.data;
     link.parentUuid = rel ? rel.id : null;
   }
-  if (req.body?.data?.attributes?.weight !== undefined) {
-    link.weight = req.body.data.attributes.weight;
-  }
+  const attrs = req.body?.data?.attributes ?? {};
+  if (attrs.weight !== undefined) link.weight = attrs.weight;
+  if (attrs.enabled !== undefined) link.enabled = attrs.enabled;
+  if (attrs.title !== undefined) link.title = attrs.title;
   res.json(single({ type: 'menu_link_content--menu_link_content', id: link.uuid }));
 });
 
@@ -541,6 +550,8 @@ app.post('/jsonapi/menu_link_content/menu_link_content', (req, res) => {
     nodeUuid: rel.node?.data?.id ?? null,
     parentUuid: rel.parent?.data?.id ?? null,
     weight: req.body?.data?.attributes?.weight ?? 0,
+    enabled: req.body?.data?.attributes?.enabled ?? true,
+    title: req.body?.data?.attributes?.title ?? null,
   });
   res.status(201).json(single({ type: 'menu_link_content--menu_link_content', id }));
 });

@@ -15,8 +15,17 @@
  * Pure, so the rules below are testable without mounting a toolbar.
  */
 
-/** Changing who can reach this without moving it. Reserved id in the contract. */
-export const ACCESS_ID = 'access';
+/**
+ * Staying where you are, and changing anything else that matters here.
+ *
+ * Reserved id in the contract. It was called `access` and offered only
+ * permissions, which was too narrow: it is the entry for the state the
+ * document is ALREADY in, so it carries whatever matters in that state — who
+ * can reach it, what it is called, whether it is listed, when it expires. An
+ * already-published document has no publish transition, so without this there
+ * is nowhere to change any of that.
+ */
+export const UPDATE_ID = 'update';
 
 /**
  * @param {object} pas - PermissionsAndState from `state.get`
@@ -38,10 +47,13 @@ export function menuEntriesFrom(pas, forms) {
       relocates: Boolean(t.relocates),
     }));
 
-  if (forms?.[ACCESS_ID]) {
-    entries.push(
-      entry(ACCESS_ID, 'Change who can access…', 'access', forms),
-    );
+  if (forms?.[UPDATE_ID]) {
+    // Named for the state it keeps you in, so it cannot be misread as a
+    // transition that does nothing.
+    const label = pas?.state?.label
+      ? `Update — stays ${pas.state.label}`
+      : 'Update';
+    entries.push(entry(UPDATE_ID, label, 'update', forms));
   }
 
   return entries;

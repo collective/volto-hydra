@@ -24,7 +24,24 @@ export type Capability =
   | 'hierarchical-permissions'
   | 'versioning'
   | 'sharing'
-  | 'comments';
+  | 'comments'
+  /**
+   * A document can be kept OUT of navigation without being unpublished.
+   *
+   * A different claim from any workflow state: the document stays readable by
+   * anyone who has its address, it is simply not listed. Plone spells it
+   * `exclude_from_nav` on the document; Drupal disables the menu link.
+   */
+  | 'navigation-exclusion'
+  /**
+   * A document can be called something else in the menu — "About" in the nav,
+   * "About our organisation" as the heading.
+   *
+   * Drupal has this natively, because its menu link is a separate object with
+   * its own title. Plone 6 has no equivalent: @navigation returns the
+   * document's own title and nothing else.
+   */
+  | 'navigation-title';
 
 export type Intent =
   | 'content.get'
@@ -60,6 +77,15 @@ export type Intent =
   | 'querystring.getIndexes'
   | 'querystringSearch'
   /** Lifecycle position, available transitions and effective permissions. */
+  /**
+   * Keep a document out of the menu, or call it something else there.
+   *
+   * Separate from state on purpose: an excluded document is still readable by
+   * anyone holding its address. Only adapters advertising
+   * `navigation-exclusion` / `navigation-title` implement them.
+   */
+  | 'navigation.setExcluded'
+  | 'navigation.setTitle'
   | 'state.get'
   /**
    * Every transition's form, fetched once when the state menu opens.

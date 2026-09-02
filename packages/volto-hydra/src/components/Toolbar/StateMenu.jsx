@@ -4,7 +4,7 @@ import { useHistory } from 'react-router-dom';
 import InlineForm from '@plone/volto/components/manage/Form/InlineForm';
 import { getContent } from '@plone/volto/actions';
 import { useContentState } from './useContentState';
-import { menuEntriesFrom, ACCESS_ID } from './menuEntries';
+import { menuEntriesFrom, UPDATE_ID } from './menuEntries';
 import './StateMenu.css';
 
 /**
@@ -98,10 +98,10 @@ const StateMenu = ({ pathname, closeMenu }) => {
           ← {pas.state.label}
         </button>
 
-        {chosen.kind === ACCESS_ID ? (
+        {chosen.kind === UPDATE_ID ? (
           <p className="state-consequence">
-            Who can reach this. Roles come from the CMS, and what each one
-            permits can depend on the state this document is in.
+            {`Stays ${pas.state.label}. Everything below applies to it as it is
+              — who can reach it, and how it appears.`}
           </p>
         ) : (
           !chosen.asks && (

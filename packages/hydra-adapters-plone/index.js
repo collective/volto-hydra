@@ -323,7 +323,7 @@ export class PloneAdapter extends BaseAdapter {
    * the principals holding it, and back again on write. See
    * tests-adapters/fixtures/plone/sharing_folder_get.resp.
    */
-  async accessForm(path) {
+  async updateForm(path) {
     const sharing = await this.fetchJson(`${path}/@sharing`);
     const roles = sharing.available_roles ?? [];
 
@@ -342,6 +342,26 @@ export class PloneAdapter extends BaseAdapter {
         .map((e) => e.id);
     }
 
+    // Not only permissions. This is the entry for the state the document is
+    // already in, so it carries what matters there — an already-published
+    // document has no publish transition, and without this there would be
+    // nowhere to change its address or take it out of the menu.
+    const doc = await this.fetchJson(path);
+    properties.id = {
+      title: 'Short name',
+      description:
+        'The last part of this item\u2019s address. Changing it after people have linked here breaks those links.',
+      type: 'string',
+    };
+    data.id = doc?.id ?? path.split('/').pop();
+    properties.exclude_from_nav = {
+      title: 'Exclude from navigation',
+      description:
+        'Still readable by anyone who has the address \u2014 just not listed in menus.',
+      type: 'boolean',
+    };
+    data.exclude_from_nav = Boolean(doc?.exclude_from_nav);
+
     properties.inherit = {
       title: 'Inherit permissions from parent',
       description:
@@ -356,7 +376,7 @@ export class PloneAdapter extends BaseAdapter {
           {
             id: 'default',
             title: 'Default',
-            fields: [...roles.map((r) => r.id), 'inherit'],
+            fields: [...roles.map((r) => r.id), 'id', 'exclude_from_nav', 'inherit'],
           },
         ],
         properties,
@@ -407,7 +427,7 @@ export class PloneAdapter extends BaseAdapter {
     // itself, and the user finds out which half was right by clicking it.
     const { effective } = await this.dispatch('state.get', { path });
     if (effective.canShare) {
-      forms.access = await this.accessForm(path);
+      forms.update = await this.updateForm(path);
     }
     return forms;
   }
@@ -773,7 +793,7 @@ export class PloneAdapter extends BaseAdapter {
         this.assertDeclared(args.data, forms[args.id]?.schema, args.id);
         const d = args.data ?? {};
 
-        if (args.id === 'access') {
+        if (args.id === 'update') {
           // Transpose back: role-major fields become Plone's entry-major
           // {Role: bool} maps. Principals not named in any field keep whatever
           // they had — this posts only what the dialog actually touched.
@@ -797,6 +817,23 @@ export class PloneAdapter extends BaseAdapter {
             method: 'POST',
             body: { entries, inherit: d.inherit ?? sharing.inherit },
           });
+
+          // The rest of the form is document metadata, in a second write
+          // because @sharing takes none of it.
+          const fields = {};
+          if (d.exclude_from_nav !== undefined) {
+            fields.exclude_from_nav = d.exclude_from_nav;
+          }
+          const was = args.path.split('/').pop();
+          const moved = d.id !== undefined && d.id !== was;
+          if (moved) fields.id = d.id;
+          if (Object.keys(fields).length) {
+            await this.fetchJson(args.path, { method: 'PATCH', body: fields });
+          }
+          if (moved) {
+            const parent = args.path.slice(0, args.path.lastIndexOf('/'));
+            return { redirect: `${parent}/${d.id}` };
+          }
           return null;
         }
 

@@ -4,7 +4,7 @@ import { menuEntriesFrom } from './menuEntries';
 const forms = {
   publish: { schema: { fieldsets: [], properties: { comment: {} }, required: [] }, data: {} },
   retract: { schema: { fieldsets: [], properties: {}, required: [] }, data: {} },
-  access: {
+  update: {
     schema: { fieldsets: [], properties: { Reader: { vocabulary: 'principals' } }, required: [] },
     data: { Reader: ['alice'] },
   },
@@ -16,7 +16,7 @@ describe('menuEntriesFrom', () => {
       { state: { name: 'private' }, transitions: [{ id: 'publish', label: 'Publish' }] },
       forms,
     );
-    expect(entries.map((e) => e.id)).toEqual(['publish', 'access']);
+    expect(entries.map((e) => e.id)).toEqual(['publish', 'update']);
     expect(entries[0].schema.properties.comment).toBeDefined();
   });
 
@@ -33,7 +33,7 @@ describe('menuEntriesFrom', () => {
       },
       forms,
     );
-    expect(entries.map((e) => e.id)).toEqual(['retract', 'access']);
+    expect(entries.map((e) => e.id)).toEqual(['retract', 'update']);
   });
 
   it('keeps a transition that cannot say where it leads', () => {
@@ -45,9 +45,15 @@ describe('menuEntriesFrom', () => {
     expect(entries.map((e) => e.id)).toContain('publish');
   });
 
-  it('offers access separately, and only when the CMS has it', () => {
-    const withAccess = menuEntriesFrom({ state: { name: 'x' }, transitions: [] }, forms);
-    expect(withAccess.map((e) => e.kind)).toEqual(['access']);
+  it('offers the stay-here entry separately, and only when the CMS has it', () => {
+    const withUpdate = menuEntriesFrom(
+      { state: { name: 'x', label: 'Published' }, transitions: [] },
+      forms,
+    );
+    expect(withUpdate.map((e) => e.kind)).toEqual(['update']);
+    // Named for the state it keeps you in, so it reads as "change something
+    // else" rather than as a transition that does nothing.
+    expect(withUpdate[0].label).toContain('Published');
 
     const without = menuEntriesFrom({ state: { name: 'x' }, transitions: [] }, { publish: forms.publish });
     expect(without).toEqual([]);
