@@ -768,7 +768,7 @@ function buildBreadcrumbsComponent(cleanPath, baseUrl) {
   };
 }
 
-function buildActionsComponent(cleanPath, baseUrl) {
+function buildActionsComponent(cleanPath, baseUrl, sessionId) {
   const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
   return {
     '@id': `${fullUrl}/@actions`,
@@ -780,7 +780,11 @@ function buildActionsComponent(cleanPath, baseUrl) {
       { url: `${fullUrl}/edit`, icon: '', id: 'edit', title: 'Edit' },
       { id: 'folderContents', title: 'Contents' },
     ],
-    object_buttons: [],
+    // Where Volto reads whether a working copy is possible, and now where the
+    // adapter reads it too. iterate_checkin only appears on a copy.
+    object_buttons: workingCopyOf(cleanPath, sessionId)
+      ? [{ id: 'iterate_checkin', title: 'Check in' }]
+      : [{ id: 'iterate_checkout', title: 'Check out' }],
     portal_tabs: [],
     site_actions: [],
     user: [],
@@ -864,6 +868,17 @@ const AVAILABLE_ROLES = [
 
 const sessionSharing = {};
 
+/**
+ * Working copies. Shapes from tests-adapters/fixtures/plone/workingcopy_*.
+ * A checkout lives at a DIFFERENT path, which is the whole reason the
+ * transition has to say where the editing session should go.
+ */
+const sessionWorkingCopies = {};
+
+function workingCopyOf(cleanPath, sessionId) {
+  return sessionWorkingCopies[sessionId]?.[cleanPath] ?? null;
+}
+
 function noRoles() {
   return Object.fromEntries(AVAILABLE_ROLES.map((r) => [r.id, false]));
 }
@@ -911,6 +926,9 @@ function buildTypesComponent() {
 function generateComponents(urlPath, baseUrl) {
   const cleanPath = urlPath.replace(/\/$/, '') || '/';
   return {
+    // No session here: generateComponents builds the expander bundle, which
+    // has no request context. The adapter reads @actions directly, and that
+    // route IS session-aware, so a working copy still reports iterate_checkin.
     actions: buildActionsComponent(cleanPath, baseUrl),
     breadcrumbs: buildBreadcrumbsComponent(cleanPath, baseUrl),
     navigation: buildNavigationComponent(cleanPath, baseUrl),
@@ -2341,6 +2359,50 @@ app.post(/.*\/@workflow\/[^/]+$/, (req, res) => {
   });
 });
 
+app.post(/.*\/@workingcopy$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@workingcopy$/, '') || '/').replace(/\/+$/, '') || '/';
+  const sessionId = getSessionId(req);
+  const content = getContent(cleanPath, sessionId);
+  if (!content) return res.status(404).json({ error: { type: 'NotFound' } });
+
+  const segments = cleanPath.split('/');
+  const id = segments.pop();
+  const copyPath = [...segments, `copy_of_${id}`].join('/') || '/';
+
+  setSessionContent(sessionId, copyPath, { ...content, id: `copy_of_${id}` });
+  if (!sessionWorkingCopies[sessionId]) sessionWorkingCopies[sessionId] = {};
+  sessionWorkingCopies[sessionId][copyPath] = cleanPath;
+
+  res.status(201).json({ '@id': `http://localhost:${PORT}${copyPath}` });
+});
+
+app.get(/.*\/@workingcopy$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@workingcopy$/, '') || '/').replace(/\/+$/, '') || '/';
+  const baseline = workingCopyOf(cleanPath, getSessionId(req));
+  res.json({
+    working_copy: null,
+    working_copy_of: baseline ? { '@id': `http://localhost:${PORT}${baseline}` } : null,
+  });
+});
+
+function endWorkingCopy(req, res) {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@workingcopy$/, '') || '/').replace(/\/+$/, '') || '/';
+  const sessionId = getSessionId(req);
+  const baseline = workingCopyOf(cleanPath, sessionId);
+  if (!baseline) {
+    return res.status(400).json({
+      error: { type: 'BadRequest', message: 'Not a working copy' },
+    });
+  }
+  delete sessionWorkingCopies[sessionId][cleanPath];
+  res.json({
+    working_copy_of: { '@id': `http://localhost:${PORT}${baseline}` },
+  });
+}
+
+app.patch(/.*\/@workingcopy$/, endWorkingCopy);
+app.delete(/.*\/@workingcopy$/, endWorkingCopy);
+
 app.get(/.*\/@sharing$/, (req, res) => {
   const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@sharing$/, '') || '/').replace(/\/+$/, '') || '/';
   res.json(getSharing(cleanPath, getSessionId(req)));
@@ -2620,7 +2682,7 @@ app.get('*/@breadcrumbs', (req, res) => {
  */
 app.get(/.*\/@actions$/, (req, res) => {
   const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@actions$/, '') || '/').replace(/\/+$/, '') || '/';
-  res.json(buildActionsComponent(cleanPath, `http://localhost:${PORT}`));
+  res.json(buildActionsComponent(cleanPath, `http://localhost:${PORT}`, getSessionId(req)));
 });
 
 /**

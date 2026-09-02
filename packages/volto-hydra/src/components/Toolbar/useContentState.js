@@ -54,11 +54,20 @@ export function useContentState(path) {
 
   const transition = useCallback(
     async (id, data) => {
-      await getBridgeRpc().request('state.transition', { path, id, data });
+      const result = await getBridgeRpc().request('state.transition', {
+        path,
+        id,
+        data,
+      });
       // Re-read rather than assume: the adapter may land somewhere other than
       // the transition's nominal target, and one of three cannot even name one.
-      setPas(await getBridgeRpc().request('state.get', { path }));
+      // Skipped when we are being sent elsewhere — the state of the document we
+      // are leaving is about to stop being what is on screen.
+      if (!result?.redirect) {
+        setPas(await getBridgeRpc().request('state.get', { path }));
+      }
       setForms(null);
+      return result;
     },
     [path],
   );

@@ -70,6 +70,23 @@ describe('menuEntriesFrom', () => {
     expect(entries.find((e) => e.id === 'retract').asks).toBe(false);
   });
 
+  it('carries whether committing will move the editor elsewhere', () => {
+    // Checking out a copy puts the draft at another path. The dialog has to say
+    // so before it happens rather than leave it to be discovered.
+    const entries = menuEntriesFrom(
+      {
+        state: { name: 'published' },
+        transitions: [
+          { id: 'checkout', label: 'Work on a draft copy', relocates: true },
+          { id: 'retract', label: 'Retract' },
+        ],
+      },
+      forms,
+    );
+    expect(entries.find((e) => e.id === 'checkout').relocates).toBe(true);
+    expect(entries.find((e) => e.id === 'retract').relocates).toBe(false);
+  });
+
   it('survives a transition the adapter offered no form for', () => {
     const entries = menuEntriesFrom(
       { state: { name: 'private' }, transitions: [{ id: 'mystery', label: 'Mystery' }] },

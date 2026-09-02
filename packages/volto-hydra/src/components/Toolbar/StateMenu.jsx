@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
+import { useHistory } from 'react-router-dom';
 import InlineForm from '@plone/volto/components/manage/Form/InlineForm';
 import { getContent } from '@plone/volto/actions';
 import { useContentState } from './useContentState';
@@ -24,6 +25,7 @@ import { menuEntriesFrom, ACCESS_ID } from './stateMenu';
  */
 const StateMenu = ({ pathname }) => {
   const dispatch = useDispatch();
+  const history = useHistory();
   const { pas, forms, error, loadForms, transition } = useContentState(pathname);
 
   const [chosen, setChosen] = useState(null);
@@ -61,12 +63,19 @@ const StateMenu = ({ pathname }) => {
     setBusy(true);
     setFailure(null);
     try {
-      await transition(chosen.id, formData);
-      // The document itself may have moved with the transition — a new
-      // effective date, a slug, a working copy — so the view re-reads rather
-      // than keep rendering what it had.
-      dispatch(getContent(pathname));
+      const result = await transition(chosen.id, formData);
       setChosen(null);
+      if (result?.redirect) {
+        // Checking out a copy puts the draft at a different path. Staying here
+        // would show the published version while the draft sat elsewhere
+        // unedited — so the session follows.
+        history.push(result.redirect);
+        return;
+      }
+      // The document itself may have moved with the transition — a new
+      // effective date, a slug — so the view re-reads rather than keep
+      // rendering what it had.
+      dispatch(getContent(pathname));
     } catch (err) {
       // Stays open, showing why. Closing on failure would look exactly like
       // succeeding.
@@ -103,6 +112,14 @@ const StateMenu = ({ pathname }) => {
             onChangeFormData={setFormData}
             title={chosen.label}
           />
+        )}
+
+        {chosen.relocates && (
+          // Said before committing, not discovered after: this ends with the
+          // editor looking at a different document.
+          <p className="state-relocates">
+            This will take you to the copy you will be working on.
+          </p>
         )}
 
         {failure && <p className="state-error">{failure}</p>}

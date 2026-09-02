@@ -214,6 +214,25 @@ describe('state.transition with data', () => {
     expect(typeof after.state.name).toBe('string');
   });
 
+  it('a transition that relocates the session says where, and it resolves', async () => {
+    if (!advertises('state')) return;
+    const pas: any = await target.adapter.dispatch('state.get', { path: PATH });
+    const move = pas.transitions.find((t: any) => t.relocates);
+    if (!move) return; // this CMS has nothing that moves you
+
+    const result: any = await target.adapter.dispatch('state.transition', {
+      path: PATH,
+      id: move.id,
+    });
+
+    // Declaring `relocates` and then not saying where would leave the editor
+    // looking at the version they did not choose to work on.
+    expect(result?.redirect).toBeTruthy();
+    expect(result.redirect).not.toBe(PATH);
+    // And it has to be somewhere that exists.
+    await target.adapter.dispatch('content.get', { path: result.redirect });
+  });
+
   it('refuses a field its form did not declare', async () => {
     if (!advertises('state')) return;
     const pas: any = await target.adapter.dispatch('state.get', { path: PATH });

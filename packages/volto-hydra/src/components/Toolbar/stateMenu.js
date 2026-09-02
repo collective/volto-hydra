@@ -25,7 +25,12 @@ export function menuEntriesFrom(pas, forms) {
     // where it leads — Plone's @workflow names no destination, and dropping
     // those would empty its menu entirely.
     .filter((t) => t.targetState === undefined || t.targetState !== current)
-    .map((t) => entry(t.id, t.label, 'transition', forms));
+    .map((t) => ({
+      ...entry(t.id, t.label, 'transition', forms),
+      // Whether committing ends with the editor somewhere else. The dialog
+      // says so first.
+      relocates: Boolean(t.relocates),
+    }));
 
   if (forms?.[ACCESS_ID]) {
     entries.push(

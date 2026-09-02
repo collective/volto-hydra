@@ -217,6 +217,16 @@ export interface PermissionsAndState {
      * grouping by destination, which is what Plone's own UI does today.
      */
     targetState?: string;
+    /**
+     * True when taking this moves the editing session somewhere else, and
+     * `state.transition` answers `{ redirect }` rather than null.
+     *
+     * Checking out a working copy is the case that needs it: the copy lives at
+     * a different path, and staying put would show the published version while
+     * the draft sat elsewhere unedited. The dialog says so before committing,
+     * because being relocated is not something to discover afterwards.
+     */
+    relocates?: boolean;
   }>;
   /** What the current user may do. UI gates visible/enabled controls on this. */
   effective: {

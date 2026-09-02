@@ -347,6 +347,15 @@ export class PloneAdapter extends BaseAdapter {
         data: {},
       };
     }
+    // Working copies take no body at all (neither PATCH nor DELETE @workingcopy
+    // does), so these are a sentence and a confirm rather than a form. They are
+    // listed by state.get only where the CMS said they are possible; an empty
+    // schema here is what makes the dialog render as prose.
+    const empty = { fieldsets: [], properties: {}, required: [] };
+    for (const id of ['checkout', 'checkin', 'cancel-checkout']) {
+      forms[id] = { schema: empty, data: {} };
+    }
+
     // Changing who can reach this without moving it. A transition in the menu
     // like any other; its target state is the one it is already in.
     forms.access = await this.accessForm(path);
@@ -665,6 +674,34 @@ export class PloneAdapter extends BaseAdapter {
           // Deliberately no targetState: @workflow does not name one.
         }));
 
+        // Checking out a copy IS a state change — the document gains a draft
+        // that only its author sees, while the published version stays put —
+        // so it belongs in the same list rather than on its own screen.
+        //
+        // Whether it is possible is already in the actions we just fetched,
+        // which is where Volto's own buttons read it from. No extra request.
+        const buttons = actions.object_buttons ?? [];
+        const can = (id) => buttons.some((a) => a.id === id);
+        if (can('iterate_checkout')) {
+          transitions.push({
+            id: 'checkout',
+            label: 'Work on a draft copy',
+            relocates: true,
+          });
+        }
+        if (can('iterate_checkin')) {
+          transitions.push({
+            id: 'checkin',
+            label: 'Publish the draft',
+            relocates: true,
+          });
+          transitions.push({
+            id: 'cancel-checkout',
+            label: 'Discard the draft',
+            relocates: true,
+          });
+        }
+
         return {
           state: { name: wf.state.id, label: wf.state.title },
           transitions,
@@ -711,6 +748,26 @@ export class PloneAdapter extends BaseAdapter {
             body: { entries, inherit: d.inherit ?? sharing.inherit },
           });
           return null;
+        }
+
+        if (args.id === 'checkout') {
+          const copy = await this.fetchJson(`${args.path}/@workingcopy`, {
+            method: 'POST',
+          });
+          // The copy lives at a DIFFERENT path, and the point of checking one
+          // out is to work on it — so the transition says where the session
+          // should go. Leaving the user on the original would show them the
+          // published version while their draft sat elsewhere unedited.
+          return { redirect: this.toPath(copy['@id']) };
+        }
+        if (args.id === 'checkin' || args.id === 'cancel-checkout') {
+          const wc = await this.fetchJson(`${args.path}/@workingcopy`, {
+            method: args.id === 'checkin' ? 'PATCH' : 'DELETE',
+          });
+          // Applying or discarding a draft ends the draft, so the session goes
+          // back to the document it was a copy of.
+          const baseline = wc?.working_copy_of?.['@id'];
+          return baseline ? { redirect: this.toPath(baseline) } : null;
         }
 
         const body = {};
