@@ -85,15 +85,16 @@ describe('navigation.get', () => {
       excluded: true,
     });
 
-    // Out of the menu is not out of the CMS. An editor has to be able to reach
-    // it — otherwise "hide from navigation" is a one-way door, and the only way
-    // back is whatever native screen we were trying not to send them to.
-    if (advertises('search-fulltext')) {
-      const found: any = await target.adapter.dispatch('search', {
-        query: doc.title,
-      });
-      expect(found.items.map((i: any) => i.path)).toContain(victim.path);
-    }
+    // Out of the menu is not out of the CMS, and BROWSABLE is the requirement —
+    // not merely findable if you already know what to search for. The Contents
+    // view is how an editor reaches a document they cannot see in the menu, so
+    // it has to still be listed there. Otherwise "hide from navigation" is a
+    // one-way door whose only way back is the native screen we were trying not
+    // to send them to.
+    const listing: any = await target.adapter.dispatch('tree.list', {
+      parent: '/',
+    });
+    expect(listing.items.map((i: any) => i.path)).toContain(victim.path);
 
     // And still writable, which is the half that would fail quietly: on a CMS
     // where the menu IS the hierarchy, a document with no link can lose the

@@ -719,6 +719,15 @@ export class PloneAdapter extends BaseAdapter {
         };
       }
 
+      case 'navigation.setExcluded':
+        // A field on the document, unlike Drupal where it lives on the menu
+        // link. Same claim either way: still readable, just not listed.
+        await this.fetchJson(args.path, {
+          method: 'PATCH',
+          body: { exclude_from_nav: Boolean(args.excluded) },
+        });
+        return null;
+
       case 'state.get': {
         const [wf, actions] = await Promise.all([
           this.fetchJson(`${args.path}/@workflow`),

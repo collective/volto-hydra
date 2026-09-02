@@ -727,12 +727,12 @@ function getNavigationItems(basePath = '/', depth = 1, baseUrlIn) {
  * Merges items from all content mounts so test content (/_test_data/*)
  * appears alongside docs content in the navigation.
  */
-function getRootNavigationItems() {
+function getRootNavigationItems(sessionId) {
   // Top-level items each pre-populated with their immediate children, so
   // the dropdown menu shows the next level on hover. depth=2 means "two
   // levels of items in total" — top + their direct children — which is
   // what the previous (depth-1-with-implicit-child-recursion) code produced.
-  return getNavigationItems('/', 2);
+  return getNavigationItems('/', 2, undefined, sessionId);
 }
 
 // ── Per-component builders ────────────────────────────────────────────────
@@ -803,12 +803,12 @@ function buildActionsComponent(cleanPath, baseUrl, sessionId) {
   };
 }
 
-function buildNavigationComponent(cleanPath, baseUrl) {
+function buildNavigationComponent(cleanPath, baseUrl, sessionId) {
   const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
   return {
     '@id': `${fullUrl}/@navigation`,
     // Always rooted at site root — top-level items with nested children
-    items: getRootNavigationItems(),
+    items: getRootNavigationItems(sessionId),
   };
 }
 
@@ -2724,11 +2724,11 @@ app.get(/.*\/@navigation$/, (req, res) => {
     const rootPath = rootPathParam || '/';
     res.json({
       '@id': `${baseUrl}${cleanPath}/@navigation`,
-      items: getNavigationItems(rootPath, depth, baseUrl),
+      items: getNavigationItems(rootPath, depth, baseUrl, getSessionId(req)),
     });
     return;
   }
-  res.json(buildNavigationComponent(cleanPath, baseUrl));
+  res.json(buildNavigationComponent(cleanPath, baseUrl, getSessionId(req)));
 });
 
 app.get(/.*\/@navroot$/, (req, res) => {
