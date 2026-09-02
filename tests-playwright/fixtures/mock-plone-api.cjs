@@ -2030,7 +2030,17 @@ app.get('/@types/:typeName', (req, res) => {
  * Shortcuts block reads Keywords (Subject) unique values in site-wide mode.
  */
 const VOCAB_ITEMS = {
-  'plone.app.vocabularies.Keywords': ['news', 'plone', 'events'],
+  // Five, not three, and three of them share a prefix on purpose: a type-ahead
+  // is the one caller that asks this endpoint a real question ("what starts
+  // with `new`?"), and with no two terms alike every answer was the whole list —
+  // which cannot tell a working filter from an ignored one.
+  'plone.app.vocabularies.Keywords': [
+    'news',
+    'newsletter',
+    'newsroom',
+    'plone',
+    'events',
+  ],
   // A second one, so a picker that lists vocabularies has something to choose
   // BETWEEN — with one entry, "offers the right list" and "offers any list at
   // all" are the same assertion.
