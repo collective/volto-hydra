@@ -1044,12 +1044,19 @@ export async function verifyBlockRendering(
   if (isListing) {
     const items = iframe.locator(`[data-block-uid="${blockId}"]`);
     await expect(items.first()).toBeVisible({ timeout: 15000 });
+    // Three consecutive equal reads, not "at least 2 items": the old n >= 2
+    // floor assumed every listing shows several results, so a listing whose
+    // QUERY yields one item (b_size=1 — a doc example showing one look) could
+    // never pass. The streak is the streaming guard now — one read mid-stream
+    // can catch a stale count, three equal reads across the ramping intervals
+    // cannot.
     let prev = -1;
+    let streak = 0;
     await expect.poll(async () => {
       const n = await items.count();
-      const stable = n === prev && n >= 2;
+      streak = n === prev && n >= 1 ? streak + 1 : 0;
       prev = n;
-      return stable;
+      return streak >= 2;
     }, { timeout: 15000, intervals: [200, 400, 800] }).toBe(true);
     await checkEditAnnotations(items.first(), blockData);
     return;
