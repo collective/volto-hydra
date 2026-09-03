@@ -68,6 +68,22 @@ import {
   applySchemaDefaultsToBlockWithContext,
 } from './schemaValidation.mjs';
 
+// Conversion-graph logic lives in conversionValidation.mjs so it stays free of
+// the React context barrel (a Playwright gate imports it directly).
+// Re-exported here for backward compat; conversionValidation.mjs is the SSOT.
+export {
+  DEFAULT_TYPE_FIELDS,
+  hasValidDefault,
+  shapeSignature,
+  getConvertibleTypes,
+  validateConversionRegistry,
+} from './conversionValidation.mjs';
+import {
+  DEFAULT_TYPE_FIELDS,
+  getConvertibleTypes,
+  hasValidDefault,
+} from './conversionValidation.mjs';
+
 // Re-export getBlockTypeSchema from blockPath for convenience
 export { getBlockTypeSchema };
 
@@ -2441,31 +2457,6 @@ export function getBlockTypeChoices(options, blocksConfig, blockPathMap, blockId
 // pulls any of these onto its own fields (copy-from-target). The set stays an
 // allowlist so genuine mistakes — this block's own field names / fieldRules keys
 // (label, field, required, hidden, …) put in @default — still warn.
-const DEFAULT_TYPE_FIELDS = new Set([
-  '@id',
-  'title',
-  'description',
-  'image',
-  'hasPreviewImage',
-  'Subject',
-  'created',
-  'modified',
-  'effective',
-  'expires',
-  'start',
-  'end',
-]);
-
-/**
- * Check if a block config has a valid @default mapping.
- * Valid means all keys are from the canonical @default field set.
- */
-function hasValidDefault(blockConfig) {
-  const defaultMapping = blockConfig?.fieldMappings?.['@default'];
-  if (!defaultMapping) return false;
-  return Object.keys(defaultMapping).every(key => DEFAULT_TYPE_FIELDS.has(key));
-}
-
 /**
  * Validate fieldMappings on a block config. Logs warnings for invalid entries.
  * Call during INIT to catch configuration errors early.
@@ -2491,71 +2482,6 @@ export function validateFieldMappings(blockType, blockConfig) {
   }
 }
 
-/**
- * Get block types that the given source type can be converted to.
- *
- * Scans all blocks to find ones reachable from the source type through
- * fieldMappings. Types without fieldMappings never appear in results.
- *
- * Edge rules:
- * - Explicit fieldMappings[currentType] always creates an edge.
- * - @default only creates an edge if BOTH types have valid @default mappings
- *   (keys from the canonical set: @id, title, description, image).
- *   Types with invalid @default keys (e.g., form fields, facets) are ignored.
- *
- * @param {string} sourceType - The current block's @type
- * @param {Object} blocksConfig - Block configuration registry
- * @returns {Array} - Array of { type, title } objects for convertible types
- */
-export function getConvertibleTypes(sourceType, blocksConfig, allowedTypes = null) {
-  if (!sourceType || !blocksConfig) return [];
-
-  // Source block must have fieldMappings defined to be convertible
-  const sourceConfig = blocksConfig[sourceType];
-  if (!sourceConfig?.fieldMappings) return [];
-
-  // BFS to find all reachable types through the conversion graph
-  const reachable = new Set();
-  const queue = [sourceType];
-  const visited = new Set([sourceType]);
-
-  while (queue.length > 0) {
-    const currentType = queue.shift();
-
-    for (const [blockType, blockConfig] of Object.entries(blocksConfig)) {
-      if (visited.has(blockType)) continue;
-      if (!blockConfig.fieldMappings) continue;
-
-      // Explicit mapping from currentType → blockType
-      if (blockConfig.fieldMappings[currentType]) {
-        reachable.add(blockType);
-        visited.add(blockType);
-        queue.push(blockType);
-        continue;
-      }
-
-      // @default: only if BOTH types have valid @default (canonical keys)
-      if (blockConfig.fieldMappings['@default'] &&
-          hasValidDefault(blockConfig) &&
-          hasValidDefault(blocksConfig[currentType])) {
-        reachable.add(blockType);
-        visited.add(blockType);
-        queue.push(blockType);
-      }
-    }
-  }
-
-  // Filter by container's allowedTypes if provided
-  const allowedSet = allowedTypes ? new Set(allowedTypes) : null;
-
-  // Convert to array of { type, title }
-  return Array.from(reachable)
-    .filter(blockType => !allowedSet || allowedSet.has(blockType))
-    .map(blockType => ({
-      type: blockType,
-      title: blocksConfig[blockType]?.title || blockType,
-    }));
-}
 
 /**
  * Static map { sourceType: [reachableTypes] } over the fieldMappings conversion
