@@ -485,6 +485,13 @@ function imageDimensions(file) {
       // strip ../ prefixes, scale suffixes (@@images/…) and resource views (/++…)
       let base = ref.replace(/^(\.\.\/)+/, '');
       if (!base.startsWith('/')) base = '/' + base;
+      // Drop the #fragment and ?query before looking the path up. Deep-linking
+      // to a heading is legitimate content (RichText emits slugged heading ids
+      // so `page#section` resolves), and without this a good link read as
+      // "path not in content: /services/advise#discovery". The PATH is still
+      // checked — only the part after # is dropped, so a dead page cannot be
+      // smuggled past the gate by appending an anchor.
+      base = base.split('#')[0].split('?')[0];
       base = base.split('/@@')[0].split('/++')[0].replace(/\/+$/, '') || '/';
       return pathMap.has(base) ? null : `path not in content: ${base}`;
     }
@@ -500,7 +507,34 @@ function imageDimensions(file) {
     return `unrecognized reference form: ${ref.slice(0, 60)}`;
   }
 
+  // Slate links live at value[].data.url — inside the block's rich text, not in
+  // one of LINK_FIELDS — so the field scan below never saw them. Only resolveuid
+  // refs were caught, by a raw-text regex over the whole file; a plain-path
+  // slate link pointing nowhere was not checked at all while the gate still
+  // reported "0 broken".
+  function* slateLinkUrls(value) {
+    if (Array.isArray(value)) {
+      for (const node of value) yield* slateLinkUrls(node);
+      return;
+    }
+    if (!value || typeof value !== 'object') return;
+    if (value.type === 'link') {
+      const url = (value.data || {}).url;
+      if (typeof url === 'string' && url !== '') yield url;
+    }
+    yield* slateLinkUrls(value.children);
+  }
+
   function checkBlockRefs(rel, bid, block) {
+    for (const url of slateLinkUrls(block.value)) {
+      const reason = refFailure(url);
+      if (reason) {
+        stats.linksBroken += 1;
+        errors.push(`  ${rel}: block ${bid} (${block['@type']}) slate link: ${reason}`);
+      } else {
+        stats.linksOk += 1;
+      }
+    }
     for (const field of LINK_FIELDS) {
       if (!(field in block)) continue;
       for (const ref of refStrings(block[field])) {
