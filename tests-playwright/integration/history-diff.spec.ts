@@ -17,7 +17,7 @@ test.describe('History and compare', () => {
   test('history lists the synthetic revisions', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
-    await page.goto(helper.contentUrl('/test-page', '/historyview'));
+    await page.goto(helper.contentUrl('/history-test-page', '/historyview'));
 
     // Two synthetic versioning rows (0 and 1), newest first.
     const rows = page.locator('#page-history table tbody tr, .contents-table tbody tr, table tbody tr');
@@ -29,8 +29,8 @@ test.describe('History and compare', () => {
     await helper.login();
     // Arrive the way users do — from the page (this also persists the
     // frontend preview URL the compare panes reuse).
-    await helper.navigateToView('/test-page');
-    await page.goto(helper.contentUrl('/test-page', '/diff?one=0&two=1'));
+    await helper.navigateToView('/history-test-page');
+    await page.goto(helper.contentUrl('/history-test-page', '/diff?one=0&two=1'));
 
     const panes = page.locator('#page-diff iframe');
     await expect(panes).toHaveCount(2, { timeout: 20_000 });
@@ -60,7 +60,7 @@ test.describe('History and compare', () => {
     // current page's last block must be absent from BOTH panes — the decisive
     // proof each pane shows pushed version content, not the SSR page.
     const current = await (
-      await page.request.get(`${URLS.mockApi}/++api++/_test_data/test-page`)
+      await page.request.get(`${URLS.mockApi}/++api++/_test_data/history-test-page`)
     ).json();
     const lastUid = current.blocks_layout.items[current.blocks_layout.items.length - 1];
     for (const n of [0, 1]) {
@@ -87,7 +87,7 @@ test.describe('History and compare', () => {
   test('the history row offers View changes for a comparable version', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
-    await page.goto(helper.contentUrl('/test-page', '/historyview'));
+    await page.goto(helper.contentUrl('/history-test-page', '/historyview'));
 
     const laterVersion = page.locator('table tbody tr', { hasText: 'Edited' }).first();
     await expect(laterVersion).toBeVisible({ timeout: 15_000 });
