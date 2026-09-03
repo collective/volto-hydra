@@ -991,14 +991,14 @@ export async function verifyPathMapCoverage(
     if (!b?.blockPathMap) return null;
     const pathMap = b.blockPathMap;
 
-    // Dynamic-container block types render interactive `data-block-uid`
-    // children that are intentionally NOT part of the editable pathMap:
-    // `search` (facets widget + results listing) and `listing`/
-    // `contextNavigation` (async-fetched results). Those are a different
-    // editability model, not the static-nested-editable-block class this
-    // guardrail targets — skip them wholesale to stay false-positive-free.
-    const DYNAMIC = new Set(['search', 'listing', 'contextNavigation']);
-    if (DYNAMIC.has(pathMap[parentUid]?.blockType)) return [];
+    // No dynamic-container exemptions. search/listing/contextNavigation used
+    // to be skipped wholesale ("async-fetched results are a different
+    // editability model"), which is how "search wasn't getting sanity
+    // checked" happened — the reveal work (#330) closed the reachability
+    // hole, and the tolerances below already cover what dynamic expansion
+    // legitimately renders: expanded items REUSE their container's uid, and
+    // projected subtrees carry data-block-readonly. Anything else with a uid
+    // must resolve in the pathMap, dynamic container or not.
 
     const found: string[] = [];
     el.querySelectorAll('[data-block-uid]').forEach((child: Element) => {
