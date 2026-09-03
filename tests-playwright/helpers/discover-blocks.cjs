@@ -1146,6 +1146,10 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   // chevron / drag walks it OUT to the nearest ancestor that accepts the type,
   // so it "escapes"). Surface each as a failing test, like the issues below.
   const allowedBlocksViolations = []; // {blockType, allowed, parentType, pagePath, blockId}
+  // Every page as fetched, for the graph-integrity pass (the same validator
+  // the mock API runs over content DIRS, fed the API's answers instead —
+  // broken resolveuid/link/layout refs on the LIVE site).
+  const fetchedPages = [];
   const containmentRules = readContainmentRules();
   // Track block @types seen in content that aren't in blocksConfig — the
   // frontend's Block.vue falls through to a "Not implemented" placeholder
@@ -1178,7 +1182,7 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   const subTypeExamples = new Map();
 
   // Step 1: Get all content paths via @search (b_size=9999 to avoid pagination)
-  const searchUrl = `${apiUrl}/@search?b_size=9999`;
+  const searchUrl = `${apiUrl}/@search?b_size=9999&metadata_fields=UID`;
   console.log(`[DISCOVER] Fetching content list from ${searchUrl}`);
   const searchResp = await fetch(searchUrl, {
     headers: { Accept: 'application/json' },
@@ -1216,6 +1220,7 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
 
       const content = await resp.json();
       fetched++;
+      fetchedPages.push({ rel: pagePath.replace(/^\//, '') || '/', data: content });
 
       if (!content.blocks || !content.blocks_layout?.items) continue;
 
@@ -1540,6 +1545,50 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   // (these fields can't be edited in the sidebar until declared).
   for (const { blockType, field, blockId, pagePath } of undeclaredFields.values()) {
     result.push({ blockType, blockId, pagePath, field, undeclaredField: true });
+  }
+
+  // Graph integrity over what the API actually served: the SAME
+  // checkIntegrity the mock API runs against content dirs, fed the fetched
+  // pages (disk-only passes — blob files, __metadata__ — skip themselves).
+  // One failing test per affected page, so a broken resolveuid or a
+  // blocks_layout entry pointing at a deleted block fails by name.
+  {
+    const { checkIntegrity } = require('../fixtures/plone-content-validator.cjs');
+    // Discovery only FETCHES page-like items, but references point at every
+    // content type (an image block's url names an Image object). Register the
+    // rest of the @search result as stubs — path + UID into the maps, no
+    // blocks to walk — so their references resolve instead of false-flagging.
+    const fetchedPaths = new Set(fetchedPages.map((p) => p.rel));
+    const stubs = items
+      .filter((item) => {
+        const rel = new URL(item['@id']).pathname.replace(/^\//, '') || '/';
+        return !fetchedPaths.has(rel);
+      })
+      .map((item) => ({
+        rel: new URL(item['@id']).pathname.replace(/^\//, '') || '/',
+        data: { '@id': new URL(item['@id']).pathname, '@type': item['@type'], UID: item.UID },
+      }));
+    const { errors } = checkIntegrity([...fetchedPages, ...stubs]);
+    // A harness may mount extra content trees whose pages were authored for a
+    // different root (the parent's /_test_data fixture mount): their internal
+    // refs legitimately miss this merged view. Same idea as
+    // CONTAINMENT_EXEMPT_SLOTS — the harness states the exemption, discovery
+    // doesn't guess. CSV of page-path prefixes.
+    const exemptPrefixes = (process.env.INTEGRITY_EXEMPT_PREFIXES || '')
+      .split(',')
+      .map((prefix) => prefix.trim())
+      .filter(Boolean);
+    const byPage = new Map();
+    for (const message of errors) {
+      const rel = message.trim().split(':')[0];
+      const pagePath = rel.startsWith('/') ? rel : `/${rel}`;
+      if (exemptPrefixes.some((prefix) => pagePath.startsWith(prefix))) continue;
+      if (!byPage.has(pagePath)) byPage.set(pagePath, []);
+      byPage.get(pagePath).push(message.trim());
+    }
+    for (const [pagePath, issues] of byPage) {
+      result.push({ blockType: null, pagePath, integrityIssue: true, issues });
+    }
   }
 
   // Every block type the FRONTEND registers needs at least one content

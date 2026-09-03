@@ -115,6 +115,11 @@ async function globalSetup() {
 
   // Run block discovery if configured (before health checks — SKIP_VOLTO_CHECK
   // causes early return but discovery still needs to run for bridge tests)
+  // Fixture mounts are authored for their own root: served under /_test_data
+  // (the docs+fixtures job layout) their internal refs legitimately miss the
+  // merged view. Default the integrity exemption here so every harness gets
+  // it; a consuming repo can still override before setup runs.
+  process.env.INTEGRITY_EXEMPT_PREFIXES ??= '/_test_data';
   const discoverApi = process.env.DISCOVER_BLOCKS_API;
   if (discoverApi) {
     const maxPages = process.env.DISCOVER_MAX_PAGES

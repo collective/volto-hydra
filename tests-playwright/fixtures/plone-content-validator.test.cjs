@@ -563,3 +563,46 @@ describe('plone-content-validator checkIntegrity()', () => {
     assert.equal(r.stats.resolveuidOk, 1);
   });
 });
+
+describe('checkIntegrity over in-memory items (API-fed)', () => {
+  it('catches broken resolveuid, dangling layout refs and duplicate UIDs with no disk tree', () => {
+    const uid = 'abcdef1234567890';
+    const r = checkIntegrity([
+      {
+        rel: 'page-a',
+        data: {
+          '@id': '/page-a',
+          '@type': 'Document',
+          id: 'page-a',
+          UID: uid,
+          blocks: {
+            good: { '@type': 'slate', value: [{ type: 'p', children: [{ text: `see resolveuid/${uid}` }] }] },
+            bad: { '@type': 'slate', value: [{ type: 'p', children: [{ text: 'see resolveuid/feedfeedfeedfeed' }] }] },
+          },
+          blocks_layout: { items: ['good', 'bad', 'ghost'] },
+        },
+      },
+      {
+        rel: 'page-b',
+        data: { '@id': '/page-b', '@type': 'Document', id: 'page-b', UID: uid, blocks: {}, blocks_layout: { items: [] } },
+      },
+    ]);
+    assert.equal(r.stats.resolveuidOk, 1);
+    assert.equal(r.stats.resolveuidBroken, 1);
+    assert.equal(r.stats.layoutBroken, 1);
+    assert.ok(r.errors.some((e) => e.includes('duplicate UID')));
+    assert.ok(r.errors.some((e) => e.includes('missing block ghost')));
+    // Disk-only passes must not have run (nothing to stat).
+    assert.equal(r.stats.imagesBroken, 0);
+  });
+
+  it('a clean in-memory set reports nothing', () => {
+    const r = checkIntegrity([
+      {
+        rel: 'page-a',
+        data: { '@id': '/page-a', '@type': 'Document', id: 'page-a', UID: 'aaaabbbbcccc', blocks: {}, blocks_layout: { items: [] } },
+      },
+    ]);
+    assert.deepEqual(r.errors, []);
+  });
+});
