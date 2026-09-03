@@ -15,8 +15,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import qs from 'query-string';
-import Cookies from 'js-cookie';
 import { getContent } from '@plone/volto/actions';
 import { getBaseUrl } from '@plone/volto/helpers';
 import { getURlsFromEnv } from '../../utils/getSavedURLs';
@@ -72,16 +70,21 @@ const HydraDiff = (props) => {
   const dispatch = useDispatch();
   const location = useLocation();
   const path = getBaseUrl(location.pathname);
-  const { one, two } = qs.parse(location.search);
+  const params = new URLSearchParams(location.search);
+  const one = params.get('one') ?? undefined;
+  const two = params.get('two') ?? undefined;
   const [versions, setVersions] = useState({});
 
   const adminOrigin =
     typeof window !== 'undefined' ? window.location.origin : '';
   const iframeName = `hydra-view:${adminOrigin}`;
   const urlFromEnv = getURlsFromEnv();
+  const cookieMatch =
+    typeof document !== 'undefined' &&
+    document.cookie.match(new RegExp(`${getIframeUrlCookieName()}=([^;]+)`));
   const previewBase =
-    useSelector((state) => state.frontendPreviewUrl.url) ||
-    Cookies.get(getIframeUrlCookieName()) ||
+    useSelector((state) => state.frontendPreviewUrl?.url) ||
+    (cookieMatch ? decodeURIComponent(cookieMatch[1]) : null) ||
     urlFromEnv[0]?.url;
   const src = previewBase ? `${previewBase.replace(/\/$/, '')}${path === '/' ? '' : path}` : null;
 
