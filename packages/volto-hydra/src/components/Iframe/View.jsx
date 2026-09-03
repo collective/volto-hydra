@@ -1,3 +1,4 @@
+import { addUrlParams } from '../../utils/iframeUrl';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { isEqual } from 'lodash';
 import { v4 as uuid } from 'uuid';
@@ -445,24 +446,7 @@ const extractBlockFieldTypes = (intl, contentTypeSchema = null) => {
  * @param {String} pathname
  * @returns {String}
  */
-const addUrlParams = (url, qParams, pathname) => {
-  const urlObj = new URL(url);
-  for (const [key, value] of Object.entries(qParams)) {
-    urlObj.searchParams.set(key, value);
-  }
-  // console.log('pathname', appendPathToURL(newUrl, pathname));
 
-  const path = pathname.startsWith('/') ? pathname.slice(1) : pathname;
-  if (urlObj.hash) {
-    // Support both /#/ and /# - normalize by removing trailing slash before appending
-    const hashBase = urlObj.hash.replace(/\/$/, '');
-    urlObj.hash = `${hashBase}/${path}`;
-  } else {
-    urlObj.pathname += `${path}`;
-  }
-  const newURL = urlObj.toString();
-  return newURL;
-};
 
 /**
  * Format the URL for the Iframe with location, token and edit mode

@@ -11,7 +11,7 @@
  * A unified inline text-diff is out of scope by design: there is no honest way
  * to line-diff two arbitrary frontend renders (see volto-hydra#327).
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation } from 'react-router-dom';
 import { Link } from 'react-router-dom';
@@ -19,6 +19,8 @@ import { getContent } from '@plone/volto/actions/content/content';
 import { getBaseUrl } from '@plone/volto/helpers/Url/Url';
 import { getURlsFromEnv } from '../../../../../utils/getSavedURLs';
 import { getIframeUrlCookieName } from '../../../../../utils/cookieNames';
+import { addUrlParams } from '../../../../../utils/iframeUrl';
+import ViewPane from '../../../../../components/Iframe/ViewPane';
 
 const panelStyle = {
   flex: '1 1 0',
@@ -30,41 +32,21 @@ const panelStyle = {
   overflow: 'hidden',
 };
 
-const VersionPane = ({ label, when, actor, src, iframeName, content }) => {
-  const ref = useRef(null);
-  // Answer THIS iframe's INIT with THIS version's content. The listener stays
-  // for the iframe's lifetime: a reload (dev, viewport change) re-INITs and
-  // must be re-fed the same version.
-  useEffect(() => {
-    if (!content) return undefined;
-    const onMessage = (event) => {
-      if (event.source !== ref.current?.contentWindow) return;
-      if (event.data?.type !== 'INIT') return;
-      ref.current.contentWindow.postMessage(
-        { type: 'FORM_DATA', data: content },
-        '*',
-      );
-    };
-    window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
-  }, [content]);
-  return (
-    <div style={panelStyle}>
-      <div style={{ padding: '0.5em 1em', background: '#f3f5f7', borderBottom: '1px solid #ccc' }}>
-        <strong>{label}</strong>
-        {when ? <span style={{ marginLeft: '0.75em', color: '#666' }}>{when}</span> : null}
-        {actor ? <span style={{ marginLeft: '0.75em', color: '#666' }}>{actor}</span> : null}
-      </div>
-      <iframe
-        ref={ref}
-        title={label}
-        name={iframeName}
-        src={src}
-        style={{ flex: 1, width: '100%', border: 0, minHeight: '70vh' }}
-      />
+const VersionPane = ({ label, when, actor, src, content }) => (
+  <div style={panelStyle}>
+    <div style={{ padding: '0.5em 1em', background: '#f3f5f7', borderBottom: '1px solid #ccc' }}>
+      <strong>{label}</strong>
+      {when ? <span style={{ marginLeft: '0.75em', color: '#666' }}>{when}</span> : null}
+      {actor ? <span style={{ marginLeft: '0.75em', color: '#666' }}>{actor}</span> : null}
     </div>
-  );
-};
+    <ViewPane
+      title={label}
+      src={src}
+      content={content}
+      style={{ flex: 1, width: '100%', border: 0, minHeight: '70vh' }}
+    />
+  </div>
+);
 
 const HydraDiff = (props) => {
   const dispatch = useDispatch();
@@ -75,9 +57,6 @@ const HydraDiff = (props) => {
   const two = params.get('two') ?? undefined;
   const [versions, setVersions] = useState({});
 
-  const adminOrigin =
-    typeof window !== 'undefined' ? window.location.origin : '';
-  const iframeName = `hydra-view:${adminOrigin}`;
   const urlFromEnv = getURlsFromEnv();
   const cookieMatch =
     typeof document !== 'undefined' &&
@@ -86,7 +65,13 @@ const HydraDiff = (props) => {
     useSelector((state) => state.frontendPreviewUrl?.url) ||
     (cookieMatch ? decodeURIComponent(cookieMatch[1]) : null) ||
     urlFromEnv[0]?.url;
-  const src = previewBase ? `${previewBase.replace(/\/$/, '')}${path === '/' ? '' : path}` : null;
+  const token = useSelector((state) => state.userSession?.token);
+  // The SAME url recipe the editor's canvas uses — hash-routed frontends get
+  // the path in the hash, and the access token rides along so the pane's own
+  // SSR fetch is authenticated like the canvas's.
+  const src = previewBase
+    ? addUrlParams(previewBase, { access_token: token || '', _edit: 'false' }, path)
+    : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -118,14 +103,12 @@ const HydraDiff = (props) => {
             label={`Version ${one}`}
             when={versions.one?.modified || versions.one?.time}
             src={src}
-            iframeName={iframeName}
             content={versions.one}
           />
           <VersionPane
             label={two === 'current' ? 'Current' : `Version ${two}`}
             when={versions.two?.modified || versions.two?.time}
             src={src}
-            iframeName={iframeName}
             content={versions.two}
           />
         </div>
