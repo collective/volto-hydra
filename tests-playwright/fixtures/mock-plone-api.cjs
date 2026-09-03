@@ -710,6 +710,10 @@ function buildActionsComponent(cleanPath, baseUrl) {
       { '@id': fullUrl, icon: '', id: 'view', title: 'View' },
       { '@id': `${fullUrl}/edit`, icon: '', id: 'edit', title: 'Edit' },
       { id: 'folderContents', title: 'Contents' },
+      // The admin's More menu builds its Sharing entry from this action —
+      // pair of the @sharing endpoint below.
+      { '@id': `${fullUrl}/sharing`, icon: '', id: 'local_roles', title: 'Sharing' },
+      { '@id': `${fullUrl}/history`, icon: '', id: 'history', title: 'History' },
     ],
     object_buttons: [],
     portal_tabs: [],
@@ -1997,6 +2001,26 @@ app.post(/.*\/@workflow\/[^/]+$/, (req, res) => {
   const record = applyWorkflowTransition(cleanPath, match[2]);
   if (!record) return res.status(400).json({ error: 'invalid transition' });
   res.json(record);
+});
+
+/**
+ * GET /@history — the version + workflow trail the admin's History view lists;
+ * grows as @workflow transitions apply.
+ */
+app.get(/.*\/@history$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@history$/, '') || '/').replace(/\/+$/, '') || '/';
+  const entry = workflowState.get(cleanPath) || { state: 'published', history: [] };
+  res.json(entry.history.map((h, n) => ({
+    '@id': `http://localhost:${PORT}${cleanPath}/@history/${n + 1}`,
+    action: h.action,
+    actor: { '@id': null, fullname: 'Admin User', id: 'admin', username: 'admin' },
+    comments: h.comments,
+    review_state: h.review_state,
+    state_title: h.title,
+    time: h.time,
+    transition_title: h.title,
+    type: 'workflow',
+  })).reverse());
 });
 
 /**
