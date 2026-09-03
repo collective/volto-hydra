@@ -251,18 +251,25 @@ export async function checkDataEditTextClicks(
  */
 export async function revealBlock(iframe: FrameLocator, blockUid: string): Promise<void> {
   const block = iframe.locator(`[data-block-uid="${blockUid}"]`).first();
+  // A query-gated block (data-block-selector-input) has NO element until its
+  // question is asked — and locator.evaluate AUTO-WAITS on an absent element,
+  // so probing it directly hung the whole test until the timeout and the
+  // reveal never ran. Count first: count() never waits.
+  const exists = (await block.count()) > 0;
   // Ask the bridge whether it considers the block visible — do not re-derive it.
   // A carousel slide translated out of view still HAS client rects: it is laid
   // out, just at x=-777 while its container starts at x=16. Checking rects
   // concluded "already rendered", skipped the reveal, and left the click landing
   // off-viewport. isElementHidden knows about off-screen translates.
-  const rendered = await block
-    .evaluate((node) => {
-      const bridge = (window as any).__hydraBridge;
-      if (bridge?.isElementHidden) return !bridge.isElementHidden(node);
-      return node.getClientRects().length > 0;
-    })
-    .catch(() => false);
+  const rendered = exists
+    ? await block
+        .evaluate((node) => {
+          const bridge = (window as any).__hydraBridge;
+          if (bridge?.isElementHidden) return !bridge.isElementHidden(node);
+          return node.getClientRects().length > 0;
+        })
+        .catch(() => false)
+    : false;
   if (rendered) return;
 
   // hydra already knows how to do this: tryMakeBlockVisible clicks a direct
@@ -279,7 +286,10 @@ export async function revealBlock(iframe: FrameLocator, blockUid: string): Promi
     .catch(() => false);
   if (!clicked) return;
 
-  await expect(block).toBeVisible({ timeout: 5000 });
+  // A click reveal repaints in a frame; a QUERY reveal navigates (the form
+  // submits, the page reloads, edit mode waits for INITIAL_DATA, then
+  // renders) — give it the reload's worth of time.
+  await expect(block).toBeVisible({ timeout: 15000 });
 
 }
 
@@ -1162,6 +1172,11 @@ export async function verifyBlockRendering(
     let anyVisible = false;
     for (const { id, data } of subBlocks) {
       const loc = iframe.locator(`[data-block-uid="${id}"]`).first();
+      // A query-gated child has no element until its question is asked —
+      // reveal FIRST (revealBlock knows how to ask), then require attachment.
+      if ((await loc.count()) === 0) {
+        await revealBlock(iframe, id);
+      }
       await expect(loc).toBeAttached({ timeout: 5000 });
       // Content gated behind a reveal control — an accordion header, a tab, a
       // carousel nav — is display:none until revealed. That's by design: the

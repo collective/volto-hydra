@@ -518,6 +518,26 @@ export const sharedBlocksConfig = {
                 headline: { title: 'Headline', type: 'string' },
                 title: { title: 'Title', type: 'string' },
                 facetsTitle: { title: 'Facets title', type: 'string' },
+                // The quick-answer region only renders once a query has been
+                // asked; the sample question is what data-block-selector-input
+                // types to reveal it (query-reveal-page + query-reveal.spec).
+                quickAnswerSample: { title: 'Sample question', type: 'string' },
+                quickAnswer: {
+                  title: 'Quick answer',
+                  widget: 'blocks_layout',
+                  allowedBlocks: ['quickAnswer'],
+                },
+            },
+        },
+    },
+    quickAnswer: {
+        id: 'quickAnswer',
+        title: 'Quick answer',
+        group: 'common',
+        restricted: true,
+        blockSchema: {
+            properties: {
+                answer: { title: 'Answer', type: 'string' },
             },
         },
     },
