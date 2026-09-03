@@ -178,6 +178,19 @@ test.describe('Block sanity (auto-discovered)', () => {
       });
       continue;
     }
+    // Graph integrity on what the API served (the plone-content-validator run
+    // over fetched pages): broken resolveuid/link refs, blocks_layout entries
+    // pointing at missing blocks, duplicate UIDs. One failing test per page.
+    if (block.integrityIssue) {
+      test(`content integrity on ${block.pagePath}${src}`, ({}, testInfo) => {
+        test.skip(!belongsHere(testInfo.project.name), `discovered via ${block.frontend}`);
+        throw new Error(
+          `Content-graph integrity failures on ${block.pagePath}:\n` +
+            (block.issues || []).map((issue: string) => `  - ${issue}`).join('\n'),
+        );
+      });
+      continue;
+    }
     // Content/schema shape mismatch (e.g. a field declared slate but holding a
     // string) — fails as its own test rather than blocking the suite.
     if (block.shapeIssue || block.slateIssue) {

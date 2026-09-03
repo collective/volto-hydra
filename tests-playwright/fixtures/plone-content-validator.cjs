@@ -4,8 +4,13 @@
  * Two entry points:
  *   validate(contentDir) — export shape: _data_files_/_blob_files_ consistency,
  *                          parent/UID/id presence, Image blob paths, ordering
- *   checkIntegrity(contentDir) — graph integrity: resolveuid refs, image refs,
- *                                teaser/button hrefs, parent containers
+ *   checkIntegrity(source) — graph integrity: resolveuid refs, image refs,
+ *                            teaser/button hrefs, parent containers.
+ *                            `source` is a content DIR (full check) or an
+ *                            in-memory [{ rel, data }] array (e.g. pages
+ *                            fetched from a live API) — the disk-only passes
+ *                            (blob files, __metadata__ cross-check) skip for
+ *                            the in-memory form.
  *
  * Both return { errors: string[], warnings: string[], stats: object }.
  * Mirrors the behaviour of pretagov-site/{validate,test}-content.py so the
@@ -271,7 +276,9 @@ function validate(contentDir) {
 /**
  * Graph integrity. Mirrors test-content.py.
  */
-function checkIntegrity(contentDir) {
+function checkIntegrity(source) {
+  const onDisk = typeof source === 'string';
+  const contentDir = onDisk ? source : null;
   const errors = [];
   const warnings = [];
   const stats = {
@@ -292,8 +299,9 @@ function checkIntegrity(contentDir) {
   const uidMap = new Map();
   const pathMap = new Map();
   const items = [];
-  for (const { rel, data, dir } of walkData(contentDir)) {
-    items.push({ rel, data, dir });
+  for (const entry of onDisk ? walkData(contentDir) : source) {
+    items.push(entry);
+    const { rel, data } = entry;
     // `id` is required by the Plone importer: a missing id aborts the ENTIRE
     // create-site with `KeyError: 'id'` (plone.exportimport process_id), and an
     // underscore-prefixed id is rejected by Plone OFS. Both silently leave an
@@ -304,7 +312,10 @@ function checkIntegrity(contentDir) {
       data['@type'] === 'Plone Site' ||
       rel === 'plone_site_root' ||
       data['@id'] === '/Plone';
-    if (!isRoot) {
+    // Identity presence is an IMPORT-side concern (a real API always serves
+    // `id`; mocks serving fixture JSON verbatim legitimately may not) — check
+    // it only for on-disk export trees, where a missing id aborts the import.
+    if (!isRoot && onDisk) {
       if (!data.id) {
         errors.push(`  ${rel}: missing id (Plone import aborts with KeyError: 'id')`);
       } else if (/^_/.test(data.id)) {
@@ -332,8 +343,10 @@ function checkIntegrity(contentDir) {
 
   // Pass 2a: resolveuid references
   const resolveuidRe = /(?:\.\.\/)*resolveuid\/([a-f0-9]{10,})/g;
-  for (const { rel, dir } of items) {
-    const text = fs.readFileSync(path.join(dir, 'data.json'), 'utf8');
+  for (const { rel, dir, data } of items) {
+    const text = onDisk
+      ? fs.readFileSync(path.join(dir, 'data.json'), 'utf8')
+      : JSON.stringify(data);
     let m;
     while ((m = resolveuidRe.exec(text)) !== null) {
       const uid = m[1];
@@ -383,8 +396,10 @@ function imageDimensions(file) {
   return null;
 }
 
-  // Pass 2b: Image content items have blob files
+  // Pass 2b: Image content items have blob files (disk only — an API-fed
+  // check has no blob files to stat; scale URLs are the frontend's concern).
   for (const { rel, data } of items) {
+    if (!onDisk) break;
     if (data['@type'] !== 'Image') continue;
     const img = data.image || {};
     const blobPath = img.blob_path || '';
@@ -548,8 +563,8 @@ function imageDimensions(file) {
   // Parent containers (metadata cross-check for completeness). Uses the `@id`
   // hierarchy via pathMap, not the directory path — see validate()'s note: our
   // content is UID-keyed and flat, so a path-derived parent never resolves.
-  const metaPath = path.join(contentDir, '__metadata__.json');
-  if (fs.existsSync(metaPath)) {
+  const metaPath = onDisk ? path.join(contentDir, '__metadata__.json') : null;
+  if (metaPath && fs.existsSync(metaPath)) {
     const meta = readJson(metaPath);
     for (const entry of meta._data_files_ || []) {
       const entryPath = path.join(contentDir, entry);
