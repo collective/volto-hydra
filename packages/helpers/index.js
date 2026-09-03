@@ -1595,12 +1595,16 @@ function _isEditMode() {
  * Simple UUID generator for block IDs.
  * @returns {string} UUID v4 format string
  */
-function generateUUID() {
+function uuidFromRand(rand) {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-    const r = (Math.random() * 16) | 0;
+    const r = (rand() * 16) | 0;
     const v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
+}
+
+function generateUUID() {
+  return uuidFromRand(Math.random);
 }
 
 /**
@@ -1625,11 +1629,7 @@ function deterministicUUID(seed) {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-    const r = (rand() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+  return uuidFromRand(rand);
 }
 
 /**
@@ -2716,6 +2716,17 @@ export function collectContentFromTree(
  * the shared ctx (consumed so it isn't reused), and recurses into nested containers.
  * Returns filled [{ id, block }] in order.
  */
+/**
+ * THE single policy for a template child's block id. Deterministic by default
+ * (`${instanceId}::${tplChildId}` — stable across a server render and the
+ * client hydration, and instance-scoped so two instances of one template
+ * never collide); a caller-provided generator wins only where the caller
+ * genuinely needs one-off ids (e.g. snippet insertion into a page).
+ */
+function mintChildBlockId(instanceId, tplChildId, uuidGenerator) {
+  return uuidGenerator ? uuidGenerator() : `${instanceId}::${tplChildId}`;
+}
+
 function fillRegionEntries(entries, templateState, options) {
   const { instanceId, templateId } = templateState;
   const ctx = templateState.instances?.[instanceId];
@@ -2784,9 +2795,7 @@ function fillRegionEntries(entries, templateState, options) {
         // (a slot's contents are per-page user content, never template content; a fixed
         // block placed inside a slot is malformed and must not ride along). Field
         // placeholders only matter on first insert.
-        const nid = uuidGenerator
-          ? uuidGenerator()
-          : `${instanceId}::${tplChildId}`;
+        const nid = mintChildBlockId(instanceId, tplChildId, uuidGenerator);
         const {
           blocks: _slotBlocks,
           blocks_layout: _slotLayout,
@@ -3420,9 +3429,29 @@ export function expandTemplatesSync(inputItems, options = {}) {
       // Derive the id deterministically from the region's first block id so the
       // server render and the client hydration mint the SAME instance id (and so
       // the same `${instanceId}::tplChildId` block uids) — a random id differs
-      // between the two passes and causes a hydration mismatch. Fall back to a
-      // random id only when there's no stable seed (an empty forced layout).
-      instanceId = idemKey ? deterministicUUID(idemKey) : generateUUID();
+      // between the two passes and causes a hydration mismatch. An EMPTY forced
+      // layout has no first block id, but the forced template id itself is a
+      // stable seed (one region, one forced template): without it, every block
+      // of a forced chrome template changed uid on hydration, and the editor's
+      // pathmap/selectors (e.g. `uid#field` reveal handles) pointed at the
+      // server pass's dead uids. Random only when there is truly no seed.
+      // Distinctness: TWO forced layouts of the same template in one pass
+      // (same templateState) must not share an instance — count per template,
+      // so the Nth forced application seeds `${templateId}#${N}`. Region
+      // render order is the same on the server and the client, so the counter
+      // yields the same ids both passes.
+      let forcedSeed = null;
+      if (!idemKey && allowedLayouts?.length === 1) {
+        if (!templateState.forcedSeedCounts) templateState.forcedSeedCounts = {};
+        const nth = templateState.forcedSeedCounts[allowedLayouts[0]] || 0;
+        templateState.forcedSeedCounts[allowedLayouts[0]] = nth + 1;
+        forcedSeed = `${allowedLayouts[0]}#${nth}`;
+      }
+      instanceId = idemKey
+        ? deterministicUUID(idemKey)
+        : forcedSeed
+          ? deterministicUUID(forcedSeed)
+          : generateUUID();
       if (idemKey) {
         if (!templateState.generatedInstanceIds)
           templateState.generatedInstanceIds = {};
@@ -3613,11 +3642,8 @@ export function expandTemplatesSync(inputItems, options = {}) {
     if (tplBlock.fixed) {
       const slotId = tplBlock.slotId;
       const existing = slotId && existingFixedBlockIds?.get(slotId);
-      const blockId = existing?.blockId
-        ? existing.blockId
-        : uuidGenerator
-          ? uuidGenerator()
-          : `${instanceId}::${tplBlockId}`;
+      const blockId =
+        existing?.blockId || mintChildBlockId(instanceId, tplBlockId, uuidGenerator);
 
       let blockContent = tplBlock;
       if (!tplBlock.readOnly && existing?.block) {

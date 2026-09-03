@@ -72,8 +72,11 @@ if (fs.existsSync(discoveredPath)) {
 // one fetches an external feed that only resolves against the mock. They're
 // covered by their own integration spec (admin-mock), not this render contract.
 const NON_CONTRACT_BLOCKS = new Set(['relatedItemsListing', 'searchShortcuts', 'rssFeed']);
+const seenShapeTitles = new Map();
 discoveredBlocks = discoveredBlocks.filter(
-  (b) => !b.blockType.startsWith('conv') && !NON_CONTRACT_BLOCKS.has(b.blockType),
+  // a shape-issue discovery entry has no blockType — keep it (its test FAILS
+  // with the issue text; dropping it here would hide a real content problem)
+  (b) => !(b.blockType ?? '').startsWith('conv') && !NON_CONTRACT_BLOCKS.has(b.blockType),
 );
 
 // Block sanity is the cross-cutting render contract. We only enforce it on
@@ -183,7 +186,13 @@ test.describe('Block sanity (auto-discovered)', () => {
       // can have per-field shape/slate issues — without them, two entries would
       // collide into a "duplicate test title" error and abort the whole run.
       const where = `${block.pagePath || '?'}${block.field ? `.${block.field}` : ''}`;
-      test(`${block.blockType} block [${block.blockId}] on ${where} has valid ${kind}${src}`, () => {
+      // A block can carry SEVERAL distinct issues of the same kind on the same
+      // page+field — suffix repeats so titles stay unique instead of aborting.
+      const baseTitle = `${block.blockType} block [${block.blockId}] on ${where} has valid ${kind}`;
+      const seen = (seenShapeTitles.get(baseTitle) || 0) + 1;
+      seenShapeTitles.set(baseTitle, seen);
+      const title = seen > 1 ? `${baseTitle} (#${seen})` : baseTitle;
+      test(`${title}${src}`, () => {
         throw new Error(
           `Block "${block.blockType}" [${block.blockId}] on ${block.pagePath}` +
             (block.field ? ` field "${block.field}"` : '') +
