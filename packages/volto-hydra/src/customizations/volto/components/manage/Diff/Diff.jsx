@@ -1,5 +1,5 @@
 /**
- * Inka's compare view — replaces Volto's Diff route.
+ * Inka's compare view — SHADOWS Volto's Diff component (customizations/).
  *
  * Volto's diff renders both versions with Volto's OWN block components, which
  * a hydra admin deliberately doesn't have: the frontend is the only renderer.
@@ -17,8 +17,8 @@ import { useLocation } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { getContent } from '@plone/volto/actions/content/content';
 import { getBaseUrl } from '@plone/volto/helpers/Url/Url';
-import { getURlsFromEnv } from '../../utils/getSavedURLs';
-import { getIframeUrlCookieName } from '../../utils/cookieNames';
+import { getURlsFromEnv } from '../../../../../utils/getSavedURLs';
+import { getIframeUrlCookieName } from '../../../../../utils/cookieNames';
 
 const panelStyle = {
   flex: '1 1 0',
