@@ -527,6 +527,15 @@ export const sharedBlocksConfig = {
                   widget: 'blocks_layout',
                   allowedBlocks: ['quickAnswer'],
                 },
+                // The results region (docs/examples/search.md): a child listing
+                // block under blocks_layout.listing. Undeclared, its children
+                // render but never enter the pathMap — the exact orphan the
+                // guardrail now refuses without exemptions.
+                listing: {
+                  title: 'Listing',
+                  widget: 'blocks_layout',
+                  allowedBlocks: ['listing'],
+                },
             },
         },
     },
