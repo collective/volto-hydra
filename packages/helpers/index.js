@@ -3426,7 +3426,18 @@ export function expandTemplatesSync(inputItems, options = {}) {
       // of a forced chrome template changed uid on hydration, and the editor's
       // pathmap/selectors (e.g. `uid#field` reveal handles) pointed at the
       // server pass's dead uids. Random only when there is truly no seed.
-      const forcedSeed = !idemKey && allowedLayouts?.length === 1 ? allowedLayouts[0] : null;
+      // Distinctness: TWO forced layouts of the same template in one pass
+      // (same templateState) must not share an instance — count per template,
+      // so the Nth forced application seeds `${templateId}#${N}`. Region
+      // render order is the same on the server and the client, so the counter
+      // yields the same ids both passes.
+      let forcedSeed = null;
+      if (!idemKey && allowedLayouts?.length === 1) {
+        if (!templateState.forcedSeedCounts) templateState.forcedSeedCounts = {};
+        const nth = templateState.forcedSeedCounts[allowedLayouts[0]] || 0;
+        templateState.forcedSeedCounts[allowedLayouts[0]] = nth + 1;
+        forcedSeed = `${allowedLayouts[0]}#${nth}`;
+      }
       instanceId = idemKey
         ? deterministicUUID(idemKey)
         : forcedSeed
