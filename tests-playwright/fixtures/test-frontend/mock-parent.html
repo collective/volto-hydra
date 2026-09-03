@@ -209,7 +209,19 @@
           },
         }),
       },
-      slate: { id: 'slate', blockSchema: { properties: { value: { widget: 'slate' } } } },
+      slate: {
+        id: 'slate',
+        blockSchema: {
+          properties: {
+            value: { widget: 'slate' },
+            // Mirrors the real admin's slate schema factory (#335): the
+            // permanent fragment id a frontend renders on the block. Without
+            // the mirror, any fixture storing an anchor is flagged as an
+            // undeclared field by block-sanity's stray-field check.
+            anchor: { title: 'Anchor', type: 'string' },
+          },
+        },
+      },
       hero: {
         id: 'hero',
         blockSchema: {
