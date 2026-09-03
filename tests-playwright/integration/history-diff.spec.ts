@@ -52,6 +52,19 @@ test.describe('History and compare', () => {
       expect(v0).toBeGreaterThan(0);
       expect(v1).toBeGreaterThan(v0);
     }).toPass({ timeout: 30_000 });
+
+    // The view keeps the admin chrome: a toolbar with a way back, and the
+    // versions are named and switchable from inside the view.
+    await expect(
+      page.locator('#toolbar a[href*="historyview"]'),
+      'the toolbar offers the way back to history',
+    ).toBeVisible();
+    const dropdowns = page.locator('#page-diff .ui.dropdown');
+    await expect(dropdowns, 'Base and Compare version pickers').toHaveCount(2);
+    // Repoint Base at the newest version ("Current") — the URL must follow.
+    await dropdowns.nth(0).click();
+    await dropdowns.nth(0).locator('.menu .item', { hasText: 'Current' }).click();
+    await expect(page).toHaveURL(/one=1/, { timeout: 10_000 });
   });
 
   test('the history row offers View changes for a comparable version', async ({ page }) => {
