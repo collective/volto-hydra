@@ -731,6 +731,9 @@ function buildNavigationComponent(cleanPath, baseUrl) {
   };
 }
 
+// Content snapshots per path, grown on PATCH — versions the compare view diffs.
+const contentVersions = new Map();
+
 // In-memory workflow state per path — the docs demo clips walk a real
 // publish/retract cycle, so transitions must ACT (and history must grow),
 // while staying ephemeral like everything else the mock holds.
@@ -2007,10 +2010,36 @@ app.post(/.*\/@workflow\/[^/]+$/, (req, res) => {
  * GET /@history — the version + workflow trail the admin's History view lists;
  * grows as @workflow transitions apply.
  */
+app.get(/.*\/@history\/\d+$/, (req, res) => {
+  // A content SNAPSHOT: what the page held before edit N+1 (or current for the
+  // newest). The compare view renders these in frontend iframes.
+  const match = req.path.match(/^(.*)\/@history\/(\d+)$/);
+  const cleanPath = (match[1].replace('/++api++', '') || '/').replace(/\/+$/, '') || '/';
+  const version = Number(match[2]);
+  const versions = contentVersions.get(cleanPath) || [];
+  const snapshot = versions.find((v) => v.version === version);
+  if (snapshot) return res.json(snapshot.content);
+  const sessionId = getSessionId(req);
+  const current = getContent(cleanPath, sessionId);
+  if (current) return res.json(current);
+  res.status(404).json({ error: 'no such version' });
+});
+
 app.get(/.*\/@history$/, (req, res) => {
   const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@history$/, '') || '/').replace(/\/+$/, '') || '/';
   const entry = workflowState.get(cleanPath) || { state: 'published', history: [] };
-  res.json(entry.history.map((h, n) => ({
+  const versions = contentVersions.get(cleanPath) || [];
+  const versioning = versions.map((v) => ({
+    '@id': `http://localhost:${PORT}${cleanPath}/@history/${v.version}`,
+    actor: { '@id': null, fullname: 'Admin User', id: 'admin', username: 'admin' },
+    comments: '',
+    may_revert: true,
+    time: v.time,
+    transition_title: 'Edited',
+    type: 'versioning',
+    version: v.version,
+  }));
+  const workflow = entry.history.map((h, n) => ({
     '@id': `http://localhost:${PORT}${cleanPath}/@history/${n + 1}`,
     action: h.action,
     actor: { '@id': null, fullname: 'Admin User', id: 'admin', username: 'admin' },
@@ -2020,7 +2049,8 @@ app.get(/.*\/@history$/, (req, res) => {
     time: h.time,
     transition_title: h.title,
     type: 'workflow',
-  })).reverse());
+  }));
+  res.json([...versioning, ...workflow].sort((a, b) => (a.time < b.time ? 1 : -1)));
 });
 
 /**
@@ -3494,6 +3524,16 @@ app.patch('*', (req, res) => {
   const content = getContent(cleanPath, sessionId);
 
   if (content) {
+    // Version snapshot: the state BEFORE this edit becomes version N (like
+    // CMFEditions). @history lists these; @history/<n> serves them; the
+    // admin's compare view renders any two side by side.
+    const versions = contentVersions.get(cleanPath) || [];
+    versions.push({
+      version: versions.length,
+      time: new Date().toISOString(),
+      content: JSON.parse(JSON.stringify(content)),
+    });
+    contentVersions.set(cleanPath, versions);
     // Emulate Plone's REST deserializer: only fields backed by a registered
     // dexterity field / behavior survive a save. Unknown top-level fields (e.g.
     // an ad-hoc `footer_blocks`) are silently dropped. This is WHY layout
