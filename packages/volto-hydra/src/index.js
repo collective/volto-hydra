@@ -268,13 +268,23 @@ config.settings.additionalToolbarComponents = {
           {
             id: 'default',
             title: 'Default',
-            fields: ['value', ...blockTabFields],
+            fields: ['value', ...blockTabFields, 'anchor'],
           },
           ...(blockTab?.fieldsets?.slice(1) || []),
         ],
         properties: {
           value: { title: 'Body', widget: 'slate', placeholder },
           ...(blockTab?.properties || {}),
+          // Permanent fragment id for a heading block. Frontends render it as
+          // the heading's id, so links and tables of contents survive the
+          // heading being retitled (text-derived slugs don't). Empty = the
+          // frontend falls back to a stable automatic id (the block uid).
+          anchor: {
+            title: 'Anchor',
+            description:
+              'Permanent link id for this heading. Leave empty for an automatic id.',
+            type: 'string',
+          },
         },
         required: blockTab?.required || [],
       };
