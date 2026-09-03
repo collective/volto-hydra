@@ -727,13 +727,60 @@ function buildNavigationComponent(cleanPath, baseUrl) {
   };
 }
 
+// In-memory workflow state per path — the docs demo clips walk a real
+// publish/retract cycle, so transitions must ACT (and history must grow),
+// while staying ephemeral like everything else the mock holds.
+const workflowState = new Map();
+
+const WORKFLOW = {
+  private: {
+    title: 'Private',
+    transitions: [{ '@id': 'publish', title: 'Publish', to: 'published' },
+                  { '@id': 'submit', title: 'Submit for publication', to: 'pending' }],
+  },
+  pending: {
+    title: 'Pending review',
+    transitions: [{ '@id': 'publish', title: 'Publish', to: 'published' },
+                  { '@id': 'reject', title: 'Send back', to: 'private' }],
+  },
+  published: {
+    title: 'Published',
+    transitions: [{ '@id': 'retract', title: 'Retract', to: 'private' }],
+  },
+};
+
 function buildWorkflowComponent(cleanPath, baseUrl) {
   const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
+  const entry = workflowState.get(cleanPath) || { state: 'published', history: [] };
+  const def = WORKFLOW[entry.state];
   return {
     '@id': `${fullUrl}/@workflow`,
-    history: [],
-    transitions: [],
+    history: entry.history,
+    state: { id: entry.state, title: def.title },
+    transitions: def.transitions.map((t) => ({
+      '@id': `${fullUrl}/@workflow/${t['@id']}`,
+      title: t.title,
+    })),
   };
+}
+
+function applyWorkflowTransition(cleanPath, transitionId) {
+  const entry = workflowState.get(cleanPath) || { state: 'published', history: [] };
+  const def = WORKFLOW[entry.state];
+  const transition = def.transitions.find((t) => t['@id'] === transitionId);
+  if (!transition) return null;
+  const record = {
+    action: transitionId,
+    actor: 'admin',
+    comments: '',
+    review_state: transition.to,
+    time: new Date().toISOString(),
+    title: WORKFLOW[transition.to].title,
+  };
+  entry.state = transition.to;
+  entry.history = [...entry.history, record];
+  workflowState.set(cleanPath, entry);
+  return record;
 }
 
 function buildNavrootComponent(cleanPath, baseUrl) {
@@ -1938,6 +1985,50 @@ app.get('/@site', (req, res) => {
 app.get(/.*\/@workflow$/, (req, res) => {
   const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@workflow$/, '') || '/').replace(/\/+$/, '') || '/';
   res.json(buildWorkflowComponent(cleanPath, `http://localhost:${PORT}`));
+});
+
+/**
+ * POST /@workflow/:transition — apply a transition (publish/retract/…), as
+ * Plone does. The docs demo clips drive the admin's state menu through this.
+ */
+app.post(/.*\/@workflow\/[^/]+$/, (req, res) => {
+  const match = req.path.match(/^(.*)\/@workflow\/([^/]+)$/);
+  const cleanPath = (match[1].replace('/++api++', '') || '/').replace(/\/+$/, '') || '/';
+  const record = applyWorkflowTransition(cleanPath, match[2]);
+  if (!record) return res.status(400).json({ error: 'invalid transition' });
+  res.json(record);
+});
+
+/**
+ * GET /@sharing — the per-principal role matrix the admin's Sharing view
+ * renders; POST accepts changes (held in memory only).
+ */
+const sharingOverrides = new Map();
+app.get(/.*\/@sharing$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@sharing$/, '') || '/').replace(/\/+$/, '') || '/';
+  const stored = sharingOverrides.get(cleanPath);
+  res.json(stored || {
+    available_roles: [
+      { id: 'Contributor', title: 'Can add' },
+      { id: 'Editor', title: 'Can edit' },
+      { id: 'Reader', title: 'Can view' },
+      { id: 'Reviewer', title: 'Can review' },
+    ],
+    entries: [
+      { id: 'AuthenticatedUsers', title: 'Logged-in users', type: 'group',
+        roles: { Contributor: false, Editor: false, Reader: false, Reviewer: false } },
+      { id: 'reviewers', title: 'Reviewers', type: 'group',
+        roles: { Contributor: false, Editor: false, Reader: false, Reviewer: 'global' } },
+    ],
+    inherit: true,
+  });
+});
+app.post(/.*\/@sharing$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@sharing$/, '') || '/').replace(/\/+$/, '') || '/';
+  const current = sharingOverrides.get(cleanPath);
+  // merge entries' role changes into the stored matrix (enough for the demo)
+  sharingOverrides.set(cleanPath, { ...(current || {}), ...req.body });
+  res.status(204).end();
 });
 
 /**
