@@ -69,6 +69,8 @@ async function ListingItems({ id, blocks, paging, seen, fetchItems, onPaging }) 
 }
 ```
 
+**Worked example:** [Listing Block](./examples/listing.md) — the built-in block, with renderers for all four stacks.
+
 ## expandListingBlocks Options
 
 - **`blocks`** — Map of blockId to block data
@@ -166,6 +168,8 @@ Built-in item types and the fields they expose:
 Types: string (array→join, image→URL), link (→[{@id}]), image (pass through)
 ```
 
+**Worked example:** [RSS Feed Block](./examples/rssFeed.md) — feed entries mapped onto the item schema by a fetcher you provide.
+
 ## Item Type Selection
 
 Use `variation` on the listing block to control what `@type` expanded items get. Listings reuse the same `inheritSchemaFrom` recipe as container blocks (see [Container Blocks › Synchronised Block Types](container-blocks.md#synchronised-block-types-in-a-container)) but differ in one structural way: there's no blocks field to declare `itemTypeField` on, since listing children are *virtual* (produced from query results at render time, not authored as page data). Instead, declare the typeField directly on the `inheritSchemaFrom` recipe:
@@ -195,9 +199,30 @@ listing: {
 }
 ```
 
-`filterConvertibleFrom: '@default'` restricts the dropdown to types that have a `fieldMappings['@default']` entry — i.e. types that can be populated from the canonical content fields (`@id`, `title`, `description`, `image`) that listing queries return. Each item type's `fieldMappings['@default']` (on its own block config) defines how those source fields land on its schema; that static mapping is enough to render listings. Adding `mappingField` to the enhancer exposes the `FieldMappingWidget` so the editor can override the mapping per listing instance.
+`filterConvertibleFrom: '@default'` restricts the dropdown to types that have a `fieldMappings['@default']` entry — i.e. types that can be populated from the canonical content fields (`@id`, `title`, `description`, `image`) that listing queries return. Each item type's `fieldMappings['@default']` (on its own block config) defines how those source fields land on its schema. Adding `mappingField` to the enhancer exposes the `FieldMappingWidget` so the editor can override the mapping per listing instance.
 
-The widget saves its output as `fieldMapping` (singular) on the block data. `expandListingBlocks` reads that at render time to translate each query result into an item block.
+**Worked example:** [Related Items Block](./examples/relatedItemsListing.md) — the page's relation field, drawn with a configurable item type.
+
+### Where the mapping lives
+
+`fieldMappings` (plural, on a **block config**) and `fieldMapping` (singular, on **block data**) are different things, and only the singular one is read at render:
+
+| | `fieldMappings['@default']` | `fieldMapping` |
+|---|---|---|
+| Lives on | the item type's block config | the listing block's saved data |
+| Used by | `FieldMappingWidget`, while **editing** | `expandListingBlocks`, at **render** |
+| Role | seeds the widget's smart defaults for the chosen item type | the mapping actually applied to query results |
+
+The registry mapping is an *editing-time* input: it decides what the widget proposes for the selected `variation`. `expandListingBlocks` never reads a block config — it reads `block.fieldMapping`, and when that is absent falls back to its own default, `{ @id → href, title, description, image }`.
+
+That fallback targets `href`, which suits `link`-shaped item types and not others. A `card`, for example, renders its link from `url`, so a listing of cards with no saved `fieldMapping` produces cards with no link at all.
+
+Two ways to end up with no saved mapping:
+
+- **Hand-authored content.** A listing block written directly into a distribution or fixture JSON never passes through the widget, so nothing is saved. Author `fieldMapping` explicitly.
+- **An untouched widget.** `FieldMappingWidget` *displays* `{ ...smartDefaults, ...saved }`, but only persists rows the editor actually changes. Accepting every proposed default without touching a row leaves `fieldMapping` empty — the sidebar shows one mapping while the page renders with another.
+
+If the item type's fields don't match the render-time fallback, set `fieldMapping` on the block rather than relying on the defaults shown in the sidebar.
 
 ## Combining Listings with Container Syncing
 

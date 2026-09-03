@@ -13,7 +13,8 @@ This is a **built-in** block.
       "properties": {
         "value": {
           "title": "Text",
-          "widget": "slate"
+          "widget": "slate",
+          "type": "array"
         }
       }
     }

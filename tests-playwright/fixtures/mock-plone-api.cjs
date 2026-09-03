@@ -15,6 +15,19 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 8888;
 
+// Every absolute URL this server emits is built from the port it is ACTUALLY
+// listening on. `PORT` is overridable (playwright passes HYDRA_MOCK_API_PORT,
+// see tests-playwright/ports.ts) so a parent project embedding this checkout
+// can move the server off 8888 — and a URL still naming 8888 then points at a
+// dead port, or at whatever unrelated server got there first.
+const API_ORIGIN = `http://localhost:${PORT}`;
+
+// Content fixtures on disk are written against the canonical origin: `@id`s,
+// image `url`s and hrefs all say localhost:8888. That is a storage convention,
+// not a claim about where the server runs, so it is normalised on the way out
+// (see rewriteFixtureOrigin). Covered by tests-playwright/api/fixture-origin.spec.ts.
+const FIXTURE_ORIGIN = 'http://localhost:8888';
+
 /**
  * Parse CONTENT_MOUNTS env variable for multiple content directories
  * Format: "mountPath:dirPath,mountPath2:dirPath2"
@@ -167,6 +180,15 @@ function generateAuthToken(username = 'admin') {
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' })); // Increase limit for image uploads
+
+// Normalise the fixtures' baked origin to ours on the way out. Every JSON
+// response goes through res.json, so this is the one place a URL can leave the
+// server — no endpoint has to remember to call the rewrite itself.
+app.use((req, res, next) => {
+  const sendJson = res.json.bind(res);
+  res.json = (body) => sendJson(rewriteFixtureOrigin(body));
+  next();
+});
 
 // Virtual Host Monster path rewriting middleware
 // Volto's proxy adds VHM paths like: /VirtualHostBase/http/localhost:8888/++api++/VirtualHostRoot/@login
@@ -688,6 +710,10 @@ function buildActionsComponent(cleanPath, baseUrl) {
       { '@id': fullUrl, icon: '', id: 'view', title: 'View' },
       { '@id': `${fullUrl}/edit`, icon: '', id: 'edit', title: 'Edit' },
       { id: 'folderContents', title: 'Contents' },
+      // The admin's More menu builds its Sharing entry from this action —
+      // pair of the @sharing endpoint below.
+      { '@id': `${fullUrl}/sharing`, icon: '', id: 'local_roles', title: 'Sharing' },
+      { '@id': `${fullUrl}/history`, icon: '', id: 'history', title: 'History' },
     ],
     object_buttons: [],
     portal_tabs: [],
@@ -705,23 +731,131 @@ function buildNavigationComponent(cleanPath, baseUrl) {
   };
 }
 
+// Content snapshots per path, grown on PATCH — versions the compare view diffs.
+const contentVersions = new Map();
+
+// How many versions to SYNTHESIZE for a page nobody has edited — so every
+// page's History offers something to compare in demos and dev.
+const SYNTH_VERSIONS = 2;
+
+// Deterministic PRNG (xfnv1a hash -> mulberry32), seeded by path#version:
+// the same synthetic version renders identically every time it is asked for.
+function seededRand(seed) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+  return () => {
+    h = (h + 0x6d2b79f5) | 0;
+    let t = Math.imul(h ^ (h >>> 15), 1 | h);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// A plausible OLDER revision, derived deterministically from current content:
+// content grows over time, so version N drops the trailing blocks the later
+// versions "added"; and one paragraph gets a seeded word-swap so copy visibly
+// changed too. Purely synthetic — a real PATCH snapshot always wins.
+function synthesizeVersion(cleanPath, content, version, total) {
+  const rand = seededRand(`${cleanPath}#${version}`);
+  const old = JSON.parse(JSON.stringify(content));
+  const layout = old.blocks_layout && old.blocks_layout.items;
+  if (Array.isArray(layout) && layout.length > 2) {
+    const drop = Math.min(layout.length - 2, total - version);
+    const dropped = layout.splice(layout.length - drop, drop);
+    for (const uid of dropped) delete old.blocks[uid];
+  }
+  // Swap the two longest words in one seeded slate paragraph — visibly
+  // different copy without looking corrupted.
+  const slates = Object.values(old.blocks || {}).filter(
+    (b) => b && b['@type'] === 'slate' && typeof b.plaintext === 'string' && b.plaintext.split(' ').length > 6,
+  );
+  if (slates.length) {
+    const target = slates[Math.floor(rand() * slates.length)];
+    const words = target.plaintext.split(' ');
+    const byLen = words.map((w, i) => [w.length, i]).sort((a, b) => b[0] - a[0]);
+    const [i, j] = [byLen[0][1], byLen[1][1]];
+    [words[i], words[j]] = [words[j], words[i]];
+    const swapped = words.join(' ');
+    target.plaintext = swapped;
+    target.value = [{ type: 'p', children: [{ text: swapped }] }];
+  }
+  old.modified = new Date(Date.parse('2026-01-01T09:00:00Z') + version * 86400000).toISOString();
+  return old;
+}
+
+// In-memory workflow state per path — the docs demo clips walk a real
+// publish/retract cycle, so transitions must ACT (and history must grow),
+// while staying ephemeral like everything else the mock holds.
+const workflowState = new Map();
+
+const WORKFLOW = {
+  private: {
+    title: 'Private',
+    transitions: [{ '@id': 'publish', title: 'Publish', to: 'published' },
+                  { '@id': 'submit', title: 'Submit for publication', to: 'pending' }],
+  },
+  pending: {
+    title: 'Pending review',
+    transitions: [{ '@id': 'publish', title: 'Publish', to: 'published' },
+                  { '@id': 'reject', title: 'Send back', to: 'private' }],
+  },
+  published: {
+    title: 'Published',
+    transitions: [{ '@id': 'retract', title: 'Retract', to: 'private' }],
+  },
+};
+
 function buildWorkflowComponent(cleanPath, baseUrl) {
   const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
+  const entry = workflowState.get(cleanPath) || { state: 'published', history: [] };
+  const def = WORKFLOW[entry.state];
   return {
     '@id': `${fullUrl}/@workflow`,
-    history: [],
-    transitions: [],
+    history: entry.history,
+    state: { id: entry.state, title: def.title },
+    transitions: def.transitions.map((t) => ({
+      '@id': `${fullUrl}/@workflow/${t['@id']}`,
+      title: t.title,
+    })),
   };
+}
+
+function applyWorkflowTransition(cleanPath, transitionId) {
+  const entry = workflowState.get(cleanPath) || { state: 'published', history: [] };
+  const def = WORKFLOW[entry.state];
+  const transition = def.transitions.find((t) => t['@id'] === transitionId);
+  if (!transition) return null;
+  const record = {
+    action: transitionId,
+    actor: 'admin',
+    comments: '',
+    review_state: transition.to,
+    time: new Date().toISOString(),
+    title: WORKFLOW[transition.to].title,
+  };
+  entry.state = transition.to;
+  entry.history = [...entry.history, record];
+  workflowState.set(cleanPath, entry);
+  return record;
 }
 
 function buildNavrootComponent(cleanPath, baseUrl) {
   const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
+  // The navigation root is the SITE ROOT object, so serialise its real title and
+  // description — Plone does, and a frontend is entitled to read the site's name
+  // out of the response it already has rather than fetching the root itself.
+  // This used to answer `title: 'Site'` regardless, which is a lie a consumer
+  // can only discover by comparing against a real backend: our own frontend had
+  // grown a second request for the site root with a comment explaining that
+  // navroot "would work against Plone and quietly differ under test".
+  const root = loadRawContentFromDisk('/') || {};
   return {
     '@id': `${fullUrl}/@navroot`,
     navroot: {
       '@id': baseUrl,
-      '@type': 'Plone Site',
-      title: 'Site',
+      '@type': root['@type'] || 'Plone Site',
+      title: root.title || 'Site',
+      ...(root.description ? { description: root.description } : {}),
     },
   };
 }
@@ -781,6 +915,32 @@ function resolveUidUrls(obj, parentKey = null) {
     const result = {};
     for (const [key, value] of Object.entries(obj)) {
       result[key] = resolveUidUrls(value, key);
+    }
+    return result;
+  }
+  return obj;
+}
+
+/**
+ * Rewrite the fixtures' canonical origin to the one we are serving from.
+ *
+ * Plone builds absolute URLs from the incoming request, so stored content
+ * never dictates the origin. Our fixtures are static files that had to pick
+ * one, and picked 8888; this is the equivalent normalisation. Only the origin
+ * is touched — paths, and any other host, are left alone.
+ */
+function rewriteFixtureOrigin(obj) {
+  if (API_ORIGIN === FIXTURE_ORIGIN) return obj;
+  if (typeof obj === 'string') {
+    return obj.startsWith(FIXTURE_ORIGIN)
+      ? API_ORIGIN + obj.slice(FIXTURE_ORIGIN.length)
+      : obj;
+  }
+  if (Array.isArray(obj)) return obj.map(rewriteFixtureOrigin);
+  if (obj && typeof obj === 'object') {
+    const result = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = rewriteFixtureOrigin(value);
     }
     return result;
   }
@@ -1043,10 +1203,33 @@ function enrichContent(content, urlPath, baseUrl, expandList = []) {
   // 1. Resolve resolveuid/UID references to actual URLs (like Plone's serializer)
   // 2. Turn relation fields into summaries of their target (RelationChoiceFieldSerializer)
   // 3. Add image_scales to anything summary-shaped (image_field + @id)
-  return enrichImageBrains(
-    summarizeRelations(resolveUidUrls(enriched), baseUrl),
-    baseUrl,
+  // 4. Give every form block the validator catalogue its serializer injects
+  return addFormValidationSettings(
+    enrichImageBrains(
+      summarizeRelations(resolveUidUrls(enriched), baseUrl),
+      baseUrl,
+    ),
   );
+}
+
+/**
+ * collective.volto.formsupport's form serializer adds `validationSettings` to
+ * every form block on read — the catalogue of settable validators the sidebar
+ * builds its "Rule settings" widget from. It is regenerated on each GET, so it
+ * is a property of the RESPONSE, not of what is stored, and a fixture that
+ * carried one by hand would be testing its own copy instead of the contract.
+ */
+function addFormValidationSettings(node) {
+  if (Array.isArray(node)) return node.map(addFormValidationSettings);
+  if (!node || typeof node !== 'object') return node;
+  const out = {};
+  for (const [key, value] of Object.entries(node)) {
+    out[key] = addFormValidationSettings(value);
+  }
+  if (out['@type'] === 'form') {
+    out.validationSettings = { ...VALIDATION_SETTINGS_CATALOGUE };
+  }
+  return out;
 }
 
 /**
@@ -1239,7 +1422,7 @@ app.post('/@login-renew', (req, res) => {
   res.json({
     token: generateAuthToken('admin'),
     user: {
-      '@id': 'http://localhost:8888/@users/admin',
+      '@id': `${API_ORIGIN}/@users/admin`,
       id: 'admin',
       fullname: 'Admin User',
       email: 'admin@example.com',
@@ -1265,7 +1448,7 @@ app.post('/@login', (req, res) => {
     const response = {
       token,
       user: {
-        '@id': `http://localhost:8888/@users/${login}`,
+        '@id': `${API_ORIGIN}/@users/${login}`,
         id: login,
         fullname: 'Admin User',
         email: 'admin@example.com',
@@ -1350,7 +1533,7 @@ app.post('/*', (req, res, next) => {
 
     // Create the image content
     const imageContent = {
-      '@id': `http://localhost:8888${imagePath}`,
+      '@id': `${API_ORIGIN}${imagePath}`,
       '@type': 'Image',
       'UID': `uid-${imageId}`,
       'id': imageId,
@@ -1358,18 +1541,18 @@ app.post('/*', (req, res, next) => {
       'description': body.description || '',
       'image': {
         'content-type': body.image?.['content-type'] || 'image/png',
-        'download': `http://localhost:8888${imagePath}/@@images/image`,
+        'download': `${API_ORIGIN}${imagePath}/@@images/image`,
         'filename': body.image?.filename || 'image.png',
         'height': height,
         'width': width,
         'scales': {
           'preview': {
-            'download': `http://localhost:8888${imagePath}/@@images/image/preview`,
+            'download': `${API_ORIGIN}${imagePath}/@@images/image/preview`,
             'height': 400,
             'width': 400,
           },
           'large': {
-            'download': `http://localhost:8888${imagePath}/@@images/image/large`,
+            'download': `${API_ORIGIN}${imagePath}/@@images/image/large`,
             'height': 800,
             'width': 800,
           },
@@ -1418,7 +1601,7 @@ app.post('/*', (req, res, next) => {
         .replace(/^-+|-+$/g, '');
     const filePath = `${parentPath === '/' ? '' : parentPath}/${fileId}`.replace(/\/+/g, '/');
     const fileContent = {
-      '@id': `http://localhost:8888${filePath}`,
+      '@id': `${API_ORIGIN}${filePath}`,
       '@type': 'File',
       'UID': `uid-${fileId}`,
       'id': fileId,
@@ -1426,7 +1609,7 @@ app.post('/*', (req, res, next) => {
       'description': body.description || '',
       'file': {
         'content-type': body.file?.['content-type'] || 'application/octet-stream',
-        'download': `http://localhost:8888${filePath}/@@download/file`,
+        'download': `${API_ORIGIN}${filePath}/@@download/file`,
         'filename': body.file?.filename || rawName,
         'size': body.file?.data?.length || 0,
       },
@@ -1552,7 +1735,7 @@ function collectSubjectValues() {
  */
 app.get('*/@querystring', (req, res) => {
   res.json({
-    '@id': 'http://localhost:8888/@querystring',
+    '@id': `${API_ORIGIN}/@querystring`,
     'indexes': {
       'portal_type': {
         'title': 'Type',
@@ -1838,7 +2021,7 @@ app.get('*/@querystring', (req, res) => {
  */
 app.get('/@site', (req, res) => {
   res.json({
-    '@id': 'http://localhost:8888',
+    '@id': API_ORIGIN,
     'plone.site_title': 'Plone Site',
     'plone.site_logo': null,
     // Volto 19 reads `plone.default_language` from this response as the
@@ -1861,13 +2044,113 @@ app.get(/.*\/@workflow$/, (req, res) => {
 });
 
 /**
+ * POST /@workflow/:transition — apply a transition (publish/retract/…), as
+ * Plone does. The docs demo clips drive the admin's state menu through this.
+ */
+app.post(/.*\/@workflow\/[^/]+$/, (req, res) => {
+  const match = req.path.match(/^(.*)\/@workflow\/([^/]+)$/);
+  const cleanPath = (match[1].replace('/++api++', '') || '/').replace(/\/+$/, '') || '/';
+  const record = applyWorkflowTransition(cleanPath, match[2]);
+  if (!record) return res.status(400).json({ error: 'invalid transition' });
+  res.json(record);
+});
+
+/**
+ * GET /@history — the version + workflow trail the admin's History view lists;
+ * grows as @workflow transitions apply.
+ */
+app.get(/.*\/@history\/\d+$/, (req, res) => {
+  // A content SNAPSHOT: what the page held before edit N+1 (or current for the
+  // newest). The compare view renders these in frontend iframes.
+  const match = req.path.match(/^(.*)\/@history\/(\d+)$/);
+  const cleanPath = (match[1].replace('/++api++', '') || '/').replace(/\/+$/, '') || '/';
+  const version = Number(match[2]);
+  const versions = contentVersions.get(cleanPath) || [];
+  const snapshot = versions.find((v) => v.version === version);
+  if (snapshot) return res.json(snapshot.content);
+  const sessionId = getSessionId(req);
+  const current = getContent(cleanPath, sessionId);
+  if (!current) return res.status(404).json({ error: 'no such version' });
+  if (versions.length === 0 && version < SYNTH_VERSIONS) {
+    return res.json(synthesizeVersion(cleanPath, current, version, SYNTH_VERSIONS));
+  }
+  res.json(current);
+});
+
+app.get(/.*\/@history$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@history$/, '') || '/').replace(/\/+$/, '') || '/';
+  const entry = workflowState.get(cleanPath) || { state: 'published', history: [] };
+  let versions = contentVersions.get(cleanPath) || [];
+  if (versions.length === 0) {
+    versions = Array.from({ length: SYNTH_VERSIONS }, (_, n) => ({
+      version: n,
+      time: new Date(Date.parse('2026-01-01T09:00:00Z') + n * 86400000).toISOString(),
+    }));
+  }
+  const versioning = versions.map((v) => ({
+    '@id': `http://localhost:${PORT}${cleanPath}/@history/${v.version}`,
+    actor: { '@id': null, fullname: 'Admin User', id: 'admin', username: 'admin' },
+    comments: '',
+    may_revert: true,
+    time: v.time,
+    transition_title: 'Edited',
+    type: 'versioning',
+    version: v.version,
+  }));
+  const workflow = entry.history.map((h, n) => ({
+    '@id': `http://localhost:${PORT}${cleanPath}/@history/${n + 1}`,
+    action: h.action,
+    actor: { '@id': null, fullname: 'Admin User', id: 'admin', username: 'admin' },
+    comments: h.comments,
+    review_state: h.review_state,
+    state_title: h.title,
+    time: h.time,
+    transition_title: h.title,
+    type: 'workflow',
+  }));
+  res.json([...versioning, ...workflow].sort((a, b) => (a.time < b.time ? 1 : -1)));
+});
+
+/**
+ * GET /@sharing — the per-principal role matrix the admin's Sharing view
+ * renders; POST accepts changes (held in memory only).
+ */
+const sharingOverrides = new Map();
+app.get(/.*\/@sharing$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@sharing$/, '') || '/').replace(/\/+$/, '') || '/';
+  const stored = sharingOverrides.get(cleanPath);
+  res.json(stored || {
+    available_roles: [
+      { id: 'Contributor', title: 'Can add' },
+      { id: 'Editor', title: 'Can edit' },
+      { id: 'Reader', title: 'Can view' },
+      { id: 'Reviewer', title: 'Can review' },
+    ],
+    entries: [
+      { id: 'AuthenticatedUsers', title: 'Logged-in users', type: 'group',
+        roles: { Contributor: false, Editor: false, Reader: false, Reviewer: false } },
+      { id: 'reviewers', title: 'Reviewers', type: 'group',
+        roles: { Contributor: false, Editor: false, Reader: false, Reviewer: 'global' } },
+    ],
+    inherit: true,
+  });
+});
+app.post(/.*\/@sharing$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@sharing$/, '') || '/').replace(/\/+$/, '') || '/';
+  const current = sharingOverrides.get(cleanPath);
+  // merge entries' role changes into the stored matrix (enough for the demo)
+  sharingOverrides.set(cleanPath, { ...(current || {}), ...req.body });
+  res.status(204).end();
+});
+
+/**
  * GET /@users/:userid
  * Get user information
  */
 app.get('/@users/:userid', (req, res) => {
   const { userid } = req.params;
   res.json({
-    '@id': `http://localhost:8888/@users/${userid}`,
+    '@id': `${API_ORIGIN}/@users/${userid}`,
     id: userid,
     fullname: 'Admin User',
     email: 'admin@example.com',
@@ -1950,10 +2233,44 @@ app.get('/@types/:typeName', (req, res) => {
  * Shortcuts block reads Keywords (Subject) unique values in site-wide mode.
  */
 const VOCAB_ITEMS = {
-  'plone.app.vocabularies.Keywords': ['news', 'plone', 'events'],
+  // Five, not three, and three of them share a prefix on purpose: a type-ahead
+  // is the one caller that asks this endpoint a real question ("what starts
+  // with `new`?"), and with no two terms alike every answer was the whole list —
+  // which cannot tell a working filter from an ignored one.
+  'plone.app.vocabularies.Keywords': [
+    'news',
+    'newsletter',
+    'newsroom',
+    'plone',
+    'events',
+  ],
+  // A second one, so a picker that lists vocabularies has something to choose
+  // BETWEEN — with one entry, "offers the right list" and "offers any list at
+  // all" are the same assertion.
+  'plone.app.vocabularies.ReallyUserFriendlyTypes': ['Document', 'News Item'],
 };
+/**
+ * GET /@vocabularies — the LISTING: every vocabulary this site has, the shape
+ * plone.restapi answers with (`@id` + `title`, no token). A field that picks
+ * WHICH vocabulary to use reads this.
+ */
+app.get('/@vocabularies', (req, res) => {
+  res.json(
+    Object.keys(VOCAB_ITEMS).map((name) => ({
+      '@id': `http://localhost:${PORT}/@vocabularies/${name}`,
+      title: name,
+    })),
+  );
+});
+
 app.get('/@vocabularies/:vocab', (req, res) => {
-  const values = VOCAB_ITEMS[req.params.vocab] || [];
+  const all = VOCAB_ITEMS[req.params.vocab] || [];
+  // `?title=` is a case-insensitive substring filter in plone.restapi's
+  // serializer — what a type-ahead sends so the server does the narrowing.
+  const title = String(req.query.title || '').toLowerCase();
+  const values = title
+    ? all.filter((v) => v.toLowerCase().includes(title))
+    : all;
   res.json({
     '@id': `http://localhost:${PORT}/@vocabularies/${req.params.vocab}`,
     items: values.map((v) => ({ token: v, title: v })),
@@ -2252,10 +2569,17 @@ app.post('*/@querystring-search', (req, res) => {
         });
       }
       allItems = allItems.filter((item) => new URL(item['@id']).pathname !== contextPath);
-    } else if (index === 'SearchableText' && operation.includes('string.contains')) {
+    } else if (
+      index === 'SearchableText' &&
+      (operation.includes('string.contains') ||
+        operation.includes('string.search'))
+    ) {
       // Full-text search across title/description/id. Mirrors Plone 6.2's
       // plone.app.querystring 3.0.0 wildcard-prefix behavior — each word in
       // the search term must prefix-match a word token in one of those fields.
+      // Both `string.contains` (Standard) and `string.search` (Advanced,
+      // queryType=search) resolve to a SearchableText full-text match; the
+      // block's queryType picks the operation, and both filter here.
       if (value) {
         allItems = allItems.filter((item) => matchSearchableText(value, item));
       }
@@ -2359,19 +2683,38 @@ app.get('*/@search', (req, res) => {
   const pathDepth = req.query['path.depth'];
   const pathQuery = req.query['path.query'];
   const searchableText = req.query['SearchableText'];
+  const titleQuery = req.query['Title'];
   const portalType = req.query['portal_type'];
   const baseUrl = `http://localhost:${PORT}`;
 
   let items;
 
-  // Handle SearchableText (used by ObjectBrowser search input). Plone 6.2
-  // (plone.app.querystring 3.0.0) appends a wildcard to each word and ANDs
-  // the parts — matchSearchableText replicates that on title/description/id.
-  if (searchableText) {
+  // Text queries: SearchableText (used by ObjectBrowser search input) and/or
+  // the Title INDEX alone (`@search?Title=` — what a title autocomplete asks).
+  // Plone 6.2 (plone.app.querystring 3.0.0) appends a wildcard to each word of
+  // SearchableText and ANDs the parts — matchSearchableText replicates that on
+  // title/description/id. The Title index is ZCTextIndex: whole words, with
+  // optional right-truncation (`sea*`) — replicated on the title only.
+  if (searchableText || titleQuery) {
     items = Object.keys(contentDirMap)
       .filter((itemPath) => itemPath !== '/')
-      .map((itemPath) => formatSearchItem(loadContentFromDisk(itemPath), baseUrl))
-      .filter((item) => matchSearchableText(searchableText, item));
+      .map((itemPath) => formatSearchItem(loadContentFromDisk(itemPath), baseUrl));
+    if (searchableText) {
+      items = items.filter((item) => matchSearchableText(searchableText, item));
+    }
+    if (titleQuery) {
+      const terms = String(titleQuery)
+        .toLowerCase()
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((t) => (t.endsWith('*') ? t.slice(0, -1) : t));
+      items = items.filter((item) => {
+        const words = String(item.title || '')
+          .toLowerCase()
+          .split(/\W+/);
+        return terms.every((t) => words.some((w) => w.startsWith(t)));
+      });
+    }
     // Filter by portal_type if specified
     if (portalType) {
       const types = Array.isArray(portalType) ? portalType : [portalType];
@@ -2379,8 +2722,7 @@ app.get('*/@search', (req, res) => {
     }
   }
   // Handle path.query with path.depth=0 (exact match for specific content)
-  else
-  if (pathQuery && pathDepth === '0') {
+  else if (pathQuery && pathDepth === '0') {
     const content = loadContentFromDisk(pathQuery);
     if (content) {
       items = [formatSearchItem(content, baseUrl)];
@@ -2466,8 +2808,8 @@ app.get('*/@search', (req, res) => {
   }
 
   const searchUrl = searchPath === '' || searchPath === '/'
-    ? 'http://localhost:8888/@search'
-    : `http://localhost:8888${searchPath}/@search`;
+    ? `${API_ORIGIN}/@search`
+    : `${API_ORIGIN}${searchPath}/@search`;
 
   res.json({
     '@id': searchUrl,
@@ -2545,7 +2887,7 @@ app.get('*/@contents', (req, res) => {
   }
 
   res.json({
-    '@id': `http://localhost:8888${contentPath}/@contents`,
+    '@id': `${API_ORIGIN}${contentPath}/@contents`,
     'items': items,
     'items_total': items.length,
   });
@@ -2556,9 +2898,326 @@ app.get('*/@contents', (req, res) => {
  * Form submission endpoint (collective.volto.formsupport)
  * Accepts { block_id, data: [{ field_id, label, value }] }
  */
+// Submissions recorded in memory, keyed by `${contentPath}::${block_id}` —
+// exactly how formsupport keys stored data (its records carry a `block_id` that
+// the CSV export and clear service filter on), so two forms on a page keep
+// separate result sets here too.
+const formSubmissions = new Map();
+
+const submissionKey = (contentPath, blockId) => `${contentPath}::${blockId || ''}`;
+
+/**
+ * Find a block by uid anywhere in a content item's block tree, top level or
+ * nested in a container. Mirrors formsupport's get_block_data, which resolves
+ * against a FLATTENED hierarchy and refuses anything that is not a form block.
+ */
+function findFormBlock(node, blockId) {
+  const blocks = node && node.blocks;
+  if (!blocks || typeof blocks !== 'object') return null;
+  if (blocks[blockId]) {
+    return blocks[blockId]['@type'] === 'form' ? blocks[blockId] : null;
+  }
+  for (const child of Object.values(blocks)) {
+    const found = findFormBlock(child, blockId);
+    if (found) return found;
+  }
+  return null;
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * The field `validations` collective.volto.formsupport enforces.
+ *
+ * The real backend registers `Products.validation`'s base validators (minus
+ * `inNumericRange`) as named utilities, plus four custom ones that take a
+ * setting. This reproduces the four settable ones and the regex validators a
+ * form is realistically authored with — enough that a test can prove a rule is
+ * enforced SERVER-side, which is the whole point of moving these off our own
+ * invented `minLength`/`maxLength`/`pattern` keys.
+ *
+ * Messages are the real ones. The backend strips the
+ * `Validation failed(<id>): ` prefix its custom validators emit, so they read
+ * as a continuation of the field's label.
+ */
+const FORM_VALIDATORS = {
+  maxCharacters: (value, s) =>
+    value.length > Number(s.characters)
+      ? `is more than ${s.characters} characters long`
+      : null,
+  minCharacters: (value, s) =>
+    value.length < Number(s.characters)
+      ? `is less than ${s.characters} characters long`
+      : null,
+  maxWords: (value, s) =>
+    (value.match(/\w+/g) || []).length > Number(s.words)
+      ? `is more than ${s.words} words long`
+      : null,
+  minWords: (value, s) =>
+    (value.match(/\w+/g) || []).length < Number(s.words)
+      ? `is less than ${s.words} words long`
+      : null,
+  isEmail: (value) => (EMAIL_RE.test(value) ? null : 'is not a valid email address.'),
+  isURL: (value) => (/^\w+:\/\/\S+$/.test(value) ? null : 'is not a valid url.'),
+  isInt: (value) => (/^[+-]?\d+$/.test(value) ? null : 'is not an integer.'),
+  isDecimal: (value) =>
+    /^([+-]?)(?=\d|[.,]\d)\d*([.,]\d*)?([Ee][+-]?\d+)?$/.test(value)
+      ? null
+      : 'is not a decimal number.',
+  isPrintable: (value) =>
+    /^[a-zA-Z0-9\s]+$/.test(value) ? null : 'contains unprintable characters',
+};
+
+/**
+ * The block-level catalogue the form serializer injects on GET: every settable
+ * validator's parameter, keyed `<validatorId>-<settingName>`. The sidebar builds
+ * the "Rule settings" widget from this, so it has to be present on the block the
+ * editor loads, not just understood at submit time.
+ */
+const VALIDATION_SETTINGS_CATALOGUE = {
+  'maxCharacters-characters': {
+    validation_title: 'maxCharacters',
+    title: 'characters',
+    type: 'integer',
+    default: 0,
+  },
+  'minCharacters-characters': {
+    validation_title: 'minCharacters',
+    title: 'characters',
+    type: 'integer',
+    default: 0,
+  },
+  'maxWords-words': {
+    validation_title: 'maxWords',
+    title: 'words',
+    type: 'integer',
+    default: 0,
+  },
+  'minWords-words': {
+    validation_title: 'minWords',
+    title: 'words',
+    type: 'integer',
+    default: 0,
+  },
+};
+
+/**
+ * Run a field's authored rules, exactly as @submit-form does: the field names
+ * validators in `validations`, and their parameters live in a FLAT
+ * `validationSettings` keyed `<validatorId>-<settingName>` which the backend
+ * splits on the hyphen to rebuild `{validator: {setting: value}}`.
+ *
+ * Returns `{validatorId: message}` — the backend's per-field error shape.
+ */
+function runFieldValidations(field, value) {
+  const names = Array.isArray(field.validations) ? field.validations : [];
+  if (!names.length || !value) return null;
+  const settings = {};
+  for (const [key, val] of Object.entries(field.validationSettings || {})) {
+    const [id, setting] = key.split('-');
+    if (!id || !setting || !names.includes(id)) continue;
+    (settings[id] = settings[id] || {})[setting] = val;
+  }
+  const errors = {};
+  for (const name of names) {
+    const validator = FORM_VALIDATORS[name];
+    if (!validator) continue;
+    const message = validator(String(value), settings[name] || {});
+    if (message) errors[name] = message;
+  }
+  return Object.keys(errors).length ? errors : null;
+}
+
+/**
+ * POST /:path/@submit-form
+ * Form submission endpoint (collective.volto.formsupport).
+ * Accepts { block_id, data: [{ field_id, label, value }], attachments, captcha }
+ *
+ * Records the submission so a test can assert on what the frontend actually
+ * sent, and reproduces the checks formsupport really performs, so a broken
+ * submission fails loudly here instead of silently succeeding:
+ *
+ *  - empty form data (no `data` entries and no attachments) -> 400, as
+ *    collective.volto.formsupport's post adapter does;
+ *  - the honeypot captcha -> 400 unless `captcha.value` is the empty string,
+ *    matching HoneypotSupport.verify;
+ *  - a `from` field whose value is not an address -> 400, matching
+ *    validate_email_fields.
+ *
+ *  - a `block_id` that resolves to no form block -> 400, matching
+ *    validate_form's `block_form_not_found_label`;
+ *  - a form with neither `send` nor `store` -> 400, matching `missing_action`
+ *    ("You need to set at least one form action between send and store"). This
+ *    one is easy to author by accident and impossible to notice until a visitor
+ *    tries to submit.
+ *
+ * The resolved block is also recorded as `block_found`, so a multi-form test can
+ * assert the id pointed at the form it meant.
+ */
 app.post('*/@submit-form', (req, res) => {
+  const contentPath = req.path.replace(/\/@submit-form$/, '') || '/';
+  const body = req.body || {};
+  const blockId = body.block_id;
+  const data = Array.isArray(body.data) ? body.data : [];
+  const attachments = body.attachments || {};
+
   if (process.env.DEBUG) {
-    console.log(`POST @submit-form: path=${req.path}`);
+    console.log(`POST @submit-form: path=${contentPath} block=${blockId}`);
+  }
+
+  const content = loadRawContentFromDisk(contentPath);
+  const block = content ? findFormBlock(content, blockId) : null;
+
+  if (!blockId) {
+    return res.status(400).json({ type: 'BadRequest', message: 'Missing block_id' });
+  }
+
+  if (!block) {
+    return res.status(400).json({
+      type: 'BadRequest',
+      message: `Block with @type "form" and id "${blockId}" not found in this context: ${contentPath}`,
+    });
+  }
+
+  if (!block.store && !block.send) {
+    return res.status(400).json({
+      type: 'BadRequest',
+      message:
+        'You need to set at least one form action between "send" and "store".',
+    });
+  }
+
+  if (data.length === 0 && Object.keys(attachments).length === 0) {
+    return res.status(400).json({ type: 'BadRequest', message: 'Empty form data.' });
+  }
+
+  // HoneypotSupport.verify has two branches, and only one of them is about the
+  // `captcha` object. A frontend that sends one (volto-form-block, and our
+  // Next.js action) is checked on its `value`; a frontend that does not — the
+  // Nuxt example here, for instance — falls back to looking for a FILLED
+  // honeypot field among the submitted data. An absent captcha is not by itself
+  // a rejection, and treating it as one fails every frontend that does not
+  // implement the token.
+  //
+  // The real fallback is `found_honeypot(form, required=True)`, which also
+  // rejects a submission MISSING the field. That rule depends on
+  // collective.honeypot's HONEYPOT_FIELD being configured in the environment —
+  // when it is unset the whole check short-circuits to "pass" — and there is no
+  // such environment here, so this models the "field is present and filled"
+  // half only.
+  if (block.captcha === 'honeypot') {
+    const captcha = body.captcha;
+    const reject = () =>
+      res.status(400).json({ type: 'BadRequest', message: 'Error submitting form.' });
+    if (captcha) {
+      if (typeof captcha.value !== 'string' || captcha.value !== '') return reject();
+    } else {
+      const honeypotId = (block.captcha_props || {}).id;
+      const trap = honeypotId
+        ? data.find((entry) => entry.field_id === honeypotId || entry.label === honeypotId)
+        : null;
+      if (trap && String(trap.value || '') !== '') return reject();
+    }
+  }
+
+  {
+    const emailFields = (block.subblocks || [])
+      .filter((f) => f && f.field_type === 'from')
+      .map((f) => f.field_id);
+    for (const entry of data) {
+      if (emailFields.includes(entry.field_id) && entry.value) {
+        if (!EMAIL_RE.test(String(entry.value))) {
+          return res.status(400).json({
+            type: 'BadRequest',
+            message: `Email not valid in "${entry.label || entry.field_id}" field.`,
+          });
+        }
+      }
+    }
+  }
+
+  // The authored answer rules. A field whose skip-logic condition is not met is
+  // not validated — @submit-form resolves the trigger field first and only
+  // validates the ones it decided to show.
+  {
+    const byId = new Map(
+      (block.subblocks || [])
+        .filter((f) => f && f.field_id)
+        .map((f) => [f.field_id, f]),
+    );
+    const answered = new Map(data.map((e) => [e.field_id, e.value]));
+    const errors = {};
+    for (const entry of data) {
+      const field = byId.get(entry.field_id);
+      if (!field) continue;
+      // Skip logic: the backend looks the trigger up by `id`, so a field
+      // stored without one makes the whole submission fail there. Mirror the
+      // lookup (not the crash) so a missing `id` shows up as a test failure.
+      const when = field.show_when_when;
+      if (when && when !== 'always') {
+        const trigger = (block.subblocks || []).find((f) => f && f.id === when);
+        if (!trigger) {
+          return res.status(400).json({
+            type: 'BadRequest',
+            message: `Field "${field.field_id}" is shown when "${when}", but no field has that id — @submit-form resolves the trigger by id, not field_id.`,
+          });
+        }
+        const target = String(answered.get(trigger.field_id) ?? '');
+        const shown =
+          field.show_when_is === 'value_is_not'
+            ? target !== (field.show_when_to ?? '')
+            : target === (field.show_when_to ?? '');
+        if (!shown) continue;
+      }
+      const fieldErrors = runFieldValidations(field, entry.value);
+      if (fieldErrors) errors[entry.field_id] = fieldErrors;
+    }
+    if (Object.keys(errors).length) {
+      return res.status(400).json({ error: { type: 'Invalid', errors } });
+    }
+  }
+
+  const key = submissionKey(contentPath, blockId);
+  const record = {
+    block_id: blockId,
+    block_found: Boolean(block),
+    data,
+    attachments,
+    captcha: body.captcha,
+    received: formSubmissions.get(key) ? formSubmissions.get(key).length : 0,
+  };
+  formSubmissions.set(key, [...(formSubmissions.get(key) || []), record]);
+
+  res.status(204).end();
+});
+
+/**
+ * GET /:path/@form-data?block_id=...
+ * Read back what was submitted — formsupport's own service, and how a test
+ * asserts that a form posted what it was supposed to. Without `block_id` every
+ * form on the page is returned.
+ */
+app.get('*/@form-data', (req, res) => {
+  const contentPath = req.path.replace(/\/@form-data$/, '') || '/';
+  const blockId = req.query.block_id;
+  const items = [];
+  for (const [key, records] of formSubmissions) {
+    const [path_, block] = key.split('::');
+    if (path_ !== contentPath) continue;
+    if (blockId && block !== blockId) continue;
+    items.push(...records);
+  }
+  res.json({ items, items_total: items.length });
+});
+
+/**
+ * DELETE /:path/@form-data
+ * Clear recorded submissions, so a test can start from a known state.
+ */
+app.delete('*/@form-data', (req, res) => {
+  const contentPath = req.path.replace(/\/@form-data$/, '') || '/';
+  for (const key of [...formSubmissions.keys()]) {
+    if (key.split('::')[0] === contentPath) formSubmissions.delete(key);
   }
   res.status(204).end();
 });
@@ -2713,7 +3372,8 @@ app.get('*/@@images/*', (req, res) => {
   });
 });
 
-// @@download — same as @@images, serves image files from content directories
+// @@download — serves a content object's blob for any field directory (an
+// Image's `image/`, a File's `file/`), the way Plone serves @@download/<field>.
 app.get('*/@@download/*', (req, res) => {
   // e.g., /images/quadrant/@@download/image/quadrant.svg -> contentPath=/images/quadrant, fieldName=image
   const pathMatch = req.path.match(/^(.+?)\/@@download\/(\w+)(?:\/.*)?$/);
@@ -2731,6 +3391,11 @@ app.get('*/@@download/*', (req, res) => {
       const mimeTypes = {
         '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
         '.gif': 'image/gif', '.svg': 'image/svg+xml', '.webp': 'image/webp',
+        // A File's blob is whatever was uploaded — this route serves any field
+        // directory, not only images, and a video block's <video src> points
+        // straight at it.
+        '.mp4': 'video/mp4', '.webm': 'video/webm', '.ogg': 'video/ogg',
+        '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.pdf': 'application/pdf',
       };
       res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream');
       res.sendFile(imageFile);
@@ -2917,6 +3582,16 @@ app.patch('*', (req, res) => {
   const content = getContent(cleanPath, sessionId);
 
   if (content) {
+    // Version snapshot: the state BEFORE this edit becomes version N (like
+    // CMFEditions). @history lists these; @history/<n> serves them; the
+    // admin's compare view renders any two side by side.
+    const versions = contentVersions.get(cleanPath) || [];
+    versions.push({
+      version: versions.length,
+      time: new Date().toISOString(),
+      content: JSON.parse(JSON.stringify(content)),
+    });
+    contentVersions.set(cleanPath, versions);
     // Emulate Plone's REST deserializer: only fields backed by a registered
     // dexterity field / behavior survive a save. Unknown top-level fields (e.g.
     // an ad-hoc `footer_blocks`) are silently dropped. This is WHY layout
@@ -2974,4 +3649,4 @@ if (require.main === module) {
 }
 
 // Export for use by test frontend server or test harnesses
-module.exports = { app, server, contentDirMap, CONTENT_MOUNTS };
+module.exports = { app, server, contentDirMap, CONTENT_MOUNTS, formSubmissions };

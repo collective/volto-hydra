@@ -11,6 +11,11 @@
  * Env vars:
  *   DISCOVER_BLOCKS_API  - Plone API URL for discovery and content fetching
  *   MOCK_PARENT_URL      - URL of mock-parent.html (defaults to test-frontend port)
+ *   CONTAINMENT_EXEMPT_SLOTS
+ *                        - comma-separated template slot ids where a block may
+ *                          sit outside its container's allowedBlocks on purpose
+ *                          (e.g. a docs site's component showcase slot). See
+ *                          readContainmentRules in helpers/discover-blocks.cjs.
  *
  * Works against any Plone API — mock or remote.
  */
@@ -19,11 +24,12 @@ import { AdminUIHelper } from '../helpers/AdminUIHelper';
 import { verifyBlockRendering } from '../helpers/BlockVerificationHelper';
 import { fieldsNeverEditable } from '../helpers/field-coverage';
 import { axeCheckPage, formatViolations } from '../helpers/axe-sanity';
-import { getFrontendUrl } from './fixtures';
+import { getFrontendUrl, SANITY_PROJECTS } from './fixtures';
 import { URLS } from '../ports';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { requireEnvironment } from '../helpers/preconditions';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 interface DiscoveredBlock {
   blockType: string;
@@ -42,6 +48,9 @@ interface DiscoveredBlock {
   field?: string;
   issues?: string[];
   noExample?: boolean;
+  // Set by discovery for a locked block found on its own template document.
+  // The instance to unlock is read from the bridge at runtime — see below.
+  needsUnlock?: boolean;
   allowedBlocksViolation?: boolean;
   parentType?: string;
   allowed?: string[];
@@ -63,8 +72,11 @@ if (fs.existsSync(discoveredPath)) {
 // one fetches an external feed that only resolves against the mock. They're
 // covered by their own integration spec (admin-mock), not this render contract.
 const NON_CONTRACT_BLOCKS = new Set(['relatedItemsListing', 'searchShortcuts', 'rssFeed']);
+const seenShapeTitles = new Map();
 discoveredBlocks = discoveredBlocks.filter(
-  (b) => !b.blockType.startsWith('conv') && !NON_CONTRACT_BLOCKS.has(b.blockType),
+  // a shape-issue discovery entry has no blockType — keep it (its test FAILS
+  // with the issue text; dropping it here would hide a real content problem)
+  (b) => !(b.blockType ?? '').startsWith('conv') && !NON_CONTRACT_BLOCKS.has(b.blockType),
 );
 
 // Block sanity is the cross-cutting render contract. We only enforce it on
@@ -73,15 +85,20 @@ discoveredBlocks = discoveredBlocks.filter(
 // own ground truth), Nuxt, and Next.js. Other example frontends (react,
 // svelte, vue, f7) intentionally skip block-sanity so missing block types or
 // in-flight renderer changes don't gate the suite.
-const SANITY_PROJECTS = new Set(['mock', 'nuxt', 'nextjs']);
+
 
 base.beforeEach(async ({}, testInfo) => {
-  if (discoveredBlocks.length === 0) {
-    testInfo.skip(true, 'No .discovered-blocks.json found — run with DISCOVER_BLOCKS_API=<url>');
-  }
+  // Scope BEFORE environment: a project this spec doesn't cover is a decision,
+  // and no CI change would make it run — so it skips even on CI. Discovery
+  // missing is the opposite, hence requireEnvironment below.
   if (!SANITY_PROJECTS.has(testInfo.project.name)) {
     testInfo.skip(true, `block-sanity only runs on mock/nuxt/nextjs (skipping ${testInfo.project.name})`);
   }
+  requireEnvironment(
+    testInfo,
+    discoveredBlocks.length > 0,
+    'no .discovered-blocks.json — discovery needs DISCOVER_BLOCKS_API=<mock api url> in this job',
+  );
 });
 
 const test = base.extend<{ helper: AdminUIHelper }>({
@@ -93,11 +110,28 @@ const test = base.extend<{ helper: AdminUIHelper }>({
 
 test.describe('Block sanity (auto-discovered)', () => {
   for (const block of discoveredBlocks) {
+    // Run each discovered case only on the frontend it came from. Discovery is
+    // per-frontend because they do not register the same blocks — one found via
+    // nextjs must not be asserted against f7, which never claimed it.
+    // Playwright collects this file once for all projects, so the cases are all
+    // generated and the foreign ones skip at run time (the idiom dnd-convert
+    // already uses for its mock-only conversion blocks).
+    const belongsHere = (name: string) =>
+      !block.frontend || block.frontend === name
+      || block.frontend === '(env)' || block.frontend === 'mock';
+    // Discovery runs once per frontend, so the SAME block surfaces once per
+    // frontend that registered it. Playwright rejects a file with two identical
+    // titles — it aborts the whole run before a single test executes — so every
+    // generated title carries its source frontend. It is also the honest label:
+    // these are separate measurements, not one shared result.
+    const src = block.frontend ? ` @${block.frontend}` : '';
+
     // A block @type used in content but not registered in the frontend's
     // blocksConfig fails as its own test (it renders as "Not implemented
     // Block") rather than blocking the whole suite.
     if (block.unregistered) {
-      test(`${block.blockType} block @type is registered in the frontend`, () => {
+      test(`${block.blockType} block @type is registered in the frontend${src}`, ({}, testInfo) => {
+        test.skip(!belongsHere(testInfo.project.name), `discovered via ${block.frontend}`);
         throw new Error(
           `Block @type "${block.blockType}" is used in content (${block.occurrenceCount} ` +
             `occurrence(s), e.g. ${block.pagePath}) but is not registered in the frontend's ` +
@@ -110,11 +144,15 @@ test.describe('Block sanity (auto-discovered)', () => {
     // A frontend-registered type with no content example — fails as its own
     // test (nothing to render) rather than blocking the suite.
     if (block.noExample) {
-      test(`${block.blockType} block has a content example to render`, () => {
+      test(`${block.blockType} block has an editable content example to render${src}`, ({}, testInfo) => {
+        test.skip(!belongsHere(testInfo.project.name), `discovered via ${block.frontend}`);
         throw new Error(
-          `Block @type "${block.blockType}" is registered in the frontend but no content ` +
+          `Block @type "${block.blockType}" is registered in the frontend but no EDITABLE content ` +
             `example exists to run its render test. Add a fixture (a page with a populated ` +
-            `instance), or mark the type restricted if it only belongs inside a parent container.`,
+            `instance), or mark the type restricted if it only belongs inside a parent container.\n\n` +
+            `Locked instances don't count: a /templates/* definition, or a block flagged ` +
+            `readOnly/fixed, cannot be edited by an author, so the editing checks would be ` +
+            `asserting the opposite of what that block is for.`,
         );
       });
       continue;
@@ -124,7 +162,11 @@ test.describe('Block sanity (auto-discovered)', () => {
     // nearest ancestor that accepts the type). Fails as its own test rather
     // than blocking the suite.
     if (block.allowedBlocksViolation) {
-      test(`${block.blockType} block [${block.blockId}] is allowed in its container`, () => {
+      // pagePath for the same reason the shape test carries it: one blockId can
+      // repeat across pages, and two such entries would collide into a duplicate
+      // title, which aborts the whole file before any test runs.
+      test(`${block.blockType} block [${block.blockId}] on ${block.pagePath} is allowed in its container${src}`, ({}, testInfo) => {
+        test.skip(!belongsHere(testInfo.project.name), `discovered via ${block.frontend}`);
         throw new Error(
           `Block "${block.blockType}" [${block.blockId}] on ${block.pagePath} is placed in a ` +
             `${block.parentType} container that doesn't allow its @type ` +
@@ -132,6 +174,19 @@ test.describe('Block sanity (auto-discovered)', () => {
             `within its container — the mobile chevron / drag walks it OUT to the nearest ` +
             `ancestor that accepts the type, so it "escapes". Widen the container's allowedBlocks ` +
             `(if the placement is intended) or move/convert the block.`,
+        );
+      });
+      continue;
+    }
+    // Graph integrity on what the API served (the plone-content-validator run
+    // over fetched pages): broken resolveuid/link refs, blocks_layout entries
+    // pointing at missing blocks, duplicate UIDs. One failing test per page.
+    if (block.integrityIssue) {
+      test(`content integrity on ${block.pagePath}${src}`, ({}, testInfo) => {
+        test.skip(!belongsHere(testInfo.project.name), `discovered via ${block.frontend}`);
+        throw new Error(
+          `Content-graph integrity failures on ${block.pagePath}:\n` +
+            (block.issues || []).map((issue: string) => `  - ${issue}`).join('\n'),
         );
       });
       continue;
@@ -144,7 +199,13 @@ test.describe('Block sanity (auto-discovered)', () => {
       // can have per-field shape/slate issues — without them, two entries would
       // collide into a "duplicate test title" error and abort the whole run.
       const where = `${block.pagePath || '?'}${block.field ? `.${block.field}` : ''}`;
-      test(`${block.blockType} block [${block.blockId}] on ${where} has valid ${kind}`, () => {
+      // A block can carry SEVERAL distinct issues of the same kind on the same
+      // page+field — suffix repeats so titles stay unique instead of aborting.
+      const baseTitle = `${block.blockType} block [${block.blockId}] on ${where} has valid ${kind}`;
+      const seen = (seenShapeTitles.get(baseTitle) || 0) + 1;
+      seenShapeTitles.set(baseTitle, seen);
+      const title = seen > 1 ? `${baseTitle} (#${seen})` : baseTitle;
+      test(`${title}${src}`, () => {
         throw new Error(
           `Block "${block.blockType}" [${block.blockId}] on ${block.pagePath}` +
             (block.field ? ` field "${block.field}"` : '') +
@@ -158,7 +219,7 @@ test.describe('Block sanity (auto-discovered)', () => {
     // test per (blockType, field) so each missing field is reported once. It
     // can't be edited in the sidebar until the schema declares it.
     if (block.undeclaredField) {
-      test(`${block.blockType} block declares field "${block.field}" in its schema`, () => {
+      test(`${block.blockType} block declares field "${block.field}" in its schema${src}`, () => {
         throw new Error(
           `Block "${block.blockType}" stores field "${block.field}" (e.g. on ` +
             `${block.pagePath}) but its schema does not declare it — the field can't be ` +
@@ -172,7 +233,8 @@ test.describe('Block sanity (auto-discovered)', () => {
       : '';
     const labelKind = block.kind ? ` [${block.kind}]` : '';
     const label = `${block.blockType}${labelVariation}${labelKind}`;
-    test(`${label} block renders and has edit annotations`, async ({ page, helper }, testInfo) => {
+    test(`${label} block renders and has edit annotations${src}`, async ({ page, helper }, testInfo) => {
+      test.skip(!belongsHere(testInfo.project.name), `discovered via ${block.frontend}`);
       const frontendUrl = process.env.FRONTEND_URL || getFrontendUrl(testInfo.project.name);
       const frontend = frontendUrl ? `&frontend=${encodeURIComponent(frontendUrl)}` : '';
 
@@ -191,6 +253,84 @@ test.describe('Block sanity (auto-discovered)', () => {
       // races bridge init and flakily throws "blockPathMap not available".
       await helper.waitForBridgeConnected();
 
+      // Site chrome (a footer, a global announcement) is authored on its
+      // template's own document, where its blocks are locked until the template
+      // is unlocked — the gesture that says "this changes everywhere", and the
+      // one an author makes before editing it anywhere. Unlocking is a single
+      // message; the admin's toggle sends the same one.
+      //
+      // The instance id comes from the BRIDGE, not from discovery. It identifies
+      // one application of a template and the merge mints it
+      // (`const instanceId = uuidGenerator()`), so stored content cannot say what
+      // it will be; deriving it offline worked only for the deterministic cases
+      // and failed as "stayed locked" for the rest. Reading it here also makes
+      // "locked with nothing able to unlock it" a legible failure instead of a
+      // silent mismatch.
+      if (block.needsUnlock) {
+        const frame = page.frames().find((f) => f !== page.mainFrame())!;
+
+        // A block whose CONTENTS are generated is not authored inline, and
+        // unlocking its template instance must not make them editable: the
+        // expanded items of a listing reuse the block's own uid, so anything
+        // that unlocks the block unlocks the generated items with it. hydra
+        // therefore force-locks such blocks (expandListingBlocks registers
+        // every type that has a fetcher), and that lock outranks template edit
+        // mode by design.
+        //
+        // The frontend PUBLISHES that fact by registering the block readonly on
+        // the bridge — the same opt-in shape as data-block-selector for reveal.
+        // Reading it keeps this check free of "listing means X" knowledge: any
+        // block a frontend declares generated is authored through the sidebar,
+        // so "still locked" is the correct outcome, not a failure.
+        const generatedContents = await frame.evaluate((uid) => {
+          const registry = (window as any).__hydraBridge?._readonlyBlocks;
+          return registry ? [...registry].includes(uid) : false;
+        }, block.blockId);
+        if (generatedContents) {
+          test.info().annotations.push({
+            type: 'generated-contents',
+            description:
+              `${block.blockType} [${block.blockId}] is registered readonly by the frontend — ` +
+              `its items share the block uid, so it is authored in the sidebar, not inline.`,
+          });
+        }
+        // Ask the bridge, don't walk the data. getBlockData resolves a uid
+        // through blockPathMap, which already covers nested blocks AND
+        // object_list items (a slide, an accordion panel) — the cases a
+        // hand-rolled walk over `blocks` dicts silently misses, reporting a
+        // template-bound item as having no templateInstanceId when it has one.
+        const instanceId = await frame.evaluate(
+          (uid) => (window as any).__hydraBridge?.getBlockData(uid)?.templateInstanceId ?? null,
+          block.blockId,
+        );
+
+        expect(
+          instanceId,
+          `${block.blockType} block "${block.blockId}" is readOnly with no templateInstanceId — ` +
+            `nothing can unlock it, so it is uneditable everywhere`,
+        ).toBeTruthy();
+
+        await page.evaluate((id) => {
+          (document.getElementById('previewIframe') as HTMLIFrameElement)
+            .contentWindow!.postMessage(
+              { type: 'TEMPLATE_EDIT_MODE', instanceIds: [id] },
+              '*',
+            );
+        }, instanceId);
+
+        await expect
+          .poll(
+            () =>
+              generatedContents ||
+              frame.evaluate(
+                (uid) => !(window as any).__hydraBridge?.isBlockReadonly(uid),
+                block.blockId,
+              ),
+            { message: `${block.blockType} stayed locked after unlocking instance ${instanceId}` },
+          )
+          .toBe(true);
+      }
+
       const iframe = helper.getIframe();
 
       await verifyBlockRendering(page, iframe, block.blockId, block.blockData, {
@@ -198,8 +338,11 @@ test.describe('Block sanity (auto-discovered)', () => {
         // Sub-block iteration uses the bridge's blockPathMap (canonical,
         // schema-resolved) rather than a shape heuristic on blockData.
         checkSubBlocks: true,
-        // Skip data-edit-text clicks for discovered content — we just want rendering + annotation checks
-        checkEditTextClicks: false,
+        // Click the block's first editable field and require that it actually
+        // becomes editable. Annotation presence alone is not the contract an
+        // author experiences: a component whose own JS reveals or rebuilds its
+        // DOM can carry every annotation and still be impossible to type into.
+        checkEditTextClicks: true,
       });
 
       // Accessibility pass (axe-core) over the WHOLE rendered fixture page —

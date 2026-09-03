@@ -315,10 +315,12 @@ export const sharedBlocksConfig = {
                 {
                     id: 'default',
                     title: 'Default',
-                    fields: ['slides', 'variation', 'autoplayEnabled', 'autoplayDelay', 'autoplayJump'],
+                    fields: ['slides', 'variation', 'autoplayEnabled', 'autoplayDelay', 'autoplayJump', 'headline', 'headlineTag'],
                 },
             ],
             properties: {
+                headline: { title: 'Headline', type: 'string' },
+                headlineTag: { title: 'Headline tag', widget: 'select', choices: [['h1','h1'],['h2','h2'],['h3','h3'],['h4','h4'],['h5','h5'],['h6','h6']] },
                 slides: {
                     title: 'Slides',
                     widget: 'object_list',
@@ -368,9 +370,20 @@ export const sharedBlocksConfig = {
         // parentControlled config, so nothing is hidden by default.
         blockSchema: {
             title: 'Slide',
-            fieldsets: [{ id: 'default', title: 'Default', fields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'hideButton'] }],
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'href', 'hideButton', 'flagAlign'] }],
             properties: {
                 head_title: { title: 'Kicker', type: 'string' },
+                // The slide's own link target, and which side its caption sits
+                // on. Both are stored by the fixtures and read by the example
+                // frontends (nuxt keys its card position off flagAlign), so an
+                // author could see them on screen but not reach them.
+                href: { title: 'Link', widget: 'object_browser', mode: 'link' },
+                flagAlign: {
+                    title: 'Caption Alignment',
+                    widget: 'select',
+                    choices: [['left', 'Left'], ['right', 'Right']],
+                    default: 'left',
+                },
                 title: { title: 'Title', type: 'string' },
                 description: { title: 'Description', type: 'string', widget: 'textarea' },
                 preview_image: { title: 'Image Override', widget: 'object_browser', mode: 'image', allowExternals: true },
@@ -388,6 +401,10 @@ export const sharedBlocksConfig = {
         group: 'common',
         blockSchema: {
             properties: {
+                collapsed: { title: 'Collapsed', type: 'boolean' },
+                filtering: { title: 'Filtering', type: 'boolean' },
+                non_exclusive: { title: 'Allow multiple open', type: 'boolean' },
+                right_arrows: { title: 'Arrows on the right', type: 'boolean' },
                 panels: {
                     title: 'Panels',
                     widget: 'object_list',
@@ -406,7 +423,7 @@ export const sharedBlocksConfig = {
                                     'slate', 'image', 'separator', 'teaser', 'listing', 'slateTable',
                                     'hero', 'columns', 'slider', 'gridBlock', 'section',
                                     'contextNavigation', 'codeExample', 'toc', 'highlight', 'introduction',
-                                ],
+                                , 'accordion'],
                                 defaultBlockType: 'slate',
                             },
                         },
@@ -469,8 +486,86 @@ export const sharedBlocksConfig = {
     // so they were excluded from the page-level allowed set (getPageAllowedBlocks
     // only includes registered blocks with an id). Minimal registration makes them
     // valid page blocks; the frontend still owns their rendering.
-    search: { id: 'search', title: 'Search', group: 'common', blockSchema: { properties: {} } },
-    heading: { id: 'heading', title: 'Heading', group: 'common', blockSchema: { properties: {} } },
+    // Both DO declare their inline-editable fields: the bridge refuses to promote
+    // a field its schema doesn't declare as text (getFieldType returns undefined,
+    // so restoreContentEditableOnFields skips it). An undeclared field renders a
+    // data-edit-text annotation that can never be edited — which is what the
+    // renderer has been emitting for these two since they were registered.
+    search: {
+        id: 'search',
+        title: 'Search',
+        group: 'common',
+        blockSchema: {
+            properties: {
+                variation: { title: 'Variation' },
+                query: { title: 'Query', widget: 'querystring' },
+                listingBodyTemplate: { title: 'Results template' },
+                showSearchInput: { title: 'Show search input', type: 'boolean' },
+                showSortOn: { title: 'Show sort on', type: 'boolean' },
+                showTotalResults: { title: 'Show total results', type: 'boolean' },
+                sortOnOptions: { title: 'Sort on options', type: 'array' },
+                facets: {
+                  // Typed sub-items: each facet's `type` names its own block type,
+                  // so the item is edited with THAT type's schema (the same shape
+                  // slider.slides uses). A site can register another facet type and
+                  // list it here without touching this schema.
+                  title: 'Facets',
+                  widget: 'object_list',
+                  typeField: 'type',
+                  allowedBlocks: ['checkboxFacet', 'selectFacet', 'daterangeFacet', 'toggleFacet'],
+                  defaultBlockType: 'checkboxFacet',
+                },
+                headline: { title: 'Headline', type: 'string' },
+                title: { title: 'Title', type: 'string' },
+                facetsTitle: { title: 'Facets title', type: 'string' },
+                // The quick-answer region only renders once a query has been
+                // asked; the sample question is what data-block-selector-input
+                // types to reveal it (query-reveal-page + query-reveal.spec).
+                quickAnswerSample: { title: 'Sample question', type: 'string' },
+                quickAnswer: {
+                  title: 'Quick answer',
+                  widget: 'blocks_layout',
+                  allowedBlocks: ['quickAnswer'],
+                },
+                // The results region (docs/examples/search.md): a child listing
+                // block under blocks_layout.listing. Undeclared, its children
+                // render but never enter the pathMap — the exact orphan the
+                // guardrail now refuses without exemptions. Mirrors the admin's
+                // search schemaEnhancer (volto-hydra/src/index.js) EXACTLY —
+                // that enhancer only adds the field when absent, so a diverging
+                // fixture copy would win and change the sidebar.
+                listing: {
+                  title: 'Results Listing',
+                  widget: 'blocks_layout',
+                  description: 'Listing block to render search results',
+                  allowedBlocks: ['listing', 'default', 'summary', 'teaser', 'image'],
+                  maxLength: 1,
+                  defaultBlockType: 'listing',
+                },
+            },
+        },
+    },
+    quickAnswer: {
+        id: 'quickAnswer',
+        title: 'Quick answer',
+        group: 'common',
+        restricted: true,
+        blockSchema: {
+            properties: {
+                answer: { title: 'Answer', type: 'string' },
+            },
+        },
+    },
+    heading: {
+        id: 'heading',
+        title: 'Heading',
+        group: 'common',
+        blockSchema: {
+            properties: {
+                alignment: { title: 'Alignment', widget: 'align' },
+                tag: { title: 'Tag', widget: 'select', choices: [['h1','h1'],['h2','h2'],['h3','h3'],['h4','h4'],['h5','h5'],['h6','h6']] }, heading: { title: 'Heading', type: 'string' } },
+        },
+    },
     // slateTable has inline-editable cells, so it MUST declare its nested
     // structure — table (object) → rows (object_list) → cells (object_list) →
     // value (slate). A frontend's registered schema OVERRIDES the admin's
@@ -513,8 +608,64 @@ export const sharedBlocksConfig = {
             },
         },
     },
-    maps: { id: 'maps', title: 'Map', group: 'common', blockSchema: { properties: {} } },
-    video: { id: 'video', title: 'Video', group: 'common', blockSchema: { properties: {} } },
+    // Declared, not empty: the bridge promotes a field only if the block's
+    // schema has it, so an empty schema makes every annotation on these blocks
+    // dead — `data-edit-text="title"` on a map never becomes editable, however
+    // correctly the frontend marked it up. Fields are the ones the fixtures
+    // actually store.
+    maps: {
+        id: 'maps',
+        title: 'Map',
+        group: 'common',
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'url', 'align'] }],
+            properties: {
+                title: { title: 'Title', type: 'string' },
+                url: { title: 'Map URL', widget: 'url' },
+                align: { title: 'Alignment', type: 'string', factory: 'Choice' },
+            },
+            required: [],
+        },
+    },
+    video: { id: 'video', title: 'Video', group: 'common', blockSchema: { properties: {
+        url: { title: 'Video URL', widget: 'url' },
+        preview_image: { title: 'Preview image URL', widget: 'url' },
+        align: { title: 'Alignment', widget: 'align' },
+        autoplay: { title: 'Autoplay', type: 'boolean' },
+        controls: { title: 'Show controls', type: 'boolean' },
+        loop: { title: 'Loop', type: 'boolean' },
+        muted: { title: 'Muted', type: 'boolean' },} } },
+    // Cookie consent — the worked example for revealing the place a FIELD is
+    // edited (docs/examples/cookie-consent.md). Its two authored fields are read
+    // in two different places, each outside the block's own element and hidden
+    // until its trigger is pressed, so each trigger names the field its half
+    // holds: `data-block-selector="uid#message"` / `uid#analyticsPurpose`.
+    cookieConsent: {
+        id: 'cookieConsent',
+        title: 'Cookie consent',
+        blockSchema: {
+            fieldsets: [
+                { id: 'default', title: 'Default', fields: ['message', 'analyticsPurpose'] },
+            ],
+            properties: {
+                message: {
+                    title: 'Banner message',
+                    type: 'array',
+                    widget: 'slate',
+                    description:
+                        'Shown in the consent banner, at the foot of every page, until a visitor chooses.',
+                },
+                analyticsPurpose: {
+                    title: 'Analytics cookies — what they are for',
+                    type: 'string',
+                    widget: 'textarea',
+                    description:
+                        'Shown beside the analytics tick box, inside the preferences dialog.',
+                },
+            },
+            required: [],
+        },
+    },
     // Code example block: tabbed code display with syntax highlighting
     codeExample: {
         id: 'codeExample',
@@ -595,8 +746,13 @@ export const sharedBlocksConfig = {
     listing: {
         id: 'listing',
         blockSchema: {
-            fieldsets: [{ id: 'default', title: 'Default', fields: ['variation', 'fieldMapping'] }],
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['variation', 'fieldMapping', 'headline', 'headlineTag', 'querystring'] }],
             properties: {
+                fieldMapping: { title: 'Field mapping' },
+                headline: { title: 'Headline', type: 'string' },
+                headlineTag: { title: 'Headline tag', widget: 'select', choices: [['h1','h1'],['h2','h2'],['h3','h3'],['h4','h4'],['h5','h5'],['h6','h6']] },
+                querystring: { title: 'Search criteria', widget: 'querystring' },
+                query: { title: 'Query', widget: 'querystring' },
                 variation: {
                     title: 'Item Type',
                     widget: 'blockTypeSelect',
@@ -643,6 +799,30 @@ export const sharedBlocksConfig = {
         },
         schemaEnhancer: {
             inheritSchemaFrom: { typeField: 'variation', mappingField: 'fieldMapping', defaultsField: 'itemDefaults' },
+        },
+    },
+    // The vocabularySelect worked example (#321): a question whose answer is
+    // completed from a vocabulary the author picked. Registered here so EVERY
+    // example frontend carries it — the docs frontends already register it via
+    // block-definitions.json, and a type only some frontends know is a type
+    // block-sanity rightly flags on the others.
+    suggest: {
+        id: 'suggest',
+        title: 'Suggest',
+        blockSchema: {
+            fieldsets: [
+                { id: 'default', title: 'Default', fields: ['label', 'suggestFrom', 'value'] },
+            ],
+            properties: {
+                label: { title: 'Question' },
+                suggestFrom: {
+                    title: 'Suggest from',
+                    widget: 'vocabularySelect',
+                    vocabularyFilter: 'Keywords|Subject',
+                },
+                value: { title: 'Answer' },
+            },
+            required: [],
         },
     },
     searchShortcuts: {
@@ -723,9 +903,10 @@ export const sharedBlocksConfig = {
         blockSchema: {
             title: 'Table of Contents',
             fieldsets: [
-                { id: 'default', title: 'Default', fields: ['title', 'hide_title', 'ordered', 'levels'] },
+                { id: 'default', title: 'Default', fields: ['title', 'hide_title', 'ordered', 'levels', 'variation'] },
             ],
             properties: {
+                variation: { title: 'Variation' },
                 title: { title: 'Title', type: 'string' },
                 hide_title: { title: 'Hide title', type: 'boolean' },
                 ordered: { title: 'Ordered', type: 'boolean' },
@@ -748,8 +929,10 @@ export const sharedBlocksConfig = {
         // that accepts the type. Keep gridBlock (no nesting) and hero out of it.
         allowedBlocks: ['slate', 'image', 'listing', 'teaser'],
         blockSchema: {
-            fieldsets: [{ id: 'default', title: 'Default', fields: ['items', 'variation'] }],
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['items', 'variation', 'headline', 'headlineTag'] }],
             properties: {
+                headline: { title: 'Headline', type: 'string' },
+                headlineTag: { title: 'Headline tag', widget: 'select', choices: [['h1','h1'],['h2','h2'],['h3','h3'],['h4','h4'],['h5','h5'],['h6','h6']] },
                 items: {
                     widget: 'blocks_layout',
                     itemTypeField: 'variation',  // sync trigger
@@ -779,14 +962,121 @@ export const sharedBlocksConfig = {
     // for teasers via inheritSchemaFrom.parentControlled.teaser.
     teaser: {
         id: 'teaser',
+        // A listing renders each result as this type, so it must declare how a
+        // result's fields land on it — that mapping is also what makes it
+        // selectable in the Item Type widget (filterConvertibleFrom: '@default').
+        fieldMappings: {
+            '@default': { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'preview_image' },
+        },
         title: 'Teaser',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>',
         group: 'common',
+        // Mirrors Volto's own teaser schema (core Teaser/schema.js), because a
+        // fixture blockSchema WINS over the admin's. A PARTIAL copy is what
+        // broke the starter UI: declaring title/description without `overwrite`
+        // — the "customize" checkbox those fields hang off — left the bridge
+        // with a teaser whose link and toggle did not exist.
+        blockSchema: {
+            fieldsets: [
+                { id: 'default', title: 'Default', fields: ['href', 'overwrite', 'title', 'head_title', 'description', 'preview_image'] },
+            ],
+            properties: {
+                href: { title: 'Target', widget: 'object_browser', mode: 'link', allowExternals: true },
+                overwrite: { title: 'Customize teaser content', type: 'boolean', default: false },
+                title: { title: 'Title' },
+                head_title: { title: 'Kicker' },
+                description: { title: 'Description', widget: 'textarea' },
+                preview_image: { title: 'Image override', widget: 'object_browser', mode: 'image', allowExternals: true },
+            },
+            required: ['href'],
+        },
+        // The teaser's RULE, not a snapshot of one side of it. A teaser MIRRORS
+        // its target by default — title/description/image belong to the page it
+        // points at and are not this block's to edit — until "Customize teaser
+        // content" is ticked, when they become its own.
+        //
+        // Volto expresses that as a schema FUNCTION of the data, which cannot
+        // reach a frontend: the block config crosses postMessage, so functions
+        // don't survive. fieldRules is the declarative form of the same rule and
+        // travels intact, so the admin and the mock parent resolve the teaser
+        // identically — instead of one of them believing the title is always
+        // editable and the other that it has no fields at all.
+        schemaEnhancer: {
+            fieldRules: {
+                title: { when: { overwrite: true }, else: false },
+                head_title: { when: { overwrite: true }, else: false },
+                description: { when: { overwrite: true }, else: false },
+                preview_image: { when: { overwrite: true }, else: false },
+            },
+        },
     },
     // Image block: parents declare claims via inheritSchemaFrom.parentControlled.image.
     image: {
         id: 'image',
         title: 'Image',
+        // Mirrors Volto's ImageSchema (core Image/schema.jsx), with two
+        // deliberate differences.
+        //
+        // 1. `url` is declared. Volto leaves it out of `properties` because the
+        //    upload widget writes it, not a sidebar field — but hydra reads the
+        //    schema to learn that `url` is a MEDIA field, which is what makes
+        //    data-edit-media="url" an editable target rather than an unknown
+        //    attribute. Undeclared, the image is uneditable on the canvas.
+        //
+        // 2. `url` is REQUIRED. An image block exists to hold an image, so it
+        //    renders one either way — a grey placeholder until the author picks
+        //    a real one, giving them something to click. Marking it required is
+        //    what tells reveal to leave it alone: reveal is for OPTIONAL fields
+        //    that are absent until asked for (a hero's image), and offering to
+        //    "reveal" a field whose element is already on screen is nonsense.
+        //
+        // Volto states the rest as a schema FUNCTION of formData (alt/align/size
+        // and the link fieldset appear only once a url exists). A function can't
+        // cross postMessage to a frontend, so the same rule is expressed as
+        // fieldRules, which travels as data.
+        blockSchema: {
+            fieldsets: [
+                { id: 'default', title: 'Default', fields: ['url', 'alt', 'align', 'size', 'title', 'description', 'credit', 'copyright_and_sources', 'allow_image_download'] },
+                { id: 'link_settings', title: 'Link settings', fields: ['href', 'openLinkInNewTab'] },
+            ],
+            properties: {
+                title: { title: 'Title' },
+                description: { title: 'Description', widget: 'textarea' },
+                credit: { title: 'Credit' },
+                copyright_and_sources: { title: 'Copyright and sources' },
+                allow_image_download: { title: 'Allow image download', type: 'boolean' },
+                url: { title: 'Image', widget: 'image' },
+                alt: { title: 'Alt text' },
+                align: { title: 'Alignment', widget: 'align', default: 'center' },
+                size: { title: 'Size', widget: 'image_size', default: 'l' },
+                href: {
+                    title: 'Link to',
+                    widget: 'object_browser',
+                    mode: 'link',
+                    selectedItemAttrs: ['Title', 'Description', 'hasPreviewImage'],
+                    allowExternals: true,
+                },
+                openLinkInNewTab: { title: 'Open in a new tab', type: 'boolean' },
+            },
+            required: ['url'],
+        },
+        schemaEnhancer: {
+            fieldRules: {
+                alt: { when: { url: { isSet: true } }, else: false },
+                align: { when: { url: { isSet: true } }, else: false },
+                // Volto's own Image schema drops the size choice for a
+                // full-width image: the width IS the page, so there is nothing
+                // to choose. Written as a LIST of rules — the first whose
+                // condition holds wins, and the bare `false` at the end is the
+                // catch-all that hides the field when none does.
+                size: [
+                  { when: { url: { isSet: true }, align: { isNot: 'full' } } },
+                  false,
+                ],
+                href: { when: { url: { isSet: true } }, else: false },
+                openLinkInNewTab: { when: { url: { isSet: true } }, else: false },
+            },
+        },
         fieldMappings: {
             '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },
         },
@@ -808,8 +1098,7 @@ export const sharedBlocksConfig = {
                         'default_to', 'default_from', 'default_subject',
                         'submit_label', 'show_cancel', 'cancel_label',
                         'mail_header', 'mail_footer',
-                        'captcha', 'email_otp_verification',
-                    ],
+                        'captcha', 'email_otp_verification', 'sortOn', 'sortOnOptions', 'optionsFrom'],
                 },
                 {
                     id: 'manage_data',
@@ -818,14 +1107,34 @@ export const sharedBlocksConfig = {
                 },
             ],
             properties: {
+                // Three custom widgets, on a block whose schema this
+                // fixture owns — the built-in search block's schema is Volto's,
+                // so a widget declared there never reaches the sidebar.
+                sortOn: {
+                    title: 'Sort results by',
+                    type: 'string',
+                    widget: 'querystringSelect',
+                    indexes: 'sortable',
+                    emptyLabel: '— no sorting —',
+                },
+                sortOnOptions: {
+                    title: 'Sort-by options',
+                    type: 'array',
+                    widget: 'querystringSelect',
+                    indexes: 'sortable',
+                    multiple: true,
+                },
+                optionsFrom: {
+                    title: 'Options from',
+                    type: 'string',
+                    widget: 'vocabularySelect',
+                },
+                send_email: { title: 'Send email', type: 'boolean' },
                 title: {
                     title: 'Title',
                     type: 'string',
                 },
-                description: {
-                    title: 'Description',
-                    type: 'textarea',
-                },
+                description: { title: 'Description', type: 'string', widget: 'textarea' },
                 subblocks: {
                     title: 'Fields',
                     widget: 'object_list',
@@ -927,13 +1236,42 @@ export const sharedBlocksConfig = {
     // are not canonical @default fields (@id, title, description, image).
     text: {
         id: 'text',
+        schemaEnhancer: {
+            fieldRules: {
+                // The comparison only means anything once a question is named.
+                show_when_is: {
+                    when: { show_when_field: { isSet: true } },
+                    else: false,
+                },
+            },
+        },
         title: 'Text',
         restricted: true,
         fieldMappings: { select: { label: 'label', description: 'description', required: 'required' } },
         blockSchema: {
             title: 'Text Field',
-            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'required'] }],
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'required'] }, { id: 'conditions', title: 'Conditions', fields: ['show_when_field', 'show_when_is'] }],
             properties: {
+                show_when_field: {
+                    title: 'Only show when',
+                    description: 'An earlier question in this form.',
+                    type: 'string',
+                    widget: 'blockPicker',
+                    scope: 'subblocks',
+                    direction: 'before',
+                    valueField: 'field_id',
+                    labelField: 'label',
+                    emptyLabel: '— always show —',
+                },
+                show_when_is: {
+                    title: 'Condition',
+                    type: 'string',
+                    factory: 'Choice',
+                    choices: [
+                        ['value_is', 'is'],
+                        ['filled', 'has an answer'],
+                    ],
+                },
                 label: { title: 'Label', type: 'string' },
                 description: { title: 'Description', type: 'string' },
                 required: { title: 'Required', type: 'boolean', default: false },
@@ -942,13 +1280,42 @@ export const sharedBlocksConfig = {
     },
     textarea: {
         id: 'textarea',
+        schemaEnhancer: {
+            fieldRules: {
+                // The comparison only means anything once a question is named.
+                show_when_is: {
+                    when: { show_when_field: { isSet: true } },
+                    else: false,
+                },
+            },
+        },
         title: 'Textarea',
         restricted: true,
         fieldMappings: { select: { label: 'label', description: 'description', required: 'required' } },
         blockSchema: {
             title: 'Textarea Field',
-            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'required'] }],
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'required'] }, { id: 'conditions', title: 'Conditions', fields: ['show_when_field', 'show_when_is'] }],
             properties: {
+                show_when_field: {
+                    title: 'Only show when',
+                    description: 'An earlier question in this form.',
+                    type: 'string',
+                    widget: 'blockPicker',
+                    scope: 'subblocks',
+                    direction: 'before',
+                    valueField: 'field_id',
+                    labelField: 'label',
+                    emptyLabel: '— always show —',
+                },
+                show_when_is: {
+                    title: 'Condition',
+                    type: 'string',
+                    factory: 'Choice',
+                    choices: [
+                        ['value_is', 'is'],
+                        ['filled', 'has an answer'],
+                    ],
+                },
                 label: { title: 'Label', type: 'string' },
                 description: { title: 'Description', type: 'string' },
                 required: { title: 'Required', type: 'boolean', default: false },
@@ -957,13 +1324,42 @@ export const sharedBlocksConfig = {
     },
     number: {
         id: 'number',
+        schemaEnhancer: {
+            fieldRules: {
+                // The comparison only means anything once a question is named.
+                show_when_is: {
+                    when: { show_when_field: { isSet: true } },
+                    else: false,
+                },
+            },
+        },
         title: 'Number',
         restricted: true,
         fieldMappings: { select: { label: 'label', description: 'description', required: 'required' } },
         blockSchema: {
             title: 'Number Field',
-            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'required'] }],
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'required'] }, { id: 'conditions', title: 'Conditions', fields: ['show_when_field', 'show_when_is'] }],
             properties: {
+                show_when_field: {
+                    title: 'Only show when',
+                    description: 'An earlier question in this form.',
+                    type: 'string',
+                    widget: 'blockPicker',
+                    scope: 'subblocks',
+                    direction: 'before',
+                    valueField: 'field_id',
+                    labelField: 'label',
+                    emptyLabel: '— always show —',
+                },
+                show_when_is: {
+                    title: 'Condition',
+                    type: 'string',
+                    factory: 'Choice',
+                    choices: [
+                        ['value_is', 'is'],
+                        ['filled', 'has an answer'],
+                    ],
+                },
                 label: { title: 'Label', type: 'string' },
                 description: { title: 'Description', type: 'string' },
                 required: { title: 'Required', type: 'boolean', default: false },
@@ -972,6 +1368,15 @@ export const sharedBlocksConfig = {
     },
     select: {
         id: 'select',
+        schemaEnhancer: {
+            fieldRules: {
+                // The comparison only means anything once a question is named.
+                show_when_is: {
+                    when: { show_when_field: { isSet: true } },
+                    else: false,
+                },
+            },
+        },
         title: 'List',
         restricted: true,
         fieldMappings: {
@@ -989,8 +1394,34 @@ export const sharedBlocksConfig = {
         },
         blockSchema: {
             title: 'Select Field',
-            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'input_values', 'required'] }],
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'input_values', 'required', 'options_from'] }, { id: 'conditions', title: 'Conditions', fields: ['show_when_field', 'show_when_is'] }],
             properties: {
+                show_when_field: {
+                    title: 'Only show when',
+                    description: 'An earlier question in this form.',
+                    type: 'string',
+                    widget: 'blockPicker',
+                    scope: 'subblocks',
+                    direction: 'before',
+                    valueField: 'field_id',
+                    labelField: 'label',
+                    emptyLabel: '— always show —',
+                },
+                show_when_is: {
+                    title: 'Condition',
+                    type: 'string',
+                    factory: 'Choice',
+                    choices: [
+                        ['value_is', 'is'],
+                        ['filled', 'has an answer'],
+                    ],
+                },
+                options_from: {
+                    title: 'Options from',
+                    description: 'A vocabulary this site keeps.',
+                    type: 'string',
+                    widget: 'vocabularySelect',
+                },
                 label: { title: 'Label', type: 'string' },
                 description: { title: 'Description', type: 'string' },
                 input_values: { title: 'Possible values', type: 'array', creatable: true },
@@ -1000,13 +1431,42 @@ export const sharedBlocksConfig = {
     },
     single_choice: {
         id: 'single_choice',
+        schemaEnhancer: {
+            fieldRules: {
+                // The comparison only means anything once a question is named.
+                show_when_is: {
+                    when: { show_when_field: { isSet: true } },
+                    else: false,
+                },
+            },
+        },
         title: 'Single Choice',
         restricted: true,
         fieldMappings: { select: { label: 'label', description: 'description', required: 'required', input_values: 'input_values' } },
         blockSchema: {
             title: 'Single Choice Field',
-            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'input_values', 'required'] }],
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'input_values', 'required'] }, { id: 'conditions', title: 'Conditions', fields: ['show_when_field', 'show_when_is'] }],
             properties: {
+                show_when_field: {
+                    title: 'Only show when',
+                    description: 'An earlier question in this form.',
+                    type: 'string',
+                    widget: 'blockPicker',
+                    scope: 'subblocks',
+                    direction: 'before',
+                    valueField: 'field_id',
+                    labelField: 'label',
+                    emptyLabel: '— always show —',
+                },
+                show_when_is: {
+                    title: 'Condition',
+                    type: 'string',
+                    factory: 'Choice',
+                    choices: [
+                        ['value_is', 'is'],
+                        ['filled', 'has an answer'],
+                    ],
+                },
                 label: { title: 'Label', type: 'string' },
                 description: { title: 'Description', type: 'string' },
                 input_values: { title: 'Possible values', type: 'array', creatable: true },
@@ -1016,13 +1476,42 @@ export const sharedBlocksConfig = {
     },
     multiple_choice: {
         id: 'multiple_choice',
+        schemaEnhancer: {
+            fieldRules: {
+                // The comparison only means anything once a question is named.
+                show_when_is: {
+                    when: { show_when_field: { isSet: true } },
+                    else: false,
+                },
+            },
+        },
         title: 'Multiple Choice',
         restricted: true,
         fieldMappings: { select: { label: 'label', description: 'description', required: 'required', input_values: 'input_values' } },
         blockSchema: {
             title: 'Multiple Choice Field',
-            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'input_values', 'required'] }],
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'input_values', 'required'] }, { id: 'conditions', title: 'Conditions', fields: ['show_when_field', 'show_when_is'] }],
             properties: {
+                show_when_field: {
+                    title: 'Only show when',
+                    description: 'An earlier question in this form.',
+                    type: 'string',
+                    widget: 'blockPicker',
+                    scope: 'subblocks',
+                    direction: 'before',
+                    valueField: 'field_id',
+                    labelField: 'label',
+                    emptyLabel: '— always show —',
+                },
+                show_when_is: {
+                    title: 'Condition',
+                    type: 'string',
+                    factory: 'Choice',
+                    choices: [
+                        ['value_is', 'is'],
+                        ['filled', 'has an answer'],
+                    ],
+                },
                 label: { title: 'Label', type: 'string' },
                 description: { title: 'Description', type: 'string' },
                 input_values: { title: 'Possible values', type: 'array', creatable: true },
@@ -1032,13 +1521,42 @@ export const sharedBlocksConfig = {
     },
     checkbox: {
         id: 'checkbox',
+        schemaEnhancer: {
+            fieldRules: {
+                // The comparison only means anything once a question is named.
+                show_when_is: {
+                    when: { show_when_field: { isSet: true } },
+                    else: false,
+                },
+            },
+        },
         title: 'Checkbox',
         restricted: true,
         fieldMappings: { select: { label: 'label', description: 'description', required: 'required' } },
         blockSchema: {
             title: 'Checkbox Field',
-            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'required'] }],
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'required'] }, { id: 'conditions', title: 'Conditions', fields: ['show_when_field', 'show_when_is'] }],
             properties: {
+                show_when_field: {
+                    title: 'Only show when',
+                    description: 'An earlier question in this form.',
+                    type: 'string',
+                    widget: 'blockPicker',
+                    scope: 'subblocks',
+                    direction: 'before',
+                    valueField: 'field_id',
+                    labelField: 'label',
+                    emptyLabel: '— always show —',
+                },
+                show_when_is: {
+                    title: 'Condition',
+                    type: 'string',
+                    factory: 'Choice',
+                    choices: [
+                        ['value_is', 'is'],
+                        ['filled', 'has an answer'],
+                    ],
+                },
                 label: { title: 'Label', type: 'string' },
                 description: { title: 'Description', type: 'string' },
                 required: { title: 'Required', type: 'boolean', default: false },
@@ -1047,13 +1565,42 @@ export const sharedBlocksConfig = {
     },
     date: {
         id: 'date',
+        schemaEnhancer: {
+            fieldRules: {
+                // The comparison only means anything once a question is named.
+                show_when_is: {
+                    when: { show_when_field: { isSet: true } },
+                    else: false,
+                },
+            },
+        },
         title: 'Date',
         restricted: true,
         fieldMappings: { select: { label: 'label', description: 'description', required: 'required' } },
         blockSchema: {
             title: 'Date Field',
-            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'required'] }],
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'required'] }, { id: 'conditions', title: 'Conditions', fields: ['show_when_field', 'show_when_is'] }],
             properties: {
+                show_when_field: {
+                    title: 'Only show when',
+                    description: 'An earlier question in this form.',
+                    type: 'string',
+                    widget: 'blockPicker',
+                    scope: 'subblocks',
+                    direction: 'before',
+                    valueField: 'field_id',
+                    labelField: 'label',
+                    emptyLabel: '— always show —',
+                },
+                show_when_is: {
+                    title: 'Condition',
+                    type: 'string',
+                    factory: 'Choice',
+                    choices: [
+                        ['value_is', 'is'],
+                        ['filled', 'has an answer'],
+                    ],
+                },
                 label: { title: 'Label', type: 'string' },
                 description: { title: 'Description', type: 'string' },
                 required: { title: 'Required', type: 'boolean', default: false },
@@ -1062,13 +1609,42 @@ export const sharedBlocksConfig = {
     },
     from: {
         id: 'from',
+        schemaEnhancer: {
+            fieldRules: {
+                // The comparison only means anything once a question is named.
+                show_when_is: {
+                    when: { show_when_field: { isSet: true } },
+                    else: false,
+                },
+            },
+        },
         title: 'E-mail',
         restricted: true,
         fieldMappings: { select: { label: 'label', description: 'description', required: 'required' } },
         blockSchema: {
             title: 'Email Field',
-            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'use_as_reply_to', 'use_as_bcc', 'required'] }],
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'use_as_reply_to', 'use_as_bcc', 'required'] }, { id: 'conditions', title: 'Conditions', fields: ['show_when_field', 'show_when_is'] }],
             properties: {
+                show_when_field: {
+                    title: 'Only show when',
+                    description: 'An earlier question in this form.',
+                    type: 'string',
+                    widget: 'blockPicker',
+                    scope: 'subblocks',
+                    direction: 'before',
+                    valueField: 'field_id',
+                    labelField: 'label',
+                    emptyLabel: '— always show —',
+                },
+                show_when_is: {
+                    title: 'Condition',
+                    type: 'string',
+                    factory: 'Choice',
+                    choices: [
+                        ['value_is', 'is'],
+                        ['filled', 'has an answer'],
+                    ],
+                },
                 label: { title: 'Label', type: 'string' },
                 description: { title: 'Description', type: 'string' },
                 use_as_reply_to: { title: "Use as 'reply to'", type: 'boolean', default: false },
@@ -1079,13 +1655,42 @@ export const sharedBlocksConfig = {
     },
     static_text: {
         id: 'static_text',
+        schemaEnhancer: {
+            fieldRules: {
+                // The comparison only means anything once a question is named.
+                show_when_is: {
+                    when: { show_when_field: { isSet: true } },
+                    else: false,
+                },
+            },
+        },
         title: 'Static Text',
         restricted: true,
         fieldMappings: { select: { label: 'label', description: 'description' } },
         blockSchema: {
             title: 'Static Text',
-            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description'] }],
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description'] }, { id: 'conditions', title: 'Conditions', fields: ['show_when_field', 'show_when_is'] }],
             properties: {
+                show_when_field: {
+                    title: 'Only show when',
+                    description: 'An earlier question in this form.',
+                    type: 'string',
+                    widget: 'blockPicker',
+                    scope: 'subblocks',
+                    direction: 'before',
+                    valueField: 'field_id',
+                    labelField: 'label',
+                    emptyLabel: '— always show —',
+                },
+                show_when_is: {
+                    title: 'Condition',
+                    type: 'string',
+                    factory: 'Choice',
+                    choices: [
+                        ['value_is', 'is'],
+                        ['filled', 'has an answer'],
+                    ],
+                },
                 label: { title: 'Label', type: 'string' },
                 description: { title: 'Description', type: 'string' },
             },
@@ -1093,95 +1698,193 @@ export const sharedBlocksConfig = {
     },
     hidden: {
         id: 'hidden',
+        schemaEnhancer: {
+            fieldRules: {
+                // The comparison only means anything once a question is named.
+                show_when_is: {
+                    when: { show_when_field: { isSet: true } },
+                    else: false,
+                },
+            },
+        },
         title: 'Hidden',
         restricted: true,
         fieldMappings: { select: { label: 'label' } },
         blockSchema: {
             title: 'Hidden Field',
-            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'value'] }],
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'value'] }, { id: 'conditions', title: 'Conditions', fields: ['show_when_field', 'show_when_is'] }],
             properties: {
+                show_when_field: {
+                    title: 'Only show when',
+                    description: 'An earlier question in this form.',
+                    type: 'string',
+                    widget: 'blockPicker',
+                    scope: 'subblocks',
+                    direction: 'before',
+                    valueField: 'field_id',
+                    labelField: 'label',
+                    emptyLabel: '— always show —',
+                },
+                show_when_is: {
+                    title: 'Condition',
+                    type: 'string',
+                    factory: 'Choice',
+                    choices: [
+                        ['value_is', 'is'],
+                        ['filled', 'has an answer'],
+                    ],
+                },
                 label: { title: 'Label', type: 'string' },
                 description: { title: 'Description', type: 'string' },
                 value: { title: 'Value for field', type: 'string' },
+                // What the field submits when nothing sets it — the whole point
+                // of a hidden field, and it was the one thing not declared.
+                default_value: { title: 'Default value', type: 'string' },
             },
         },
     },
     attachment: {
         id: 'attachment',
+        schemaEnhancer: {
+            fieldRules: {
+                // The comparison only means anything once a question is named.
+                show_when_is: {
+                    when: { show_when_field: { isSet: true } },
+                    else: false,
+                },
+            },
+        },
         title: 'Attachment',
         restricted: true,
         fieldMappings: { select: { label: 'label', description: 'description', required: 'required' } },
         blockSchema: {
             title: 'Attachment Field',
-            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'required'] }],
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'description', 'required'] }, { id: 'conditions', title: 'Conditions', fields: ['show_when_field', 'show_when_is'] }],
             properties: {
+                show_when_field: {
+                    title: 'Only show when',
+                    description: 'An earlier question in this form.',
+                    type: 'string',
+                    widget: 'blockPicker',
+                    scope: 'subblocks',
+                    direction: 'before',
+                    valueField: 'field_id',
+                    labelField: 'label',
+                    emptyLabel: '— always show —',
+                },
+                show_when_is: {
+                    title: 'Condition',
+                    type: 'string',
+                    factory: 'Choice',
+                    choices: [
+                        ['value_is', 'is'],
+                        ['filled', 'has an answer'],
+                    ],
+                },
                 label: { title: 'Label', type: 'string' },
                 description: { title: 'Description', type: 'string' },
                 required: { title: 'Required', type: 'boolean', default: false },
             },
         },
     },
-    // fieldRules test block: demonstrates conditional field visibility
-    skiplogicTest: {
-        id: 'skiplogicTest',
-        title: 'Field Rules Test',
-        group: 'common',
-        blockSchema: {
-            properties: {
-                mode: {
-                    title: 'Mode',
-                    widget: 'select',
-                    choices: [['simple', 'Simple'], ['advanced', 'Advanced']],
-                },
-                columns: {
-                    title: 'Columns',
-                    type: 'integer',
-                    default: 1,
-                },
-                basicTitle: {
-                    title: 'Basic Title',
-                    type: 'string',
-                },
-                advancedOptions: {
-                    title: 'Advanced Options',
-                    type: 'string',
-                },
-                simpleWarning: {
-                    title: 'Simple Warning',
-                    type: 'string',
-                },
-                columnLayout: {
-                    title: 'Column Layout',
-                    widget: 'select',
-                    choices: [['equal', 'Equal'], ['weighted', 'Weighted']],
-                },
-                pageNotice: {
-                    title: 'Page Notice',
-                    type: 'string',
-                    description: 'Only visible when page has a description',
-                },
-                switchField: {
-                    title: 'Switch Field',
-                    type: 'string',
-                    description: 'Array rule with bare false as catch-all hide',
-                },
-            },
-        },
-        schemaEnhancer: {
-            fieldRules: {
-                advancedOptions: { when: { mode: 'advanced' }, else: false },
-                simpleWarning: { when: { mode: { isNot: 'advanced' } }, else: false },
-                columnLayout: { when: { columns: { gte: 2 } }, else: false },
-                pageNotice: { when: { '../description': { isSet: true } }, else: false },
-                // Array rule: show when simple OR advanced, bare false hides otherwise
-                switchField: [
-                    { when: { mode: 'simple' } },
-                    { when: { mode: 'advanced' } },
-                    false,
-                ],
-            },
-        },
+    title: {
+      id: 'title',
+      title: 'Title',
+      group: 'text',
+      restricted: true,
+      blockSchema: { fieldsets: [], properties: {}, required: [] },
     },
+    description: {
+      id: 'description',
+      title: 'Description',
+      group: 'text',
+      restricted: true,
+      blockSchema: { fieldsets: [], properties: {}, required: [] },
+    },
+    leadimage: {
+      id: 'leadimage',
+      title: 'Lead image',
+      group: 'media',
+      restricted: true,
+      blockSchema: { fieldsets: [], properties: {
+          align: { title: 'Alignment', widget: 'align' },}, required: [] },
+    },
+    // Which page date field to show — the block's own setting.
+    dateField: {
+      id: 'dateField',
+      title: 'Date',
+      group: 'text',
+      restricted: true,
+      blockSchema: {
+        fieldsets: [{ id: 'default', title: 'Default', fields: ['dateField', 'showTime'] }],
+        properties: {
+            showTime: { title: 'Show time', type: 'boolean' },
+          dateField: {
+            title: 'Field',
+            type: 'string',
+            factory: 'Choice',
+            choices: [['effective', 'Published'], ['created', 'Created'], ['modified', 'Modified']],
+          },
+        },
+        required: [],
+      },
+    },
+    eventMetadata: {
+      id: 'eventMetadata',
+      title: 'Event metadata',
+      group: 'text',
+      restricted: true,
+      // No fields of its own: this block PROJECTS the content item's fields
+      // (an Event's location, contact_name), which is why the sidebar shows the
+      // page form when it is selected. Declaring a property here fills the
+      // sidebar with that instead, and the Event's own fields disappear.
+      //
+      // `required` appears on the docs copy of an event beside fixed/slotId/
+      // templateId — template machinery, not something an author edits.
+      blockSchema: { fieldsets: [], properties: {}, required: [] },
+    },
+    socialLinks: {
+      id: 'socialLinks',
+      title: 'Social links',
+      group: 'common',
+      // Matches the declaration the Next.js example ships (PageClient.js): the
+      // links are an object_list keyed by `@id`, and each item's `url` is a
+      // plain string, not a link object. Without idField the items cannot be
+      // addressed by their stored id, so they never become selectable
+      // sub-items — the block renders but nothing inside it can be edited.
+      blockSchema: {
+        fieldsets: [{ id: 'default', title: 'Default', fields: ['links'] }],
+        properties: {
+          links: {
+            title: 'Links',
+            widget: 'object_list',
+            idField: '@id',
+            schema: {
+              fieldsets: [{ id: 'default', title: 'Default', fields: ['url'] }],
+              properties: { url: { title: 'URL', widget: 'url' } },
+              required: [],
+            },
+          },
+        },
+        required: [],
+      },
+    },
+    // The placeholder a container seeds into an empty region. Registered so it
+    // is not reported as unimplemented; it has nothing to edit.
+    empty: {
+      id: 'empty',
+      title: 'Empty',
+      group: 'common',
+      restricted: true,
+      // An empty field is a spacer in a form, but it still carries a label —
+      // the fixtures store one, so a bare properties map made it uneditable.
+      blockSchema: {
+        fieldsets: [{ id: 'default', title: 'Default', fields: ['label'] }],
+        properties: { label: { title: 'Label', type: 'string' } },
+        required: [],
+      },
+    },
+
     // Highlight block: banner with title, slate description, image, CTA
     highlight: {
         id: 'highlight',
@@ -1218,8 +1921,8 @@ export const sharedBlocksConfig = {
     // Edge direction: `X.fieldMappings[Y]` = "X can be built FROM Y" (Y → X).
     convSource: {
         id: 'convSource',
-        restricted: true,
         title: 'Conv Source',
+        restricted: true,
         group: 'common',
         fieldMappings: {}, // present (truthy) so it's a valid conversion source
         blockSchema: {
@@ -1256,8 +1959,8 @@ export const sharedBlocksConfig = {
     // restricted container that doesn't list it rejects it outright.
     convAlien: {
         id: 'convAlien',
-        restricted: true,
         title: 'Conv Alien',
+        restricted: true,
         group: 'common',
         blockSchema: {
             fieldsets: [{ id: 'default', title: 'Default', fields: ['title'] }],
@@ -1269,8 +1972,8 @@ export const sharedBlocksConfig = {
     // convGroupDst, carrying its children. Exercises convertContainerBlock on drop.
     convGroupSrc: {
         id: 'convGroupSrc',
-        restricted: true,
         title: 'Conv Group Src',
+        restricted: true,
         group: 'common',
         fieldMappings: {}, // valid conversion source
         blockSchema: {
@@ -1298,8 +2001,8 @@ export const sharedBlocksConfig = {
     // Restricted to convGroupDst → a dropped convGroupSrc auto-converts to it.
     convGroupBox: {
         id: 'convGroupBox',
-        restricted: true,
         title: 'Conv Group Box',
+        restricted: true,
         group: 'common',
         blockSchema: {
             fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
@@ -1312,8 +2015,8 @@ export const sharedBlocksConfig = {
     // Container restricted to a SINGLE convert-target → convSource drops auto-convert.
     convBox: {
         id: 'convBox',
-        restricted: true,
         title: 'Convert Box',
+        restricted: true,
         group: 'common',
         blockSchema: {
             fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
@@ -1326,8 +2029,8 @@ export const sharedBlocksConfig = {
     // Container restricted to TWO convert-targets → convSource drop opens the chooser.
     convBoxMulti: {
         id: 'convBoxMulti',
-        restricted: true,
         title: 'Convert Box (multi)',
+        restricted: true,
         group: 'common',
         blockSchema: {
             fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
@@ -1336,6 +2039,67 @@ export const sharedBlocksConfig = {
                     widget: 'blocks_layout',
                     allowedBlocks: ['convTargetA', 'convTargetB'],
                 },
+            },
+            required: [],
+        },
+    },
+
+    // Search facet types. Copied from docs/examples/block-definitions.json, which
+    // is what the docs example frontends load — these four lived only there, so
+    // any frontend using THIS registry reported them as unregistered.
+    checkboxFacet: {
+        id: 'checkboxFacet',
+        title: 'Checkboxes',
+        restricted: true,
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'field', 'multiple', 'hidden'] }],
+            properties: {
+            title: { title: 'Label' },
+            field: { title: 'Field', widget: 'select_querystring_field' },
+            hidden: { title: 'Hide facet?', type: 'boolean', default: false },
+                multiple: { title: 'Multiple choices?', type: 'boolean', default: false },
+            },
+            required: [],
+        },
+    },
+    selectFacet: {
+        id: 'selectFacet',
+        title: 'Select',
+        restricted: true,
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'field', 'hidden'] }],
+            properties: {
+            title: { title: 'Label' },
+            field: { title: 'Field', widget: 'select_querystring_field' },
+            hidden: { title: 'Hide facet?', type: 'boolean', default: false },
+            },
+            required: [],
+        },
+    },
+    daterangeFacet: {
+        id: 'daterangeFacet',
+        title: 'Date range',
+        restricted: true,
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'field', 'hidden'] }],
+            properties: {
+            title: { title: 'Label' },
+            field: { title: 'Field', widget: 'select_querystring_field' },
+            hidden: { title: 'Hide facet?', type: 'boolean', default: false },
+            },
+            required: [],
+        },
+    },
+    toggleFacet: {
+        id: 'toggleFacet',
+        title: 'Toggle',
+        restricted: true,
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'field', 'hidden'] }],
+            properties: {
+            title: { title: 'Label' },
+            field: { title: 'Field', widget: 'select_querystring_field' },
+            hidden: { title: 'Hide facet?', type: 'boolean', default: false },
             },
             required: [],
         },

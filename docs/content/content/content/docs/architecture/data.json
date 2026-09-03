@@ -343,7 +343,7 @@
             {
               "type": "link",
               "data": {
-                "url": "./server-rendered-frontends.md"
+                "url": "/docs/server-rendered-frontends"
               },
               "children": [
                 {
@@ -459,7 +459,7 @@
             {
               "type": "link",
               "data": {
-                "url": "visual-editing.md#renderer-node-id-rules"
+                "url": "/docs/visual-editing#renderer-node-id-rules"
               },
               "children": [
                 {
@@ -475,6 +475,1009 @@
       ]
     },
     "h-18": {
+      "@type": "slate",
+      "plaintext": "Template membership (edit-side slot assignment)",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Template membership (edit-side slot assignment)"
+            }
+          ]
+        }
+      ]
+    },
+    "p-19": {
+      "@type": "slate",
+      "plaintext": "A block's template membership — `templateId`, `templateInstanceId`, `slotId`, `fixed`, `readOnly` — is not intrinsic to the block; the admin **assigns** it at edit time. The [merge](templates.md#how-the-merge-works) reads these fields to place content at render time. Crucially, assignment is **gated on edit mode** — editing a template is a different act from moving content around inside a template you're *not* editing:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A block's template membership — "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "templateId"
+                }
+              ]
+            },
+            {
+              "text": ", "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "templateInstanceId"
+                }
+              ]
+            },
+            {
+              "text": ", "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "slotId"
+                }
+              ]
+            },
+            {
+              "text": ", "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "fixed"
+                }
+              ]
+            },
+            {
+              "text": ", "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "readOnly"
+                }
+              ]
+            },
+            {
+              "text": " — is not intrinsic to the block; the admin "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "assigns"
+                }
+              ]
+            },
+            {
+              "text": " it at edit time. The "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "/docs/templates#how-the-merge-works"
+              },
+              "children": [
+                {
+                  "text": "merge"
+                }
+              ]
+            },
+            {
+              "text": " reads these fields to place content at render time. Crucially, assignment is "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "gated on edit mode"
+                }
+              ]
+            },
+            {
+              "text": " — editing a template is a different act from moving content around inside a template you're "
+            },
+            {
+              "type": "em",
+              "children": [
+                {
+                  "text": "not"
+                }
+              ]
+            },
+            {
+              "text": " editing:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-20": {
+      "@type": "slate",
+      "plaintext": "Normal editing (you are not editing the template): a block's slot is implicit, derived from position. A moved/pasted block takes on the membership of wherever it lands and carries nothing from where it came from. Drag direction is irrelevant — a given drop position always yields the same membership. Template edit mode (you are editing the template, having unlocked it): the slotId is explicit — there's a slotId field, and you rename slots rather than change them by dragging. So a move that stays inside the template keeps its slotId; you can even build an invalid arrangement this way (save/lock validation, not the drag, is what refuses it). A move out of the template still strips it — dragging out exits, even while editing.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Normal editing"
+                    }
+                  ]
+                },
+                {
+                  "text": " (you are "
+                },
+                {
+                  "type": "em",
+                  "children": [
+                    {
+                      "text": "not"
+                    }
+                  ]
+                },
+                {
+                  "text": " editing the template): a block's slot is "
+                },
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "implicit"
+                    }
+                  ]
+                },
+                {
+                  "text": ", derived from position. A moved/pasted block "
+                },
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "takes on the membership of wherever it lands and carries nothing from where it came from"
+                    }
+                  ]
+                },
+                {
+                  "text": ". Drag direction is irrelevant — a given drop position always yields the same membership."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Template edit mode"
+                    }
+                  ]
+                },
+                {
+                  "text": " (you "
+                },
+                {
+                  "type": "em",
+                  "children": [
+                    {
+                      "text": "are"
+                    }
+                  ]
+                },
+                {
+                  "text": " editing the template, having unlocked it): the "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "slotId"
+                    }
+                  ]
+                },
+                {
+                  "text": " is "
+                },
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "explicit"
+                    }
+                  ]
+                },
+                {
+                  "text": " — there's a "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "slotId"
+                    }
+                  ]
+                },
+                {
+                  "text": " field, and you "
+                },
+                {
+                  "type": "em",
+                  "children": [
+                    {
+                      "text": "rename"
+                    }
+                  ]
+                },
+                {
+                  "text": " slots rather than change them by dragging. So a move that stays "
+                },
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "inside"
+                    }
+                  ]
+                },
+                {
+                  "text": " the template "
+                },
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "keeps"
+                    }
+                  ]
+                },
+                {
+                  "text": " its "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "slotId"
+                    }
+                  ]
+                },
+                {
+                  "text": "; you can even build an invalid arrangement this way (save/lock validation, not the drag, is what refuses it). A move "
+                },
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "out"
+                    }
+                  ]
+                },
+                {
+                  "text": " of the template still "
+                },
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "strips"
+                    }
+                  ]
+                },
+                {
+                  "text": " it — dragging out exits, even while editing."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-21": {
+      "@type": "slate",
+      "plaintext": "Fixed template blocks are only movable in template edit mode and their slot/`fixed` identity *is* the template, so they always keep their membership.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Fixed template blocks are only movable in template edit mode and their slot/"
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "fixed"
+                }
+              ]
+            },
+            {
+              "text": " identity "
+            },
+            {
+              "type": "em",
+              "children": [
+                {
+                  "text": "is"
+                }
+              ]
+            },
+            {
+              "text": " the template, so they always keep their membership."
+            }
+          ]
+        }
+      ]
+    },
+    "p-22": {
+      "@type": "slate",
+      "plaintext": "**Deriving membership from position** (the normal-mode path, and the \"is this inside the template\" test) — `getTemplateInfoFromNeighbors` in `blockSync.js` (reached via `applyBlockDefaultsWithContext`). Given a position in a container region it inspects the immediate neighbours and asks whether a slot *faces this gap*:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Deriving membership from position"
+                }
+              ]
+            },
+            {
+              "text": " (the normal-mode path, and the \"is this inside the template\" test) — "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "getTemplateInfoFromNeighbors"
+                }
+              ]
+            },
+            {
+              "text": " in "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "blockSync.js"
+                }
+              ]
+            },
+            {
+              "text": " (reached via "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "applyBlockDefaultsWithContext"
+                }
+              ]
+            },
+            {
+              "text": "). Given a position in a container region it inspects the immediate neighbours and asks whether a slot "
+            },
+            {
+              "type": "em",
+              "children": [
+                {
+                  "text": "faces this gap"
+                }
+              ]
+            },
+            {
+              "text": ":"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-23": {
+      "@type": "slate",
+      "plaintext": "a non-fixed slot neighbour on either side → join its slotId; a fixed anchor whose slot region faces the gap — the block before the gap via its nextSlotId (a trailing slot), or the block after it via its prevSlotId (a leading slot). nextSlotId/prevSlotId are an anchor's record of an empty adjacent slot (when the slot has content, the non-fixed neighbour above already covers it); they are mirror images, for top- vs bottom-anchored layouts; otherwise, if the container itself is a template instance (e.g. a columns block carrying a templateId), the block joins that instance and is given a freshly generated slotId.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "a "
+                },
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "non-fixed slot neighbour"
+                    }
+                  ]
+                },
+                {
+                  "text": " on either side → join its "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "slotId"
+                    }
+                  ]
+                },
+                {
+                  "text": ";"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "a "
+                },
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "fixed anchor"
+                    }
+                  ]
+                },
+                {
+                  "text": " whose slot region faces the gap — the block "
+                },
+                {
+                  "type": "em",
+                  "children": [
+                    {
+                      "text": "before"
+                    }
+                  ]
+                },
+                {
+                  "text": " the gap via its "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "nextSlotId"
+                    }
+                  ]
+                },
+                {
+                  "text": " (a trailing slot), or the block "
+                },
+                {
+                  "type": "em",
+                  "children": [
+                    {
+                      "text": "after"
+                    }
+                  ]
+                },
+                {
+                  "text": " it via its "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "prevSlotId"
+                    }
+                  ]
+                },
+                {
+                  "text": " (a leading slot). "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "nextSlotId"
+                    }
+                  ]
+                },
+                {
+                  "text": "/"
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "prevSlotId"
+                    }
+                  ]
+                },
+                {
+                  "text": " are an anchor's record of an "
+                },
+                {
+                  "type": "em",
+                  "children": [
+                    {
+                      "text": "empty"
+                    }
+                  ]
+                },
+                {
+                  "text": " adjacent slot (when the slot has content, the non-fixed neighbour above already covers it); they are mirror images, for top- vs bottom-anchored layouts;"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "otherwise, if the "
+                },
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "container itself is a template instance"
+                    }
+                  ]
+                },
+                {
+                  "text": " (e.g. a "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "columns"
+                    }
+                  ]
+                },
+                {
+                  "text": " block carrying a "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "templateId"
+                    }
+                  ]
+                },
+                {
+                  "text": "), the block joins that instance and is given a freshly generated "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "slotId"
+                    }
+                  ]
+                },
+                {
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-24": {
+      "@type": "slate",
+      "plaintext": "If none apply, the position is **outside every template** and the function returns `undefined` — plain page content. A slot member is never fixed, so membership derived this way is always `fixed: false`.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "If none apply, the position is "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "outside every template"
+                }
+              ]
+            },
+            {
+              "text": " and the function returns "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "undefined"
+                }
+              ]
+            },
+            {
+              "text": " — plain page content. A slot member is never fixed, so membership derived this way is always "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "fixed: false"
+                }
+              ]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    "p-25": {
+      "@type": "slate",
+      "plaintext": "**Applying it on a move or paste** — the `MOVE_BLOCKS` handler and the add/paste helper in `View.jsx`. Four things make the gated rule actually happen:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Applying it on a move or paste"
+                }
+              ]
+            },
+            {
+              "text": " — the "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "MOVE_BLOCKS"
+                }
+              ]
+            },
+            {
+              "text": " handler and the add/paste helper in "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "View.jsx"
+                }
+              ]
+            },
+            {
+              "text": ". Four things make the gated rule actually happen:"
+            }
+          ]
+        }
+      ]
+    },
+    "ol-26": {
+      "@type": "slate",
+      "plaintext": "Strip the source membership — but only when the destination should re-derive it. A moved/pasted non-fixed block has its templateId / templateInstanceId / slotId / readOnly deleted before the recompute, so applyBlockDefaultsWithContext can only refill them from the destination. This runs in normal mode, and in *template edit mode only when the block lands outside the template (a same-instance block no longer sits both before and after the landing gap) — that's the drag-out exit. For an in-template move while editing, the strip is skipped, so the recompute's prefer-existing-slotId* keeps the authored slot. Fixed blocks are never stripped. Exclude the block from its own neighbour scan. On a move the block already sits in the layout at its new index, so a naïve getNeighborData(position) returns the block itself — it would offer its own stale slot back to itself. The recompute filters the moved block out and treats position as the insertion gap between its real prev/next neighbours (also the basis of the \"inside the template?\" test above). Write back against the original. The update guard compares the recompute result to the originally stored block, not the stripped copy — otherwise a block whose stripped recompute is a structural no-op is never written back and the stale membership survives. templateEditModeRef for the mode check. The handler reads the current set of unlocked template instances from a ref (not the effect-closure value), so the gate sees the live edit-mode state.",
+      "value": [
+        {
+          "type": "ol",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Strip the source membership — but only when the destination should re-derive it."
+                    }
+                  ]
+                },
+                {
+                  "text": " A moved/pasted non-fixed block has its "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "templateId"
+                    }
+                  ]
+                },
+                {
+                  "text": " / "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "templateInstanceId"
+                    }
+                  ]
+                },
+                {
+                  "text": " / "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "slotId"
+                    }
+                  ]
+                },
+                {
+                  "text": " / "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "readOnly"
+                    }
+                  ]
+                },
+                {
+                  "text": " deleted "
+                },
+                {
+                  "type": "em",
+                  "children": [
+                    {
+                      "text": "before"
+                    }
+                  ]
+                },
+                {
+                  "text": " the recompute, so "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "applyBlockDefaultsWithContext"
+                    }
+                  ]
+                },
+                {
+                  "text": " can only refill them from the destination. This runs in "
+                },
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "normal mode"
+                    }
+                  ]
+                },
+                {
+                  "text": ", and in *"
+                },
+                {
+                  "type": "em",
+                  "children": [
+                    {
+                      "text": "template edit mode only when the block lands "
+                    }
+                  ]
+                },
+                {
+                  "text": "outside"
+                },
+                {
+                  "type": "em",
+                  "children": [
+                    {
+                      "text": " the template"
+                    }
+                  ]
+                },
+                {
+                  "type": "em",
+                  "children": [
+                    {
+                      "text": " (a same-instance block no longer sits both before and after the landing gap) — that's the drag-out exit. For an "
+                    }
+                  ]
+                },
+                {
+                  "type": "em",
+                  "children": [
+                    {
+                      "text": "in-template move while editing"
+                    }
+                  ]
+                },
+                {
+                  "type": "em",
+                  "children": [
+                    {
+                      "text": ", the strip is skipped, so the recompute's "
+                    }
+                  ]
+                },
+                {
+                  "text": "prefer-existing-"
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "slotId"
+                    }
+                  ]
+                },
+                {
+                  "type": "em",
+                  "children": [
+                    {
+                      "text": " keeps the authored slot. "
+                    }
+                  ]
+                },
+                {
+                  "type": "em",
+                  "children": [
+                    {
+                      "text": "Fixed"
+                    }
+                  ]
+                },
+                {
+                  "text": "* blocks are never stripped."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Exclude the block from its own neighbour scan."
+                    }
+                  ]
+                },
+                {
+                  "text": " On a move the block already sits in the layout at its new index, so a naïve "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "getNeighborData(position)"
+                    }
+                  ]
+                },
+                {
+                  "text": " returns the block itself — it would offer its own stale slot back to itself. The recompute filters the moved block out and treats "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "position"
+                    }
+                  ]
+                },
+                {
+                  "text": " as the insertion gap between its real prev/next neighbours (also the basis of the \"inside the template?\" test above)."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Write back against the original."
+                    }
+                  ]
+                },
+                {
+                  "text": " The update guard compares the recompute result to the "
+                },
+                {
+                  "type": "em",
+                  "children": [
+                    {
+                      "text": "originally stored"
+                    }
+                  ]
+                },
+                {
+                  "text": " block, not the stripped copy — otherwise a block whose stripped recompute is a structural no-op is never written back and the stale membership survives."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`templateEditModeRef` for the mode check."
+                    }
+                  ]
+                },
+                {
+                  "text": " The handler reads the current set of unlocked template instances from a ref (not the effect-closure value), so the gate sees the live edit-mode state."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-27": {
+      "@type": "slate",
+      "plaintext": "In normal mode the net effect matches the merge's own placement rules (a top/bottom slot outside a fixed anchor): dropping a block past a **free** edge flows it into that slot; dropping it past a **both-anchored** edge exits it to the surrounding page region. The drag scan that decides the drop position lives in `hydra.js` and, on a distance tie between coincident edges, prefers the deeper (inner) edge so a reorder inside a container isn't ejected to the outer level.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "In normal mode the net effect matches the merge's own placement rules (a top/bottom slot outside a fixed anchor): dropping a block past a "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "free"
+                }
+              ]
+            },
+            {
+              "text": " edge flows it into that slot; dropping it past a "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "both-anchored"
+                }
+              ]
+            },
+            {
+              "text": " edge exits it to the surrounding page region. The drag scan that decides the drop position lives in "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "hydra.js"
+                }
+              ]
+            },
+            {
+              "text": " and, on a distance tie between coincident edges, prefers the deeper (inner) edge so a reorder inside a container isn't ejected to the outer level."
+            }
+          ]
+        }
+      ]
+    },
+    "h-28": {
       "@type": "slate",
       "plaintext": "URL flattening and publicURL",
       "value": [
@@ -496,7 +1499,7 @@
         }
       ]
     },
-    "p-19": {
+    "p-29": {
       "@type": "slate",
       "plaintext": "Volto's stock URL helpers (`flattenToAppURL`, `isInternalURL`, `toPublicURL`) assume there's one \"public URL\" — usually the same origin the admin runs on, configured via `RAZZLE_PUBLIC_URL`. In Hydra the admin and the published frontend(s) live on different origins, and the editor switches between published frontends at will, so there is no single public URL.",
       "value": [
@@ -554,7 +1557,7 @@
         }
       ]
     },
-    "p-20": {
+    "p-30": {
       "@type": "slate",
       "plaintext": "**Do not set `RAZZLE_PUBLIC_URL`** in a Hydra deployment. Pinning `settings.publicURL` to one value would break flattening for every other frontend — pastes from them would be misrecognised as external and saved verbatim instead of as `/path` references.",
       "value": [
@@ -598,7 +1601,7 @@
         }
       ]
     },
-    "p-21": {
+    "p-31": {
       "@type": "slate",
       "plaintext": "Hydra makes `settings.publicURL` follow the currently active iframe frontend:",
       "value": [
@@ -623,7 +1626,7 @@
         }
       ]
     },
-    "ul-22": {
+    "ul-32": {
       "@type": "slate",
       "plaintext": "Boot — applyConfig reads the iframe_url_<port> cookie (set by View.jsx on previous visits), looks up the matching saved-frontends entry, and writes settings.publicURL = entry.publishUrl || entry.url. A returning editor sees the right value before they open the switcher. Switch — when the editor picks a different frontend in the toolbar switcher (FrontendSwitcherPanel), it dispatches setFrontendPreviewUrl(url). Hydra's publicUrlSync Redux middleware intercepts the action and updates settings.publicURL before the next render. Other frontends — flattenToAppURL and isInternalURL are shadowed to strip publicURL (the active frontend) plus every other saved frontend's edit / publish URL, so a paste from a frontend you're not currently viewing still flattens cleanly.",
       "value": [
@@ -814,7 +1817,7 @@
         }
       ]
     },
-    "p-23": {
+    "p-33": {
       "@type": "slate",
       "plaintext": "Saved frontends come from two sources, merged: the `RAZZLE_DEFAULT_IFRAME_URL` env (baseline list shipped with the deployment, format `Name|EditURL[|PublishURL],…`) and the `saved_urls_<port>` cookie (per-editor additions made via the toolbar Settings modal). The optional third slot in each entry is for setups where the published site lives at a different origin than the edit-mode frontend (e.g. `edit.example.com` for previews, `www.example.com` for production).",
       "value": [
@@ -883,7 +1886,7 @@
         }
       ]
     },
-    "p-24": {
+    "p-34": {
       "@type": "slate",
       "plaintext": "What we deliberately did NOT shadow: `UniversalLink`'s fallback `href` when an item is empty, Volto's admin-side `Robots.txt` / `Sitemap.xml` generators, `ContentMetadataTags` / `AlternateHrefLangs` in the admin's `<head>`, and the `RegistryImageWidget` site-logo URL. All of these inherit the dynamic `publicURL` transparently, and in a Hydra deployment the authoritative `robots.txt` / `sitemap.xml` / SEO tags are served by the frontends, not the admin.",
       "value": [
@@ -1018,7 +2021,7 @@
         }
       ]
     },
-    "h-25": {
+    "h-35": {
       "@type": "slate",
       "plaintext": "Building a frontend",
       "value": [
@@ -1032,7 +2035,7 @@
         }
       ]
     },
-    "p-26": {
+    "p-36": {
       "@type": "slate",
       "plaintext": "The steps for creating a Hydra-compatible frontend are the same across frameworks: catch-all route → fetch page from Plone REST API → render blocks recursively → add `data-block-uid` and `data-edit-*` attributes on editable elements → load `hydra.js` only inside the admin iframe.",
       "value": [
@@ -1079,7 +2082,7 @@
         }
       ]
     },
-    "p-27": {
+    "p-37": {
       "@type": "slate",
       "plaintext": "See [Build a frontend](build-a-frontend.md) for the full step-by-step guide, or the example frontends: [Nuxt.js](https://github.com/collective/volto-hydra/tree/main/examples/nuxt-blog-starter), [Next.js](https://github.com/collective/volto-hydra/tree/main/examples/hydra-nextjs), [F7-Vue](https://github.com/collective/volto-hydra/tree/main/examples/hydra-vue-f7).",
       "value": [
@@ -1092,7 +2095,7 @@
             {
               "type": "link",
               "data": {
-                "url": "build-a-frontend.md"
+                "url": "/docs/build-a-frontend"
               },
               "children": [
                 {
@@ -1149,7 +2152,7 @@
         }
       ]
     },
-    "h-28": {
+    "h-38": {
       "@type": "slate",
       "plaintext": "Layers of adoption",
       "value": [
@@ -1163,7 +2166,7 @@
         }
       ]
     },
-    "p-29": {
+    "p-39": {
       "@type": "slate",
       "plaintext": "Hydra is **additive**: each layer below works on its own, and each next row enhances editing without breaking what came before. You can ship at any row, mix rows on the same site, and add the next layer when you're ready.",
       "value": [
@@ -1188,7 +2191,7 @@
         }
       ]
     },
-    "tbl-30": {
+    "tbl-40": {
       "@type": "slateTable",
       "table": {
         "fixed": true,
@@ -1199,10 +2202,10 @@
         "striped": false,
         "rows": [
           {
-            "key": "tbl-30-r0",
+            "key": "tbl-40-r0",
             "cells": [
               {
-                "key": "tbl-30-r0c0",
+                "key": "tbl-40-r0c0",
                 "type": "header",
                 "value": [
                   {
@@ -1216,7 +2219,7 @@
                 ]
               },
               {
-                "key": "tbl-30-r0c1",
+                "key": "tbl-40-r0c1",
                 "type": "header",
                 "value": [
                   {
@@ -1230,7 +2233,7 @@
                 ]
               },
               {
-                "key": "tbl-30-r0c2",
+                "key": "tbl-40-r0c2",
                 "type": "header",
                 "value": [
                   {
@@ -1246,10 +2249,10 @@
             ]
           },
           {
-            "key": "tbl-30-r1",
+            "key": "tbl-40-r1",
             "cells": [
               {
-                "key": "tbl-30-r1c0",
+                "key": "tbl-40-r1c0",
                 "type": "data",
                 "value": [
                   {
@@ -1268,7 +2271,7 @@
                 ]
               },
               {
-                "key": "tbl-30-r1c1",
+                "key": "tbl-40-r1c1",
                 "type": "data",
                 "value": [
                   {
@@ -1293,7 +2296,7 @@
                 ]
               },
               {
-                "key": "tbl-30-r1c2",
+                "key": "tbl-40-r1c2",
                 "type": "data",
                 "value": [
                   {
@@ -1309,10 +2312,10 @@
             ]
           },
           {
-            "key": "tbl-30-r2",
+            "key": "tbl-40-r2",
             "cells": [
               {
-                "key": "tbl-30-r2c0",
+                "key": "tbl-40-r2c0",
                 "type": "data",
                 "value": [
                   {
@@ -1331,7 +2334,7 @@
                 ]
               },
               {
-                "key": "tbl-30-r2c1",
+                "key": "tbl-40-r2c1",
                 "type": "data",
                 "value": [
                   {
@@ -1365,7 +2368,7 @@
                       {
                         "type": "link",
                         "data": {
-                          "url": "live-preview.md#setting-up-the-bridge"
+                          "url": "/docs/live-preview#setting-up-the-bridge"
                         },
                         "children": [
                           {
@@ -1381,7 +2384,7 @@
                 ]
               },
               {
-                "key": "tbl-30-r2c2",
+                "key": "tbl-40-r2c2",
                 "type": "data",
                 "value": [
                   {
@@ -1393,7 +2396,7 @@
                       {
                         "type": "link",
                         "data": {
-                          "url": "advanced.md#authentication"
+                          "url": "/docs/advanced#authentication"
                         },
                         "children": [
                           {
@@ -1411,10 +2414,10 @@
             ]
           },
           {
-            "key": "tbl-30-r3",
+            "key": "tbl-40-r3",
             "cells": [
               {
-                "key": "tbl-30-r3c0",
+                "key": "tbl-40-r3c0",
                 "type": "data",
                 "value": [
                   {
@@ -1433,7 +2436,7 @@
                 ]
               },
               {
-                "key": "tbl-30-r3c1",
+                "key": "tbl-40-r3c1",
                 "type": "data",
                 "value": [
                   {
@@ -1467,7 +2470,7 @@
                       {
                         "type": "link",
                         "data": {
-                          "url": "custom-blocks.md#initbridge-reference"
+                          "url": "/docs/custom-blocks#initbridge-reference"
                         },
                         "children": [
                           {
@@ -1483,7 +2486,7 @@
                 ]
               },
               {
-                "key": "tbl-30-r3c2",
+                "key": "tbl-40-r3c2",
                 "type": "data",
                 "value": [
                   {
@@ -1495,7 +2498,7 @@
                       {
                         "type": "link",
                         "data": {
-                          "url": "custom-blocks.md#block-conversion--fieldmappings"
+                          "url": "/docs/custom-blocks#block-conversion--fieldmappings"
                         },
                         "children": [
                           {
@@ -1513,10 +2516,10 @@
             ]
           },
           {
-            "key": "tbl-30-r4",
+            "key": "tbl-40-r4",
             "cells": [
               {
-                "key": "tbl-30-r4c0",
+                "key": "tbl-40-r4c0",
                 "type": "data",
                 "value": [
                   {
@@ -1535,7 +2538,7 @@
                 ]
               },
               {
-                "key": "tbl-30-r4c1",
+                "key": "tbl-40-r4c1",
                 "type": "data",
                 "value": [
                   {
@@ -1558,7 +2561,7 @@
                       {
                         "type": "link",
                         "data": {
-                          "url": "visual-editing.md#html-annotations-for-visual-editing"
+                          "url": "/docs/visual-editing#html-annotations-for-visual-editing"
                         },
                         "children": [
                           {
@@ -1574,7 +2577,7 @@
                 ]
               },
               {
-                "key": "tbl-30-r4c2",
+                "key": "tbl-40-r4c2",
                 "type": "data",
                 "value": [
                   {
@@ -1590,10 +2593,10 @@
             ]
           },
           {
-            "key": "tbl-30-r5",
+            "key": "tbl-40-r5",
             "cells": [
               {
-                "key": "tbl-30-r5c0",
+                "key": "tbl-40-r5c0",
                 "type": "data",
                 "value": [
                   {
@@ -1612,7 +2615,7 @@
                 ]
               },
               {
-                "key": "tbl-30-r5c1",
+                "key": "tbl-40-r5c1",
                 "type": "data",
                 "value": [
                   {
@@ -1648,7 +2651,7 @@
                 ]
               },
               {
-                "key": "tbl-30-r5c2",
+                "key": "tbl-40-r5c2",
                 "type": "data",
                 "value": [
                   {
@@ -1660,7 +2663,7 @@
                       {
                         "type": "link",
                         "data": {
-                          "url": "what-editors-will-experience/index.md"
+                          "url": "/docs/what-editors-will-experience"
                         },
                         "children": [
                           {
@@ -1678,10 +2681,10 @@
             ]
           },
           {
-            "key": "tbl-30-r6",
+            "key": "tbl-40-r6",
             "cells": [
               {
-                "key": "tbl-30-r6c0",
+                "key": "tbl-40-r6c0",
                 "type": "data",
                 "value": [
                   {
@@ -1700,7 +2703,7 @@
                 ]
               },
               {
-                "key": "tbl-30-r6c1",
+                "key": "tbl-40-r6c1",
                 "type": "data",
                 "value": [
                   {
@@ -1747,7 +2750,7 @@
                 ]
               },
               {
-                "key": "tbl-30-r6c2",
+                "key": "tbl-40-r6c2",
                 "type": "data",
                 "value": [
                   {
@@ -1785,10 +2788,10 @@
             ]
           },
           {
-            "key": "tbl-30-r7",
+            "key": "tbl-40-r7",
             "cells": [
               {
-                "key": "tbl-30-r7c0",
+                "key": "tbl-40-r7c0",
                 "type": "data",
                 "value": [
                   {
@@ -1807,7 +2810,7 @@
                 ]
               },
               {
-                "key": "tbl-30-r7c1",
+                "key": "tbl-40-r7c1",
                 "type": "data",
                 "value": [
                   {
@@ -1852,7 +2855,7 @@
                       {
                         "type": "link",
                         "data": {
-                          "url": "templates.md"
+                          "url": "/docs/templates"
                         },
                         "children": [
                           {
@@ -1868,7 +2871,7 @@
                 ]
               },
               {
-                "key": "tbl-30-r7c2",
+                "key": "tbl-40-r7c2",
                 "type": "data",
                 "value": [
                   {
@@ -1884,10 +2887,10 @@
             ]
           },
           {
-            "key": "tbl-30-r8",
+            "key": "tbl-40-r8",
             "cells": [
               {
-                "key": "tbl-30-r8c0",
+                "key": "tbl-40-r8c0",
                 "type": "data",
                 "value": [
                   {
@@ -1906,7 +2909,7 @@
                 ]
               },
               {
-                "key": "tbl-30-r8c1",
+                "key": "tbl-40-r8c1",
                 "type": "data",
                 "value": [
                   {
@@ -1940,7 +2943,7 @@
                       {
                         "type": "link",
                         "data": {
-                          "url": "listings.md"
+                          "url": "/docs/listings"
                         },
                         "children": [
                           {
@@ -1956,7 +2959,7 @@
                 ]
               },
               {
-                "key": "tbl-30-r8c2",
+                "key": "tbl-40-r8c2",
                 "type": "data",
                 "value": [
                   {
@@ -1983,10 +2986,10 @@
             ]
           },
           {
-            "key": "tbl-30-r9",
+            "key": "tbl-40-r9",
             "cells": [
               {
-                "key": "tbl-30-r9c0",
+                "key": "tbl-40-r9c0",
                 "type": "data",
                 "value": [
                   {
@@ -2005,7 +3008,7 @@
                 ]
               },
               {
-                "key": "tbl-30-r9c1",
+                "key": "tbl-40-r9c1",
                 "type": "data",
                 "value": [
                   {
@@ -2039,7 +3042,7 @@
                       {
                         "type": "link",
                         "data": {
-                          "url": "advanced.md#custom-sidebar-and-cms-ui"
+                          "url": "/docs/advanced#custom-sidebar-and-cms-ui"
                         },
                         "children": [
                           {
@@ -2055,7 +3058,7 @@
                 ]
               },
               {
-                "key": "tbl-30-r9c2",
+                "key": "tbl-40-r9c2",
                 "type": "data",
                 "value": [
                   {
@@ -2073,7 +3076,7 @@
         ]
       }
     },
-    "p-31": {
+    "p-41": {
       "@type": "slate",
       "plaintext": "Different parts of the same site can sit at different rows — inline-editable headlines on a marketing page, sidebar-only editing on a complex catalog page.",
       "value": [
@@ -2110,18 +3113,28 @@
       "p-17",
       "h-18",
       "p-19",
-      "p-20",
+      "ul-20",
       "p-21",
-      "ul-22",
-      "p-23",
+      "p-22",
+      "ul-23",
       "p-24",
-      "h-25",
-      "p-26",
+      "p-25",
+      "ol-26",
       "p-27",
       "h-28",
       "p-29",
-      "tbl-30",
-      "p-31"
+      "p-30",
+      "p-31",
+      "ul-32",
+      "p-33",
+      "p-34",
+      "h-35",
+      "p-36",
+      "p-37",
+      "h-38",
+      "p-39",
+      "tbl-40",
+      "p-41"
     ]
   }
 }

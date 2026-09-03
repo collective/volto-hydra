@@ -3,10 +3,30 @@ name: Build and test
 on:
   push:
 
+# Every test port, stated. `tests-playwright/ports.ts` has no defaults on
+# purpose — a checkout that fell back to these numbers could take over another
+# checkout's servers without saying so — so CI declares them like any other
+# caller. The values are the historical ones; a runner has the machine to
+# itself, so there is nothing to avoid here.
+env:
+  HYDRA_MOCK_API_PORT: 8888
+  HYDRA_TEST_FRONTEND_PORT: 8889
+  HYDRA_MOCK_PARENT_PORT: 8891
+  HYDRA_VOLTO_SSR_PORT: 3001
+  HYDRA_VOLTO_WEBPACK_PORT: 3002
+  HYDRA_NUXT_PORT: 3003
+  HYDRA_REACT_DOC_PORT: 3004
+  HYDRA_VUE_DOC_PORT: 3005
+  HYDRA_SVELTE_DOC_PORT: 3006
+  HYDRA_NEXTJS_PORT: 3007
+  HYDRA_F7_PORT: 3008
+  HYDRA_ASTRO_DOC_PORT: 3009
+
 jobs:
   # ── Build Volto and upload artifact ──────────────────────────────────────
   build:
     runs-on: 'ubuntu-latest'
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -101,10 +121,30 @@ jobs:
           key: ${{ runner.os }}-playwright-v2-${{ hashFiles('**/pnpm-lock.yaml') }}
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium firefox
+        run: |
+          sudo tee /etc/apt/apt.conf.d/99-hydra-acquire >/dev/null <<'APTCONF'
+          Acquire::Retries "3";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APTCONF
+          pnpm exec playwright install --with-deps chromium firefox
       - name: Install Playwright deps only
+        # This step sat for 3h38m on one run. The log shows apt-get update stalling
+        # mid-fetch of the Ubuntu package indexes — silent after
+        # "Get:5 …noble-security InRelease", no output until the run was cancelled.
+        # A stalled fetch, not a dpkg lock or a prompt. Retry and time-limit the
+        # acquire so it fails fast, and bound the step as a backstop.
+        timeout-minutes: 10
+        env:
+          DEBIAN_FRONTEND: noninteractive
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium firefox
+        run: |
+          sudo tee /etc/apt/apt.conf.d/99-hydra-acquire >/dev/null <<'APTCONF'
+          Acquire::Retries "3";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APTCONF
+          pnpm exec playwright install-deps chromium firefox
       - name: Start servers
         run: |
           node tests-playwright/fixtures/mock-api-server.cjs &
@@ -131,6 +171,14 @@ jobs:
           NO_WEBSERVER: true
           SKIP_VOLTO_CHECK: true
           DISCOVER_BLOCKS_API: http://localhost:8888
+          # Discovery needs a frontend: without one it is type-only, container
+          # regions are invisible, and the schema-dependent checks measure less
+          # than they appear to. This job runs several frontends and discovery
+          # runs once, so it nominates its primary — the vite test-frontend,
+          # which carries the shared registry the fixtures are written against.
+          # Per-frontend discovery would remove the need to choose.
+          FRONTEND_URL: http://localhost:8889
+          MOCK_PARENT_URL: http://localhost:8889/mock-parent.html
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v4
@@ -145,6 +193,7 @@ jobs:
   test-admin-mock:
     needs: build
     runs-on: 'ubuntu-latest'
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -189,10 +238,30 @@ jobs:
           key: ${{ runner.os }}-playwright-v2-${{ hashFiles('**/pnpm-lock.yaml') }}
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium firefox
+        run: |
+          sudo tee /etc/apt/apt.conf.d/99-hydra-acquire >/dev/null <<'APTCONF'
+          Acquire::Retries "3";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APTCONF
+          pnpm exec playwright install --with-deps chromium firefox
       - name: Install Playwright deps only
+        # This step sat for 3h38m on one run. The log shows apt-get update stalling
+        # mid-fetch of the Ubuntu package indexes — silent after
+        # "Get:5 …noble-security InRelease", no output until the run was cancelled.
+        # A stalled fetch, not a dpkg lock or a prompt. Retry and time-limit the
+        # acquire so it fails fast, and bound the step as a backstop.
+        timeout-minutes: 10
+        env:
+          DEBIAN_FRONTEND: noninteractive
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium firefox
+        run: |
+          sudo tee /etc/apt/apt.conf.d/99-hydra-acquire >/dev/null <<'APTCONF'
+          Acquire::Retries "3";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APTCONF
+          pnpm exec playwright install-deps chromium firefox
       - name: Start servers
         run: |
           node tests-playwright/fixtures/mock-api-server.cjs &
@@ -228,6 +297,7 @@ jobs:
   # ── Nuxt bridge tests (no Volto needed) ─────────────────────────────────
   test-nuxt-bridge:
     runs-on: 'ubuntu-latest'
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -265,10 +335,30 @@ jobs:
           key: ${{ runner.os }}-playwright-v2-${{ hashFiles('**/pnpm-lock.yaml') }}
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium firefox
+        run: |
+          sudo tee /etc/apt/apt.conf.d/99-hydra-acquire >/dev/null <<'APTCONF'
+          Acquire::Retries "3";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APTCONF
+          pnpm exec playwright install --with-deps chromium firefox
       - name: Install Playwright deps only
+        # This step sat for 3h38m on one run. The log shows apt-get update stalling
+        # mid-fetch of the Ubuntu package indexes — silent after
+        # "Get:5 …noble-security InRelease", no output until the run was cancelled.
+        # A stalled fetch, not a dpkg lock or a prompt. Retry and time-limit the
+        # acquire so it fails fast, and bound the step as a backstop.
+        timeout-minutes: 10
+        env:
+          DEBIAN_FRONTEND: noninteractive
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium firefox
+        run: |
+          sudo tee /etc/apt/apt.conf.d/99-hydra-acquire >/dev/null <<'APTCONF'
+          Acquire::Retries "3";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APTCONF
+          pnpm exec playwright install-deps chromium firefox
       - name: Start servers
         run: |
           node tests-playwright/fixtures/mock-api-server.cjs &
@@ -290,6 +380,13 @@ jobs:
           SKIP_VOLTO_CHECK: true
           DISCOVER_BLOCKS_API: http://localhost:8888
           FRONTEND_URL: http://localhost:3003
+          # Discovery reads the frontend's INIT through mock-parent. Without it
+          # discovery is type-only: no container regions, so nested blocks are
+          # invisible and every schema-dependent check passes by measuring
+          # nothing. The server has always been up in this job (8889, waited on
+          # above) — the variable was simply never passed, while FRONTEND_URL
+          # beside it was. globalSetup now fails rather than run type-only.
+          MOCK_PARENT_URL: http://localhost:8889/mock-parent.html
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v4
@@ -304,6 +401,7 @@ jobs:
   test-nuxt-admin:
     needs: build
     runs-on: 'ubuntu-latest'
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -350,10 +448,30 @@ jobs:
           key: ${{ runner.os }}-playwright-v2-${{ hashFiles('**/pnpm-lock.yaml') }}
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium firefox
+        run: |
+          sudo tee /etc/apt/apt.conf.d/99-hydra-acquire >/dev/null <<'APTCONF'
+          Acquire::Retries "3";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APTCONF
+          pnpm exec playwright install --with-deps chromium firefox
       - name: Install Playwright deps only
+        # This step sat for 3h38m on one run. The log shows apt-get update stalling
+        # mid-fetch of the Ubuntu package indexes — silent after
+        # "Get:5 …noble-security InRelease", no output until the run was cancelled.
+        # A stalled fetch, not a dpkg lock or a prompt. Retry and time-limit the
+        # acquire so it fails fast, and bound the step as a backstop.
+        timeout-minutes: 10
+        env:
+          DEBIAN_FRONTEND: noninteractive
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium firefox
+        run: |
+          sudo tee /etc/apt/apt.conf.d/99-hydra-acquire >/dev/null <<'APTCONF'
+          Acquire::Retries "3";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APTCONF
+          pnpm exec playwright install-deps chromium firefox
       - name: Start servers
         run: |
           node tests-playwright/fixtures/mock-api-server.cjs &
@@ -390,6 +508,7 @@ jobs:
   # ── Next.js + F7 bridge tests (no Volto needed) ─────────────────────────
   test-nextjs-f7:
     runs-on: 'ubuntu-latest'
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -431,25 +550,54 @@ jobs:
           key: ${{ runner.os }}-playwright-v2-${{ hashFiles('**/pnpm-lock.yaml') }}
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium firefox
+        run: |
+          sudo tee /etc/apt/apt.conf.d/99-hydra-acquire >/dev/null <<'APTCONF'
+          Acquire::Retries "3";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APTCONF
+          pnpm exec playwright install --with-deps chromium firefox
       - name: Install Playwright deps only
+        # This step sat for 3h38m on one run. The log shows apt-get update stalling
+        # mid-fetch of the Ubuntu package indexes — silent after
+        # "Get:5 …noble-security InRelease", no output until the run was cancelled.
+        # A stalled fetch, not a dpkg lock or a prompt. Retry and time-limit the
+        # acquire so it fails fast, and bound the step as a backstop.
+        timeout-minutes: 10
+        env:
+          DEBIAN_FRONTEND: noninteractive
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium firefox
+        run: |
+          sudo tee /etc/apt/apt.conf.d/99-hydra-acquire >/dev/null <<'APTCONF'
+          Acquire::Retries "3";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APTCONF
+          pnpm exec playwright install-deps chromium firefox
       - name: Start servers
         run: |
           node tests-playwright/fixtures/mock-api-server.cjs &
           npx vite --config tests-playwright/fixtures/test-frontend/vite.config.js &
           cd examples/hydra-nextjs && pnpm run start:test &
-          cd examples/hydra-vue-f7 && VITE_API_BASE_URL=http://localhost:8888 npx vite --port 3008 --strictPort --config vite.config.test.js &
+          cd examples/hydra-vue-f7 && VITE_API_BASE_URL=http://localhost:8888 npx vite --port 3008 --strictPort --config vite.config.test.mjs &
           sleep 3
       - name: Wait for servers
         run: |
+          # Fail here if a server never came up. The old loop just ran out of
+          # attempts and carried on, so a dead frontend reached the tests as 140
+          # identical 30s timeouts ("no [data-block-uid] visible") and burned the
+          # job's whole 45min budget — the symptom looked like 140 bugs.
           for port in 8888 8889 3007 3008; do
             echo "Waiting for port $port..."
+            ready=""
             for i in {1..30}; do
-              curl -s http://localhost:$port > /dev/null && break
+              if curl -s http://localhost:$port > /dev/null; then ready=1; break; fi
               sleep 2
             done
+            if [ -z "$ready" ]; then
+              echo "::error::No server on port $port after 60s — check the Start servers step"
+              exit 1
+            fi
           done
           echo "All servers ready"
       - name: Run tests
@@ -458,6 +606,15 @@ jobs:
           CI: true
           NO_WEBSERVER: true
           SKIP_VOLTO_CHECK: true
+          # Without this, discovery never runs here, so block-sanity and
+          # page-integrity found no .discovered-blocks.json and skipped — the
+          # nextjs project is inside block-sanity's own scope, so it had simply
+          # stopped being checked while the job reported green.
+          DISCOVER_BLOCKS_API: http://localhost:8888
+          # See the bridge-unit job: discovery needs a frontend. This job runs
+          # two, and nominates nextjs.
+          FRONTEND_URL: http://localhost:3007
+          MOCK_PARENT_URL: http://localhost:8889/mock-parent.html
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v4

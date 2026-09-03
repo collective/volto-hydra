@@ -367,6 +367,96 @@ describe('plone-content-validator checkIntegrity()', () => {
     assert.equal(r.stats.resolveuidBroken, 1);
   });
 
+  it('FAILS on a broken path inside a SLATE link node', () => {
+    // Slate links live at value[].data.url, not in a block field, so pass 2c's
+    // LINK_FIELDS scan never saw them. Only resolveuid refs were caught (by a
+    // raw-text regex over the whole file) — a plain-path slate link pointing
+    // nowhere was not checked at all, and the gate still said "0 broken".
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/page-a', '@type': 'Document', id: 'page-a',
+        UID: 'pageauid1234567', parent: { '@id': '/' },
+        blocks: {
+          'slate-1': {
+            '@type': 'slate',
+            value: [{
+              type: 'p',
+              children: [
+                { text: 'See ' },
+                { type: 'link', data: { url: '/nope' }, children: [{ text: 'this' }] },
+              ],
+            }],
+          },
+        },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.ok(r.errors.some((e) => e.includes('/nope')), r.errors.join('\n'));
+    assert.equal(r.stats.linksBroken, 1);
+  });
+
+  it('accepts a slate link to a real page', () => {
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/page-a', '@type': 'Document', id: 'page-a',
+        UID: 'pageauid1234567', parent: { '@id': '/' },
+        blocks: {
+          'slate-1': {
+            '@type': 'slate',
+            value: [{
+              type: 'p',
+              children: [{ type: 'link', data: { url: '/page-a' }, children: [{ text: 'self' }] }],
+            }],
+          },
+        },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.equal(r.stats.linksBroken, 0, r.errors.join('\n'));
+  });
+
+  it('accepts a path carrying a #fragment, and still checks the path', () => {
+    // Deep-linking to a heading is legitimate content — RichText emits slugged
+    // ids for headings precisely so `page#section` resolves. The path branch
+    // did not strip the fragment, so a perfectly good link read as
+    // "path not in content: /page-a#section".
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/page-a', '@type': 'Document', id: 'page-a',
+        UID: 'pageauid1234567', parent: { '@id': '/' },
+        blocks: {
+          'good': {
+            '@type': 'teaser',
+            href: [{ '@id': '/page-a#a-heading' }],
+          },
+        },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.equal(r.stats.linksBroken, 0, r.errors.join('\n'));
+  });
+
+  it('still FAILS when the page before the #fragment does not exist', () => {
+    // Stripping the fragment must not become a way to smuggle a dead path past
+    // the gate.
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/page-a', '@type': 'Document', id: 'page-a',
+        UID: 'pageauid1234567', parent: { '@id': '/' },
+        blocks: {
+          'bad': { '@type': 'teaser', href: [{ '@id': '/ghost#a-heading' }] },
+        },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.ok(r.errors.some((e) => e.includes('/ghost')), r.errors.join('\n'));
+    assert.equal(r.stats.linksBroken, 1);
+  });
+
   it('FAILS on a broken internal href in a block teaser', () => {
     // A broken link is a malformed-content ERROR, not a warning. A warning does
     // not fail the deploy gate, so a broken href would ship.
@@ -561,5 +651,48 @@ describe('plone-content-validator checkIntegrity()', () => {
     cleanup(root);
     assert.equal(r.stats.resolveuidBroken, 0);
     assert.equal(r.stats.resolveuidOk, 1);
+  });
+});
+
+describe('checkIntegrity over in-memory items (API-fed)', () => {
+  it('catches broken resolveuid, dangling layout refs and duplicate UIDs with no disk tree', () => {
+    const uid = 'abcdef1234567890';
+    const r = checkIntegrity([
+      {
+        rel: 'page-a',
+        data: {
+          '@id': '/page-a',
+          '@type': 'Document',
+          id: 'page-a',
+          UID: uid,
+          blocks: {
+            good: { '@type': 'slate', value: [{ type: 'p', children: [{ text: `see resolveuid/${uid}` }] }] },
+            bad: { '@type': 'slate', value: [{ type: 'p', children: [{ text: 'see resolveuid/feedfeedfeedfeed' }] }] },
+          },
+          blocks_layout: { items: ['good', 'bad', 'ghost'] },
+        },
+      },
+      {
+        rel: 'page-b',
+        data: { '@id': '/page-b', '@type': 'Document', id: 'page-b', UID: uid, blocks: {}, blocks_layout: { items: [] } },
+      },
+    ]);
+    assert.equal(r.stats.resolveuidOk, 1);
+    assert.equal(r.stats.resolveuidBroken, 1);
+    assert.equal(r.stats.layoutBroken, 1);
+    assert.ok(r.errors.some((e) => e.includes('duplicate UID')));
+    assert.ok(r.errors.some((e) => e.includes('missing block ghost')));
+    // Disk-only passes must not have run (nothing to stat).
+    assert.equal(r.stats.imagesBroken, 0);
+  });
+
+  it('a clean in-memory set reports nothing', () => {
+    const r = checkIntegrity([
+      {
+        rel: 'page-a',
+        data: { '@id': '/page-a', '@type': 'Document', id: 'page-a', UID: 'aaaabbbbcccc', blocks: {}, blocks_layout: { items: [] } },
+      },
+    ]);
+    assert.deepEqual(r.errors, []);
   });
 });

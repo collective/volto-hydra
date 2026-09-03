@@ -184,28 +184,6 @@ onMounted(() => {
 
         if (isHydraIframe) {
             const newBlocks = {
-                hello_from_the_other_side: {
-                    id: 'hello_from_the_other_side',
-                    title: 'Hello from the other side',
-                    group: 'common',
-                    icon: 'test', // Invalid icon string - fallback to block.svg
-                    blockSchema: {
-                        required: ['title'],
-                        fieldsets: [
-                            {
-                                id: 'default',
-                                title: 'Default',
-                                fields: ['title'],
-                                required: ['title'],
-                            },
-                        ],
-                        properties: {
-                            title: {
-                                title: "My field title",
-                            },
-                        },
-                    },
-                },
                 eventMetadata: {
                     id: 'eventMetadata',
                     title: 'Event Metadata',
@@ -283,7 +261,7 @@ onMounted(() => {
                 page: {
                     schema: {
                         properties: {
-                            items: {
+                                                        items: {
                                 title: 'Blocks',
                                 allowedBlocks: [...new Set(['slate', 'image', 'separator', 'video', 'gridBlock', 'teaser', 'listing', 'summary', 'default', 'section', 'contextNavigation', ...pageLevelBlocks])],
                                 allowedTemplates: ['/_test_data/templates/test-layout'],

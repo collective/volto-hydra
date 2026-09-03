@@ -10,9 +10,16 @@
  * to use it via the same import path as before.
  */
 
-// @volto-hydra/helpers is pure (no @plone/volto), so importing from it keeps this module
-// free of Volto deps — unlike @volto-hydra/hydra-js, which is why PAGE_BLOCK_UID is inlined.
-import { getBlockType } from '@volto-hydra/helpers';
+// The helpers package is pure (no @plone/volto), so importing from it keeps this
+// module free of Volto deps — unlike @volto-hydra/hydra-js, which is why
+// PAGE_BLOCK_UID is inlined below.
+//
+// Imported by RELATIVE path, not as '@volto-hydra/helpers'. Consumers import
+// this file directly out of a checkout — pretagov-site's content gate runs it
+// as plain node, with no install — and a bare specifier needs node_modules to
+// resolve, so it failed there with ERR_MODULE_NOT_FOUND while passing anywhere
+// the workspace happened to be linked. A relative path needs nothing installed.
+import { getBlockType } from '../helpers/index.js';
 
 // Same value as PAGE_BLOCK_UID in hydra.js — defined locally to avoid
 // importing from @volto-hydra/hydra-js (which would pull in Volto deps).
@@ -837,6 +844,12 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         region: fieldName, // The container field (region) — same concept as blocks fields
         blockType: itemBlockType, // Real type (from typeField) or virtual type (from parent:field)
         isObjectListItem: true,
+        // `parent:field` is a SIDEBAR DISPLAY name, not a block type: nothing
+        // registers it in blocksConfig and nothing renders it. Flag it so
+        // consumers that treat `blockType` as a real `@type` (coverage
+        // discovery) can tell the two apart — an untyped object_list item
+        // (a table row/cell) only ever gets this label.
+        ...(itemBlockType === virtualType && { isVirtualBlockType: true }),
         idField,
         ...(typeField && { typeField }), // Only set if typed object_list
         // A region-level `@type` RULE: a `when`-based fieldRule whose `set` is a

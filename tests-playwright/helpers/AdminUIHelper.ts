@@ -1097,6 +1097,37 @@ export class AdminUIHelper {
   }
 
   /**
+   * Press Cmd+A once and wait for THAT escalation to land, identified by a label
+   * the new level carries in the sidebar's block path.
+   *
+   * Pressing and then polling the path rows for a few seconds measures the last
+   * link of a chain — admin dispatches, the bridge re-measures rects in the
+   * iframe, BLOCK_SELECTED comes back, React re-renders the rows — and gives the
+   * whole chain a fixed budget. On a loaded machine (a 2-core CI runner) the
+   * chain simply takes longer, so the budget expires while nothing is wrong.
+   * Worse, the press was fire-and-forget: with no wait between presses, the next
+   * Cmd+A can be handled against a stale selection, so the escalation lands on a
+   * different level than the test assumes — which is why these failed
+   * DETERMINISTICALLY under load rather than intermittently.
+   *
+   * Waiting on the label (not a duration, and not a bare count — two levels can
+   * share a count) means each press is synchronised with its own result.
+   *
+   * @param label - text the new level's path rows must contain
+   * @returns the number of path rows at the new level
+   */
+  async escalateSelection(label: string): Promise<number> {
+    const rows = this.page.locator('.selected-block-path');
+    await this.page.keyboard.press('ControlOrMeta+a');
+    await expect
+      .poll(async () => (await rows.allTextContents()).some((t) => t.includes(label)), {
+        message: `Cmd+A never escalated to a level containing "${label}"`,
+      })
+      .toBe(true);
+    return rows.count();
+  }
+
+  /**
    * Press Escape twice to navigate from text editing to parent block (or deselect).
    * First Escape: text mode → block mode. Second Escape: block mode → parent.
    * If already in block mode (not editing), only one Escape is needed.
@@ -2900,25 +2931,43 @@ export class AdminUIHelper {
    * @param position - The character offset position to move to (0-based)
    */
   async moveCursorToPosition(editor: any, position: number): Promise<void> {
-    await editor.evaluate(
-      (el: any, pos: number) => {
-        const doc = el.ownerDocument;
-        const selection = doc.defaultView.getSelection();
+    // selection.modify() steps the caret one grapheme at a time from the
+    // element start. On the slow CI static build a single pass can land short
+    // (e.g. the editable isn't focused yet, or a text-node boundary eats a
+    // step), leaving the caret at pos-1 — so typing "Beautiful " lands after
+    // "Hello" instead of "Hello ", yielding "HelloBeautiful  World". Measure the
+    // caret's absolute offset after stepping and re-step until it genuinely
+    // reaches `position`; don't trust the loop to arrive on the first pass.
+    await expect(async () => {
+      const offset = await editor.evaluate(
+        (el: any, pos: number) => {
+          const doc = el.ownerDocument;
+          const selection = doc.defaultView.getSelection();
 
-        // First, move cursor to start of element
-        const range = doc.createRange();
-        range.selectNodeContents(el);
-        range.collapse(true); // Collapse to start
-        selection.removeAllRanges();
-        selection.addRange(range);
+          // Collapse the caret to the start of the element.
+          const range = doc.createRange();
+          range.selectNodeContents(el);
+          range.collapse(true);
+          selection.removeAllRanges();
+          selection.addRange(range);
 
-        // Then move forward by visible characters using Selection.modify()
-        for (let i = 0; i < pos; i++) {
-          selection.modify('move', 'forward', 'character');
-        }
-      },
-      position,
-    );
+          // Step forward by visible characters.
+          for (let i = 0; i < pos; i++) {
+            selection.modify('move', 'forward', 'character');
+          }
+
+          // Report the caret's absolute character offset from the element start
+          // so the caller can confirm it actually reached `pos`.
+          const caret = selection.getRangeAt(0);
+          const measure = doc.createRange();
+          measure.selectNodeContents(el);
+          measure.setEnd(caret.startContainer, caret.startOffset);
+          return measure.toString().length;
+        },
+        position,
+      );
+      expect(offset).toBe(position);
+    }).toPass({ timeout: 5000 });
   }
 
   /**
@@ -2997,6 +3046,40 @@ export class AdminUIHelper {
    * @param fieldName - Optional field name to target (e.g., 'value', 'title'). If not provided, uses first editable field.
    * @returns The editor element, ready for text input
    */
+  /**
+   * The uid of a block you located by CONTENT or POSITION.
+   *
+   * Every block-level helper here takes a `blockId`, so a spec that wants "the
+   * card I just added" or "the empty block in this grid" has to produce one —
+   * and 105 places currently do it by hand, reading the attribute inline. That
+   * couples specs to a value which is generated, changes, and means nothing to
+   * the person reading the test. Locate the block the way a reader would and
+   * resolve the uid here, in the one place that has to know the attribute
+   * exists.
+   *
+   *   const empty = iframe.locator('.nsw-card:has([data-edit-text][data-empty])').first();
+   *   await helper.enterEditMode(await helper.getBlockUid(empty), 'title');
+   *
+   * Resolves from the element itself or the nearest ancestor carrying the
+   * attribute, because a component may put `data-block-uid` on a wrapper rather
+   * than on the element that matched the content selector.
+   */
+  async getBlockUid(target: Locator): Promise<string> {
+    await target.waitFor({ state: 'attached', timeout: 10000 });
+    const uid = await target.evaluate((el) => {
+      const owner = (el as Element).closest('[data-block-uid]');
+      return owner?.getAttribute('data-block-uid') || '';
+    });
+    if (!uid) {
+      throw new Error(
+        'getBlockUid: the located element carries no data-block-uid and neither ' +
+          'does any ancestor. A block that was just added may not be registered ' +
+          'with the bridge yet — wait for it to render before resolving.',
+      );
+    }
+    return uid;
+  }
+
   async enterEditMode(blockId: string, fieldName?: string): Promise<any> {
     const iframe = this.getIframe();
 
@@ -3381,18 +3464,43 @@ export class AdminUIHelper {
     const container = options.container || '#sidebar-properties';
     const fieldWrapper = this.page.locator(`${container} .field-wrapper-${fieldName}`);
 
+    // A field can be revealed by another field's value (schemaEnhancer
+    // fieldRules: a form question's "Condition" appears only once the question
+    // it depends on has been named). That reveal is a round trip through the
+    // iframe, so wait for a control to exist before judging the field missing —
+    // the alternative is a race that fails whenever the sidebar is a beat
+    // behind.
+    await fieldWrapper
+      .locator('input, textarea, [contenteditable="true"], .react-select__control')
+      .first()
+      .waitFor({ state: 'visible', timeout: 10000 })
+      .catch(() => {
+        // Genuinely absent fields fall through to the explicit throw below,
+        // which says which field and where to look.
+      });
+
+    // A react-select is checked FIRST, and its own branch is below. Its search
+    // box is an `input[type="text"]`, so the text branch below matches it — and
+    // typing into a search box then blurring selects NOTHING. The field keeps
+    // its placeholder, the helper returns as if it had worked, and the value is
+    // silently never set. That is what made a picker look like it stored
+    // nothing.
+    const asSelect = fieldWrapper.locator('.react-select__control');
+    const isSelect = await asSelect.isVisible().catch(() => false);
+
     // Try text input
     const input = fieldWrapper.locator('input[type="text"], input[type="url"], textarea');
-    if (await input.isVisible()) {
+    if (!isSelect && (await input.isVisible())) {
       await input.fill(value);
       await input.blur(); // Trigger blur to commit the value
       return;
     }
 
-    // Try contenteditable (Slate editors)
+    // Try contenteditable (Slate editors)  — also not a select
+
     // Note: fill() doesn't reliably clear Slate editors, use select-all + type
     const contentEditable = fieldWrapper.locator('[contenteditable="true"]');
-    if (await contentEditable.isVisible()) {
+    if (!isSelect && (await contentEditable.isVisible())) {
       // Get current text to verify selection
       const currentText = await contentEditable.textContent() || '';
 
@@ -3416,6 +3524,92 @@ export class AdminUIHelper {
       await contentEditable.blur(); // Trigger blur to commit the value
       return;
     }
+
+    // A Choice / vocabulary / block picker renders react-select, which has no
+    // fillable input until it is opened. Click the control, type to filter,
+    // then take the option once it is actually listed — waiting on the option
+    // rather than on a timer, so a slow menu fails as a missing option instead
+    // of quietly picking whatever was highlighted.
+    const control = asSelect;
+    if (isSelect) {
+      // No Escape to dismiss another field's open menu: in the admin, Escape
+      // leaves block mode and DESELECTS the block, so the sidebar reverts to
+      // the page form and the field being set disappears. Clicking this
+      // control is enough — react-select closes any other menu on the
+      // outside mousedown that precedes the click.
+      await control.scrollIntoViewIfNeeded();
+      // Clicking a control TOGGLES its menu, so clicking one that is already
+      // open closes it and the wait below never resolves. Open it only if it
+      // is shut.
+      const own = fieldWrapper.locator('.react-select__menu');
+      if (!(await own.isVisible().catch(() => false))) {
+        await control.click();
+      }
+      // Wait for the MENU before reaching for an option: react-select renders it
+      // in a portal, so an option located before the menu exists resolves to
+      // nothing and the click lands on the page. Same sequence as
+      // block-sync.spec.ts, which is the one gesture in this repo known to
+      // commit.
+      // Scoped to THIS field's wrapper, and only after anything already open
+      // has gone. A page-wide `.react-select__menu` can be another field's menu
+      // — still up, or on its way out — and taking an option from it writes the
+      // value to the wrong field while this one keeps its placeholder.
+      const menu = fieldWrapper.locator('.react-select__menu');
+      await menu.waitFor({ state: 'visible', timeout: 10000 });
+      const option = menu.locator('.react-select__option', { hasText: value });
+      await option.first().click();
+      // Deliberately NO blur afterwards. Blurring the control once the value is
+      // chosen loses it — the field reads back empty a second later, which is
+      // what made a dropdown look impossible to set from a test.
+      // It took, or this throws. A dropdown that silently keeps its old value
+      // is the thing that makes a spec assert against a sidebar it never
+      // changed.
+      // The value CONTAINER, not the value nodes: a multi-select has one node
+      // per chosen entry, and a locator that matches several trips strict mode
+      // — reporting "the menu closed without taking it" for a field that took
+      // it twice over.
+      await expect(
+        fieldWrapper.locator('.react-select__value-container'),
+        `setSidebarFieldValue("${fieldName}"): the menu closed without taking "${value}"`,
+      ).toContainText(value, { timeout: 5000 });
+      return;
+    }
+
+    // Nothing matched. Saying so is the whole point: this used to return
+    // silently, so a spec that set a dropdown asserted against a sidebar that
+    // had never been touched, and a demo clip recorded a video of nothing
+    // happening.
+    throw new Error(
+      `setSidebarFieldValue("${fieldName}"): no text input, slate editor or ` +
+        `react-select inside ${container} .field-wrapper-${fieldName}. ` +
+        `Check the field name, or that the field is in the open fieldset.`,
+    );
+  }
+
+  /**
+   * Add a block on the canvas next to `anchorUid` and return the new block's uid.
+   *
+   * Selecting an anchor, pressing add, choosing a type, then diffing the block
+   * order to learn the new uid is the canvas add sequence — it was written out
+   * by hand in each spec that needed it. The uid is the part callers actually
+   * want and the part that is easy to get subtly wrong (a container add can
+   * introduce more than one block), so it is asserted here once.
+   *
+   * For adding INTO a container field from the sidebar, use addBlockViaSidebar.
+   *
+   * @param anchorUid - uid of the block to select before adding
+   * @param blockType - the @type to choose in the block chooser
+   * @returns the uid of the newly added block
+   */
+  async addBlockOnCanvas(anchorUid: string, blockType: string): Promise<string> {
+    const before = await this.getBlockOrder();
+    await this.clickBlockInIframe(anchorUid);
+    await this.clickAddBlockButton();
+    await this.selectBlockType(blockType);
+    await this.waitForBlockCountToBe(before.length + 1);
+    const added = (await this.getBlockOrder()).filter((id) => !before.includes(id));
+    expect(added, `exactly one new block after adding a ${blockType}`).toHaveLength(1);
+    return added[0];
   }
 
   /**
@@ -4082,8 +4276,12 @@ export class AdminUIHelper {
   /**
    * Wait for an element's position to stabilize (stop moving).
    * Returns when the element has a valid bounding box and position hasn't changed for 2 checks.
+   *
+   * Public: revealing a block starts an animation too — a carousel slides, a
+   * panel opens — and anything that clicks or measures afterwards needs the
+   * same guarantee the drag auto-scroll needs.
    */
-  private async waitForPositionStable(element: Locator): Promise<void> {
+  async waitForPositionStable(element: Locator): Promise<void> {
     let lastY: number | null = null;
     await expect(async () => {
       const rect = await element.boundingBox();
@@ -4755,23 +4953,28 @@ export class AdminUIHelper {
   }
 
   /**
-   * Wait for block count to stabilize and return it.
-   * Use this when the page may still be rendering (e.g., Nuxt async components).
-   * Returns after getting the same count on consecutive checks.
+   * Wait for the block count to stop changing, and return it.
+   *
+   * QUIESCENCE, NOT A CONDITION — and that distinction is the whole caveat.
+   * "Same count twice" cannot tell FINISHED from HASN'T STARTED: sample before
+   * an add lands and 1,1 reads as settled, so the caller proceeds too early.
+   * Whenever the expected end state is known, don't call this — assert it:
+   * `await expect(blocks).toHaveCount(n)` waits for the thing you actually mean
+   * and says what went wrong when it doesn't happen. This is for the case where
+   * no target exists (a frontend still hydrating async components).
+   *
+   * Fails rather than guesses: on timeout it throws with the counts it saw.
+   * (It used to sleep 100ms per turn and, on timeout, RETURN the last count —
+   * so a never-settling page silently handed the caller a number.)
    *
    * @param timeout - Maximum time to wait in milliseconds (default 5000)
    * @returns The stable block count
    */
   async getStableBlockCount(timeout: number = 5000): Promise<number> {
-    const startTime = Date.now();
-    let lastCount = -1;
-    let stableChecks = 0;
-    const requiredStableChecks = 2;
-
-    // Caller often triggers a navigation (e.g. search form submit) then
-    // immediately polls. evaluateAll throws "Execution context was
-    // destroyed" if the iframe navigates mid-call. Treat that as
-    // "iframe is still settling" and keep polling instead of failing.
+    // A caller often triggers a navigation (e.g. a search form submit) and then
+    // polls immediately; evaluateAll throws "Execution context was destroyed"
+    // if the iframe navigates mid-call. Treat that as "still settling" rather
+    // than an error, and keep polling.
     const safeCount = async (): Promise<number> => {
       try {
         return await this.getBlockCount();
@@ -4782,24 +4985,37 @@ export class AdminUIHelper {
       }
     };
 
-    while (Date.now() - startTime < timeout) {
-      const currentCount = await safeCount();
+    const seen: number[] = [];
+    let lastCount = -1;
+    let stableChecks = 0;
 
-      if (currentCount !== -1 && currentCount === lastCount) {
-        stableChecks++;
-        if (stableChecks >= requiredStableChecks) {
-          return currentCount;
-        }
-      } else {
-        lastCount = currentCount;
-        stableChecks = 1;
-      }
+    // expect.poll owns the interval and the failure — no sleep of our own, and
+    // a page that never settles fails loudly instead of returning a number.
+    await expect
+      .poll(
+        async () => {
+          const currentCount = await safeCount();
+          seen.push(currentCount);
+          if (currentCount !== -1 && currentCount === lastCount) {
+            stableChecks += 1;
+          } else {
+            lastCount = currentCount;
+            stableChecks = 1;
+          }
+          return stableChecks;
+        },
+        {
+          timeout,
+          message:
+            `Block count never settled within ${timeout}ms — counts seen: ` +
+            `[${seen.join(', ')}] (-1 = iframe was navigating). The page kept ` +
+            `re-rendering; if you know the count you expect, assert it with ` +
+            `toHaveCount instead of waiting for quiescence.`,
+        },
+      )
+      .toBeGreaterThanOrEqual(2);
 
-      await this.page.waitForTimeout(100);
-    }
-
-    // Return the last count if timeout reached
-    return await safeCount();
+    return lastCount;
   }
 
   /**

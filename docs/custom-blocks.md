@@ -162,6 +162,243 @@ Child block types (like `slide` above) must be defined at the top level of `bloc
 
 **A `widget: 'slate'` field holds one top-level node.** A slate field — like `description` on the `slide` above — stores a single paragraph, heading, or list, not a document of several. Pasting or typing multiple paragraphs into it flattens them back into one node; only the built-in `slate` *block* splits multi-node content into separate blocks. Design slate fields for single-node content, and use a `blocks_layout`/`object_list` of `slate` blocks when you need several. See [Visual Editing › One top-level node per slate field](visual-editing.md#one-top-level-node-per-slate-field).
 
+**Worked example:** [Heading Block](./examples/heading.md) — roughly the smallest custom block there is: one field, one annotation.
+
+## Inline-editable fields: annotation and schema must agree
+
+A field is inline-editable only when BOTH halves are in place. They are easy to
+get out of step, because each half looks fine on its own.
+
+**1. Your markup renders something to click**, annotated with the field name:
+
+```html
+<h3 data-edit-text="title">Sydney Opera House</h3>
+```
+
+An *empty* field still has to render its element in edit mode — the editor
+reveals empty fields by marking them `data-empty` and drawing a "Click to edit"
+placeholder, and it can only mark an element that exists. A field that renders
+nothing when empty can never be filled in on the canvas. (In view mode, render
+nothing — the annotations are edit-mode only.)
+
+Text with no box on screen is not inline-editable at all: a `.sr-only` element
+is clipped to 1×1, so there is nothing to put a cursor in. Leave it unannotated
+and let the sidebar edit it.
+
+**2. Your schema declares that field as text.** The bridge will not make a field
+editable unless its schema says it is one:
+
+```javascript
+properties: {
+    title:       { title: 'Title', type: 'string' },
+    description: { title: 'Description', type: 'string', widget: 'textarea' },
+    body:        { title: 'Body', widget: 'slate' },
+}
+```
+
+`type` is the DATA type (`string`, `array`, `object`, `boolean`) and `widget` is
+the editor. Do not put a widget name in `type` — `{ type: 'textarea' }` is not a
+textarea field, and the bridge will silently refuse to make it editable, with no
+error and no clue in the DOM. Either declare both (`type: 'string', widget:
+'textarea'`) or the widget alone.
+
+`block-sanity` checks both halves: every schema text field visible on screen has
+to be annotated, and every annotated field has to become editable and take the
+caret when clicked.
+
+## Widgets hydra registers
+
+A schema names a widget by string, so anything in `config.widgets.widget` is
+available — Volto's own included (`select_querystring_field`, `query_sort_on`,
+`object_browser`, …). These are the ones hydra adds:
+
+| widget | picks | documented |
+|---|---|---|
+| `blockTypeSelect` | which block type a container's item is | [container blocks](container-blocks.md#blocktypeselect-widget-options) |
+| `schemaFieldSelect` | a field of a CONTENT TYPE, from `/@types` | [listings](listings.md) |
+| `vocabularySelect` | WHICH vocabulary (not a term from one) | below |
+| `blockPicker` | a block, storing a named field value from it | below |
+| `querystringSelect` | catalog indexes, one or several | below |
+| `field_mapping` | how one block's fields map onto another's | [fieldMappings](#block-conversion--fieldmappings) |
+
+Three more are swapped in rather than named: `url`, `blocks_layout` and
+`object_list` replace Volto's own so the bridge can handle them.
+
+Reach for a Volto widget first where one fits; each section below says when it
+does.
+
+## Picking a vocabulary (`vocabularySelect`)
+
+A field can reference a vocabulary — "suggest this answer from the site's
+keywords", "offer these states". Volto has widgets for picking a **term from** a
+vocabulary; it has none for picking **which vocabulary**, and the reason is
+structural rather than an oversight:
+
+- Vocabularies are named utilities, and `GET /@vocabularies` lists them all.
+- But it answers `{"@id", "title"}` per item, while Volto's vocabulary reducer
+  reads `{token, title}` — so a built-in select aimed at the listing shows every
+  name and stores `undefined`.
+
+`vocabularySelect` reads the listing itself and keeps the **name** (the last
+segment of `@id`), which is what every consumer accepts — `@vocabularies/<name>`,
+Volto's `getVocabulary`, a schema's `vocabulary: { "@id": … }`.
+
+```js
+suggest_from: {
+  title: 'Suggest from',
+  widget: 'vocabularySelect',
+  // Optional: only offer vocabularies whose NAME matches this expression.
+  vocabularyFilter: 'Keywords|Subject',
+}
+```
+
+The stored value is a name (`plone.app.vocabularies.Keywords`), not a URL, so
+content does not carry one environment's origin.
+
+### What it deliberately does not offer
+
+**Catalog queries.** A query is not a list of terms. "Content matching these
+criteria" belongs to a listing's `querystring`, which has its own widget.
+
+**Field-bound sources.** In `zope.schema` a vocabulary *is* a source, and
+`@sources/<field>` will even enumerate one when it is `IIterableSource` — the
+same serializer answers both. But a source has no name to store: it is
+identified by a field on an object (`field.bind(context).source`), so nothing
+registers it and nothing can list it. `@sources` and `@querysources` also
+require the `plone.restapi.vocabularies` permission (Manager / Site
+Administrator), while `@vocabularies` is `zope2.View` — so an anonymous visitor
+filling in a form can read a vocabulary and can never read a source.
+
+### Searching a vocabulary
+
+`@vocabularies/<name>` supports `?title=` (a case-insensitive substring filter,
+applied server-side) and `b_start` / `b_size` batching. A type-ahead should send
+`?title=` per keystroke rather than fetch every term — a long vocabulary is
+exactly the case where a list is the wrong control.
+
+## Picking a block, and a value from it (`blockPicker`)
+
+A field that names **another block** — "show this question when THAT one is
+answered" — should offer a menu, not ask for a uid. `blockPicker` reads
+`blockPathMap`, the same container/region map the editor uses, and stores a
+**field of the block chosen**.
+
+```js
+show_when_when: {
+  title: 'Show when',
+  widget: 'blockPicker',
+  scope: 'siblings',      // 'siblings' (default) | '..' (parent's siblings) | '<region>'
+  direction: 'before',    // only blocks earlier than this one
+  blockTypes: ['text', 'select', 'single_choice'],
+  valueField: 'field_id', // what to STORE (default: the block's own id)
+  labelField: 'label',    // what to SHOW  (optional — see below)
+}
+```
+
+`valueField` is the part worth understanding. A rule is evaluated against the
+value a field submits — a form question's `field_id` — so storing the block's
+uid would produce a rule that reads correctly in the sidebar and never matches
+anything. Name the field the consumer actually resolves.
+
+`direction: 'before'` is what keeps skip logic honest: a question cannot depend
+on an answer given after it, and the first question has nothing to depend on at
+all (the menu is then empty rather than wrong).
+
+### What a candidate reads as
+
+`labelField` only nominates where THIS kind of block keeps its name. Without it,
+a block is named by the shared `blockDisplayTitle` — `title`, then `label`, then
+the block's own rich text read live, then the stored `plaintext`, then the block
+type's configured title, then the raw type.
+
+Live text comes before `plaintext` on purpose. Nothing in the editor writes
+`plaintext`: the backend serializer does, at save time. Preferring it would name
+a heading by its previous wording for as long as the author kept typing, so the
+slate value is read directly (`slateNodesText`) and the stored text is the
+fallback for blocks whose words are not slate.
+
+That is the same function the sidebar's child list uses, deliberately: a
+question that reads "Your name" in one list and "Text" in another is confusing
+in a way nobody reports. Set `labelField` when a block's name lives somewhere
+the chain would not look — a form question's `label` beats its `plaintext`.
+
+### Not the same as `schemaFieldSelect`
+
+| | `schemaFieldSelect` | `blockPicker` |
+|---|---|---|
+| choices | the CONTENT TYPE's schema fields, from `/@types` | blocks on the page, from `blockPathMap` |
+| scope | the whole type | relative — siblings, `..`, a named region |
+| stores | the field name | any field of the chosen block |
+
+They share only their tail (build choices, hand them to the select). One asks
+the backend what a content type looks like; the other walks the block tree in
+the editor.
+
+## Picking a catalog index (`querystringSelect`)
+
+A field that names a catalog index — what a listing sorts on, what a facet
+filters by — should offer the site's indexes, not a text box. A typo in a text
+box produces a sort option that appears in the menu and silently sorts nothing.
+
+One widget covers both shapes: `multiple: false` (the default) stores one index
+name, `multiple: true` stores a chosen subset in the author's order.
+
+`indexes: "sortable"` (also the default) offers only what the catalog can sort
+on. That list is worth taking as given rather than deriving: index type sets the
+floor — a KeywordIndex like `Subject` is multi-valued and has no single key to
+sort by, a ZCTextIndex is ranked text — but Plone layers judgment on top. In its
+registry `portal_type` and `review_state` are both `FieldIndex`, and only
+`review_state` is flagged sortable. Filtering an index list by type would offer
+things Plone deliberately does not.
+
+**Volto's own widgets, for comparison.** Both are registered and pass straight
+through a hydra schema:
+
+| widget | for |
+|---|---|
+| [`query_sort_on`](https://github.com/plone/volto/blob/main/packages/volto/src/components/manage/Widgets/QuerySortOnWidget.jsx) | ONE index to sort by — a menu grouped by the registry's `group` |
+| `select_querystring_field` | ONE index to query on (what the facet examples use) |
+
+Prefer `query_sort_on` for a single sort field in a schema that also carries a
+`querystring` field, where its grouped menu is nicer and the data is already
+loaded. Prefer this widget otherwise, and for every `multiple` case.
+
+The reason for "already loaded": `query_sort_on` reads
+`state.querystring.sortable_indexes` but never dispatches `getQuerystring()` —
+in Volto's listing sidebar the `QueryWidget` beside it does the asking. Alone in
+a hydra schema it renders an empty menu with no error. This widget asks for
+itself.
+
+Volto has no declarative answer at all for the `multiple` case: its search block
+builds that field imperatively in `SearchBlockEdit`, which writes
+`sortOnOptions.items.choices` before rendering — a route a JSON schema cannot
+take.
+
+```json
+"sortOnOptions": {
+  "title": "Sort-by options",
+  "type": "array",
+  "widget": "querystringSelect",
+  "indexes": "sortable",
+  "multiple": true
+}
+```
+
+| option | meaning |
+|---|---|
+| `indexes` | `"sortable"` (default) offers only what the catalog can sort on; `"all"` offers every queryable index |
+| `multiple` | `true` stores an array — a chosen subset, in the author's order, which is what a "sort by" menu is |
+| `emptyLabel` | wording of the "none" entry in single mode (default `— no sorting —`). Single mode needs one: no sorting is a real answer, usually the default. Ignored when `multiple`, where an empty list says it already |
+
+The stored value is the index NAME (`effective`, `sortable_title`), because that
+is what a query is built from; the title is only what the author reads.
+
+`@querystring` is loaded once for the whole editor, so the widget asks for it
+only if nothing else has, and shows an empty menu — not a crash — while it is
+still in flight.
+
+
+
 ## Schema Enhancers
 
 Schema enhancers modify block schemas dynamically:
@@ -267,6 +504,8 @@ A block that isn't an `object_list` item yields an unset `@index`, so comparison
 
 Field paths: `../field` for the parent block's field (and `@index` / `../@index` for position), `/field` for a page metadata field.
 
+**Worked examples:** two blocks in the reference carry rules for their own reasons — the [Teaser Block](./examples/teaser.md) has nothing to ask for while it borrows the linked page's wording (`overwrite` off), and the [Image Block](./examples/image-block.md) offers no size for a full-width image, written as a list of rules with a bare `false` as the catch-all.
+
 ## Block Conversion & fieldMappings
 
 `fieldMappings` (plural) on a block config defines how fields map between block types (and from linked content). This enables:
@@ -278,6 +517,8 @@ Field paths: `../field` for the parent block's field (and `@index` / `../@index`
 - **Copy from a linked target** — a block pulls fields from the content item its link field points at, with a per-field linked/custom toggle (see [`@target`](#target--copy-from-a-linked-content-item)).
 
 Each key in `fieldMappings` is either a **specific block type name**, **`@default`**, or **`@target`**.
+
+**Worked example:** [Teaser Block](./examples/teaser.md) — `@default` mappings, so a converted or dragged block keeps its title, description and image.
 
 ### `@default` — the canonical content shape
 

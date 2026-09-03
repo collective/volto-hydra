@@ -25,6 +25,8 @@ Example of a fully annotated slide block:
 </div>
 ```
 
+**Worked examples:** [Hero Block](./examples/hero.md) — text, rich text, media and link annotations in one block; [Button Block](./examples/button.md) — `data-edit-text` and `data-edit-link` on the same element.
+
 ## Comment Syntax
 
 If you can't modify the markup (e.g., using a 3rd party component library), use comment syntax to specify block attributes:
@@ -137,6 +139,28 @@ is the end of a path (a region's children are separate blocks with their own
 This lets fixed parts of the page (headers), parent-block fields, and fields
 grouped inside an object all be edited in place, with one addressing model.
 
+### Where a page field comes from
+
+A `/fieldName` path resolves against the **content type's schema**, not against
+anything the frontend declares. The admin reads the schema for the content being
+edited and hands the bridge a field type per property (`View.jsx`
+`extractBlockFieldTypes`: *"page-level field types from content type schema …
+accessed via /fieldName"*). So `data-edit-text="/title"` works on any content
+type with a `title`, and `data-edit-text="/effective"` works on one that has an
+`effective` — no registration step.
+
+The corollary matters, because getting it wrong is silent: **do not add page
+metadata to `initBridge`'s `page.schema.properties`.** That schema lists the
+page's *blocks fields* (its regions), and the admin turns every entry in it into
+a region — `widget: 'blocks_layout'` is stamped on and an empty
+`blocks_layout[<name>]` minted. Declaring `title`/`effective` there gives the
+page phantom empty regions; page-level selection then lands on one of them, and
+`Cmd+A` selects one block where it should select all siblings.
+
+If a field is annotated but clicking it does nothing, the field is missing from
+the content type's schema — the annotation renders either way, since the DOM
+knows nothing about schemas.
+
 ## Readonly Regions
 
 Add `data-block-readonly` (or `<!-- hydra block-readonly -->` comment) to disable inline editing for all fields inside an element:
@@ -241,6 +265,8 @@ item to a paragraph (`[ul, p]`). Hydra normalizes that immediately:
 A frontend renderer can therefore always assume one top-level node per
 slate field; it never has to handle a multi-node `value`.
 
+**Worked example:** [Table Block](./examples/table.md) — a slate value per cell, each its own field.
+
 ## Complete Slate Rendering Example
 
 Slate data structure (value is an array but always contains a single root node):
@@ -289,3 +315,5 @@ Usage:
   <!-- renderSlate(block.value) output goes here -->
 </div>
 ```
+
+**Worked example:** [Slate (Text) Block](./examples/slate.md) — the block itself, rendered per stack.

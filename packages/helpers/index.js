@@ -188,17 +188,43 @@ export function buildQuerystringSearchBody(
 
   // Merge extraCriteria into query
   if (extraCriteria.SearchableText) {
+    // queryType (plone6): "search" = Advanced (word/phrase) → the ZCTextIndex
+    // `string.search` operation; anything else = Standard substring
+    // (`string.contains`, the default). Only "search" switches it.
     query.push({
       i: 'SearchableText',
-      o: 'plone.app.querystring.operation.string.contains',
+      o:
+        extraCriteria.queryType === 'search'
+          ? 'plone.app.querystring.operation.string.search'
+          : 'plone.app.querystring.operation.string.contains',
       v: extraCriteria.SearchableText,
     });
   }
 
-  // Add facet filters from extraCriteria (keys starting with 'facet.')
+  // Add facet filters from extraCriteria (keys starting with 'facet.').
+  //
+  // A DATE-RANGE facet is a `facet.<field>.after` / `facet.<field>.before` key —
+  // a "from" and a "to" are TWO separate facets on the SAME index (so they don't
+  // collide on one `facet.<field>`), each carrying its direction in the key. They
+  // map to the Plone date operations `largerThan` / `lessThan` (a single scalar
+  // date value), which the catalog ANDs together into a range. Every other
+  // `facet.<field>` is a discrete-value facet → `selection.any` (an array).
+  const DATE_OPS = {
+    after: 'plone.app.querystring.operation.date.largerThan',
+    before: 'plone.app.querystring.operation.date.lessThan',
+  };
   for (const [key, value] of Object.entries(extraCriteria)) {
-    if (key.startsWith('facet.')) {
-      const field = key.replace('facet.', '');
+    if (!key.startsWith('facet.')) continue;
+    const field = key.replace('facet.', '');
+    const dateMatch = field.match(/^(.+)\.(after|before)$/);
+    if (dateMatch) {
+      // Date-range facet: `<index>.<after|before>` → a scalar date operation.
+      const [, index, direction] = dateMatch;
+      const v = Array.isArray(value) ? value[0] : value;
+      if (v) {
+        query.push({ i: index, o: DATE_OPS[direction], v });
+      }
+    } else {
       query.push({
         i: field,
         o: 'plone.app.querystring.operation.selection.any',
@@ -221,12 +247,21 @@ export function buildQuerystringSearchBody(
     metadata_fields: '_all',
   };
 
-  // Add depth if specified — Plone catalog supports a top-level depth
-  // field that limits results to N levels under each path criterion.
-  // Used by contextNavigation's listing config so a path+depth combo
-  // returns only the right tree slice.
+  // Depth belongs ON the path criterion, encoded in its VALUE as `path::depth`
+  // (`.::1`, `/docs::2`); a bare path is a recursive query. A top-level `depth`
+  // field on the request body is NOT honoured by @querystring-search — it is
+  // accepted and silently ignored, and inside the criterion as an object it
+  // errors with "index 'UID': option 'depth' is not valid".
+  //
+  // This used to set `body.depth` and so did nothing: a listing configured with
+  // depth 1 still matched the whole subtree, which put every nested Image into
+  // the /components index (`.` → 107 items, `.::1` → 33).
   if (queryConfig?.depth !== undefined) {
-    body.depth = queryConfig.depth;
+    for (const criterion of body.query) {
+      if (criterion.i !== 'path') continue;
+      if (typeof criterion.v !== 'string' || criterion.v.includes('::')) continue;
+      criterion.v = `${criterion.v}::${queryConfig.depth}`;
+    }
   }
 
   // Add limit if specified (0 or undefined means no limit)
@@ -831,6 +866,38 @@ export async function expandListingBlocks(inputItems, options = {}) {
 // ploneFetchItems (+ hierarchicalSortByPosition helper)
 ////////////////////////////////////////////////////////////////////////////////
 
+// A page can ask the SAME question many times: a doc page showing eleven filter
+// arrangements over one query, a layout repeating a list. Each caller is its own
+// block with its own ids, so nothing upstream can tell they match — only the
+// request can, and here it is built.
+//
+// Identical requests IN FLIGHT AT THE SAME MOMENT share one response. In flight
+// only: the next render asks again, so an edited query, a new page or fresh
+// content is never served from a stale entry.
+//
+// The key includes the Authorization header, not just the body. Today the token
+// is read from the browser's session (getAccessToken), so a server process is
+// always anonymous and every caller there would get the same rows anyway — this
+// is defence for the day that changes: two identical queries carrying different
+// credentials can legitimately return different rows, and sharing them would
+// hand one person another's results. It is not covered by a test, because the
+// test environment's storage is inert and the token cannot be driven from one.
+const inFlightSearches = new Map();
+
+async function fetchQuerystringSearch(url, headers, payload) {
+  const key = `${url}\n${headers.Authorization || ''}\n${payload}`;
+  const running = inFlightSearches.get(key);
+  if (running) return running;
+  const started = (async () => {
+    const res = await fetch(url, { method: 'POST', headers, body: payload });
+    return res.json();
+  })().finally(() => {
+    inFlightSearches.delete(key);
+  });
+  inFlightSearches.set(key, started);
+  return started;
+}
+
 /**
  * Create a fetchItems callback for Plone's @querystring-search endpoint.
  *
@@ -863,12 +930,9 @@ export function ploneFetchItems({
     headers['Content-Type'] = 'application/json';
 
     const path = `${contextPath}/++api++/@querystring-search`;
-    const res = await fetch(`${apiUrl}${path}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    });
-    const response = await res.json();
+    const url = `${apiUrl}${path}`;
+    const payload = JSON.stringify(body);
+    const response = await fetchQuerystringSearch(url, headers, payload);
 
     const rawItems = response.items || [];
     // Normalize: package image_field + image_scales into a self-contained image
@@ -1531,12 +1595,16 @@ function _isEditMode() {
  * Simple UUID generator for block IDs.
  * @returns {string} UUID v4 format string
  */
-function generateUUID() {
+function uuidFromRand(rand) {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-    const r = (Math.random() * 16) | 0;
+    const r = (rand() * 16) | 0;
     const v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
+}
+
+function generateUUID() {
+  return uuidFromRand(Math.random);
 }
 
 /**
@@ -1561,11 +1629,7 @@ function deterministicUUID(seed) {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-    const r = (rand() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+  return uuidFromRand(rand);
 }
 
 /**
@@ -2652,6 +2716,17 @@ export function collectContentFromTree(
  * the shared ctx (consumed so it isn't reused), and recurses into nested containers.
  * Returns filled [{ id, block }] in order.
  */
+/**
+ * THE single policy for a template child's block id. Deterministic by default
+ * (`${instanceId}::${tplChildId}` — stable across a server render and the
+ * client hydration, and instance-scoped so two instances of one template
+ * never collide); a caller-provided generator wins only where the caller
+ * genuinely needs one-off ids (e.g. snippet insertion into a page).
+ */
+function mintChildBlockId(instanceId, tplChildId, uuidGenerator) {
+  return uuidGenerator ? uuidGenerator() : `${instanceId}::${tplChildId}`;
+}
+
 function fillRegionEntries(entries, templateState, options) {
   const { instanceId, templateId } = templateState;
   const ctx = templateState.instances?.[instanceId];
@@ -2720,9 +2795,7 @@ function fillRegionEntries(entries, templateState, options) {
         // (a slot's contents are per-page user content, never template content; a fixed
         // block placed inside a slot is malformed and must not ride along). Field
         // placeholders only matter on first insert.
-        const nid = uuidGenerator
-          ? uuidGenerator()
-          : `${instanceId}::${tplChildId}`;
+        const nid = mintChildBlockId(instanceId, tplChildId, uuidGenerator);
         const {
           blocks: _slotBlocks,
           blocks_layout: _slotLayout,
@@ -3284,8 +3357,18 @@ export function expandTemplatesSync(inputItems, options = {}) {
 
     // Use path-normalised comparison: block templateId may be a full URL
     // (e.g. from Plone's resolveuid) while allowedLayouts may be paths.
+    // Only a genuine forced SWITCH re-homes a page. A page-level blocks field
+    // always carries its allowedLayouts — that is the layout MENU, not an
+    // instruction — so re-homing on every render meant a page laid out with a
+    // template the current menu doesn't list (a content-type layout offered only
+    // on that type) was moved to allowedLayouts[0]: `null` by the menu's own
+    // convention, i.e. its layout REMOVED on load, fixed blocks and all, and
+    // persisted by the next save. The same distinction the multi-instance split
+    // already makes above: exactly one allowedLayout is a switch, a list is a
+    // re-render.
     if (
       isLayout &&
+      forcedSingleLayout &&
       !allowedLayouts.some((l) => templateIdsMatch(l, templateId))
     ) {
       templateId = allowedLayouts[0];
@@ -3346,9 +3429,29 @@ export function expandTemplatesSync(inputItems, options = {}) {
       // Derive the id deterministically from the region's first block id so the
       // server render and the client hydration mint the SAME instance id (and so
       // the same `${instanceId}::tplChildId` block uids) — a random id differs
-      // between the two passes and causes a hydration mismatch. Fall back to a
-      // random id only when there's no stable seed (an empty forced layout).
-      instanceId = idemKey ? deterministicUUID(idemKey) : generateUUID();
+      // between the two passes and causes a hydration mismatch. An EMPTY forced
+      // layout has no first block id, but the forced template id itself is a
+      // stable seed (one region, one forced template): without it, every block
+      // of a forced chrome template changed uid on hydration, and the editor's
+      // pathmap/selectors (e.g. `uid#field` reveal handles) pointed at the
+      // server pass's dead uids. Random only when there is truly no seed.
+      // Distinctness: TWO forced layouts of the same template in one pass
+      // (same templateState) must not share an instance — count per template,
+      // so the Nth forced application seeds `${templateId}#${N}`. Region
+      // render order is the same on the server and the client, so the counter
+      // yields the same ids both passes.
+      let forcedSeed = null;
+      if (!idemKey && allowedLayouts?.length === 1) {
+        if (!templateState.forcedSeedCounts) templateState.forcedSeedCounts = {};
+        const nth = templateState.forcedSeedCounts[allowedLayouts[0]] || 0;
+        templateState.forcedSeedCounts[allowedLayouts[0]] = nth + 1;
+        forcedSeed = `${allowedLayouts[0]}#${nth}`;
+      }
+      instanceId = idemKey
+        ? deterministicUUID(idemKey)
+        : forcedSeed
+          ? deterministicUUID(forcedSeed)
+          : generateUUID();
       if (idemKey) {
         if (!templateState.generatedInstanceIds)
           templateState.generatedInstanceIds = {};
@@ -3539,11 +3642,8 @@ export function expandTemplatesSync(inputItems, options = {}) {
     if (tplBlock.fixed) {
       const slotId = tplBlock.slotId;
       const existing = slotId && existingFixedBlockIds?.get(slotId);
-      const blockId = existing?.blockId
-        ? existing.blockId
-        : uuidGenerator
-          ? uuidGenerator()
-          : `${instanceId}::${tplBlockId}`;
+      const blockId =
+        existing?.blockId || mintChildBlockId(instanceId, tplBlockId, uuidGenerator);
 
       let blockContent = tplBlock;
       if (!tplBlock.readOnly && existing?.block) {

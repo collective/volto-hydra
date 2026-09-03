@@ -267,6 +267,61 @@ test.describe('Template Creation', () => {
     await helper.waitForBlockSelectedInAdmin(headerBlockId);
   });
 
+  // The test above passes for the WRONG reason: test-layout happens to be one of
+  // the `items` region's allowedLayouts, so re-merging it into its own document
+  // re-inserts the same content and nothing looks broken.
+  //
+  // A template forced into a DIFFERENT region has no such luck. footer-layout is
+  // forced into `footer` (page schema, test-frontend), while its own blocks live
+  // in `items` on its definition page — so the merge, seeing a templateId that is
+  // not among that region's allowedLayouts, removes those blocks and re-inserts
+  // nothing. The definition page then shows an empty shell: the one document
+  // where a site footer is authored offers nothing to author.
+  //
+  // A page should never be re-merged against its own template. The save path
+  // already knows this (getUniqueTemplateIds(...).filter(id => id !== currentPath));
+  // the load path did not.
+  test('a template page forced into another region keeps its own blocks', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/templates/footer-layout');
+
+    const { blockId: brandingId, locator: branding } = await helper.waitForBlockByContent(
+      'Footer Branding - Forced Layout',
+    );
+    await expect(branding).toBeVisible();
+
+    // Present is not enough — the point of opening the definition is to edit it.
+    await helper.clickBlockInIframe(brandingId);
+    await helper.waitForBlockSelectedInAdmin(brandingId);
+  });
+
+  // Editing the definition still goes through the SAME unlock gesture as editing
+  // it from a page — the lock is what says "this changes everywhere", and that is
+  // true on the definition page too. All that is needed for the toggle to appear
+  // is a templateInstanceId on the definition's own blocks (see the
+  // templates/editable-fixed-layout fixture, whose blocks carry a definition-side
+  // instance id); without one, isBlockInEditedTemplate has nothing to match and
+  // the block is locked with no way to unlock it.
+  test('a template definition page unlocks + edits like any template', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/templates/footer-layout');
+
+    const { blockId: brandingId, locator: branding } = await helper.waitForBlockByContent(
+      'Footer Branding - Forced Layout',
+    );
+
+    await helper.unlockTemplate(brandingId);
+
+    // Click into the block after unlocking, as the page-side template tests do:
+    // the bridge restores contenteditable when a block is SELECTED for text
+    // editing, and skips the restore while the editor is still in block mode.
+    await helper.clickBlockInIframe(brandingId);
+    const editor = helper.getSlateField(branding);
+    await expect(editor).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
+  });
+
   test.skip('template edit mode is automatically activated when creating template', async ({ page }) => {
     // Skipped: auto-activation feature not yet implemented
     const helper = new AdminUIHelper(page);
