@@ -530,11 +530,17 @@ export const sharedBlocksConfig = {
                 // The results region (docs/examples/search.md): a child listing
                 // block under blocks_layout.listing. Undeclared, its children
                 // render but never enter the pathMap — the exact orphan the
-                // guardrail now refuses without exemptions.
+                // guardrail now refuses without exemptions. Mirrors the admin's
+                // search schemaEnhancer (volto-hydra/src/index.js) EXACTLY —
+                // that enhancer only adds the field when absent, so a diverging
+                // fixture copy would win and change the sidebar.
                 listing: {
-                  title: 'Listing',
+                  title: 'Results Listing',
                   widget: 'blocks_layout',
-                  allowedBlocks: ['listing'],
+                  description: 'Listing block to render search results',
+                  allowedBlocks: ['listing', 'default', 'summary', 'teaser', 'image'],
+                  maxLength: 1,
+                  defaultBlockType: 'listing',
                 },
             },
         },
