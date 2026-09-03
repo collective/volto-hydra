@@ -973,6 +973,26 @@
           break;
         }
 
+        case 'HIDE_BLOCK_UI': {
+          // Mirror the real parent (View.jsx: setBlockUI(null)): hide the
+          // outline, toolbar and add button without deselecting the block.
+          //
+          // The mock parent used to fall through to "Unknown message type",
+          // so overlays it had positioned on BLOCK_SELECTED stayed on screen
+          // after hydra asked for them to go away. The add button sits under
+          // the block and overlaps whatever follows, so Playwright clicks on
+          // real content intermittently failed with
+          //   <div id="add-button" class="volto-hydra-add-button">+</div>
+          //   intercepts pointer events
+          // — a harness artefact that looked exactly like a product bug.
+          for (const id of ['quanta-toolbar', 'block-outline', 'add-button']) {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+          }
+          console.log('[MOCK_PARENT] Hid block UI overlays');
+          break;
+        }
+
         default: {
           console.log('[MOCK_PARENT] Unknown message type:', message.type);
         }
