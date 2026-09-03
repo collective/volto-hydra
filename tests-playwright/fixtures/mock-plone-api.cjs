@@ -734,6 +734,55 @@ function buildNavigationComponent(cleanPath, baseUrl) {
 // Content snapshots per path, grown on PATCH — versions the compare view diffs.
 const contentVersions = new Map();
 
+// How many versions to SYNTHESIZE for a page nobody has edited — so every
+// page's History offers something to compare in demos and dev.
+const SYNTH_VERSIONS = 2;
+
+// Deterministic PRNG (xfnv1a hash -> mulberry32), seeded by path#version:
+// the same synthetic version renders identically every time it is asked for.
+function seededRand(seed) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+  return () => {
+    h = (h + 0x6d2b79f5) | 0;
+    let t = Math.imul(h ^ (h >>> 15), 1 | h);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// A plausible OLDER revision, derived deterministically from current content:
+// content grows over time, so version N drops the trailing blocks the later
+// versions "added"; and one paragraph gets a seeded word-swap so copy visibly
+// changed too. Purely synthetic — a real PATCH snapshot always wins.
+function synthesizeVersion(cleanPath, content, version, total) {
+  const rand = seededRand(`${cleanPath}#${version}`);
+  const old = JSON.parse(JSON.stringify(content));
+  const layout = old.blocks_layout && old.blocks_layout.items;
+  if (Array.isArray(layout) && layout.length > 2) {
+    const drop = Math.min(layout.length - 2, total - version);
+    const dropped = layout.splice(layout.length - drop, drop);
+    for (const uid of dropped) delete old.blocks[uid];
+  }
+  // Swap the two longest words in one seeded slate paragraph — visibly
+  // different copy without looking corrupted.
+  const slates = Object.values(old.blocks || {}).filter(
+    (b) => b && b['@type'] === 'slate' && typeof b.plaintext === 'string' && b.plaintext.split(' ').length > 6,
+  );
+  if (slates.length) {
+    const target = slates[Math.floor(rand() * slates.length)];
+    const words = target.plaintext.split(' ');
+    const byLen = words.map((w, i) => [w.length, i]).sort((a, b) => b[0] - a[0]);
+    const [i, j] = [byLen[0][1], byLen[1][1]];
+    [words[i], words[j]] = [words[j], words[i]];
+    const swapped = words.join(' ');
+    target.plaintext = swapped;
+    target.value = [{ type: 'p', children: [{ text: swapped }] }];
+  }
+  old.modified = new Date(Date.parse('2026-01-01T09:00:00Z') + version * 86400000).toISOString();
+  return old;
+}
+
 // In-memory workflow state per path — the docs demo clips walk a real
 // publish/retract cycle, so transitions must ACT (and history must grow),
 // while staying ephemeral like everything else the mock holds.
@@ -2021,14 +2070,23 @@ app.get(/.*\/@history\/\d+$/, (req, res) => {
   if (snapshot) return res.json(snapshot.content);
   const sessionId = getSessionId(req);
   const current = getContent(cleanPath, sessionId);
-  if (current) return res.json(current);
-  res.status(404).json({ error: 'no such version' });
+  if (!current) return res.status(404).json({ error: 'no such version' });
+  if (versions.length === 0 && version < SYNTH_VERSIONS) {
+    return res.json(synthesizeVersion(cleanPath, current, version, SYNTH_VERSIONS));
+  }
+  res.json(current);
 });
 
 app.get(/.*\/@history$/, (req, res) => {
   const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@history$/, '') || '/').replace(/\/+$/, '') || '/';
   const entry = workflowState.get(cleanPath) || { state: 'published', history: [] };
-  const versions = contentVersions.get(cleanPath) || [];
+  let versions = contentVersions.get(cleanPath) || [];
+  if (versions.length === 0) {
+    versions = Array.from({ length: SYNTH_VERSIONS }, (_, n) => ({
+      version: n,
+      time: new Date(Date.parse('2026-01-01T09:00:00Z') + n * 86400000).toISOString(),
+    }));
+  }
   const versioning = versions.map((v) => ({
     '@id': `http://localhost:${PORT}${cleanPath}/@history/${v.version}`,
     actor: { '@id': null, fullname: 'Admin User', id: 'admin', username: 'admin' },
