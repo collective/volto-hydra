@@ -23,7 +23,11 @@ async function fetchBlocksConfig(
   mockParentUrl: string,
   frontendUrl: string,
   apiUrl: string,
-): Promise<{ blocksConfig: Record<string, any>; frontendKeys: string[] }> {
+): Promise<{
+  blocksConfig: Record<string, any>;
+  frontendKeys: string[];
+  pageSchema?: any;
+}> {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();
@@ -34,8 +38,15 @@ async function fetchBlocksConfig(
         const mp = (window as any).mockParent;
         const c = mp?.getBlocksConfig?.();
         const fk = mp?.getFrontendBlockKeys?.() || [];
+        // `_page` stores its schema as a FUNCTION (mock-parent adopts the
+        // frontend's page schema that way), so it JSON-serialises to nothing —
+        // evaluate it here so the persisted artifact carries the page's
+        // allowedBlocks for placement checks.
+        const pageSchema = c?._page?.schema?.() ?? null;
         // Wait past mock-parent's own baseline (~10 types) for the frontend's INIT to land
-        return c && Object.keys(c).length > 10 ? { blocksConfig: c, frontendKeys: fk } : null;
+        return c && Object.keys(c).length > 10
+          ? { blocksConfig: c, frontendKeys: fk, pageSchema }
+          : null;
       });
       if (result) return result;
       await new Promise((r) => setTimeout(r, 200));
@@ -185,12 +196,14 @@ async function globalSetup() {
     }
 
     const mockParent = process.env.MOCK_PARENT_URL || `${URLS.testFrontend}/mock-parent.html`;
+    let pageSchema: any = null;
     const blocks: any[] = [];
     const perFrontend: Record<string, number> = {};
     for (const [project, url] of targets) {
       if (!(await reachable(url))) continue;
-      const { blocksConfig: cfg, frontendKeys: keys } = await fetchBlocksConfig(
-        mockParent, url, discoverApi);
+      const { blocksConfig: cfg, frontendKeys: keys, pageSchema: ps } =
+        await fetchBlocksConfig(mockParent, url, discoverApi);
+      if (ps) pageSchema = ps;
       if (Object.keys(cfg).length === 0) {
         console.warn(`[SETUP] ${project} (${url}) returned no schemas — skipped`);
         continue;
@@ -217,6 +230,16 @@ async function globalSetup() {
     const outPath = path.resolve(__dirname, '../.discovered-blocks.json');
     fs.writeFileSync(outPath, JSON.stringify(blocks, null, 2));
     console.log(`[SETUP] Wrote ${blocks.length} discovered blocks to ${outPath}`);
+
+    // Persist the fetched schemas too — a standalone artifact for anything
+    // that validates content against the block model OUTSIDE a playwright run
+    // (e.g. server-side conversion sanity, where only findings come back).
+    const schemasPath = path.resolve(__dirname, '../.blocks-schemas.json');
+    fs.writeFileSync(
+      schemasPath,
+      JSON.stringify({ blocksConfig, frontendKeys, pageSchema }, null, 2),
+    );
+    console.log(`[SETUP] Wrote block schemas to ${schemasPath}`);
 
     // Record what coverage found. Whether it RAN is no longer a question —
     // setup fails without schemas — so this is the result, not a caveat.
