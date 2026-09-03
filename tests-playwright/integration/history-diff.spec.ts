@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
+import { URLS } from '../ports';
 
 /**
  * History + the Inka compare view (volto-hydra#326/#327).
@@ -52,6 +53,22 @@ test.describe('History and compare', () => {
       expect(v0).toBeGreaterThan(0);
       expect(v1).toBeGreaterThan(v0);
     }).toPass({ timeout: 30_000 });
+
+    // The count ordering alone would still pass if only pane 0 applied its
+    // push (fewer blocks) while pane 1 silently stayed on the SSR current
+    // page. Every synthetic version drops at least one TRAILING block, so the
+    // current page's last block must be absent from BOTH panes — the decisive
+    // proof each pane shows pushed version content, not the SSR page.
+    const current = await (
+      await page.request.get(`${URLS.mockApi}/++api++/_test_data/test-page`)
+    ).json();
+    const lastUid = current.blocks_layout.items[current.blocks_layout.items.length - 1];
+    for (const n of [0, 1]) {
+      await expect(
+        panes.nth(n).contentFrame().locator(`[data-block-uid="${lastUid}"]`),
+        `pane ${n} must not render the current page's trailing block`,
+      ).toHaveCount(0);
+    }
 
     // The view keeps the admin chrome: a toolbar with a way back, and the
     // versions are named and switchable from inside the view.
