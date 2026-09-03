@@ -2473,20 +2473,46 @@ async function renderSearchBlock(block, blockId) {
         html += `<h2 data-edit-text="headline" style="margin-bottom: 15px;">${headline}</h2>`;
     }
 
+    // A block that exists ONLY once a query has been asked — the quick-answer
+    // region. Declared here so the form below can say how to reveal it: the
+    // input carries the sample question, the submit button carries the uid.
+    const quickAnswerLayout = block.blocks_layout?.quickAnswer || [];
+    const quickAnswerUid = quickAnswerLayout[0] || '';
+    const sampleQuestion = block.quickAnswerSample || '';
+
     // Search input
     if (showSearchInput) {
         // Get current search text from URL criteria (if available)
         const currentSearchText = window._searchCriteria?.SearchableText || '';
+        // The input says WHAT to type, the button says WHICH block that reveals.
+        // An element declaring a value is a field to fill; one that does not is
+        // the thing to activate — which is how two handles can share a form.
+        const revealInput = quickAnswerUid && sampleQuestion
+            ? ` data-block-selector="${escapeAttr(quickAnswerUid)}" data-block-selector-input="${escapeAttr(sampleQuestion)}"`
+            : '';
+        const revealButton = quickAnswerUid ? ` data-block-selector="${escapeAttr(quickAnswerUid)}"` : '';
         html += `<div class="search-input" style="margin-bottom: 15px;">
             <form class="search-form" data-search-block="${blockId}" style="display: flex; gap: 10px;">
                 <input type="text" name="SearchableText" placeholder="Search..." value="${currentSearchText}"
-                    class="search-input-field"
+                    class="search-input-field"${revealInput}
                     style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" />
-                <button type="submit" class="search-submit-button" style="padding: 8px 16px; background: #0066cc; color: white; border: none; border-radius: 4px;">
+                <button type="submit" class="search-submit-button"${revealButton} style="padding: 8px 16px; background: #0066cc; color: white; border: none; border-radius: 4px;">
                     Search
                 </button>
             </form>
         </div>`;
+    }
+
+    // Rendered only when a question has actually been asked. With no query there
+    // is no element at all — not hidden, absent — which is the case a click-only
+    // reveal cannot reach.
+    if (quickAnswerUid && window._searchCriteria?.SearchableText) {
+        const child = blocks[quickAnswerUid];
+        if (child) {
+            html += `<div class="quick-answer" data-block-uid="${escapeAttr(quickAnswerUid)}" style="margin: 15px 0; padding: 12px; background: #eef3fb; border-radius: 6px;">
+                <div data-edit-text="answer">${escapeHtml(child.answer || '')}</div>
+            </div>`;
+        }
     }
 
     // Sort options

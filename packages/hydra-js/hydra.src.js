@@ -11734,7 +11734,81 @@ export class Bridge {
       fieldName === null
         ? `[data-block-selector~="${uid}"], [data-block-selector*="${uid}#"]`
         : `[data-block-selector~="${uid}#${fieldName}"]`;
-    return [...document.querySelectorAll(selector)];
+    // An element that declares a VALUE is a field to fill on the way to the
+    // block, not something standing in for it. Excluding it here is what keeps
+    // two handles able to share one form: the button is the activator, the
+    // inputs beside it are not, and every existing caller — field handles,
+    // owningBlockUid, the label on a tab button — sees exactly what it did
+    // before, because no page carried this attribute until now.
+    return [...document.querySelectorAll(selector)].filter(
+      (el) => !el.hasAttribute('data-block-selector-input'),
+    );
+  }
+
+  /**
+   * The inputs a block declares as the way to bring it into being.
+   *
+   * `data-block-selector` reveals by CLICKING — a tab, a carousel dot, a step.
+   * That cannot reach a block which does not exist until a question is asked:
+   * a search's answer, a filtered listing, anything downstream of a query.
+   * There is nothing to click that produces a question. So the frontend puts
+   * the question next to the thing to click, joined by the same uid:
+   *
+   *     <input  data-block-selector="answer" data-block-selector-input="what is inka">
+   *     <button data-block-selector="answer">Search</button>
+   */
+  fillersFor(uid) {
+    if (!uid) return [];
+    return [
+      ...document.querySelectorAll(
+        `[data-block-selector~="${uid}"][data-block-selector-input], ` +
+          `[data-block-selector*="${uid}#"][data-block-selector-input]`,
+      ),
+    ];
+  }
+
+  /**
+   * Put a declared value into a field so the FRAMEWORK sees it.
+   *
+   * Assigning `.value` does not notify Vue's v-model or React's controlled
+   * inputs — the field looks filled, submits empty, and the reveal times out
+   * with nothing to explain it. React in particular tracks the last value on
+   * the node and skips the change unless the NATIVE setter is used.
+   */
+  static setDeclaredValue(el, value) {
+    if (el.type === 'checkbox' || el.type === 'radio') {
+      const on = value !== 'false' && value !== '0' && value !== '';
+      if (el.checked === on) return;
+      el.checked = on;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      return;
+    }
+    const proto =
+      el.tagName === 'TEXTAREA'
+        ? HTMLTextAreaElement.prototype
+        : el.tagName === 'SELECT'
+          ? HTMLSelectElement.prototype
+          : HTMLInputElement.prototype;
+    const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+    if (setter) setter.call(el, value);
+    else el.value = value;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  /**
+   * Fill every field this block declares. Returns the fields filled, so the
+   * caller can submit one of their forms when there is no separate activator.
+   */
+  fillDeclaredInputs(uid) {
+    const fillers = this.fillersFor(uid);
+    for (const el of fillers) {
+      Bridge.setDeclaredValue(el, el.getAttribute('data-block-selector-input'));
+    }
+    if (fillers.length) {
+      log(`tryMakeBlockVisible: filled ${fillers.length} declared input(s) for ${uid}`);
+    }
+    return fillers;
   }
 
   /** The handle advertising where one field of a block is edited, if any. */
@@ -11915,6 +11989,21 @@ export class Bridge {
       // until the timeout.
       clickedSelector = ancestorSelector;
       nextUid = ancestorUid;
+    } else if (this.fillersFor(targetUid).length) {
+      // Declared inputs but no separate activator: the field IS the trigger, so
+      // fill it and submit its own form (the Enter case). Handled before the
+      // +1/-1 walk because that walk needs the target element to exist, and the
+      // whole point of this branch is that it does not yet.
+      const filled = this.fillDeclaredInputs(targetUid);
+      const form = filled[filled.length - 1]?.closest('form');
+      if (!form) {
+        log(`tryMakeBlockVisible: declared inputs for ${targetUid} but no form to submit`);
+        return false;
+      }
+      log(`tryMakeBlockVisible: submitting the form holding ${targetUid}'s declared input`);
+      if (typeof form.requestSubmit === 'function') form.requestSubmit();
+      else form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      return true;
     } else {
       // No direct selector - try +1/-1 navigation
       log(`tryMakeBlockVisible: no direct selector, trying +1/-1 navigation`);
@@ -12005,6 +12094,12 @@ export class Bridge {
     //   accordion  — the toggle button carries `aria-expanded`; if it's
     //                already "true" the panel is open, skip the click.
     //   carousel/slider — no aria-expanded; one click always moves it.
+    // Whatever we are about to activate, put the declared values in first: a
+    // submit button that reveals a query-gated block does nothing with an empty
+    // field. No-op for every block that declares none, which is all of them
+    // until a frontend opts in.
+    this.fillDeclaredInputs(targetUid);
+
     const summaryDetails =
       clickedSelector.tagName === 'SUMMARY'
         ? clickedSelector.closest('details')
