@@ -1,3 +1,4 @@
+import HydraDiff from './components/Diff/View';
 import { defineMessages } from 'react-intl';
 import filterSVG from '@plone/volto/icons/filter.svg';
 
@@ -160,6 +161,17 @@ const applyConfig = (config) => {
   );
 
   // Frontend Switcher toolbar menu (viewport + frontend URL switching)
+  // Inka's compare view replaces Volto's Diff route: Volto's diff renders
+  // versions with Volto's own block components (which a hydra admin doesn't
+  // have); ours renders both versions in frontend iframes (see
+  // components/Diff/View.jsx and volto-hydra#327). addonRoutes outrank the
+  // core route.
+  config.addonRoutes = [
+    ...(config.addonRoutes || []),
+    { path: '/diff', component: HydraDiff, exact: true },
+    { path: '/**/diff', component: HydraDiff, exact: true },
+  ];
+
   config.settings.additionalToolbarComponents = {
     ...config.settings.additionalToolbarComponents,
     frontendSwitcher: {

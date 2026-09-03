@@ -710,6 +710,10 @@ function buildActionsComponent(cleanPath, baseUrl) {
       { '@id': fullUrl, icon: '', id: 'view', title: 'View' },
       { '@id': `${fullUrl}/edit`, icon: '', id: 'edit', title: 'Edit' },
       { id: 'folderContents', title: 'Contents' },
+      // The admin's More menu builds its Sharing entry from this action —
+      // pair of the @sharing endpoint below.
+      { '@id': `${fullUrl}/sharing`, icon: '', id: 'local_roles', title: 'Sharing' },
+      { '@id': `${fullUrl}/history`, icon: '', id: 'history', title: 'History' },
     ],
     object_buttons: [],
     portal_tabs: [],
@@ -727,13 +731,112 @@ function buildNavigationComponent(cleanPath, baseUrl) {
   };
 }
 
+// Content snapshots per path, grown on PATCH — versions the compare view diffs.
+const contentVersions = new Map();
+
+// How many versions to SYNTHESIZE for a page nobody has edited — so every
+// page's History offers something to compare in demos and dev.
+const SYNTH_VERSIONS = 2;
+
+// Deterministic PRNG (xfnv1a hash -> mulberry32), seeded by path#version:
+// the same synthetic version renders identically every time it is asked for.
+function seededRand(seed) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+  return () => {
+    h = (h + 0x6d2b79f5) | 0;
+    let t = Math.imul(h ^ (h >>> 15), 1 | h);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// A plausible OLDER revision, derived deterministically from current content:
+// content grows over time, so version N drops the trailing blocks the later
+// versions "added"; and one paragraph gets a seeded word-swap so copy visibly
+// changed too. Purely synthetic — a real PATCH snapshot always wins.
+function synthesizeVersion(cleanPath, content, version, total) {
+  const rand = seededRand(`${cleanPath}#${version}`);
+  const old = JSON.parse(JSON.stringify(content));
+  const layout = old.blocks_layout && old.blocks_layout.items;
+  if (Array.isArray(layout) && layout.length > 2) {
+    const drop = Math.min(layout.length - 2, total - version);
+    const dropped = layout.splice(layout.length - drop, drop);
+    for (const uid of dropped) delete old.blocks[uid];
+  }
+  // Swap the two longest words in one seeded slate paragraph — visibly
+  // different copy without looking corrupted.
+  const slates = Object.values(old.blocks || {}).filter(
+    (b) => b && b['@type'] === 'slate' && typeof b.plaintext === 'string' && b.plaintext.split(' ').length > 6,
+  );
+  if (slates.length) {
+    const target = slates[Math.floor(rand() * slates.length)];
+    const words = target.plaintext.split(' ');
+    const byLen = words.map((w, i) => [w.length, i]).sort((a, b) => b[0] - a[0]);
+    const [i, j] = [byLen[0][1], byLen[1][1]];
+    [words[i], words[j]] = [words[j], words[i]];
+    const swapped = words.join(' ');
+    target.plaintext = swapped;
+    target.value = [{ type: 'p', children: [{ text: swapped }] }];
+  }
+  old.modified = new Date(Date.parse('2026-01-01T09:00:00Z') + version * 86400000).toISOString();
+  return old;
+}
+
+// In-memory workflow state per path — the docs demo clips walk a real
+// publish/retract cycle, so transitions must ACT (and history must grow),
+// while staying ephemeral like everything else the mock holds.
+const workflowState = new Map();
+
+const WORKFLOW = {
+  private: {
+    title: 'Private',
+    transitions: [{ '@id': 'publish', title: 'Publish', to: 'published' },
+                  { '@id': 'submit', title: 'Submit for publication', to: 'pending' }],
+  },
+  pending: {
+    title: 'Pending review',
+    transitions: [{ '@id': 'publish', title: 'Publish', to: 'published' },
+                  { '@id': 'reject', title: 'Send back', to: 'private' }],
+  },
+  published: {
+    title: 'Published',
+    transitions: [{ '@id': 'retract', title: 'Retract', to: 'private' }],
+  },
+};
+
 function buildWorkflowComponent(cleanPath, baseUrl) {
   const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
+  const entry = workflowState.get(cleanPath) || { state: 'published', history: [] };
+  const def = WORKFLOW[entry.state];
   return {
     '@id': `${fullUrl}/@workflow`,
-    history: [],
-    transitions: [],
+    history: entry.history,
+    state: { id: entry.state, title: def.title },
+    transitions: def.transitions.map((t) => ({
+      '@id': `${fullUrl}/@workflow/${t['@id']}`,
+      title: t.title,
+    })),
   };
+}
+
+function applyWorkflowTransition(cleanPath, transitionId) {
+  const entry = workflowState.get(cleanPath) || { state: 'published', history: [] };
+  const def = WORKFLOW[entry.state];
+  const transition = def.transitions.find((t) => t['@id'] === transitionId);
+  if (!transition) return null;
+  const record = {
+    action: transitionId,
+    actor: 'admin',
+    comments: '',
+    review_state: transition.to,
+    time: new Date().toISOString(),
+    title: WORKFLOW[transition.to].title,
+  };
+  entry.state = transition.to;
+  entry.history = [...entry.history, record];
+  workflowState.set(cleanPath, entry);
+  return record;
 }
 
 function buildNavrootComponent(cleanPath, baseUrl) {
@@ -1938,6 +2041,106 @@ app.get('/@site', (req, res) => {
 app.get(/.*\/@workflow$/, (req, res) => {
   const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@workflow$/, '') || '/').replace(/\/+$/, '') || '/';
   res.json(buildWorkflowComponent(cleanPath, `http://localhost:${PORT}`));
+});
+
+/**
+ * POST /@workflow/:transition — apply a transition (publish/retract/…), as
+ * Plone does. The docs demo clips drive the admin's state menu through this.
+ */
+app.post(/.*\/@workflow\/[^/]+$/, (req, res) => {
+  const match = req.path.match(/^(.*)\/@workflow\/([^/]+)$/);
+  const cleanPath = (match[1].replace('/++api++', '') || '/').replace(/\/+$/, '') || '/';
+  const record = applyWorkflowTransition(cleanPath, match[2]);
+  if (!record) return res.status(400).json({ error: 'invalid transition' });
+  res.json(record);
+});
+
+/**
+ * GET /@history — the version + workflow trail the admin's History view lists;
+ * grows as @workflow transitions apply.
+ */
+app.get(/.*\/@history\/\d+$/, (req, res) => {
+  // A content SNAPSHOT: what the page held before edit N+1 (or current for the
+  // newest). The compare view renders these in frontend iframes.
+  const match = req.path.match(/^(.*)\/@history\/(\d+)$/);
+  const cleanPath = (match[1].replace('/++api++', '') || '/').replace(/\/+$/, '') || '/';
+  const version = Number(match[2]);
+  const versions = contentVersions.get(cleanPath) || [];
+  const snapshot = versions.find((v) => v.version === version);
+  if (snapshot) return res.json(snapshot.content);
+  const sessionId = getSessionId(req);
+  const current = getContent(cleanPath, sessionId);
+  if (!current) return res.status(404).json({ error: 'no such version' });
+  if (versions.length === 0 && version < SYNTH_VERSIONS) {
+    return res.json(synthesizeVersion(cleanPath, current, version, SYNTH_VERSIONS));
+  }
+  res.json(current);
+});
+
+app.get(/.*\/@history$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@history$/, '') || '/').replace(/\/+$/, '') || '/';
+  const entry = workflowState.get(cleanPath) || { state: 'published', history: [] };
+  let versions = contentVersions.get(cleanPath) || [];
+  if (versions.length === 0) {
+    versions = Array.from({ length: SYNTH_VERSIONS }, (_, n) => ({
+      version: n,
+      time: new Date(Date.parse('2026-01-01T09:00:00Z') + n * 86400000).toISOString(),
+    }));
+  }
+  const versioning = versions.map((v) => ({
+    '@id': `http://localhost:${PORT}${cleanPath}/@history/${v.version}`,
+    actor: { '@id': null, fullname: 'Admin User', id: 'admin', username: 'admin' },
+    comments: '',
+    may_revert: true,
+    time: v.time,
+    transition_title: 'Edited',
+    type: 'versioning',
+    version: v.version,
+  }));
+  const workflow = entry.history.map((h, n) => ({
+    '@id': `http://localhost:${PORT}${cleanPath}/@history/${n + 1}`,
+    action: h.action,
+    actor: { '@id': null, fullname: 'Admin User', id: 'admin', username: 'admin' },
+    comments: h.comments,
+    review_state: h.review_state,
+    state_title: h.title,
+    time: h.time,
+    transition_title: h.title,
+    type: 'workflow',
+  }));
+  res.json([...versioning, ...workflow].sort((a, b) => (a.time < b.time ? 1 : -1)));
+});
+
+/**
+ * GET /@sharing — the per-principal role matrix the admin's Sharing view
+ * renders; POST accepts changes (held in memory only).
+ */
+const sharingOverrides = new Map();
+app.get(/.*\/@sharing$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@sharing$/, '') || '/').replace(/\/+$/, '') || '/';
+  const stored = sharingOverrides.get(cleanPath);
+  res.json(stored || {
+    available_roles: [
+      { id: 'Contributor', title: 'Can add' },
+      { id: 'Editor', title: 'Can edit' },
+      { id: 'Reader', title: 'Can view' },
+      { id: 'Reviewer', title: 'Can review' },
+    ],
+    entries: [
+      { id: 'AuthenticatedUsers', title: 'Logged-in users', type: 'group',
+        roles: { Contributor: false, Editor: false, Reader: false, Reviewer: false } },
+      { id: 'reviewers', title: 'Reviewers', type: 'group',
+        roles: { Contributor: false, Editor: false, Reader: false, Reviewer: 'global' } },
+    ],
+    inherit: true,
+  });
+});
+app.post(/.*\/@sharing$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@sharing$/, '') || '/').replace(/\/+$/, '') || '/';
+  const current = sharingOverrides.get(cleanPath);
+  // merge entries' role changes into the stored matrix (enough for the demo)
+  sharingOverrides.set(cleanPath, { ...(current || {}), ...req.body });
+  res.status(204).end();
 });
 
 /**
@@ -3379,6 +3582,16 @@ app.patch('*', (req, res) => {
   const content = getContent(cleanPath, sessionId);
 
   if (content) {
+    // Version snapshot: the state BEFORE this edit becomes version N (like
+    // CMFEditions). @history lists these; @history/<n> serves them; the
+    // admin's compare view renders any two side by side.
+    const versions = contentVersions.get(cleanPath) || [];
+    versions.push({
+      version: versions.length,
+      time: new Date().toISOString(),
+      content: JSON.parse(JSON.stringify(content)),
+    });
+    contentVersions.set(cleanPath, versions);
     // Emulate Plone's REST deserializer: only fields backed by a registered
     // dexterity field / behavior survive a save. Unknown top-level fields (e.g.
     // an ad-hoc `footer_blocks`) are silently dropped. This is WHY layout
