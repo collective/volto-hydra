@@ -3420,9 +3420,18 @@ export function expandTemplatesSync(inputItems, options = {}) {
       // Derive the id deterministically from the region's first block id so the
       // server render and the client hydration mint the SAME instance id (and so
       // the same `${instanceId}::tplChildId` block uids) — a random id differs
-      // between the two passes and causes a hydration mismatch. Fall back to a
-      // random id only when there's no stable seed (an empty forced layout).
-      instanceId = idemKey ? deterministicUUID(idemKey) : generateUUID();
+      // between the two passes and causes a hydration mismatch. An EMPTY forced
+      // layout has no first block id, but the forced template id itself is a
+      // stable seed (one region, one forced template): without it, every block
+      // of a forced chrome template changed uid on hydration, and the editor's
+      // pathmap/selectors (e.g. `uid#field` reveal handles) pointed at the
+      // server pass's dead uids. Random only when there is truly no seed.
+      const forcedSeed = !idemKey && allowedLayouts?.length === 1 ? allowedLayouts[0] : null;
+      instanceId = idemKey
+        ? deterministicUUID(idemKey)
+        : forcedSeed
+          ? deterministicUUID(forcedSeed)
+          : generateUUID();
       if (idemKey) {
         if (!templateState.generatedInstanceIds)
           templateState.generatedInstanceIds = {};
