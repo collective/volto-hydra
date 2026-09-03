@@ -15,8 +15,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import { getContent } from '@plone/volto/actions';
-import { getBaseUrl } from '@plone/volto/helpers';
+import { getContent } from '@plone/volto/actions/content/content';
+import { getBaseUrl } from '@plone/volto/helpers/Url/Url';
 import { getURlsFromEnv } from '../../utils/getSavedURLs';
 import { getIframeUrlCookieName } from '../../utils/cookieNames';
 

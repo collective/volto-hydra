@@ -1,4 +1,4 @@
-import HydraDiff from './components/Diff/View';
+import React from 'react';
 import { defineMessages } from 'react-intl';
 import filterSVG from '@plone/volto/icons/filter.svg';
 
@@ -166,10 +166,17 @@ const applyConfig = (config) => {
   // have); ours renders both versions in frontend iframes (see
   // components/Diff/View.jsx and volto-hydra#327). addonRoutes outrank the
   // core route.
+  // LAZY: requiring the view at config time drags Volto module graphs into
+  // config initialisation (a cycle that half-initialises settings and crashed
+  // every SSR request in the language helper) — resolve it at first render.
+  const LazyHydraDiff = (props) => {
+    const View = require('./components/Diff/View').default;
+    return React.createElement(View, props);
+  };
   config.addonRoutes = [
     ...(config.addonRoutes || []),
-    { path: '/diff', component: HydraDiff, exact: true },
-    { path: '/**/diff', component: HydraDiff, exact: true },
+    { path: '/diff', component: LazyHydraDiff, exact: true },
+    { path: '/**/diff', component: LazyHydraDiff, exact: true },
   ];
 
   config.settings.additionalToolbarComponents = {
