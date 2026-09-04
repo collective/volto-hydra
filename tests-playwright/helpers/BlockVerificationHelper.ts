@@ -104,6 +104,8 @@ export async function checkDataEditTextClicks(
   // still catching up with — see the wait before the click below.
   let selected = false;
 
+  const admin = new AdminUIHelper(page);
+
   for (const i of order) {
     const el = editTextEls.nth(i);
     const owner = owners[i];
@@ -115,7 +117,6 @@ export async function checkDataEditTextClicks(
       // transit lands where it used to be, which reads as "element is outside
       // of the viewport" once Playwright has scrolled (a transform cannot be
       // scrolled to).
-      const admin = new AdminUIHelper(page);
       await admin.getStableBlockCount();
       const ownerEl = iframe.locator(`[data-block-uid="${owner}"]`).first();
       if (await ownerEl.count()) {
@@ -195,7 +196,21 @@ export async function checkDataEditTextClicks(
     // visible AND positioned over the block, handles aligned, nothing covering
     // it). Not on the first click: that click is what selects the block.
     if (selected) {
-      await new AdminUIHelper(page).waitForBlockSelectedInAdmin(blockUid);
+      // isBlockSelectedInIframe, not waitForBlockSelectedInAdmin: the state we
+      // need is "the admin has caught up with the last click" — the toolbar and
+      // outline are up and positioned over this block — and the mock parent the
+      // BRIDGE suite drives renders exactly those. waitForBlockSelectedInAdmin
+      // additionally checks sidebar coverage and drag-handle alignment, which
+      // only the real Volto admin has, so it could never settle there.
+      await expect
+        .poll(
+          async () => {
+            const res = await admin.isBlockSelectedInIframe([blockUid]);
+            return typeof res === 'boolean' ? res : !!res?.ok;
+          },
+          { timeout: 5000 },
+        )
+        .toBeTruthy();
     }
     const actionable = await el.isEnabled().catch(() => true);
     await el.click(actionable ? {} : { force: true });
