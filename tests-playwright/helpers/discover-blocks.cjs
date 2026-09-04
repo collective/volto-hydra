@@ -1053,7 +1053,16 @@ async function loadOfflineBlockSyncApi(blocksConfig) {
 }
 
 // Structural types: hydra's own plumbing, never a project's placement choice.
-const CONTAINMENT_EXEMPT_TYPES = new Set(['empty', 'column', 'title', 'description']);
+// contentLayout: a structural page-layout block applied through the layout
+// picker (allowedLayouts) — it IS the content region's root, never a
+// reorderable content block, so containment doesn't apply.
+const CONTAINMENT_EXEMPT_TYPES = new Set([
+  'empty',
+  'column',
+  'title',
+  'description',
+  'contentLayout',
+]);
 
 /**
  * Rules the CONSUMING PROJECT passes in, saying where a block placed outside

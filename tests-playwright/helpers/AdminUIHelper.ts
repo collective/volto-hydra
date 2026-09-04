@@ -72,6 +72,157 @@ export class AdminUIHelper {
         }
       }
     });
+
+    // Global opt-in demo pacing: `DEMO_PACING=1200` enables paced, cursor-visible
+    // gestures across every recorded-demo spec without per-spec wiring. A spec
+    // may still override by assigning `helper.demoPacingMs` directly. Default 0
+    // → functional tests (and hydra's own suite) are completely unaffected.
+    if (process.env.DEMO_PACING) {
+      this.demoPacingMs = Number(process.env.DEMO_PACING) || 0;
+    }
+  }
+
+  /**
+   * Demo pacing step: when demoPacingMs>0 (recorded demos), move the (visible)
+   * cursor to `target` and pause so the action reads on video. No-op in
+   * functional runs (demoPacingMs===0), so nothing else is affected.
+   */
+  private async demoStep(target?: Locator): Promise<void> {
+    if (!this.demoPacingMs) return;
+    if (target) {
+      // Best-effort cursor move — hover auto-scrolls the target into view and is
+      // BOUNDED (timeout + catch). A bare scrollIntoViewIfNeeded is NOT bounded
+      // and hangs forever on a just-opened/animating container (e.g. the card
+      // grid's "Card Defaults" accordion), so it must not be used here.
+      await target.hover({ timeout: 1500 }).catch(() => {});
+    }
+    await this.page.waitForTimeout(this.demoPacingMs);
+  }
+
+  /**
+   * Set a react-select Choice field by CLICK — open the control, then click the
+   * option by its visible label — rather than keyboard filter+Enter. Click-based
+   * so it reads clearly on video AND avoids the `fill`+Enter races (e.g. a
+   * mid-word "Methodpproach"). `field` is the schema field id; defaults to the
+   * sidebar properties form.
+   */
+  async setChoiceField(
+    field: string,
+    optionLabel: string,
+    options: { container?: string; multi?: boolean } = {}
+  ): Promise<void> {
+    const base = options.container ?? '#sidebar-properties';
+    // Close any stray-open react-select menu first — some Choice fields auto-open
+    // their menu on focus (the card grid's colour field does), and its floating
+    // options would intercept the click on THIS field. Blur closes it (NOT
+    // Escape — hydra treats that as step-up/deselect).
+    await this.page.evaluate(() =>
+      (document.activeElement as HTMLElement | null)?.blur?.()
+    );
+    // Some blocks (the card grid) render their fieldset TWICE, so a plain
+    // .first() can grab a HIDDEN copy whose control never becomes clickable
+    // (a 240s hang). Scope everything to the VISIBLE field-wrapper.
+    const fieldWrap = this.page
+      .locator(`${base} .field-wrapper-${field}:visible`)
+      .first();
+    const control = fieldWrap.locator('.react-select__control');
+    // demoStep hovers (bounded); control.click() auto-scrolls into view.
+    await this.demoStep(control);
+    await control.click();
+    // The open menu is a singleton (only one react-select is open at a time) and
+    // is NOT always a DOM descendant of its field-wrapper, so find it at page
+    // level.
+    const menu = this.page.locator('.react-select__menu');
+    // control.click() TOGGLES the menu. If the field started already-open (a
+    // prior focus can leave a react-select open), our click just closed it — so
+    // wait briefly, and if it didn't open, click again to (re)open.
+    try {
+      await menu.waitFor({ state: 'visible', timeout: 1500 });
+    } catch {
+      await control.click();
+      await menu.waitFor({ state: 'visible', timeout: 5000 });
+    }
+    // react-select renders each option as a `.react-select__option` div (no
+    // role="option"). Match the exact label with an anchored regex so e.g.
+    // "Off white" doesn't also match "Off white highlight". Scope to this menu.
+    // Match the option tolerantly: exact first (case-insensitive — some Choice
+    // options render their raw value like "none" not the label "None"), then a
+    // prefix fallback so a short caller label matches a verbose option (e.g.
+    // "Box" → "Box (rounded, bordered)").
+    const escaped = optionLabel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const opts = menu.locator('.react-select__option');
+    let option = opts
+      .filter({ hasText: new RegExp(`^\\s*${escaped}\\s*$`, 'i') })
+      .first();
+    if ((await option.count()) === 0) {
+      option = opts
+        .filter({ hasText: new RegExp(`^\\s*${escaped}\\b`, 'i') })
+        .first();
+    }
+    // Fail loudly with what the open menu actually offers, instead of a mystery
+    // timeout, if the label still isn't present.
+    if ((await option.count()) === 0) {
+      const offered = await opts.allInnerTexts();
+      throw new Error(
+        `setChoiceField('${field}', '${optionLabel}'): not offered by the open menu. Offered: [${offered.join(' | ')}]`
+      );
+    }
+    // Wait for it in the DOM, then let click() auto-scroll it into the menu's
+    // viewport (a long option list can keep an option attached-but-not-visible).
+    await option.waitFor({ state: 'attached', timeout: 5000 });
+    await option.scrollIntoViewIfNeeded().catch(() => {});
+    await this.demoStep(option);
+    await option.click();
+    // A multi-select keeps its menu OPEN after a pick (so you can add more), so
+    // blur to close it (NOT Escape — hydra reads that as step-up/deselect). A
+    // single-select closes on pick.
+    if (options.multi) {
+      await this.page.evaluate(() =>
+        (document.activeElement as HTMLElement | null)?.blur?.()
+      );
+    }
+    await expect(menu).toHaveCount(0, { timeout: 5000 });
+  }
+
+  /**
+   * Set a ButtonsWidget field (size/align/layout, …) by CLICK, matching the
+   * hidden radio's `value`. Paced for demos.
+   */
+  async setButtonsField(
+    field: string,
+    value: string,
+    options: { container?: string } = {}
+  ): Promise<void> {
+    const base = options.container ?? '#sidebar-properties';
+    const btn = this.page
+      .locator(
+        `${base} .field-wrapper-${field} .buttons-widget-option:has(input[value="${value}"])`
+      )
+      .first();
+    await btn.scrollIntoViewIfNeeded();
+    await this.demoStep(btn);
+    await btn.click();
+  }
+
+  /**
+   * Type into an inline-editable canvas field (a [data-edit-text] element or a
+   * contenteditable). Click to place the caret; when `replace`, triple-click to
+   * select the existing text VISIBLY (not Ctrl-A) so the overwrite reads on
+   * video. Typing is slowed in demo mode.
+   */
+  async typeInlineText(
+    target: Locator,
+    text: string,
+    options: { replace?: boolean } = {}
+  ): Promise<void> {
+    await target.scrollIntoViewIfNeeded();
+    await this.demoStep(target);
+    await target.click();
+    if (options.replace) {
+      await target.click({ clickCount: 3 });
+      await this.page.waitForTimeout(this.demoPacingMs ? 200 : 30);
+    }
+    await this.page.keyboard.type(text, { delay: this.demoPacingMs ? 55 : 20 });
   }
 
   /**
@@ -553,6 +704,7 @@ export class AdminUIHelper {
     // Wait for click target to be visible
     await clickTarget.waitFor({ state: 'visible', timeout: 5000 });
 
+    await this.demoStep(clickTarget);
     await clickTarget.click();
 
     if (waitForToolbar) {
@@ -3473,6 +3625,7 @@ export class AdminUIHelper {
 
     // Scroll add button into view - it may be outside viewport if block is at edge
     await addButton.scrollIntoViewIfNeeded();
+    await this.demoStep(addButton);
     await addButton.click({ timeout: 10000 });
   }
 
@@ -3596,6 +3749,7 @@ export class AdminUIHelper {
       await chooser.locator('.accordion > .title').nth(sectionIndex).click();
     }
     await expect(button).toBeVisible({ timeout: 5000 });
+    await this.demoStep(button);
     await button.click();
 
     // After click, wait until no visible chooser remains. Using a fresh
