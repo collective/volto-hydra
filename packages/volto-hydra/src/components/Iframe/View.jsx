@@ -278,6 +278,7 @@ import {
   convertBlockType,
   reshapeContainerBlock,
   validateFieldMappings,
+  reportDisallowedSlateNodes,
 } from '../../utils/blockSync';
 import {
   installCopyFromTargetEnhancers,
@@ -1554,6 +1555,29 @@ const Iframe = (props) => {
   useEffect(() => {
     validateAndLog(properties, 'properties (from Form)', blockFieldTypes);
   }, [properties, blockFieldTypes]);
+
+  // Say what the slate style allow-list would rewrite (#295). The normalization
+  // itself happens in applySchemaDefaultsToFormData; reporting it here means the
+  // migration is visible while editing instead of turning up as a diff on a save
+  // the author didn't think changed anything.
+  useEffect(() => {
+    const disallowed = reportDisallowedSlateNodes(
+      properties,
+      iframeSyncState.blockPathMap,
+      config.blocks.blocksConfig,
+      intl,
+    );
+    if (!disallowed.length) return;
+    console.warn(
+      `[slateStyles] ${disallowed.length} slate node(s) outside this page's allowed styles; they normalize on load:`,
+    );
+    for (const d of disallowed) {
+      console.warn(
+        `  block=${d.blockId} field=${d.field} path=[${d.path.join(',')}] ${d.from} → ${d.to ?? '(unwrapped)'}` +
+          (d.configError ? `  (alias "${d.configError}" is itself disallowed)` : ''),
+      );
+    }
+  }, [properties, iframeSyncState.blockPathMap, intl]);
 
   useEffect(() => {
     // Only update iframeSrc if admin path, mode, or frontend URL differs from iframe's current state
@@ -3607,6 +3631,13 @@ const Iframe = (props) => {
               defaultBlockType: fieldDef.defaultBlockType || null,
               maxLength: fieldDef.maxLength || null,
               title: fieldDef.title || fieldName,
+              // Slate styles this region permits (#295). This rebuild is a
+              // fixed key list, so anything not named here is silently dropped
+              // on the way in — which is why these four are spelled out.
+              allowedStyles: fieldDef.allowedStyles || null,
+              disallowedStyles: fieldDef.disallowedStyles || null,
+              allowedMarks: fieldDef.allowedMarks || null,
+              disallowedMarks: fieldDef.disallowedMarks || null,
             };
           }
 

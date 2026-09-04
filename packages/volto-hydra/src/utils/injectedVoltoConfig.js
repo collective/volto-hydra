@@ -32,6 +32,8 @@ let injected = {};
  * @param {Function} [accessors.applyBlockDefaults] - @plone/volto/helpers applyBlockDefaults
  * @param {Function} [accessors.getDefaultBlockType] - () => config.settings.defaultBlockType
  * @param {Function} [accessors.getBlocksConfig] - () => config.blocks.blocksConfig
+ * @param {Function} [accessors.getSlateStyleAliases] - () => config.settings.slate.styleAliases
+ * @param {Function} [accessors.getSlateDefaultBlockType] - () => config.settings.slate.defaultBlockType
  */
 export function setInjectedVoltoConfig(accessors) {
   injected = { ...injected, ...accessors };
@@ -50,4 +52,18 @@ export function getDefaultBlockType() {
 /** config.blocks.blocksConfig (via the injected getter), or undefined. */
 export function getInjectedBlocksConfig() {
   return injected.getBlocksConfig?.();
+}
+
+/**
+ * The slate-wide settings the style allow-list needs when it downgrades a node
+ * (#295): what a disallowed style is renamed to, and what it falls back to.
+ * Injected like the rest so the pure normalizer stays loadable offline.
+ *
+ * @returns {{ aliases: Object, defaultBlockType: string }}
+ */
+export function getSlateStyleGlobals() {
+  return {
+    aliases: injected.getSlateStyleAliases?.() || {},
+    defaultBlockType: injected.getSlateDefaultBlockType?.() || 'p',
+  };
 }

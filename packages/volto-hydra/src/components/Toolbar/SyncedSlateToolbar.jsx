@@ -11,6 +11,7 @@ import { syncCreateSlateBlock } from '@plone/volto-slate/utils/volto-blocks';
 import { getBlockById, updateBlockById, getResolvedSchema } from '../../utils/blockPath';
 import { calculateDragHandlePosition, PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import { isSlateFieldType, isBlockPositionLocked, isBlockReadonly, getFieldValue, getFieldDef } from '@volto-hydra/helpers';
+import { isStyleAllowed } from '../../../../hydra-js/slateStyles.js';
 import { useDispatch, useSelector } from 'react-redux';
 import FormatDropdown from './FormatDropdown';
 import DropdownMenu from './DropdownMenu';
@@ -116,6 +117,68 @@ function isBlockButton(Btn, BlockButtonRef) {
 }
 
 /**
+ * The element type a toolbar button applies, or undefined when it doesn't name
+ * one (the link editor, the style menu). Both button kinds carry it as
+ * `format`: BlockButton for block-level types, MarkElementButton for the inline
+ * ones — volto-slate models bold/italic as inline ELEMENTS, so one prop covers
+ * both. A button with no `format` is left alone rather than guessed at.
+ */
+function buttonFormat(Btn) {
+  try {
+    return Btn({})?.props?.format;
+  } catch (e) {
+    return undefined;
+  }
+}
+
+/**
+ * Bring the editor's content inside the region's slate style allow-list (#295).
+ *
+ * Used after a PASTE, which is the one surface that can introduce a disallowed
+ * node without a keystroke to intercept. Mirrors the `unwrapBlock` transform
+ * below: an aliased type is renamed, an inline node unwraps (retyping it would
+ * nest a paragraph inside a paragraph), and a top-level node becomes the
+ * default block type. Innermost-first (`mode: 'lowest'`) so unwrapping never
+ * invalidates a path we still hold.
+ */
+function enforceSlateStyles(editor, rules, aliases, defaultType) {
+  if (!rules) return;
+  // Every pass either retypes a node to something allowed or removes it, so
+  // this terminates; the cap is a backstop against a config that can't settle.
+  for (let guard = 0; guard < 500; guard++) {
+    const [entry] = Editor.nodes(editor, {
+      at: [],
+      match: (n) =>
+        Element.isElement(n) && !Editor.isEditor(n) && !isStyleAllowed(n.type, rules),
+      mode: 'lowest',
+    });
+    if (!entry) return;
+    const [node, path] = entry;
+    const alias = aliases[node.type];
+    const target = alias && isStyleAllowed(alias, rules)
+      ? alias
+      : (isStyleAllowed(defaultType, rules) ? defaultType : null);
+    const isBlockWrapper =
+      node.children?.length > 0 && node.children.every((c) => Element.isElement(c));
+    if (alias && target === alias) {
+      Transforms.setNodes(editor, { type: target }, { at: path });
+    } else if (path.length > 1 || isBlockWrapper) {
+      Transforms.unwrapNodes(editor, { at: path });
+    } else if (target) {
+      Transforms.setNodes(editor, { type: target }, { at: path });
+    } else {
+      // The fallback type is itself disallowed — a config error, and unwrapping
+      // a top-level node would lift bare text to the editor root. Leave the
+      // node and say so rather than corrupting the value.
+      console.error(
+        `[slateStyles] defaultBlockType "${defaultType}" is disallowed here, so "${node.type}" cannot be downgraded. Fix the region's allowedStyles.`,
+      );
+      return;
+    }
+  }
+}
+
+/**
  * Synced Slate Toolbar - Renders real Slate buttons with synchronized editor
  *
  * This component creates a real Slate editor that stays synchronized with:
@@ -201,6 +264,12 @@ const SyncedSlateToolbar = ({
   const updateBlockInForm = useCallback((blockId, newBlockData) => {
     return updateBlockById(form, blockPathMap, blockId, newBlockData);
   }, [form, blockPathMap]);
+
+  // Slate styles this block's REGION permits (#295), resolved by
+  // buildBlockPathMap and carried on the pathmap entry. null → unrestricted.
+  const slateRules = blockPathMap?.[selectedBlock]?.slateRules || null;
+  const slateStyleAliases = config.settings.slate?.styleAliases || {};
+  const slateDefaultType = config.settings.slate?.defaultBlockType || 'p';
 
 
   // The move target is computed by hydra.js from RENDER geometry (reusing the
@@ -660,7 +729,12 @@ const SyncedSlateToolbar = ({
       try {
       switch (type) {
         case 'format':
-          applyInlineFormat(transformAction.format, requestId);
+          // Backstop: every entry point is gated at its own surface, but this is
+          // where a format actually gets written, so a surface added later
+          // without an allow-list check still can't slip one through.
+          if (isStyleAllowed(transformAction.format, slateRules)) {
+            applyInlineFormat(transformAction.format, requestId);
+          }
           break;
         case 'paste': {
           // Use volto-slate's full insertData pipeline (handles text/plain with
@@ -673,6 +747,12 @@ const SyncedSlateToolbar = ({
             dt.setData('text/plain', pasteContent);
           }
           editor.insertData(dt);
+
+          // Paste is the one surface with no keystroke to intercept — the HTML
+          // is deserialized by volto-slate before we see it — so the allow-list
+          // is applied to the result instead. Before the split below, so the
+          // blocks that split out are already normalized.
+          enforceSlateStyles(editor, slateRules, slateStyleAliases, slateDefaultType);
 
           // Run voltoBlockEmiters (extractImages, extractTables) on the editor
           // to extract inline images/tables into separate block tuples.
@@ -998,7 +1078,7 @@ const SyncedSlateToolbar = ({
         }
       }
     }
-  }, [selectedBlock, form, currentSelection, editor, blockUI?.focusedFieldName, dispatch, completedFlushRequestId, blockFieldTypes, getBlock, applyInlineFormat, replaceEditorContent, transformAction, onTransformApplied]);
+  }, [selectedBlock, form, currentSelection, editor, blockUI?.focusedFieldName, dispatch, completedFlushRequestId, blockFieldTypes, getBlock, applyInlineFormat, replaceEditorContent, transformAction, onTransformApplied, slateRules, slateStyleAliases, slateDefaultType]);
 
   // NOTE: editor.hydra is set later (after toolbar position is calculated)
   // to include toolbarTop/toolbarLeft for LinkEditor positioning
@@ -1130,6 +1210,12 @@ const SyncedSlateToolbar = ({
     if (name === 'separator') return;
     const Btn = buttons[name];
     if (!Btn) return;
+
+    // A button whose format this region disallows isn't offered. Cosmetic on
+    // its own — paste, hotkeys and markdown are gated at their own surfaces —
+    // but this is the one the author sees.
+    const format = buttonFormat(Btn);
+    if (format && !isStyleAllowed(format, slateRules)) return;
 
     // Create element for later rendering
     const element = <Btn />;

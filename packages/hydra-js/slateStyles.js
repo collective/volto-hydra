@@ -1,0 +1,318 @@
+/**
+ * Declarative allow-list of slate styles, resolved per REGION (#295).
+ *
+ * A design system can say which slate formats exist for it. Hiding a toolbar
+ * button doesn't do that: `blockquote` also arrives by paste, by hotkey and by
+ * the `>`-space markdown shortcut, so an allow-list only means something if one
+ * vocabulary drives every surface AND normalizes what is already stored.
+ *
+ * DECLARATION — four optional keys on any `widget: 'blocks_layout'` property,
+ * beside the `allowedBlocks` that governs block types:
+ *
+ *   items: {
+ *     widget: 'blocks_layout',
+ *     allowedStyles:    ['p', 'h2', 'h3', 'ul', 'ol', 'li', 'strong', 'em'],
+ *     disallowedStyles: ['blockquote'],
+ *     allowedMarks:     null,
+ *     disallowedMarks:  ['highlight'],
+ *   }
+ *
+ * There is no separate global level: the `_page` schema's blocks fields ARE the
+ * outermost regions, so declaring there is site-wide. There is no per-field
+ * level either — every slate value belongs to a block, and every block to a
+ * region, so the region chain already reaches all of them.
+ *
+ * `allowedStyles` names element `type` values. That covers block-level formats
+ * (`p`, `h2`, `ul`, `li`) AND the inline ones, because volto-slate models bold
+ * and italic as inline ELEMENTS (`MarkElementButton` → `toggleInlineFormat`,
+ * `editor/config.jsx`), not as leaf marks — one vocabulary, matching what the
+ * toolbar actually toggles. `allowedMarks` covers true leaf marks
+ * (`Editor.addMark`), which only plugins use.
+ *
+ * INHERITANCE — rules fold root → leaf: a deny ACCUMULATES (a ban at the page
+ * level is final for the whole subtree), an allow REPLACES (a nested region
+ * restates its own list, and may widen). Intersecting instead would make an
+ * inner region unable to widen, which reads as a bug when you list `h2` and it
+ * never appears.
+ *
+ * Declaring nothing anywhere yields `null` — unrestricted, today's behaviour.
+ * This file is Volto-free on purpose: the bridge, the addon and bare-node tests
+ * all import it (same reason `buildBlockPathMap.js` lives here).
+ */
+
+/**
+ * Types that carry data, not styling. Retyping a `link` to `p` would drop its
+ * href — normalization must never lose content, so these are exempt from the
+ * allow-list rather than trusted to appear in every frontend's list.
+ */
+const STRUCTURAL_TYPES = new Set(['link']);
+
+/** Union two string lists into a new deduped array, or null when both are empty. */
+function unionLists(a, b) {
+  if (!a?.length && !b?.length) return null;
+  const out = [...(a || [])];
+  for (const v of b || []) if (!out.includes(v)) out.push(v);
+  return out;
+}
+
+const DECLARED_KEYS = [
+  'allowedStyles',
+  'disallowedStyles',
+  'allowedMarks',
+  'disallowedMarks',
+];
+
+/**
+ * Fold one region's declaration onto the rules inherited from its ancestors.
+ *
+ * Returns `inherited` BY REFERENCE when the field declares nothing, so an
+ * unchanged subtree allocates nothing and every block in it shares one object
+ * (the pathmap entries are serialized to the bridge, so this matters).
+ *
+ * @param {Object|null} inherited - rules from the containing region, or null
+ * @param {Object} fieldDef - a `widget: 'blocks_layout'` / 'object_list' field def
+ * @returns {Object|null} resolved rules, or null when nothing is declared anywhere
+ */
+export function foldSlateStyleRules(inherited, fieldDef) {
+  const declares = DECLARED_KEYS.some((k) => fieldDef?.[k]?.length);
+  if (!declares) return inherited || null;
+  return {
+    // allow REPLACES
+    allowedStyles: fieldDef.allowedStyles?.length
+      ? [...fieldDef.allowedStyles]
+      : inherited?.allowedStyles || null,
+    allowedMarks: fieldDef.allowedMarks?.length
+      ? [...fieldDef.allowedMarks]
+      : inherited?.allowedMarks || null,
+    // deny ACCUMULATES
+    disallowedStyles: unionLists(
+      inherited?.disallowedStyles,
+      fieldDef.disallowedStyles,
+    ),
+    disallowedMarks: unionLists(
+      inherited?.disallowedMarks,
+      fieldDef.disallowedMarks,
+    ),
+  };
+}
+
+function permits(name, allowed, denied) {
+  if (denied?.includes(name)) return false;
+  if (!allowed) return true;
+  return allowed.includes(name);
+}
+
+/**
+ * May a slate element carry this `type` here?
+ * No rules (or a structural type) → yes.
+ */
+export function isStyleAllowed(type, rules) {
+  if (!rules) return true;
+  if (STRUCTURAL_TYPES.has(type)) return true;
+  return permits(type, rules.allowedStyles, rules.disallowedStyles);
+}
+
+/** May a slate leaf carry this mark key here? */
+export function isMarkAllowed(mark, rules) {
+  if (!rules) return true;
+  return permits(mark, rules.allowedMarks, rules.disallowedMarks);
+}
+
+/** A slate text leaf: `text` and no `children`. */
+function isTextNode(node) {
+  return (
+    node &&
+    typeof node === 'object' &&
+    typeof node.text === 'string' &&
+    !node.children
+  );
+}
+
+function normalizeLeaf(node, rules, aliases, path, changes) {
+  let out = null;
+  for (const key of Object.keys(node)) {
+    if (key === 'text' || isMarkAllowed(key, rules)) continue;
+    out = out || { ...node };
+    delete out[key];
+    const alias = aliases[key];
+    if (alias && isMarkAllowed(alias, rules)) {
+      out[alias] = node[key];
+      changes.push({ path, from: key, to: alias, kind: 'mark' });
+    } else {
+      changes.push({ path, from: key, to: null, kind: 'mark' });
+    }
+  }
+  return out || node;
+}
+
+/**
+ * What a disallowed element becomes.
+ *
+ * An alias target that is ITSELF denied is a config error, not a reason to lose
+ * content: fall back to the default block type and say so in `configError`, so
+ * the report and the console surface it instead of it sitting there silently.
+ */
+function retypeTarget(type, rules, aliases, defaultBlockType) {
+  const alias = aliases[type];
+  if (alias) {
+    if (isStyleAllowed(alias, rules)) return { to: alias };
+    return { to: defaultBlockType, configError: alias };
+  }
+  return { to: defaultBlockType };
+}
+
+function normalizeNodes(nodes, rules, opts, parentPath, changes) {
+  const { aliases, defaultBlockType } = opts;
+  let out = null; // stays null while nothing has changed
+  const write = (i, replacement) => {
+    out = out || [...nodes];
+    out[i] = replacement;
+  };
+
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
+    const path = [...parentPath, i];
+
+    if (isTextNode(node)) {
+      const leaf = normalizeLeaf(node, rules, aliases, path, changes);
+      if (leaf !== node) write(i, leaf);
+      continue;
+    }
+    if (!node || typeof node !== 'object') continue;
+
+    const kids = Array.isArray(node.children) ? node.children : null;
+
+    if (isStyleAllowed(node.type, rules)) {
+      if (!kids) continue;
+      const nextKids = normalizeNodes(kids, rules, opts, path, changes);
+      if (nextKids !== kids) write(i, { ...node, children: nextKids });
+      continue;
+    }
+
+    // Disallowed, and no alias to rename it to. DEPTH decides what happens:
+    //
+    //   top level — must stay a block element, so retype to the default UNLESS
+    //     it only wraps other elements (a `ul` around `li`s), where retyping
+    //     would leave `p > li`; that unwraps and the lifted children retype.
+    //   deeper    — it is inline (`b` inside a `p`), and retyping it to `p`
+    //     would nest a paragraph inside a paragraph. Unwrap: the children
+    //     splice up and the text survives without the formatting.
+    //
+    // Either way nothing is deleted.
+    const isBlockWrapper = kids?.length > 0 && kids.every((k) => !isTextNode(k));
+    const unwrap = kids && !aliases[node.type] && (parentPath.length > 0 || isBlockWrapper);
+    if (unwrap) {
+      changes.push({ path, from: node.type, to: null, kind: 'style-unwrap' });
+      out = out || [...nodes];
+      // Re-normalize the lifted children AT THE PARENT'S DEPTH — that is where
+      // they now sit, and depth is what decides retype-vs-unwrap. Passing the
+      // unwrapped node's own path instead made every lifted `li` look inline
+      // and dissolve into bare text.
+      const lifted = normalizeNodes(kids, rules, opts, parentPath, changes);
+      out.splice(out.indexOf(node), 1, ...lifted);
+      continue;
+    }
+
+    const { to, configError } = retypeTarget(
+      node.type,
+      rules,
+      aliases,
+      defaultBlockType,
+    );
+    changes.push({
+      path,
+      from: node.type,
+      to,
+      kind: 'style',
+      ...(configError && { configError }),
+    });
+    const nextKids = kids
+      ? normalizeNodes(kids, rules, opts, path, changes)
+      : kids;
+    write(i, { ...node, type: to, ...(kids && { children: nextKids }) });
+  }
+
+  return out || nodes;
+}
+
+/**
+ * Downgrade every disallowed node in a slate value.
+ *
+ * Pure. Returns the SAME array reference when nothing changed, so callers can
+ * skip the write — the convention `applySchemaDefaultsToBlock` already uses.
+ * Text is never dropped: a node is retyped, aliased, or unwrapped, never
+ * deleted.
+ *
+ * @param {Array} value - a slate value (array of nodes)
+ * @param {Object|null} rules - resolved rules from `foldSlateStyleRules`
+ * @param {Object} [opts]
+ * @param {Object} [opts.aliases] - `config.settings.slate.styleAliases`, e.g. { b: 'strong' }
+ * @param {string} [opts.defaultBlockType] - `config.settings.slate.defaultBlockType`
+ * @returns {{ value: Array, changes: Array<{path, from, to, kind, configError?}> }}
+ */
+export function normalizeSlateValue(value, rules, opts = {}) {
+  if (!rules || !Array.isArray(value)) return { value, changes: [] };
+  const changes = [];
+  const normalized = normalizeNodes(
+    value,
+    rules,
+    {
+      aliases: opts.aliases || {},
+      defaultBlockType: opts.defaultBlockType || 'p',
+    },
+    [],
+    changes,
+  );
+  return { value: normalized, changes };
+}
+
+/**
+ * Widgets whose value is a slate value (an array of nodes). `richtext` /
+ * `slate_html` store an HTML STRING, so they are not listed — and
+ * `normalizeSlateValue` bails on a non-array anyway, so a frontend that uses a
+ * widget name we don't know about is left alone rather than mangled.
+ */
+const SLATE_WIDGETS = new Set(['slate', 'slate_richtext']);
+
+/**
+ * Normalize every slate field of one block against its region's rules.
+ *
+ * Descends `widget: 'object'` sub-schemas so a slate field nested in an object
+ * wrapper is reached; object_list items are NOT descended here because each one
+ * is its own pathmap entry and the caller's loop already visits it.
+ *
+ * @param {Object} blockData
+ * @param {Object} schema - the block's resolved schema
+ * @param {Object|null} rules - resolved rules from `foldSlateStyleRules`
+ * @param {Object} [opts] - { aliases, defaultBlockType }
+ * @returns {{ block: Object, changes: Array }} `block` is the SAME reference when nothing changed
+ */
+export function normalizeSlateFields(blockData, schema, rules, opts = {}) {
+  const changes = [];
+  if (!rules || !blockData || !schema?.properties) {
+    return { block: blockData, changes };
+  }
+  let block = blockData;
+  for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
+    if (fieldDef?.widget === 'object' && fieldDef.schema?.properties) {
+      const nested = normalizeSlateFields(
+        block[fieldName],
+        fieldDef.schema,
+        rules,
+        opts,
+      );
+      if (nested.block !== block[fieldName]) {
+        block = { ...block, [fieldName]: nested.block };
+      }
+      changes.push(...nested.changes.map((c) => ({ ...c, field: `${fieldName}.${c.field}` })));
+      continue;
+    }
+    if (!SLATE_WIDGETS.has(fieldDef?.widget)) continue;
+    const result = normalizeSlateValue(block[fieldName], rules, opts);
+    if (result.value !== block[fieldName]) {
+      block = { ...block, [fieldName]: result.value };
+    }
+    changes.push(...result.changes.map((c) => ({ ...c, field: fieldName })));
+  }
+  return { block, changes };
+}

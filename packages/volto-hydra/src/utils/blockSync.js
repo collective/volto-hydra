@@ -37,7 +37,8 @@
  * inject `blockId` into the args at every Volto call site, the `hydraContext`
  * branch can be removed — until then, both branches are load-bearing.
  */
-import { getInjectedBlocksConfig } from './injectedVoltoConfig.js';
+import { getInjectedBlocksConfig, getSlateStyleGlobals } from './injectedVoltoConfig.js';
+import { normalizeSlateFields } from '../../../hydra-js/slateStyles.js';
 import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField, convertValueContainer, convertContainerBlock, getContainerRegionDescriptors, insertBlockInContainer, parseRegionPath, expandValueIntoRegion, collapseRegionToValue } from './blockPath.js';
 import { addableSiblingTypes, buildBlockPathMap } from '../../../hydra-js/buildBlockPathMap.js';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
@@ -1436,6 +1437,44 @@ export function resolveEffectiveBlockSchema(blockId, formData, blockPathMap, blo
   return schema;
 }
 
+/**
+ * Every slate node the page's regions disallow, and what it would become (#295).
+ *
+ * The same walk `applySchemaDefaultsToFormData` does, but reporting instead of
+ * writing — so the migration normalize-on-load performs is visible rather than
+ * arriving as a surprise diff on someone's next save. Called from the editor to
+ * warn, and available to an offline gate (this module loads in bare Node via
+ * the injected config accessors).
+ *
+ * @param {Object} formData
+ * @param {Object} blockPathMap
+ * @param {Object} blocksConfig
+ * @param {Object} intl
+ * @returns {Array<{blockId, field, path, from, to, kind, configError?}>} empty when clean
+ */
+export function reportDisallowedSlateNodes(formData, blockPathMap, blocksConfig, intl) {
+  const report = [];
+  if (!blockPathMap) return report;
+  const globals = getSlateStyleGlobals();
+  for (const blockId of Object.keys(blockPathMap)) {
+    const rules = blockPathMap[blockId]?.slateRules;
+    if (!rules) continue;
+    const blockData = getBlockById(formData, blockPathMap, blockId);
+    if (!blockData) continue;
+    const schema = resolveEffectiveBlockSchema(
+      blockId,
+      formData,
+      blockPathMap,
+      blocksConfig,
+      intl,
+    );
+    if (!schema) continue;
+    const { changes } = normalizeSlateFields(blockData, schema, rules, globals);
+    for (const change of changes) report.push({ blockId, ...change });
+  }
+  return report;
+}
+
 export function applySchemaDefaultsToFormData(formData, blockPathMap, blocksConfig, intl) {
   if (!blockPathMap) return formData;
 
@@ -1459,6 +1498,24 @@ export function applySchemaDefaultsToFormData(formData, blockPathMap, blocksConf
     const updatedBlock = applySchemaDefaultsToBlock(blockData, schema);
     if (updatedBlock !== blockData) {
       result = updateBlockById(result, blockPathMap, blockId, updatedBlock);
+    }
+
+    // Downgrade slate nodes the block's REGION disallows (#295). Done here, in
+    // the pass every mutation already runs, so each INITIAL_DATA / FORM_DATA
+    // path gets it without its own call — and existing content migrates by
+    // being opened rather than by a separate script.
+    const slateRules = blockPathMap[blockId]?.slateRules;
+    if (slateRules) {
+      const current = getBlockById(result, blockPathMap, blockId);
+      const { block: normalized } = normalizeSlateFields(
+        current,
+        schema,
+        slateRules,
+        getSlateStyleGlobals(),
+      );
+      if (normalized !== current) {
+        result = updateBlockById(result, blockPathMap, blockId, normalized);
+      }
     }
 
     // `@type` RULE — a position-driven type. When a typed object_list item carries

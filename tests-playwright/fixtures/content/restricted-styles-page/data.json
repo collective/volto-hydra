@@ -1,0 +1,30 @@
+{
+  "@id": "http://localhost:8888/restricted-styles-page",
+  "@type": "Document",
+  "UID": "restricted-styles-page-uid",
+  "id": "restricted-styles-page",
+  "title": "Restricted Styles Page",
+  "description": "Exercises the per-region slate style allow-list (#295): the page's items region disallows blockquote and spells bold `strong`, so the toolbar hides Blockquote, a pasted <blockquote> lands as a paragraph, and the stored `b` normalizes on load.",
+  "review_state": "published",
+  "parent": {
+    "@id": "http://localhost:8888",
+    "@type": "Plone Site",
+    "title": "Site"
+  },
+  "blocks": {
+    "title-block": { "@type": "title" },
+    "legacy": {
+      "@type": "slate",
+      "value": [{ "type": "p", "children": [{ "text": "was " }, { "type": "b", "children": [{ "text": "bold" }] }] }],
+      "plaintext": "was bold"
+    },
+    "target": {
+      "@type": "slate",
+      "value": [{ "type": "p", "children": [{ "text": "paste here" }] }],
+      "plaintext": "paste here"
+    }
+  },
+  "blocks_layout": {
+    "items": ["title-block", "legacy", "target"]
+  }
+}

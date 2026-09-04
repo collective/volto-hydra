@@ -87,6 +87,11 @@ const applyConfig = (config) => {
     applyBlockDefaults,
     getDefaultBlockType: () => config.settings.defaultBlockType,
     getBlocksConfig: () => config.blocks.blocksConfig,
+    // #295: what a disallowed slate style is renamed to, and what it falls back
+    // to. `settings.slate.defaultBlockType` is the slate ELEMENT default ('p'),
+    // not `settings.defaultBlockType` (the BLOCK default, 'slate').
+    getSlateStyleAliases: () => config.settings.slate?.styleAliases,
+    getSlateDefaultBlockType: () => config.settings.slate?.defaultBlockType,
   });
 
   // Patch setTimeout to catch focus errors from AddLinkForm

@@ -459,6 +459,14 @@
                     const pagePath = window.location.pathname.replace(/\/edit$/, '');
                     const forceFooterLayout = pagePath.startsWith('/_test_data/another-page');
 
+                    // #295: one fixture page declares a slate style allow-list on
+                    // its items region, so the restriction tests have somewhere to
+                    // run without changing what every other admin-mock test sees.
+                    // The fixture tree is reachable at the root AND under
+                    // /_test_data depending on how the mock API is mounted, so
+                    // match on the page id rather than one of the two prefixes.
+                    const restrictStyles = /\/restricted-styles-page(\/|$)/.test(pagePath);
+
                     // Listen for changes from the admin UI and update blocks
                     // Return promise from async render so hydra.js can wait for DOM updates
                     window._formDataCount = 0;
@@ -483,6 +491,7 @@
                                         allowedTemplates: ['/_test_data/templates/test-layout'],
                                         allowedLayouts: contextNavLayoutForced
                                             || [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
+                                        ...(restrictStyles ? { disallowedStyles: ['blockquote', 'b'] } : {}),
                                     },
                                     footer: {
                                         title: 'Footer',
@@ -494,6 +503,9 @@
                             },
                         },
                         blocks: { ...sharedBlocksConfig },
+                        ...(restrictStyles
+                            ? { voltoConfig: { settings: { slate: { styleAliases: { b: 'strong' } } } } }
+                            : {}),
                         debug: true,
                         // Pass onEditChange before init() sends INIT to avoid race condition
                         onEditChange: (formData) => {
