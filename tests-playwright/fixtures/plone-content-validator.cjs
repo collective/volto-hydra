@@ -563,6 +563,45 @@ function imageDimensions(file) {
     }
   }
 
+  // Pass 2c-bis: a TEMPLATE's top-level blocks must carry templateId AND slotId.
+  //
+  // Forced-layout expansion matches a template's blocks onto a page's region by
+  // those two fields. A block missing either is silently skipped — no error is
+  // raised anywhere, the block just never renders. Nothing else catches it: the
+  // schema gate only checks declared fields (neither is one), and block-sanity
+  // only sees blocks that DID render.
+  //
+  // "Is a template" means a page whose own blocks point at ITSELF — that is what
+  // distinguishes a template from a page that merely EMBEDS one. An ordinary
+  // page (e.g. /services/onyx) carries a block with a templateId referencing the
+  // shared contact-CTA template; treating that as "this is a template" flagged
+  // every other block on the page. Inferred from content, not from the path, so
+  // a template stored outside /templates is still checked.
+  for (const { rel, data } of items) {
+    const blocks = data.blocks || {};
+    const top = (data.blocks_layout || {}).items || [];
+    const own = new Set([data.UID && `resolveuid/${data.UID}`, data['@id']].filter(Boolean));
+    const isTemplate = top.some((bid) => blocks[bid] && own.has(blocks[bid].templateId));
+    if (!isTemplate) continue;
+    for (const bid of top) {
+      const block = blocks[bid];
+      if (!block || typeof block !== 'object') continue;
+      const missing = [];
+      if (!block.templateId) missing.push('templateId');
+      if (!block.slotId) missing.push('slotId');
+      if (missing.length) {
+        stats.templateBlocksBroken = (stats.templateBlocksBroken || 0) + 1;
+        errors.push(
+          `  ${rel}: template block ${bid} (${block['@type']}) is missing ` +
+          `${missing.join(' and ')} — forced-layout expansion skips it silently, ` +
+          `so it will never render`,
+        );
+      } else {
+        stats.templateBlocksOk = (stats.templateBlocksOk || 0) + 1;
+      }
+    }
+  }
+
   // Pass 2d: blocks_layout references must resolve to a block in the SAME
   // container. A uid listed in a container's blocks_layout but absent from its
   // `blocks` dict is a dangling reference — exactly what a partial block deletion
