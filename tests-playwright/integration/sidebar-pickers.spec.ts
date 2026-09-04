@@ -49,8 +49,11 @@ async function readBlock(page, path: string, blockUid: string) {
  * field lookup fails as "not found" rather than as "not selected".
  */
 async function selectFormBlock(helper: AdminUIHelper, page) {
+  // The form TITLE annotation, not a heading tag: the heading level is each
+  // frontend's own choice (nextjs renders h2, nuxt h3) — the contract is
+  // data-edit-text="title" on the block's title element.
   await helper.clickBlockInIframe('form-block-1', {
-    selector: 'h2[data-edit-text="title"]',
+    selector: '[data-edit-text="title"]',
   });
   await expect(page.locator('.quanta-toolbar')).toBeVisible({ timeout: 10000 });
   await expect(page.locator('#sidebar-properties')).toBeVisible({
