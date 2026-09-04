@@ -161,6 +161,12 @@ async function globalSetup() {
   // it; a consuming repo can still override before setup runs.
   process.env.INTEGRITY_EXEMPT_PREFIXES ??= '/_test_data';
   const discoverApi = process.env.DISCOVER_BLOCKS_API;
+  // The schema fetch loads the FRONTEND in a browser with `api_path` so its
+  // INIT carries blocksConfig — any page does; schemas don't depend on which
+  // content. When discovery reads a REMOTE api (a live converted site), the
+  // browser often can't complete that load (CORS, latency), so the schema
+  // fetch stays on a local api unless the harness says otherwise.
+  const schemaApi = process.env.SCHEMA_FETCH_API || discoverApi;
   if (discoverApi) {
     const maxPages = process.env.DISCOVER_MAX_PAGES
       ? parseInt(process.env.DISCOVER_MAX_PAGES, 10)
@@ -179,7 +185,7 @@ async function globalSetup() {
       ({ blocksConfig, frontendKeys } = await fetchBlocksConfig(
         process.env.MOCK_PARENT_URL,
         process.env.FRONTEND_URL,
-        discoverApi,
+        schemaApi,
       ));
       console.log(
         `[SETUP] Got ${Object.keys(blocksConfig).length} block schemas from frontend ` +
@@ -235,7 +241,7 @@ async function globalSetup() {
     for (const [project, url] of targets) {
       if (!(await reachable(url))) continue;
       const { blocksConfig: cfg, frontendKeys: keys } = await fetchBlocksConfig(
-        mockParent, url, discoverApi);
+        mockParent, url, schemaApi);
       if (Object.keys(cfg).length === 0) {
         console.warn(`[SETUP] ${project} (${url}) returned no schemas — skipped`);
         continue;
