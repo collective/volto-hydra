@@ -40,6 +40,70 @@ test.describe('slate style allow-list', () => {
     expect(titles).toContain('Title');
   });
 
+  test('an inline style is filtered out of the toolbar too', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/restricted-styles-page');
+    await helper.waitForIframeReady();
+
+    await helper.clickBlockInIframe('target');
+    const toolbar = page.locator('.quanta-toolbar');
+    // Bold survives; strikethrough (`del`) is denied. volto-slate models both as
+    // inline ELEMENTS, so one allow-list covers block and inline formats alike.
+    await expect(toolbar.locator('[data-toolbar-button="bold"]')).toHaveCount(1);
+    await expect(toolbar.locator('[data-toolbar-button="strikethrough"]')).toHaveCount(0);
+  });
+
+  test('an ALLOWED format still applies on a restricted page', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/restricted-styles-page');
+    await helper.waitForIframeReady();
+
+    const iframe = helper.getIframe();
+    const block = iframe.locator('[data-block-uid="target"]');
+    await expect(block.locator('h2')).toHaveCount(0);
+
+    await helper.clickBlockInIframe('target');
+    const editableField = await helper.getEditorLocator('target');
+    await editableField.click();
+
+    const toolbar = page.locator('.quanta-toolbar');
+    await toolbar.locator('.format-dropdown-trigger').click();
+    const dropdownMenu = page.locator('.format-dropdown-menu');
+    await expect(dropdownMenu).toBeVisible({ timeout: 5000 });
+    await dropdownMenu.getByRole('button', { name: 'Title', exact: true }).click();
+
+    // Filtering the menu must not break applying what's left in it.
+    await expect(block.locator('h2')).toBeVisible({ timeout: 5000 });
+    expect(await block.locator('h2').textContent()).toContain('paste here');
+  });
+
+  test('a format transform driven straight at the admin is refused', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/restricted-styles-page');
+    await helper.waitForIframeReady();
+
+    const iframe = helper.getIframe();
+    await helper.clickBlockInIframe('target');
+    const editableField = await helper.getEditorLocator('target');
+    await editableField.click();
+
+    // The toolbar button is gone and the hotkey is swallowed, so nothing a user
+    // can do reaches this branch — which is the point of a backstop. Drive the
+    // transform the way a NEW surface added later would, and it still has to be
+    // refused at the place the format is actually written.
+    await iframe.locator('body').evaluate((_el, blockId) => {
+      (window as any).bridge.sendTransformRequest(blockId, 'format', { format: 'del' });
+    }, 'target');
+
+    const block = iframe.locator('[data-block-uid="target"]');
+    // This frontend renders `del` as a line-through span.
+    await expect(block.locator('span[style*="line-through"]')).toHaveCount(0);
+    await expect(block).toContainText('paste here');
+  });
+
   test('an unrestricted page still offers everything (the feature is opt-in)', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();

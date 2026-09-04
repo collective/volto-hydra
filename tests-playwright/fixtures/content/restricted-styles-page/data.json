@@ -4,7 +4,7 @@
   "UID": "restricted-styles-page-uid",
   "id": "restricted-styles-page",
   "title": "Restricted Styles Page",
-  "description": "Exercises the per-region slate style allow-list (#295): the page's items region disallows blockquote and spells bold `strong`, so the toolbar hides Blockquote, a pasted <blockquote> lands as a paragraph, and the stored `b` normalizes on load.",
+  "description": "Exercises the per-region slate style allow-list (#295): the page's items region disallows blockquote, `b` and `del`, and spells bold `strong` — so the toolbar hides Blockquote and Strikethrough, a pasted <blockquote> lands as a paragraph, the stored `b` normalizes on load, and a `del` transform driven straight at the admin is refused.",
   "review_state": "published",
   "parent": {
     "@id": "http://localhost:8888",
