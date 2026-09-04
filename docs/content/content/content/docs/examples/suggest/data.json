@@ -100,11 +100,11 @@
     "items": [
       "title-1",
       "ref-suggest-description",
+      "suggest-live-heading",
+      "suggest-live-1",
       "ref-suggest-schema",
       "ref-suggest-json-data",
-      "ref-suggest-rendering",
-      "suggest-live-heading",
-      "suggest-live-1"
+      "ref-suggest-rendering"
     ]
   },
   "contributors": [],
