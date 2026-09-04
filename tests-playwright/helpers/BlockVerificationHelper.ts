@@ -99,6 +99,10 @@ export async function checkDataEditTextClicks(
     (a, b) => String(owners[a] ?? '').localeCompare(String(owners[b] ?? '')) || a - b,
   );
   let revealedOwner: string | null = null;
+  // Whether a click in THIS pass has already selected the block. The first
+  // click is what selects it; every later one lands on a block the admin is
+  // still catching up with — see the wait before the click below.
+  let selected = false;
 
   for (const i of order) {
     const el = editTextEls.nth(i);
@@ -178,8 +182,24 @@ export async function checkDataEditTextClicks(
     // So the actionability veto is bypassed only for that case; everywhere else
     // the ordinary checks — visible, stable, receives the event — keep their
     // value.
+    // The bridge promotes a field to contenteditable ONCE, on the click that
+    // reaches it — there is no retry. A click that lands while the admin is
+    // still settling the previous selection is answered by a re-render
+    // (restoreContentEditableOnFields, whose own comment notes that it "would
+    // change the DOM and shift event.target"), and the promotion is simply
+    // lost: the assertion below then waits out its full timeout for an
+    // attribute that was never coming, and reads as a mystery flake.
+    //
+    // So wait for the admin to agree the block is selected before clicking
+    // again — the same observable state the integration specs wait on (toolbar
+    // visible AND positioned over the block, handles aligned, nothing covering
+    // it). Not on the first click: that click is what selects the block.
+    if (selected) {
+      await new AdminUIHelper(page).waitForBlockSelectedInAdmin(blockUid);
+    }
     const actionable = await el.isEnabled().catch(() => true);
     await el.click(actionable ? {} : { force: true });
+    selected = true;
     // The warning below is asserted ABSENT, so give the bridge its frame to
     // raise one — see nextFrame. (Was a 300ms sleep.)
     await nextFrame(iframe);
