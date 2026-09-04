@@ -81,9 +81,20 @@ const BLOCK_TYPES = new Set([
  */
 export const DEFAULT_SLATE_VOCABULARY = [
   'b', 'blockquote', 'callout', 'code', 'default', 'del', 'div', 'em',
-  'h1', 'h2', 'h3', 'h4', 'i', 'img', 'li', 'link', 'ol', 'p', 's',
-  'strong', 'sub', 'sup', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead',
-  'tr', 'u', 'ul',
+  'h1', 'h2', 'h3', 'h4', 'i', 'li', 'link', 'ol', 'p', 's',
+  'strong', 'sub', 'sup', 'u', 'ul',
+];
+
+/**
+ * Types the editor renders but never STORES: the block emitters
+ * (`extractTables`, `extractImages`) lift them out of the slate value into
+ * blocks of their own — hydra turns a pasted table into a `slateTable` BLOCK,
+ * not slate nodes. They are real mid-paste and absent from saved content, so a
+ * stored one means extraction failed. Excluded from the vocabulary so it is
+ * REPORTED rather than waved through.
+ */
+export const EXTRACTED_SLATE_TYPES = [
+  'table', 'tbody', 'thead', 'tfoot', 'tr', 'td', 'th', 'img',
 ];
 const KNOWN_SLATE_TYPES = new Set(DEFAULT_SLATE_VOCABULARY);
 

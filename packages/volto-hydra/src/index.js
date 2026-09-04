@@ -99,8 +99,17 @@ const applyConfig = (config) => {
     getSlateVocabulary: () => {
       const slate = config.settings.slate || {};
       const menu = slate.styleMenu || {};
+      // `elements` answers "can the editor DRAW this", which is not the same as
+      // "may this be STORED". volto-slate registers renderers for `table`/`td`/…
+      // and `img`, but the block emitters (extractTables, extractImages) lift
+      // those out of the slate value into blocks of their own — hydra turns a
+      // pasted table into a `slateTable` BLOCK. They exist mid-paste and never
+      // in saved content, so a stored one means extraction failed: reportable,
+      // not permitted. Table types come from slate.tableTypes rather than a list
+      // written here.
+      const extracted = new Set([...(slate.tableTypes || []), 'img']);
       return [
-        ...Object.keys(slate.elements || {}),
+        ...Object.keys(slate.elements || {}).filter((t) => !extracted.has(t)),
         ...[...(menu.blockStyles || []), ...(menu.inlineStyles || [])]
           .map((d) => d?.cssClass)
           .filter(Boolean)
