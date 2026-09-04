@@ -92,17 +92,6 @@
       z-index: 999;
     }
     .volto-hydra-add-button {
-      /* Positioned marker only — nothing clicks the MOCK parent's add button
-         (the specs that click .volto-hydra-add-button run on admin-mock,
-         against the real Volto admin). It sits 8px BELOW the selected block,
-         so it lands on top of whatever follows and swallowed clicks meant for
-         page content: Playwright reported
-           <div id="add-button" class="volto-hydra-add-button">+</div>
-           intercepts pointer events
-         and retried 166 times until the test timed out. Hiding it on
-         HIDE_BLOCK_UI was not enough, because a stale button from the PREVIOUS
-         selection is already covering the next element when the click starts. */
-      pointer-events: none;
       position: fixed;
       background: #007eb1;
       color: white;
