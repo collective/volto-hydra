@@ -12,7 +12,8 @@ This is a **built-in** block.
     "blockSchema": {
       "properties": {
         "url": {
-          "title": "Map Embed URL"
+          "title": "Map Embed URL",
+          "widget": "url"
         },
         "title": {
           "title": "Title",

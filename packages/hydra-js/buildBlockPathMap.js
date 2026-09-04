@@ -10,9 +10,16 @@
  * to use it via the same import path as before.
  */
 
-// @volto-hydra/helpers is pure (no @plone/volto), so importing from it keeps this module
-// free of Volto deps — unlike @volto-hydra/hydra-js, which is why PAGE_BLOCK_UID is inlined.
-import { getBlockType } from '@volto-hydra/helpers';
+// The helpers package is pure (no @plone/volto), so importing from it keeps this
+// module free of Volto deps — unlike @volto-hydra/hydra-js, which is why
+// PAGE_BLOCK_UID is inlined below.
+//
+// Imported by RELATIVE path, not as '@volto-hydra/helpers'. Consumers import
+// this file directly out of a checkout — pretagov-site's content gate runs it
+// as plain node, with no install — and a bare specifier needs node_modules to
+// resolve, so it failed there with ERR_MODULE_NOT_FOUND while passing anywhere
+// the workspace happened to be linked. A relative path needs nothing installed.
+import { getBlockType } from '../helpers/index.js';
 
 // Same value as PAGE_BLOCK_UID in hydra.js — defined locally to avoid
 // importing from @volto-hydra/hydra-js (which would pull in Volto deps).

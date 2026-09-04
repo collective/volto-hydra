@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 import SlateBlock, { SlateInline } from "@/components/SlateBlock";
 import CodeExampleBlock from "@/components/CodeExampleBlock/CodeExampleBlock";
+import CookieConsentBlock from "@/components/CookieConsentBlock/CookieConsentBlock";
 import { expandTemplatesSync, expandListingBlocks, ploneFetchItems, staticBlocks, contentPath } from "#utils/helpers";
 import { isEditMode } from "#utils/hydra";
 import SwiperSlider from "@/components/SwiperSlider";
@@ -760,6 +761,26 @@ function SearchBlock({ id, block, data, apiUrl, contextPath }) {
     setSearchText(formData.get("SearchableText") || "");
   };
 
+  // A block that exists ONLY once a question has been asked — the quick-answer
+  // region. The input carries the sample question (data-block-selector-input)
+  // and the submit button the uid, so the editor can reveal it by asking; a
+  // React-controlled input is exactly the case setDeclaredValue's native
+  // setter exists for. In-place here (state), no navigation.
+  const quickAnswerUid = block.blocks_layout?.quickAnswer?.[0] || "";
+  const quickAnswerChild = quickAnswerUid ? block.blocks?.[quickAnswerUid] : null;
+  const revealProps = quickAnswerUid
+    ? { "data-block-selector": quickAnswerUid }
+    : {};
+  const revealInputProps = quickAnswerUid && block.quickAnswerSample
+    ? { ...revealProps, "data-block-selector-input": block.quickAnswerSample }
+    : {};
+  const quickAnswer = quickAnswerUid && quickAnswerChild && searchText ? (
+    <div data-block-uid={quickAnswerUid} className="quick-answer"
+      style={{ margin: "1rem 0", padding: "0.75rem", backgroundColor: "#eef3fb", borderRadius: "0.5rem" }}>
+      <div data-edit-text="answer">{quickAnswerChild.answer || ""}</div>
+    </div>
+  ) : null;
+
   const handleSortChange = (e) => {
     setSortOn(e.target.value);
   };
@@ -883,12 +904,14 @@ function SearchBlock({ id, block, data, apiUrl, contextPath }) {
         {block.showSearchInput && (
           <form onSubmit={handleSearchSubmit} style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
             <input type="text" name="SearchableText" placeholder="Search..." defaultValue={searchText}
+              {...revealInputProps}
               style={{ flex: 1, padding: "0.5rem 1rem", border: "1px solid #d1d5db", borderRadius: "0.5rem" }} />
-            <button type="submit" style={{ padding: "0.5rem 1rem", backgroundColor: "#2563eb", color: "#fff", borderRadius: "0.5rem", border: "none" }}>
+            <button type="submit" {...revealProps} style={{ padding: "0.5rem 1rem", backgroundColor: "#2563eb", color: "#fff", borderRadius: "0.5rem", border: "none" }}>
               Search
             </button>
           </form>
         )}
+        {quickAnswer}
         <div style={{ display: "flex", gap: "1.5rem", flexDirection: block.variation === "facetsRightSide" ? "row-reverse" : "row" }}>
           {facets.length > 0 && (
             <aside className="search-facets" style={{ width: "16rem", flexShrink: 0 }}>
@@ -934,12 +957,14 @@ function SearchBlock({ id, block, data, apiUrl, contextPath }) {
       {block.showSearchInput && (
         <form onSubmit={handleSearchSubmit} style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
           <input type="text" name="SearchableText" placeholder="Search..." defaultValue={searchText}
+            {...revealInputProps}
             style={{ flex: 1, padding: "0.5rem 1rem", border: "1px solid #d1d5db", borderRadius: "0.5rem" }} />
-          <button type="submit" style={{ padding: "0.5rem 1rem", backgroundColor: "#2563eb", color: "#fff", borderRadius: "0.5rem", border: "none" }}>
+          <button type="submit" {...revealProps} style={{ padding: "0.5rem 1rem", backgroundColor: "#2563eb", color: "#fff", borderRadius: "0.5rem", border: "none" }}>
             Search
           </button>
         </form>
       )}
+      {quickAnswer}
       {facets.length > 0 && (
         <>
           {block.facetsTitle && <h3 data-edit-text="facetsTitle" style={{ fontWeight: 600, marginBottom: "0.75rem", color: "#374151" }}>{block.facetsTitle}</h3>}
@@ -1369,6 +1394,28 @@ function Block({ block, id, data, apiUrl, contextPath }) {
       );
     }
 
+    // ── Suggest — the vocabularySelect worked example. The live type-ahead
+    // is the docs' SuggestBlock; here the resting markup renders and stays
+    // editable. ──
+    case "suggest": {
+      return (
+        <div data-block-uid={id} className="suggest">
+          <label htmlFor={`${id}-input`} data-edit-text="label">
+            {block.label || ""}
+          </label>
+          <input
+            id={`${id}-input`}
+            name="answer"
+            type="text"
+            defaultValue={block.value || ""}
+            aria-autocomplete="list"
+            autoComplete="off"
+          />
+          <ul className="suggest__list" hidden></ul>
+        </div>
+      );
+    }
+
     // ── Heading ──
     case "heading": {
       const Tag = block.tag || "h2";
@@ -1526,6 +1573,12 @@ function Block({ block, id, data, apiUrl, contextPath }) {
     // ── Code Example ──
     case "codeExample":
       return <CodeExampleBlock id={id} block={block} />;
+
+    // ── Cookie Consent ──
+    // The two halves it words are rendered outside its element, each opened by
+    // the trigger that names the field it holds.
+    case "cookieConsent":
+      return <CookieConsentBlock id={id} block={block} SlateNodes={SlateNodes} />;
 
     // ── Empty ──
     case "empty":

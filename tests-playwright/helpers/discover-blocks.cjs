@@ -590,6 +590,77 @@ function unauthorableSlateStyles(nodes, seen = new Set()) {
   return seen;
 }
 
+// The conversions expandListingBlocks knows (convertFieldValue). A `type` outside
+// this set is a no-op: the raw catalog value reaches the item untouched, which is
+// how a mapping can look right and render nothing.
+const KNOWN_MAPPING_TYPES = new Set([
+  'string', 'textarea', 'slate', 'link', 'image', 'image_link', 'array',
+]);
+
+// A listing's `fieldMapping` is the only thing that decides what its results
+// carry, and every part of it can be wrong in a way nothing else notices: a
+// source the widget never offers (so no author can create or repair the
+// mapping), a target the item block does not have (so the value is dropped), a
+// conversion that mangles the value on the way (`string` over a keyword list
+// joins it into "a, b", and a renderer drawing one pill per entry draws none),
+// or a type that does not exist (silently no conversion at all).
+//
+// The allowed sources come from the listing's OWN schema — hydra hangs
+// `sourceFields` on the fieldMapping field — so this reads the same list the
+// sidebar offers rather than keeping a copy of it.
+function collectFieldMappingIssues(blockData, blockSchema, blocksConfig, issues) {
+  const mapping = blockData?.fieldMapping;
+  if (!mapping || typeof mapping !== 'object' || Array.isArray(mapping)) return;
+
+  const mappingDef = blockSchema?.properties?.fieldMapping;
+  const sourceFields = mappingDef?.sourceFields;
+  const itemTypeField = blockSchema?.properties
+    ? Object.keys(blockSchema.properties).find(
+        (f) => blockSchema.properties[f]?.filterConvertibleFrom,
+      )
+    : undefined;
+  const itemType = itemTypeField ? blockData[itemTypeField] : blockData.variation;
+  const itemProps = itemType
+    ? blocksConfig?.[itemType]?.blockSchema?.properties
+    : undefined;
+
+  for (const [source, entry] of Object.entries(mapping)) {
+    const target = typeof entry === 'string' ? entry : entry?.field;
+    const type = typeof entry === 'object' ? entry?.type : undefined;
+
+    if (!target) {
+      issues.push(`fieldMapping "${source}": no target field — the value goes nowhere.`);
+      continue;
+    }
+    if (sourceFields && !sourceFields[source]) {
+      issues.push(
+        `fieldMapping "${source}": not a source the sidebar offers (${Object.keys(sourceFields).join(', ')}) — ` +
+          `nobody can create or repair this mapping in the editor.`,
+      );
+    }
+    // `href` is where expandListingBlocks puts a result's own address. It is a
+    // convention of the expansion, not a field an author edits, so no item
+    // schema declares it — and it must not read as a missing target.
+    if (itemProps && target !== 'href' && !itemProps[target]) {
+      issues.push(
+        `fieldMapping "${source}" → "${target}": the ${itemType} block has no such field, so the value is dropped.`,
+      );
+    }
+    if (type && !KNOWN_MAPPING_TYPES.has(type)) {
+      issues.push(
+        `fieldMapping "${source}": unknown conversion "${type}" — the raw value is passed through unconverted.`,
+      );
+    }
+    const targetType = itemProps?.[target]?.type;
+    if (targetType === 'array' && type === 'string') {
+      issues.push(
+        `fieldMapping "${source}" → "${target}": "${target}" is a LIST but the mapping converts to a string, ` +
+          `which joins the values into one — use type "array".`,
+      );
+    }
+  }
+}
+
 function collectWidgetShapeIssues(
   blockData, blockSchema, pagePath, blockId, out, blockType, undeclaredFields, blockConfig, blocksConfig,
   effectiveRequired, pathInfo,
@@ -598,6 +669,7 @@ function collectWidgetShapeIssues(
   if (!props || !blockData || typeof blockData !== 'object') return;
 
   const issues = [];
+  collectFieldMappingIssues(blockData, blockSchema, blocksConfig, issues);
 
   for (const [field, def] of Object.entries(props)) {
     if (!(field in blockData)) continue;
@@ -981,7 +1053,16 @@ async function loadOfflineBlockSyncApi(blocksConfig) {
 }
 
 // Structural types: hydra's own plumbing, never a project's placement choice.
-const CONTAINMENT_EXEMPT_TYPES = new Set(['empty', 'column', 'title', 'description']);
+// contentLayout: a structural page-layout block applied through the layout
+// picker (allowedLayouts) — it IS the content region's root, never a
+// reorderable content block, so containment doesn't apply.
+const CONTAINMENT_EXEMPT_TYPES = new Set([
+  'empty',
+  'column',
+  'title',
+  'description',
+  'contentLayout',
+]);
 
 /**
  * Rules the CONSUMING PROJECT passes in, saying where a block placed outside
@@ -1074,6 +1155,10 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   // chevron / drag walks it OUT to the nearest ancestor that accepts the type,
   // so it "escapes"). Surface each as a failing test, like the issues below.
   const allowedBlocksViolations = []; // {blockType, allowed, parentType, pagePath, blockId}
+  // Every page as fetched, for the graph-integrity pass (the same validator
+  // the mock API runs over content DIRS, fed the API's answers instead —
+  // broken resolveuid/link/layout refs on the LIVE site).
+  const fetchedPages = [];
   const containmentRules = readContainmentRules();
   // Track block @types seen in content that aren't in blocksConfig — the
   // frontend's Block.vue falls through to a "Not implemented" placeholder
@@ -1106,7 +1191,7 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   const subTypeExamples = new Map();
 
   // Step 1: Get all content paths via @search (b_size=9999 to avoid pagination)
-  const searchUrl = `${apiUrl}/@search?b_size=9999`;
+  const searchUrl = `${apiUrl}/@search?b_size=9999&metadata_fields=UID`;
   console.log(`[DISCOVER] Fetching content list from ${searchUrl}`);
   const searchResp = await fetch(searchUrl, {
     headers: { Accept: 'application/json' },
@@ -1144,6 +1229,7 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
 
       const content = await resp.json();
       fetched++;
+      fetchedPages.push({ rel: pagePath.replace(/^\//, '') || '/', data: content });
 
       if (!content.blocks || !content.blocks_layout?.items) continue;
 
@@ -1470,6 +1556,50 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
     result.push({ blockType, blockId, pagePath, field, undeclaredField: true });
   }
 
+  // Graph integrity over what the API actually served: the SAME
+  // checkIntegrity the mock API runs against content dirs, fed the fetched
+  // pages (disk-only passes — blob files, __metadata__ — skip themselves).
+  // One failing test per affected page, so a broken resolveuid or a
+  // blocks_layout entry pointing at a deleted block fails by name.
+  {
+    const { checkIntegrity } = require('../fixtures/plone-content-validator.cjs');
+    // Discovery only FETCHES page-like items, but references point at every
+    // content type (an image block's url names an Image object). Register the
+    // rest of the @search result as stubs — path + UID into the maps, no
+    // blocks to walk — so their references resolve instead of false-flagging.
+    const fetchedPaths = new Set(fetchedPages.map((p) => p.rel));
+    const stubs = items
+      .filter((item) => {
+        const rel = new URL(item['@id']).pathname.replace(/^\//, '') || '/';
+        return !fetchedPaths.has(rel);
+      })
+      .map((item) => ({
+        rel: new URL(item['@id']).pathname.replace(/^\//, '') || '/',
+        data: { '@id': new URL(item['@id']).pathname, '@type': item['@type'], UID: item.UID },
+      }));
+    const { errors } = checkIntegrity([...fetchedPages, ...stubs]);
+    // A harness may mount extra content trees whose pages were authored for a
+    // different root (the parent's /_test_data fixture mount): their internal
+    // refs legitimately miss this merged view. Same idea as
+    // CONTAINMENT_EXEMPT_SLOTS — the harness states the exemption, discovery
+    // doesn't guess. CSV of page-path prefixes.
+    const exemptPrefixes = (process.env.INTEGRITY_EXEMPT_PREFIXES || '')
+      .split(',')
+      .map((prefix) => prefix.trim())
+      .filter(Boolean);
+    const byPage = new Map();
+    for (const message of errors) {
+      const rel = message.trim().split(':')[0];
+      const pagePath = rel.startsWith('/') ? rel : `/${rel}`;
+      if (exemptPrefixes.some((prefix) => pagePath.startsWith(prefix))) continue;
+      if (!byPage.has(pagePath)) byPage.set(pagePath, []);
+      byPage.get(pagePath).push(message.trim());
+    }
+    for (const [pagePath, issues] of byPage) {
+      result.push({ blockType: null, pagePath, integrityIssue: true, issues });
+    }
+  }
+
   // Every block type the FRONTEND registers needs at least one content
   // example so the sanity spec emits a render test for it — INCLUDING
   // `restricted` types. `restricted` only means "not offered in the page block
@@ -1559,6 +1689,7 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
 }
 
 module.exports = {
+  collectFieldMappingIssues,
   discoverBlocks,
   extractBlocks,
   buildObjectListFieldsMap,

@@ -52,6 +52,9 @@ import FieldMappingWidget from './components/Widgets/FieldMappingWidget';
 import BlockTypeSelectWidget from './components/Widgets/BlockTypeSelectWidget';
 import CopyFromTargetField from './components/Widgets/CopyFromTargetField';
 import SchemaFieldSelectWidget from './components/Widgets/SchemaFieldSelectWidget';
+import VocabularySelectWidget from './components/Widgets/VocabularySelectWidget';
+import BlockPickerWidget from './components/Widgets/BlockPickerWidget';
+import QuerystringSelectWidget from './components/Widgets/QuerystringSelectWidget';
 import TableSchema, { TableBlockSchema } from '@plone/volto-slate/blocks/Table/schema';
 // Volto-slate ships TWO schemas for the slate block:
 //   ./schema.js          → "Block tab" form (override_toc / level / entry_text)
@@ -157,7 +160,7 @@ const applyConfig = (config) => {
   );
 
   // Frontend Switcher toolbar menu (viewport + frontend URL switching)
-  config.settings.additionalToolbarComponents = {
+config.settings.additionalToolbarComponents = {
     ...config.settings.additionalToolbarComponents,
     frontendSwitcher: {
       component: FrontendSwitcherPanel,
@@ -192,6 +195,16 @@ const applyConfig = (config) => {
   // See README "Synchronised block types in a container".
   config.widgets.widget.blockTypeSelect = BlockTypeSelectWidget;
   config.widgets.widget.schemaFieldSelect = SchemaFieldSelectWidget;
+  // Pick WHICH vocabulary, not a term from one — see the widget's own note for
+  // why Volto's vocabulary widgets cannot do this.
+  config.widgets.widget.vocabularySelect = VocabularySelectWidget;
+  // Pick another BLOCK and store a field of it — a form's skip logic naming the
+  // question it depends on, by label rather than by uid.
+  config.widgets.widget.blockPicker = BlockPickerWidget;
+  // Pick catalog indexes from what @querystring reports. Volto's search block
+  // fills the same field imperatively from its Edit component, which a
+  // JSON-schema frontend has no way to do.
+  config.widgets.widget.querystringSelect = QuerystringSelectWidget;
 
   // Copy-from-target: mapped fields (via fieldMappings['@target']) are swapped
   // to this wrapper by installCopyFromTargetEnhancers, which renders the field's
@@ -255,13 +268,23 @@ const applyConfig = (config) => {
           {
             id: 'default',
             title: 'Default',
-            fields: ['value', ...blockTabFields],
+            fields: ['value', ...blockTabFields, 'anchor'],
           },
           ...(blockTab?.fieldsets?.slice(1) || []),
         ],
         properties: {
           value: { title: 'Body', widget: 'slate', placeholder },
           ...(blockTab?.properties || {}),
+          // Permanent fragment id for a heading block. Frontends render it as
+          // the heading's id, so links and tables of contents survive the
+          // heading being retitled (text-derived slugs don't). Empty = the
+          // frontend falls back to a stable automatic id (the block uid).
+          anchor: {
+            title: 'Anchor',
+            description:
+              'Permanent link id for this heading. Leave empty for an automatic id.',
+            type: 'string',
+          },
         },
         required: blockTab?.required || [],
       };

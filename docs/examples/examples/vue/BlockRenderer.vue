@@ -25,6 +25,7 @@ import VideoBlock from './VideoBlock.vue';
 import MapsBlock from './MapsBlock.vue';
 import TocBlock from './TocBlock.vue';
 import CodeExampleBlock from './CodeExampleBlock.vue';
+import CookieConsentBlock from './CookieConsentBlock.vue';
 import { h } from 'vue';
 
 defineProps({ block: Object, blockId: String, content: Object });
@@ -65,6 +66,7 @@ const typeMap = {
   maps: MapsBlock,
   toc: TocBlock,
   codeExample: CodeExampleBlock,
+  cookieConsent: CookieConsentBlock,
   summary: ListingItemBlock,
   default: ListingItemBlock,
 };

@@ -72,8 +72,11 @@ if (fs.existsSync(discoveredPath)) {
 // one fetches an external feed that only resolves against the mock. They're
 // covered by their own integration spec (admin-mock), not this render contract.
 const NON_CONTRACT_BLOCKS = new Set(['relatedItemsListing', 'searchShortcuts', 'rssFeed']);
+const seenShapeTitles = new Map();
 discoveredBlocks = discoveredBlocks.filter(
-  (b) => !b.blockType.startsWith('conv') && !NON_CONTRACT_BLOCKS.has(b.blockType),
+  // a shape-issue discovery entry has no blockType — keep it (its test FAILS
+  // with the issue text; dropping it here would hide a real content problem)
+  (b) => !(b.blockType ?? '').startsWith('conv') && !NON_CONTRACT_BLOCKS.has(b.blockType),
 );
 
 // Block sanity is the cross-cutting render contract. We only enforce it on
@@ -175,6 +178,19 @@ test.describe('Block sanity (auto-discovered)', () => {
       });
       continue;
     }
+    // Graph integrity on what the API served (the plone-content-validator run
+    // over fetched pages): broken resolveuid/link refs, blocks_layout entries
+    // pointing at missing blocks, duplicate UIDs. One failing test per page.
+    if (block.integrityIssue) {
+      test(`content integrity on ${block.pagePath}${src}`, ({}, testInfo) => {
+        test.skip(!belongsHere(testInfo.project.name), `discovered via ${block.frontend}`);
+        throw new Error(
+          `Content-graph integrity failures on ${block.pagePath}:\n` +
+            (block.issues || []).map((issue: string) => `  - ${issue}`).join('\n'),
+        );
+      });
+      continue;
+    }
     // Content/schema shape mismatch (e.g. a field declared slate but holding a
     // string) — fails as its own test rather than blocking the suite.
     if (block.shapeIssue || block.slateIssue) {
@@ -183,7 +199,13 @@ test.describe('Block sanity (auto-discovered)', () => {
       // can have per-field shape/slate issues — without them, two entries would
       // collide into a "duplicate test title" error and abort the whole run.
       const where = `${block.pagePath || '?'}${block.field ? `.${block.field}` : ''}`;
-      test(`${block.blockType} block [${block.blockId}] on ${where} has valid ${kind}${src}`, () => {
+      // A block can carry SEVERAL distinct issues of the same kind on the same
+      // page+field — suffix repeats so titles stay unique instead of aborting.
+      const baseTitle = `${block.blockType} block [${block.blockId}] on ${where} has valid ${kind}`;
+      const seen = (seenShapeTitles.get(baseTitle) || 0) + 1;
+      seenShapeTitles.set(baseTitle, seen);
+      const title = seen > 1 ? `${baseTitle} (#${seen})` : baseTitle;
+      test(`${title}${src}`, () => {
         throw new Error(
           `Block "${block.blockType}" [${block.blockId}] on ${block.pagePath}` +
             (block.field ? ` field "${block.field}"` : '') +

@@ -797,12 +797,8 @@ export class Bridge {
     const blockEl = el.closest('[data-block-uid]');
     const handle = el.closest('[data-block-selector]');
     if (handle && (!blockEl || handle.contains(blockEl) === false)) {
-      const advertised = (handle.getAttribute('data-block-selector') || '')
-        .trim()
-        .split(/\s+/)
-        .filter(Boolean);
-      const single = advertised.length === 1 ? advertised[0] : null;
-      if (single && single !== '+1' && single !== '-1' && !single.includes(':')) {
+      const single = Bridge.soleUidNamedBy(Bridge.selectorTokens(handle));
+      if (single) {
         // Prefer the handle only when it is NEARER than the uid element, i.e. the
         // uid element is an ancestor of the handle (a container) rather than the
         // block the field sits in.
@@ -824,18 +820,102 @@ export class Bridge {
    * tab's field. Comparing against data-block-uid alone dropped every field on
    * such an element.
    */
+  /**
+   * The uid a selector token names, or undefined if the token is not a uid.
+   *
+   * `+1` / `-1` and `uid:direction` are navigation, not naming. `uid#field` IS
+   * naming — it says WHERE a particular field of that uid is edited (see
+   * `tryMakeBlockVisible`), and for every purpose but choosing which handle to
+   * click, it means the same as the bare uid.
+   */
+  /**
+   * The one block a selector's tokens name, or undefined if they name several.
+   *
+   * A word list of DIFFERENT uids is a container advertising its children — it
+   * stands in for no single block, and never did. But a handle may now name the
+   * same block twice, once plainly and once by field:
+   *
+   *     data-block-selector="tab-py tab-py#code"
+   *
+   * which is one block said two ways — reveal the tab, and reveal where its code
+   * is edited — so it still stands in for that block. Counting tokens rather
+   * than the blocks they name took the label on such a button away from its tab,
+   * and with it the ability to select the tab at all.
+   */
+  static soleUidNamedBy(tokens) {
+    const uids = new Set(
+      (tokens || []).map((t) => Bridge.uidFromSelectorToken(t)).filter(Boolean),
+    );
+    return uids.size === 1 ? [...uids][0] : undefined;
+  }
+
+  /**
+   * The tokens of a `data-block-selector`, from the element or the raw value.
+   * Every reader of the attribute goes through here: the word list is the
+   * grammar (`uid`, `uid#field`, `uid:direction`, `+1`, `-1`), and splitting it
+   * by hand in five places is how a two-token handle broke three of them.
+   */
+  static selectorTokens(source) {
+    const value =
+      typeof source === 'string'
+        ? source
+        : source?.getAttribute?.('data-block-selector') || '';
+    return value.trim().split(/\s+/).filter(Boolean);
+  }
+
+  /**
+   * The block a handle is FOR: the first token names it, whatever the rest of
+   * the list is there to reveal (an accordion header carries its panel first,
+   * then its children).
+   */
+  static primaryUidOf(source) {
+    return Bridge.selectorTokens(source)[0];
+  }
+
+  static uidFromSelectorToken(token) {
+    if (!token || token === '+1' || token === '-1' || token.includes(':')) {
+      return undefined;
+    }
+    const uid = token.split('#')[0];
+    return uid || undefined;
+  }
+
   uidRepresentedBy(element) {
     if (!element) return undefined;
     const own = element.getAttribute?.('data-block-uid');
     if (own) return own;
-    const advertised = (element.getAttribute?.('data-block-selector') || '')
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean);
-    if (advertised.length !== 1) return undefined;
-    const single = advertised[0];
-    if (single === '+1' || single === '-1' || single.includes(':')) return undefined;
-    return single;
+    return Bridge.soleUidNamedBy(Bridge.selectorTokens(element));
+  }
+
+  /**
+   * The editable fields a block owns, in the order the bridge treats as the
+   * block's own: what it draws itself first, then what stands in for it.
+   *
+   * Both of the questions asked about a block's fields — "all of them" and
+   * "the one called X" — are this list, so there is one collector. It gathers:
+   *
+   *   - every element carrying the uid (a block can be several: a grid image's
+   *     figure + caption, an accordion panel's title + content), and their
+   *     descendants that resolve back to this block rather than a nested one;
+   *   - the fields drawn on a HANDLE instead — a tab's label sits on the button
+   *     that reveals its panel, so it is nowhere inside the uid element.
+   *
+   * @param {HTMLElement} blockElement - Any element of the block
+   * @param {string|null} fieldName - Only this field, when given
+   * @returns {HTMLElement[]} The matching field elements
+   */
+  editableFieldsOf(blockElement, fieldName = null) {
+    const found = [];
+    const add = (el) => {
+      if (el && !found.includes(el)) found.push(el);
+    };
+    // `collectBlockFields` is the walk: every element carrying the uid AND
+    // every element that stands in for the block, minus what belongs to a
+    // nested block or is readonly. This is that walk, as text fields, in order.
+    this.collectBlockFields(blockElement, 'data-edit-text', (el, name) => {
+      if (fieldName === null || name === fieldName) add(el);
+    });
+    return found;
   }
 
   /**
@@ -846,39 +926,7 @@ export class Bridge {
    * @returns {HTMLElement[]} Array of editable field elements that belong to this block
    */
   getOwnEditableFields(blockElement) {
-    const result = [];
-    // Check if block element itself is an editable field (Nuxt: both attrs on same element)
-    if (blockElement.hasAttribute('data-edit-text')) {
-      result.push(blockElement);
-    }
-    // Also check descendants
-    const allFields = blockElement.querySelectorAll('[data-edit-text]');
-    for (const field of allFields) {
-      if (this.fieldBelongsToBlock(field, blockElement)) {
-        result.push(field);
-      }
-    }
-    // A block can be drawn in two places: a tab's code sits in its panel while
-    // its label sits on the button that switches to it. The button stands in for
-    // the block (data-block-selector) rather than being it, so its fields live
-    // outside this subtree — collect them too, or the label is unreachable and
-    // clicking it does nothing.
-    const uid = blockElement.getAttribute('data-block-uid');
-    if (uid) {
-      for (const handle of document.querySelectorAll(
-        `[data-block-selector~="${uid}"]`,
-      )) {
-        if (handle.hasAttribute('data-edit-text') && !result.includes(handle)) {
-          result.push(handle);
-        }
-        for (const field of handle.querySelectorAll('[data-edit-text]')) {
-          if (this.owningBlockUid(field) === uid && !result.includes(field)) {
-            result.push(field);
-          }
-        }
-      }
-    }
-    return result;
+    return this.editableFieldsOf(blockElement);
   }
 
   /**
@@ -933,6 +981,19 @@ export class Bridge {
           }
         }
       }
+      // Fields drawn on something that stands in for the block — the same
+      // elements `collectBlockFields` reaches, and for the same reason: this
+      // list is what the admin reads to decide what a block is made of.
+      for (const [attr, type] of Object.entries(ATTR_TO_TYPE)) {
+        for (const node of this.fieldsOnHandlesFor(blockUid, { attr })) {
+          const fieldName = node.getAttribute(attr);
+          const key = `${attr}:${fieldName}`;
+          if (fieldName && !seen.has(key)) {
+            seen.add(key);
+            fields.push({ fieldName, type });
+          }
+        }
+      }
       if (fields.length) result[blockUid] = fields;
     }
     return result;
@@ -946,10 +1007,30 @@ export class Bridge {
    * @returns {HTMLElement|null} The first editable field or null if none
    */
   getOwnFirstEditableField(blockElement) {
-    const fields = [];
-    this.collectBlockFields(blockElement, 'data-edit-text',
-      (el, name, results) => { fields.push(el); });
-    return fields[0] || null;
+    return this.editableFieldsOf(blockElement)[0] || null;
+  }
+
+  /**
+   * Where a field of this block is edited, whatever KIND of field it is — text,
+   * link or media. A field's place can be hidden or drawn elsewhere regardless
+   * of which picker it opens, so anything asking "is this field reachable?"
+   * needs an answer that does not assume text.
+   *
+   * @param {HTMLElement} blockElement - Any element of the block
+   * @param {string} fieldName - The field name to find
+   * @returns {HTMLElement|null} The element, or null if the block has no such field
+   */
+  editableElementFor(blockElement, fieldName) {
+    const text = this.getEditableFieldByName(blockElement, fieldName);
+    if (text) return text;
+    const uid = blockElement?.getAttribute?.('data-block-uid');
+    for (const attr of ['data-edit-link', 'data-edit-media']) {
+      const own = blockElement?.querySelector?.(`[${attr}="${fieldName}"]`);
+      if (own) return own;
+      const onHandle = this.fieldsOnHandlesFor(uid, { attr, fieldName })[0];
+      if (onHandle) return onHandle;
+    }
+    return null;
   }
 
   /**
@@ -961,22 +1042,7 @@ export class Bridge {
    * @returns {HTMLElement|null} The editable field or null if not found
    */
   getEditableFieldByName(blockElement, fieldName) {
-    // Check if block element itself is the editable field (Nuxt: both attrs on same element)
-    if (blockElement.getAttribute('data-edit-text') === fieldName) {
-      return blockElement;
-    }
-    // Search EVERY element of the block, not just the one we were handed. A
-    // multi-element block (one uid rendered as several sibling elements — a
-    // grid image's figure + caption, an accordion panel's title + content)
-    // keeps its fields spread across them, and resolving inside the first
-    // element alone silently found nothing when the field lived in another.
-    const uid = blockElement.getAttribute('data-block-uid');
-    const scopes = uid ? [...this.getAllBlockElements(uid)] : [blockElement];
-    if (!scopes.length) scopes.push(blockElement);
-    const matches = scopes.flatMap((scope) => {
-      if (scope.getAttribute('data-edit-text') === fieldName) return [scope];
-      return [...scope.querySelectorAll(`[data-edit-text="${fieldName}"]`)];
-    });
+    const matches = this.editableFieldsOf(blockElement, fieldName);
     if (matches.length <= 1) return matches[0] || null;
 
     // The SAME field can be rendered more than once — responsive chrome does
@@ -989,10 +1055,9 @@ export class Bridge {
     // Prefer the element the author actually clicked; failing that, the visible
     // one; only then fall back to document order.
     const clicked = this.lastClickPosition?.target;
-    const clickedMatch =
-      clicked && [...matches].find((el) => el === clicked || el.contains(clicked));
-    if (clickedMatch) return clickedMatch;
-    return [...matches].find((el) => !this.isElementHidden(el)) || matches[0];
+    const clickedMatch = matches.find((el) => el === clicked || el.contains(clicked));
+    if (clicked && clickedMatch) return clickedMatch;
+    return matches.find((el) => !this.isElementHidden(el)) || matches[0];
   }
 
   /**
@@ -1048,6 +1113,20 @@ export class Bridge {
           }
         }
       }
+    }
+
+    // And the elements that stand in for the block rather than being it. A
+    // field can be drawn anywhere the frontend says the block is: a tab's label
+    // on the button that reveals its panel, a cookie banner the design system
+    // builds into `<body>`. They say so with `data-block-selector`, and that is
+    // as true of a link or an image as of text — so this walk, which every
+    // field kind goes through, is where it belongs. Without it a field drawn
+    // outside the block's own element is invisible to everything downstream:
+    // the editor's field list, the admin's merge decisions, block sanity.
+    for (const field of this.fieldsOnHandlesFor(blockUid, { attr: attrName })) {
+      if (field.closest('[data-block-readonly]')) continue;
+      const fieldName = field.getAttribute(attrName);
+      if (fieldName) processor(field, fieldName, results);
     }
     return results;
   }
@@ -3253,9 +3332,13 @@ export class Bridge {
     for (const handle of document.querySelectorAll(
       `[data-block-selector~="${blockUid}"]`,
     )) {
-      const advertised = (handle.getAttribute('data-block-selector') || '').trim().split(/\s+/);
+      const advertised = Bridge.selectorTokens(handle);
       if (!includeStandIns) continue;
-      if (advertised.length !== 1 || own.includes(handle)) continue;
+      // Naming ONE block is what makes a handle a stand-in for it — but a
+      // handle may name that block twice, plainly and by field
+      // (`tab-py tab-py#code`), which is still one block. Counting tokens
+      // instead of the blocks they name dropped the tab's own label.
+      if (!Bridge.soleUidNamedBy(advertised) || own.includes(handle)) continue;
       // Advertising a uid makes something a TRIGGER, not part of the block: a
       // carousel dot names the slide it scrolls to and holds none of its
       // content. Only an element that carries the block's own editable content
@@ -4445,14 +4528,30 @@ export class Bridge {
           log('Received TOGGLE_OPTIONAL_FIELDS:', event.data.blockUid);
           this.toggleOptionalFields(event.data.blockUid);
         } else if (event.data.type === 'FOCUS_FIELD') {
-          // Restore focus to a specific field (e.g., after LinkEditor closes)
-          const { blockId, fieldName } = event.data;
-          log('Received FOCUS_FIELD:', blockId, fieldName);
+          // The sidebar is on this field. Two things follow from that, and only
+          // one of them is always wanted:
+          //
+          //   REVEAL — show where the field is edited, if the page is not
+          //            showing it. Always right: the author is working on that
+          //            field, and it may be inside something closed.
+          //   CARET  — move the cursor into the page. Right when the admin is
+          //            handing editing back (a LinkEditor closing), wrong while
+          //            someone is typing in the sidebar, which is where the
+          //            caret would be taken from.
+          //
+          // So it is one message with an intent, not two messages: `moveCaret`
+          // defaults to true, which is what every existing sender means.
+          const { blockId, fieldName, moveCaret = true } = event.data;
+          log('Received FOCUS_FIELD:', blockId, fieldName, { moveCaret });
 
-          const blockElement = this.queryBlockElement(blockId);
+          this.revealFieldPlace(blockId, fieldName);
+          const blockElement = moveCaret ? this.queryBlockElement(blockId) : null;
           if (blockElement) {
             // Find the specific field by data-field-id attribute
-            const field = blockElement.querySelector(`[data-field-id="${fieldName}"][contenteditable="true"]`);
+            const field =
+              blockElement.querySelector(
+                `[data-field-id="${fieldName}"][contenteditable="true"]`,
+              ) || this.getEditableFieldByName(blockElement, fieldName);
             if (field) {
               field.focus();
               log('Focused field:', fieldName);
@@ -4645,7 +4744,7 @@ export class Bridge {
           // waitForBlockVisibleAndSelect, which is entitled to take 2s: two
           // clocks for one dependency, the shorter one owned by the code that
           // depends on the longer one's outcome.
-          const uid = selector.trim().split(/\s+/)[0];
+          const uid = Bridge.primaryUidOf(selector);
           this._pendingSelectorCaret = { uid, fieldName: this.focusedFieldName };
         }
         return;
@@ -8639,7 +8738,7 @@ export class Bridge {
     // AROUND the tabs. Resolving that way made this bail, and clicking a tab
     // label stopped putting the caret in it.
     const ownerUid = this.owningBlockUid(field);
-    if (ownerUid !== selector.trim().split(/\s+/)[0]) return;
+    if (ownerUid !== Bridge.primaryUidOf(selector)) return;
 
     // Readonly blocks (listing items and friends) render query results, not
     // editable content — same exclusion the plain-click path applies.
@@ -8693,13 +8792,23 @@ export class Bridge {
     // nested blocks to find. Those clicks reached "no child blocks found" and
     // returned, so the panel was never selected and its title never editable.
     if (selector !== '+1' && selector !== '-1') {
-      const targetUid = selector.trim().split(/\s+/)[0];
+      const targetUid = Bridge.primaryUidOf(selector);
       log('handleBlockSelector: direct selector targetUid =', targetUid);
       // Hide outline during transition (same as +1/-1 path)
       this._blockSelectorNavigating = true;
       this.stopTransitionTracking();
       window.parent.postMessage({ type: 'HIDE_BLOCK_UI' }, this.adminOrigin);
-      this.waitForBlockVisibleAndSelect(targetUid);
+      // Each selector navigation gets a number, and only the newest one is
+      // allowed to select. The wait below is deliberately patient — it polls
+      // until the revealed block has stopped moving — so a click on another
+      // trigger routinely arrives while an older chain is still counting. That
+      // chain would then select ITS target, and since its caret intent has
+      // already been spent, `selectBlock` falls back to the block's FIRST field
+      // and focuses it: click a tab label, and the caret lands in the code of
+      // whichever tab you clicked before. Numbering makes the stale chain
+      // notice it has been superseded and stop.
+      const seq = (this._selectorNavSeq = (this._selectorNavSeq || 0) + 1);
+      this.waitForBlockVisibleAndSelect(targetUid, 40, 0, null, seq);
       return;
     }
 
@@ -8713,7 +8822,31 @@ export class Bridge {
     const containerUid = containerBlock.getAttribute('data-block-uid');
     log('handleBlockSelector: container =', containerUid);
 
-    // Get all child blocks in this container
+    // Direct UID selector. The value is either a single uid (e.g. a
+    // carousel dot → that slide) or a space-separated word-list whose
+    // FIRST uid is the block to select — accordion panel headers carry
+    // `[panelUid, ...childUids]` (panel first), the rest of the list is
+    // only there for tryMakeBlockVisible's `~=` reveal match. Take the
+    // first token either way.
+    //
+    // This MUST run before the childBlocks===0 early-return below: the trigger
+    // can itself be the block's own node (a tab nav link carries data-block-uid)
+    // with the rest of the block as flat siblings, so it has zero nested
+    // children — returning early there swallowed the click and the block (e.g. a
+    // tab, so you could edit its title) never got selected.
+    if (selector !== '+1' && selector !== '-1') {
+      const targetUid = selector.trim().split(/\s+/)[0];
+      log('handleBlockSelector: direct selector targetUid =', targetUid);
+      // Hide outline during transition (same as +1/-1 path)
+      this._blockSelectorNavigating = true;
+      this.stopTransitionTracking();
+      window.parent.postMessage({ type: 'HIDE_BLOCK_UI' }, this.adminOrigin);
+      this.waitForBlockVisibleAndSelect(targetUid);
+      return;
+    }
+
+    // Get all child blocks in this container (only the +1/-1 cycling path needs
+    // them).
     const allNestedBlocks = containerBlock.querySelectorAll('[data-block-uid]');
     const childBlocks = Array.from(allNestedBlocks).filter((el) => {
       const parentContainer = el.parentElement?.closest('[data-block-uid]');
@@ -9014,12 +9147,33 @@ export class Bridge {
     const active = document.activeElement;
     if (active === field || field.contains(active)) return;
 
+    // The intent is re-stated from the record, not read back out of live state.
+    // Selection is deliberately deferred until the revealed block has stopped
+    // moving, and in that window the block the author was editing BEFORE
+    // finishes its own selection work — which clears `lastClickPosition` and
+    // drops `focusedFieldName` on the way out. Those are what the restore below
+    // reads, so a click that took the slow path lost its caret silently.
+    this.editMode = 'text';
+    this.focusedFieldName = pending.fieldName;
+
     // restoreFocusFromSavedClick, not focus(): it puts the caret back where the
     // click landed, where focus() would drop it at position 0.
     this.restoreFocusFromSavedClick(blockElement);
+    // …and when the saved click is gone as well, the field itself is still the
+    // right place to be: the start of the field the author clicked beats a caret
+    // left in another block entirely.
+    if (document.activeElement !== field && !field.contains(document.activeElement)) {
+      field.focus();
+    }
   }
 
-  waitForBlockVisibleAndSelect(targetUid, retries = 40, stableCount = 0, lastX = null) {
+  waitForBlockVisibleAndSelect(targetUid, retries = 40, stableCount = 0, lastX = null, seq = 0) {
+    // Superseded: a newer trigger has been clicked since this chain started, so
+    // selecting now would move the author away from what they just clicked.
+    if (seq && seq !== this._selectorNavSeq) {
+      log('handleBlockSelector: chain for', targetUid, 'superseded, stopping');
+      return;
+    }
     const STABLE_THRESHOLD = 3;
     const POSITION_TOLERANCE = 2;
 
@@ -9044,14 +9198,14 @@ export class Bridge {
 
       // Visible but not stable yet - keep polling
       if (retries > 0) {
-        setTimeout(() => this.waitForBlockVisibleAndSelect(targetUid, retries - 1, stableCount, x), 50);
+        setTimeout(() => this.waitForBlockVisibleAndSelect(targetUid, retries - 1, stableCount, x, seq), 50);
       } else {
         log('handleBlockSelector: selecting (retries exhausted)', targetUid);
         this.selectBlock(targetElement, { fromUserClick: !!this._pendingSelectorCaret });
         this.restoreSelectorCaret(targetUid);
       }
     } else if (retries > 0) {
-      setTimeout(() => this.waitForBlockVisibleAndSelect(targetUid, retries - 1, 0, null), 50);
+      setTimeout(() => this.waitForBlockVisibleAndSelect(targetUid, retries - 1, 0, null, seq), 50);
     } else {
       log('handleBlockSelector: block not visible after retries', targetUid);
     }
@@ -11554,7 +11708,168 @@ export class Bridge {
    * @returns {boolean} True if a selector was clicked (block may now be visible)
    */
 
-  tryMakeBlockVisible(targetUid, depth = 0) {
+  /**
+   * Show the place a FIELD is edited, if it is not already on screen.
+   *
+   * Not the same question as "is the block visible". A block can be drawn in
+   * several places with a different field in each: the design system's cookie
+   * consent puts its message in a banner and its category wording in a
+   * preferences dialog, each built in JavaScript into `<body>`, each hidden
+   * until its own trigger is pressed — while the block's own element (its
+   * editing bar) sits on screen the whole time. Asking about the block would
+   * always answer "visible" and reveal nothing.
+   *
+   * Does nothing when the field is already showing, and nothing when no handle
+   * advertises it — so it is safe to call on every sidebar focus.
+   *
+   * @returns {boolean} whether a reveal was attempted
+   */
+  revealFieldPlace(blockId, fieldName) {
+    if (!blockId || !fieldName) return false;
+    // OPT-IN, and strictly so: unless a handle advertises this exact field,
+    // there is nothing to reveal and nothing to do.
+    //
+    // Falling back to the block's own handle here was wrong, and wrong in a way
+    // that reached far beyond this feature: most sidebar fields have no element
+    // on the canvas at all — alignment, a link's href, any setting — so "no
+    // element" is the ordinary case rather than a hidden one. With a fallback,
+    // every focus in the sidebar clicked whatever handle the block or its
+    // ANCESTORS published, opening containers nobody asked to open. Five of
+    // hydra's own integration tests failed on it.
+    if (!this.fieldHandleFor(blockId, fieldName)) return false;
+    const blockElement = this.queryBlockElement(blockId);
+    // Any kind of field: an image or a link can sit in the half a trigger opens
+    // just as a paragraph can, and the sidebar focus that asks for this reveal
+    // does not care which picker the field opens.
+    const fieldElement =
+      blockElement && this.editableElementFor(blockElement, fieldName);
+    if (fieldElement && !this.isElementHidden(fieldElement)) return false;
+    return this.tryMakeBlockVisible(blockId, 0, fieldName);
+  }
+
+  /**
+   * Every element advertising this block — as the block (`uid`) or as the place
+   * one of its fields is edited (`uid#field`). `~=` matches whole tokens, so
+   * the field form needs its own pattern.
+   */
+  handlesFor(uid, fieldName = null) {
+    if (!uid) return [];
+    const selector =
+      fieldName === null
+        ? `[data-block-selector~="${uid}"], [data-block-selector*="${uid}#"]`
+        : `[data-block-selector~="${uid}#${fieldName}"]`;
+    // An element that declares a VALUE is a field to fill on the way to the
+    // block, not something standing in for it. Excluding it here is what keeps
+    // two handles able to share one form: the button is the activator, the
+    // inputs beside it are not, and every existing caller — field handles,
+    // owningBlockUid, the label on a tab button — sees exactly what it did
+    // before, because no page carried this attribute until now.
+    return [...document.querySelectorAll(selector)].filter(
+      (el) => !el.hasAttribute('data-block-selector-input'),
+    );
+  }
+
+  /**
+   * The inputs a block declares as the way to bring it into being.
+   *
+   * `data-block-selector` reveals by CLICKING — a tab, a carousel dot, a step.
+   * That cannot reach a block which does not exist until a question is asked:
+   * a search's answer, a filtered listing, anything downstream of a query.
+   * There is nothing to click that produces a question. So the frontend puts
+   * the question next to the thing to click, joined by the same uid:
+   *
+   *     <input  data-block-selector="answer" data-block-selector-input="what is inka">
+   *     <button data-block-selector="answer">Search</button>
+   */
+  fillersFor(uid) {
+    if (!uid) return [];
+    return [
+      ...document.querySelectorAll(
+        `[data-block-selector~="${uid}"][data-block-selector-input], ` +
+          `[data-block-selector*="${uid}#"][data-block-selector-input]`,
+      ),
+    ];
+  }
+
+  /**
+   * Put a declared value into a field so the FRAMEWORK sees it.
+   *
+   * Assigning `.value` does not notify Vue's v-model or React's controlled
+   * inputs — the field looks filled, submits empty, and the reveal times out
+   * with nothing to explain it. React in particular tracks the last value on
+   * the node and skips the change unless the NATIVE setter is used.
+   */
+  static setDeclaredValue(el, value) {
+    if (el.type === 'checkbox' || el.type === 'radio') {
+      const on = value !== 'false' && value !== '0' && value !== '';
+      if (el.checked === on) return;
+      el.checked = on;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      return;
+    }
+    const proto =
+      el.tagName === 'TEXTAREA'
+        ? HTMLTextAreaElement.prototype
+        : el.tagName === 'SELECT'
+          ? HTMLSelectElement.prototype
+          : HTMLInputElement.prototype;
+    const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+    if (setter) setter.call(el, value);
+    else el.value = value;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  /**
+   * Fill every field this block declares. Returns the fields filled, so the
+   * caller can submit one of their forms when there is no separate activator.
+   */
+  fillDeclaredInputs(uid) {
+    const fillers = this.fillersFor(uid);
+    for (const el of fillers) {
+      Bridge.setDeclaredValue(el, el.getAttribute('data-block-selector-input'));
+    }
+    if (fillers.length) {
+      log(`tryMakeBlockVisible: filled ${fillers.length} declared input(s) for ${uid}`);
+    }
+    return fillers;
+  }
+
+  /** The handle advertising where one field of a block is edited, if any. */
+  fieldHandleFor(blockId, fieldName) {
+    return this.handlesFor(blockId, fieldName)[0] || null;
+  }
+
+  /**
+   * The block's editable elements that live on a handle rather than inside the
+   * block's own element — a tab's label on the button that reveals its panel,
+   * the wording of a cookie banner the design system builds into `<body>`.
+   *
+   * Any kind of field, not just text: a link or an image can be drawn in the
+   * same place, and `attr` says which annotation to look for. Pass a
+   * `fieldName` to ask for one field.
+   *
+   * The handle's OWN text counts by virtue of advertising the uid (an accordion
+   * header carrying both attributes IS the panel's title, and may advertise its
+   * children as well); anything nested inside is only this block's if it
+   * resolves to it.
+   */
+  fieldsOnHandlesFor(uid, { attr = 'data-edit-text', fieldName = null } = {}) {
+    const found = [];
+    const wanted = (el) => fieldName === null || el.getAttribute(attr) === fieldName;
+    for (const handle of this.handlesFor(uid)) {
+      if (handle.hasAttribute(attr) && wanted(handle) && !found.includes(handle)) {
+        found.push(handle);
+      }
+      for (const field of handle.querySelectorAll(`[${attr}]`)) {
+        if (!wanted(field) || found.includes(field)) continue;
+        if (this.owningBlockUid(field) === uid) found.push(field);
+      }
+    }
+    return found;
+  }
+
+  tryMakeBlockVisible(targetUid, depth = 0, fieldName = null) {
     log(`tryMakeBlockVisible: ${targetUid}`);
     // Nested closed containers need one pass each. Bounded so a container that
     // never opens can't spin.
@@ -11569,15 +11884,41 @@ export class Bridge {
     // descendants — `data-block-selector="uid-a uid-b uid-c"` matches
     // any listed uid. Used by collapsible containers like a
     // contextNavigation `<summary>` that carries every child's uid.
-    const directCandidate = document.querySelector(
-      `[data-block-selector~="${targetUid}"]`,
-    );
+    //
+    // A block can also be drawn in SEVERAL places at once, with a different
+    // field in each: the design system's cookie consent puts its message in a
+    // banner and its category wording in a preferences dialog, both built into
+    // `<body>`, both hidden until their own trigger is pressed. One handle per
+    // uid cannot serve that — whichever half it opened, the other's wording
+    // would stay unreachable. So a handle may name a FIELD as well:
+    //
+    //     data-block-selector="uid#message"   → opens where `message` is edited
+    //     data-block-selector="uid"           → opens the block, any field
+    //
+    // `#` rather than `:`, which already means navigation (`uid:direction`).
+    // The field handle is preferred when the caller says which field it is
+    // after, and the plain one remains the fallback — so nothing that exists
+    // today changes.
+    // Every element that advertises the field, then every one that advertises
+    // the block — in that order of preference, but ALL of them: a place a field
+    // is edited may advertise itself as well as being opened by a trigger
+    // elsewhere (the cookie-consent banner does exactly that, so that the
+    // wording inside it belongs to a block at all). Taking only the first match
+    // in document order would then hand back the hidden half and give up.
+    const candidates = [
+      ...(fieldName ? this.handlesFor(targetUid, fieldName) : []),
+      ...this.handlesFor(targetUid, null).filter((el) =>
+        Bridge.selectorTokens(el).includes(targetUid),
+      ),
+    ];
+    const directCandidate = candidates[0] || null;
     // A handle that is itself hidden — inside a container that is still closed —
     // cannot be used yet: clicking it opens ITS container while the outer one
-    // stays shut, so the target never appears. Fall through to the ancestor walk
-    // and open from the outside in; this handle becomes usable on a later pass.
+    // stays shut, so the target never appears. Use the first one that IS
+    // reachable; if none is, fall through to the ancestor walk and open from the
+    // outside in, and these become usable on a later pass.
     const directSelector =
-      directCandidate && !this.isElementHidden(directCandidate) ? directCandidate : null;
+      candidates.find((el) => !this.isElementHidden(el)) || null;
     if (directCandidate && !directSelector) {
       log(`tryMakeBlockVisible: handle for ${targetUid} is itself hidden, opening its ancestors first`);
     }
@@ -11616,9 +11957,19 @@ export class Bridge {
       let parentUid = this.blockPathMap?.[targetUid]?.parentId;
       while (parentUid && !seen.has(parentUid)) {
         seen.add(parentUid);
-        const handle = document.querySelector(
-          `[data-block-selector~="${parentUid}"]`,
-        );
+        // A handle naming the ancestor's REGION counts as naming what is in it:
+        // `uid#field` says where that field is edited, and when the field is a
+        // region — a blocks_layout or an object_list — the blocks inside it are
+        // edited exactly there. A container publishes one handle for the region
+        // rather than enumerating children it cannot know in advance, and the
+        // bare-uid form still works for a container that reveals everything.
+        const childRegion = this.blockPathMap?.[childUid]?.region;
+        const handle =
+          (childRegion &&
+            document.querySelector(
+              `[data-block-selector~="${parentUid}#${childRegion}"]`,
+            )) ||
+          document.querySelector(`[data-block-selector~="${parentUid}"]`);
         if (handle) handles.push({ uid: parentUid, handle, child: childUid });
         childUid = parentUid;
         parentUid = this.blockPathMap?.[parentUid]?.parentId;
@@ -11662,6 +12013,21 @@ export class Bridge {
       // until the timeout.
       clickedSelector = ancestorSelector;
       nextUid = ancestorUid;
+    } else if (this.fillersFor(targetUid).length) {
+      // Declared inputs but no separate activator: the field IS the trigger, so
+      // fill it and submit its own form (the Enter case). Handled before the
+      // +1/-1 walk because that walk needs the target element to exist, and the
+      // whole point of this branch is that it does not yet.
+      const filled = this.fillDeclaredInputs(targetUid);
+      const form = filled[filled.length - 1]?.closest('form');
+      if (!form) {
+        log(`tryMakeBlockVisible: declared inputs for ${targetUid} but no form to submit`);
+        return false;
+      }
+      log(`tryMakeBlockVisible: submitting the form holding ${targetUid}'s declared input`);
+      if (typeof form.requestSubmit === 'function') form.requestSubmit();
+      else form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      return true;
     } else {
       // No direct selector - try +1/-1 navigation
       log(`tryMakeBlockVisible: no direct selector, trying +1/-1 navigation`);
@@ -11752,6 +12118,12 @@ export class Bridge {
     //   accordion  — the toggle button carries `aria-expanded`; if it's
     //                already "true" the panel is open, skip the click.
     //   carousel/slider — no aria-expanded; one click always moves it.
+    // Whatever we are about to activate, put the declared values in first: a
+    // submit button that reveals a query-gated block does nothing with an empty
+    // field. No-op for every block that declares none, which is all of them
+    // until a frontend opts in.
+    this.fillDeclaredInputs(targetUid);
+
     const summaryDetails =
       clickedSelector.tagName === 'SUMMARY'
         ? clickedSelector.closest('details')

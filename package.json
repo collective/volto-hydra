@@ -14,8 +14,8 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "start": "VOLTOCONFIG=$(pwd)/volto.config.js razzle start",
-    "start:test": "PORT=${HYDRA_VOLTO_SSR_PORT:-3001} RAZZLE_API_PATH=http://localhost:${HYDRA_MOCK_API_PORT:-8888} RAZZLE_DEFAULT_IFRAME_URL=\"Test frontend|http://localhost:${HYDRA_TEST_FRONTEND_PORT:-8889},Nuxt blog|http://localhost:${HYDRA_NUXT_PORT:-3003},F7 Mobile|http://localhost:${HYDRA_F7_PORT:-3008}/#!,Next.js|http://localhost:${HYDRA_NEXTJS_PORT:-3007}\" VOLTOCONFIG=$(pwd)/volto.config.js razzle start",
-    "start:mock-api": "PORT=${HYDRA_MOCK_API_PORT:-8888} CONTENT_MOUNTS='/:docs/content/content/content,/_test_data:tests-playwright/fixtures/content' node --watch --watch-path=tests-playwright/fixtures --watch-path=packages/hydra-js --watch-path=docs/content tests-playwright/fixtures/mock-api-server.cjs",
+    "start:test": "PORT=${HYDRA_VOLTO_SSR_PORT:?not set — run via the make target, or export the port} RAZZLE_API_PATH=http://localhost:${HYDRA_MOCK_API_PORT:?not set — run via the make target, or export the port} RAZZLE_DEFAULT_IFRAME_URL=\"Test frontend|http://localhost:${HYDRA_TEST_FRONTEND_PORT:?not set — run via the make target, or export the port},Nuxt blog|http://localhost:${HYDRA_NUXT_PORT:?not set — run via the make target, or export the port},F7 Mobile|http://localhost:${HYDRA_F7_PORT:?not set — run via the make target, or export the port}/#!,Next.js|http://localhost:${HYDRA_NEXTJS_PORT:?not set — run via the make target, or export the port}\" VOLTOCONFIG=$(pwd)/volto.config.js razzle start",
+    "start:mock-api": "PORT=${HYDRA_MOCK_API_PORT:?not set — run via the make target, or export the port} CONTENT_MOUNTS='/:docs/content/content/content,/_test_data:tests-playwright/fixtures/content' node --watch --watch-path=tests-playwright/fixtures --watch-path=packages/hydra-js --watch-path=docs/content tests-playwright/fixtures/mock-api-server.cjs",
     "start:test-frontend": "npx vite --config tests-playwright/fixtures/test-frontend/vite.config.js",
     "start:nuxt:test": "cd examples/nuxt-blog-starter && pnpm run dev:test",
     "start:react:test": "cd docs/examples/test-react && pnpm run dev:test",

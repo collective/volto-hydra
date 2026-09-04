@@ -356,6 +356,9 @@ async function renderBlock(blockId, block) {
         case 'heading':
             wrapper.innerHTML = renderHeadingBlock(block);
             break;
+        case 'suggest':
+            wrapper.innerHTML = renderSuggestBlock(block, blockId);
+            break;
         case 'separator':
             wrapper.innerHTML = renderSeparatorBlock(block);
             break;
@@ -372,14 +375,17 @@ async function renderBlock(blockId, block) {
             wrapper.innerHTML = renderFormBlock(block);
             attachFormValidation(wrapper.querySelector('form'), block);
             break;
-        case 'skiplogicTest':
-            wrapper.innerHTML = renderSkiplogicTestBlock(block);
-            break;
         case 'empty':
             wrapper.innerHTML = renderEmptyBlock(block);
             break;
         case 'codeExample':
             wrapper.innerHTML = renderCodeExampleBlock(block, blockId);
+            break;
+        case 'cookieConsent':
+            // The bar is the block's element; the banner and the preferences
+            // dialog it words are built OUTSIDE it (see renderCookieConsentBar).
+            wrapper.innerHTML = renderCookieConsentBar(block, blockId);
+            mountCookieConsentChrome(block, blockId);
             break;
         case 'title':
             // Title block is just rendered by page title, empty here
@@ -1020,6 +1026,21 @@ function renderIntroductionBlock(block) {
  * @param {Object} block - Heading block data
  * @returns {string} HTML string
  */
+/**
+ * Render a suggest block: a labelled text box whose answer a vocabulary
+ * completes (the live fetch is the docs example's job — the fixture renders
+ * the resting markup: label, input, empty suggestion list).
+ */
+function renderSuggestBlock(block, blockId) {
+    const label = block.label || '';
+    const value = block.value || '';
+    return `<div class="suggest">` +
+        `<label for="${blockId}-input" data-edit-text="label">${label}</label>` +
+        `<input id="${blockId}-input" name="answer" type="text" value="${value}" aria-autocomplete="list" autocomplete="off">` +
+        `<ul class="suggest__list" hidden></ul>` +
+        `</div>`;
+}
+
 function renderHeadingBlock(block) {
     const tag = block.tag || 'h2';
     const text = block.heading || '';
@@ -2070,6 +2091,96 @@ async function renderSliderBlock(block, blockId) {
 }
 
 /**
+ * Cookie consent: one block drawn in three places, two of them hidden.
+ *
+ * The bar is the block's own element (it carries data-block-uid, and is always
+ * on screen). The wording an author writes is read somewhere else entirely: the
+ * `message` in a banner and the `analyticsPurpose` beside a tick box in a
+ * preferences dialog, both built into <body> — which is where a design system's
+ * own JavaScript puts them — and both hidden until their trigger is pressed.
+ *
+ * So "is the block visible?" answers nothing here, and one handle cannot serve
+ * two halves: each trigger names the FIELD its half holds, and the bridge opens
+ * the half whose field the author reached for in the sidebar.
+ *
+ * @param {Object} block - Cookie consent block data
+ * @param {string} blockId - Block ID
+ * @returns {string} HTML string
+ */
+function renderCookieConsentBar(block, blockId) {
+    return (
+        '<div class="cookie-consent-bar" style="display: flex; gap: 12px; align-items: center; padding: 8px 12px; background: #f4f4f6; border: 1px solid #ddd;">' +
+        '<strong>Cookie consent</strong>' +
+        `<button type="button" data-block-selector="${blockId}#message" data-linkable-allow data-cookie-open="banner">Show the banner</button>` +
+        `<button type="button" data-block-selector="${blockId}#analyticsPurpose" data-linkable-allow data-cookie-open="dialog">Show cookie preferences</button>` +
+        '</div>'
+    );
+}
+
+/**
+ * Build (or rebuild) the two halves outside the block's element, and wire the
+ * bar's triggers to them. Kept idempotent per uid: renderBlock runs again on
+ * every change, and a second banner would mean a second data-edit-text="message".
+ * @param {Object} block - Cookie consent block data
+ * @param {string} blockId - Block ID
+ */
+function mountCookieConsentChrome(block, blockId) {
+    document
+        .querySelectorAll(`[data-cookie-chrome="${blockId}"]`)
+        .forEach((el) => el.remove());
+
+    let messageHtml = '';
+    (block.message || []).forEach((node) => {
+        const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
+        messageHtml += `<p data-edit-text="message"${nodeIdAttr}>${renderChildren(node.children)}</p>`;
+    });
+
+    const banner = document.createElement('div');
+    banner.setAttribute('data-cookie-chrome', blockId);
+    // The half advertises the field it holds, as well as the bar's trigger doing
+    // so. Without that the wording inside it belongs to no block at all — it is
+    // outside the block's element, so `data-edit-text` there resolves to nothing
+    // and the text is not editable. The bar's trigger is what the bridge clicks
+    // (this one is hidden until it opens), and both name the same field.
+    banner.setAttribute('data-block-selector', `${blockId}#message`);
+    banner.className = 'cookie-banner';
+    banner.hidden = true;
+    banner.innerHTML = messageHtml + '<button type="button" data-cookie-close>Accept all</button>';
+
+    const dialog = document.createElement('div');
+    dialog.setAttribute('data-cookie-chrome', blockId);
+    dialog.setAttribute('data-block-selector', `${blockId}#analyticsPurpose`);
+    dialog.className = 'cookie-dialog';
+    dialog.hidden = true;
+    dialog.innerHTML =
+        '<h2>Manage cookie preferences</h2>' +
+        '<label><input type="checkbox" name="analytics"> Analytics</label>' +
+        `<p data-edit-text="analyticsPurpose">${escapeHtml(block.analyticsPurpose || '')}</p>` +
+        '<button type="button" data-cookie-close>Save</button>';
+
+    // Rendered as SIBLINGS of the bar, not on <body>: the two halves are still
+    // outside the block's element, which is the whole point, but they stay
+    // inside the page the bridge walks. (A design system's own JavaScript does
+    // put them on <body>; that shape is drawn the same way and is what the
+    // frontends in docs/examples/cookie-consent.md show.)
+    document.body.appendChild(banner);
+    document.body.appendChild(dialog);
+
+    document.addEventListener('click', (e) => {
+        const opener = e.target.closest(`[data-block-uid="${blockId}"] [data-cookie-open]`);
+        if (opener) {
+            const half = opener.getAttribute('data-cookie-open') === 'banner' ? banner : dialog;
+            half.hidden = false;
+            return;
+        }
+        const closer = e.target.closest('[data-cookie-close]');
+        if (closer && closer.parentElement.getAttribute('data-cookie-chrome') === blockId) {
+            closer.parentElement.hidden = true;
+        }
+    });
+}
+
+/**
  * Render a codeExample block with tabs as child blocks.
  * Each tab has its own data-block-uid and the code is shown in a <pre> element.
  * @param {Object} block - Code example block data
@@ -2090,7 +2201,11 @@ function renderCodeExampleBlock(block, blockId) {
             // whenever the bar is, so selecting an inactive tab would never reveal
             // the code it holds. data-block-selector says "I represent this uid" —
             // the label still edits the tab, and clicking switches to it.
-            html += `<button data-block-selector="${tabId}" data-linkable-allow style="padding: 8px 16px; color: #aaa; background: transparent; border: none; cursor: pointer; font-size: 13px;"><span data-edit-text="label">${tab.label || tab.language || 'Tab'}</span></button>`;
+            // Two tokens: the bare uid reveals the tab (any field), and
+            // `uid#code` says WHERE the code field is edited — the panel this
+            // button opens. The label needs no handle: it is on this button,
+            // already on screen, so a focus in it has nothing to reveal.
+            html += `<button data-block-selector="${tabId} ${tabId}#code" data-linkable-allow style="padding: 8px 16px; color: #aaa; background: transparent; border: none; cursor: pointer; font-size: 13px;"><span data-edit-text="label">${tab.label || tab.language || 'Tab'}</span></button>`;
         });
         html += '</div>';
     }
@@ -2136,6 +2251,18 @@ function renderSlideBlock(block) {
     }
     html += `<h4 data-edit-text="title" style="margin: 0 0 8px 0;">${title}</h4>`;
     html += `<p data-edit-text="description" style="margin: 0; color: #666;">${description}</p>`;
+    // The slide's own link. Its `href` is a field of the SLIDE, so it needs an
+    // annotation on the slide's own markup: a teaser nested inside a slide has
+    // an `href` of its own, and borrowing that one would put an author's edit
+    // in the wrong block.
+    if (!block.hideButton) {
+        const slideHref = getLinkUrl(block.href);
+        // The label is annotated inside the link, and the link carries NO
+        // `data-linkable-allow`: with it, a click navigates and tears the editor
+        // down before an edit can happen, which is why an annotation inside such
+        // an anchor is refused. Without it the click is the editor's.
+        html += `<a href="${slideHref || '#'}" data-edit-link="href" style="display: inline-block; margin-top: 8px; color: #007eb1;"><span data-edit-text="buttonText">${escapeHtml(block.buttonText || 'Read more')}</span></a>`;
+    }
 
     return html;
 }
@@ -2346,20 +2473,46 @@ async function renderSearchBlock(block, blockId) {
         html += `<h2 data-edit-text="headline" style="margin-bottom: 15px;">${headline}</h2>`;
     }
 
+    // A block that exists ONLY once a query has been asked — the quick-answer
+    // region. Declared here so the form below can say how to reveal it: the
+    // input carries the sample question, the submit button carries the uid.
+    const quickAnswerLayout = block.blocks_layout?.quickAnswer || [];
+    const quickAnswerUid = quickAnswerLayout[0] || '';
+    const sampleQuestion = block.quickAnswerSample || '';
+
     // Search input
     if (showSearchInput) {
         // Get current search text from URL criteria (if available)
         const currentSearchText = window._searchCriteria?.SearchableText || '';
+        // The input says WHAT to type, the button says WHICH block that reveals.
+        // An element declaring a value is a field to fill; one that does not is
+        // the thing to activate — which is how two handles can share a form.
+        const revealInput = quickAnswerUid && sampleQuestion
+            ? ` data-block-selector="${escapeAttr(quickAnswerUid)}" data-block-selector-input="${escapeAttr(sampleQuestion)}"`
+            : '';
+        const revealButton = quickAnswerUid ? ` data-block-selector="${escapeAttr(quickAnswerUid)}"` : '';
         html += `<div class="search-input" style="margin-bottom: 15px;">
             <form class="search-form" data-search-block="${blockId}" style="display: flex; gap: 10px;">
                 <input type="text" name="SearchableText" placeholder="Search..." value="${currentSearchText}"
-                    class="search-input-field"
+                    class="search-input-field"${revealInput}
                     style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" />
-                <button type="submit" class="search-submit-button" style="padding: 8px 16px; background: #0066cc; color: white; border: none; border-radius: 4px;">
+                <button type="submit" class="search-submit-button"${revealButton} style="padding: 8px 16px; background: #0066cc; color: white; border: none; border-radius: 4px;">
                     Search
                 </button>
             </form>
         </div>`;
+    }
+
+    // Rendered only when a question has actually been asked. With no query there
+    // is no element at all — not hidden, absent — which is the case a click-only
+    // reveal cannot reach.
+    if (quickAnswerUid && window._searchCriteria?.SearchableText) {
+        const child = blocks[quickAnswerUid];
+        if (child) {
+            html += `<div class="quick-answer" data-block-uid="${escapeAttr(quickAnswerUid)}" style="margin: 15px 0; padding: 12px; background: #eef3fb; border-radius: 6px;">
+                <div data-edit-text="answer">${escapeHtml(child.answer || '')}</div>
+            </div>`;
+        }
     }
 
     // Sort options
@@ -2485,25 +2638,6 @@ function renderSlateTableBlock(block) {
 
     html += '</table>';
     return html;
-}
-
-/**
- * Render a Skiplogic Test block.
- * @param {Object} block - Skiplogic test block data
- * @returns {string} HTML string
- */
-function renderSkiplogicTestBlock(block) {
-    const mode = block.mode || 'not set';
-    const columns = block.columns || 1;
-    const title = block.basicTitle || 'Untitled';
-    return `
-        <div class="skiplogic-test-block" style="padding: 16px; border: 1px solid #ccc; background: #f9f9f9;">
-            <h4>Skiplogic Test Block</h4>
-            <p data-skiplogic-mode="${mode}">Mode</p>
-            <p data-skiplogic-columns="${columns}">Columns</p>
-            <p data-edit-text="basicTitle">${title}</p>
-        </div>
-    `;
 }
 
 /**
@@ -2758,7 +2892,12 @@ if (typeof window !== 'undefined' && window.matchMedia) {
 document.addEventListener('click', (event) => {
     const button = event.target.closest('[data-tab-bar] button[data-block-selector]');
     if (!button) return;
-    const uid = button.getAttribute('data-block-selector');
+    // The FIRST token, not the whole attribute: a handle may name its block
+    // twice — plainly and by field (`tab-py tab-py#code`) — and comparing the
+    // raw attribute to a uid then matches no panel at all.
+    const uid = (button.getAttribute('data-block-selector') || '')
+        .trim()
+        .split(/\s+/)[0];
     const bar = button.closest('[data-tab-bar]');
     const container = bar?.parentElement;
     if (!container) return;

@@ -1,3 +1,4 @@
+import { addUrlParams } from '../../utils/iframeUrl';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { isEqual } from 'lodash';
 import { v4 as uuid } from 'uuid';
@@ -445,24 +446,7 @@ const extractBlockFieldTypes = (intl, contentTypeSchema = null) => {
  * @param {String} pathname
  * @returns {String}
  */
-const addUrlParams = (url, qParams, pathname) => {
-  const urlObj = new URL(url);
-  for (const [key, value] of Object.entries(qParams)) {
-    urlObj.searchParams.set(key, value);
-  }
-  // console.log('pathname', appendPathToURL(newUrl, pathname));
 
-  const path = pathname.startsWith('/') ? pathname.slice(1) : pathname;
-  if (urlObj.hash) {
-    // Support both /#/ and /# - normalize by removing trailing slash before appending
-    const hashBase = urlObj.hash.replace(/\/$/, '');
-    urlObj.hash = `${hashBase}/${path}`;
-  } else {
-    urlObj.pathname += `${path}`;
-  }
-  const newURL = urlObj.toString();
-  return newURL;
-};
 
 /**
  * Format the URL for the Iframe with location, token and edit mode
@@ -1497,6 +1481,51 @@ const Iframe = (props) => {
     document.addEventListener('keydown', handleEscape, true);
     return () => document.removeEventListener('keydown', handleEscape, true);
   }, [selectedBlock, iframeSyncState.blockPathMap, onSelectBlock]);
+
+  // Follow the sidebar into the page.
+  //
+  // A field is edited SOMEWHERE, and that somewhere is not always on screen: a
+  // block can be drawn in several places with a different field in each — the
+  // design system's cookie consent puts its message in a banner and its
+  // category wording in a preferences dialog, each built in JavaScript, each
+  // hidden until its own trigger is pressed. Selecting the block reveals at most
+  // one of them, because a block-level handle is one handle; the field is what
+  // says which half the author means.
+  //
+  // So when the cursor lands in a sidebar field, tell the page which field it
+  // is — the FOCUS_FIELD the bridge has always handled, with `moveCaret: false`
+  // so it reveals without taking the caret out of the sidebar. The bridge shows
+  // that field's place only when a `uid#field` handle advertises it, and does
+  // nothing when it is already visible, so this is safe to send on every focus.
+  useEffect(() => {
+    const handleSidebarFocus = (e) => {
+      if (!selectedBlock || !iframeOriginRef.current) return;
+      const target = e.target;
+      if (!target?.closest) return;
+      // Volto wraps each field as `.field-wrapper-<name>`.
+      const wrapper = target.closest('[class*="field-wrapper-"]');
+      if (!wrapper) return;
+      const fieldName = Array.from(wrapper.classList)
+        .find((name) => name.startsWith('field-wrapper-'))
+        ?.slice('field-wrapper-'.length);
+      if (!fieldName) return;
+      const iframe = document.getElementById('previewIframe');
+      iframe?.contentWindow?.postMessage(
+        // One message with an intent, not two message types: `moveCaret: false`
+        // says "reveal it, and leave the caret where the author put it".
+        {
+          type: 'FOCUS_FIELD',
+          blockId: selectedBlock,
+          fieldName,
+          moveCaret: false,
+        },
+        iframeOriginRef.current,
+      );
+    };
+
+    document.addEventListener('focusin', handleSidebarFocus);
+    return () => document.removeEventListener('focusin', handleSidebarFocus);
+  }, [selectedBlock]);
 
   // Initialize from persisted state so component remounts don't reset to null
   // (which would cause a duplicate iframe load for the same URL).

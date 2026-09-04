@@ -4,6 +4,8 @@ A horizontal multi-column container. The block has one slot — `columns` — re
 
 This is a **custom** block — register it via `initBridge`.
 
+**Demonstrates:** [blocks_layout: a region in the shared dict](../container-blocks.md#blocks_layout-a-region-in-the-shared-dict) — a container whose children are containers.
+
 ## Schema
 
 ```json

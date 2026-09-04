@@ -31,6 +31,7 @@ These blocks demonstrate common patterns. Register them via `initBridge({ blocks
 | [Button Block](./button.md) | A call-to-action button with an editable label and link. |
 | [Columns Block](./columns.md) | A horizontal multi-column container. The block has one slot — `columns` — restricted to `column` children, capped at four. Each `column` is itself a container holding any of its allowed inner block types (slate, image, …). |
 | [Context Navigation Block](./contextNavigation.md) | A vertical navigation list for grouped pages — a left sidebar on desktop and a collapsible disclosure at the top on mobile. Each row is a `navItem` (hand-added link) and/or a `listing` (auto-populated from a path query). The active link is detected from the current URL and gets `aria-current="page"` plus a `.current` class. Named after Plone's `@contextnavigation` endpoint, which serves the same purpose. |
+| [Cookie Consent Block](./cookie-consent.md) | A consent banner and a preferences dialog, written by one block. It is the worked example for **revealing the place a FIELD is edited** — `data-block-selector="uid#fieldName"`. |
 | [Form Block](./form.md) | A multi-field form with configurable field types, validation, and email submission. Fields are stored as a typed `object_list` — each field has a `field_type` that maps to a sub-block schema. |
 | [Hero Block](./hero.md) | A full-width hero section with heading, subheading, image, rich text description, and a call-to-action button. Demonstrates multiple field types in a single block: `string`, `textarea`, `slate`, `image`, and `object_browser`. |
 | [Highlight Block](./highlight.md) | A prominent content section with a background image, overlay, title, rich text body, and an optional call-to-action link. Used for feature callouts and banners. |
@@ -38,6 +39,7 @@ These blocks demonstrate common patterns. Register them via `initBridge({ blocks
 | [RSS Feed Block](./rssFeed.md) | Renders entries from an external RSS feed. Its items are fetched at render time (by a fetcher you provide) and shown with a configurable item type (variation). |
 | [Search Shortcuts Block](./searchShortcuts.md) | Renders a set of values as links into a faceted search — a "tag cloud" of shortcuts. Each value links to a search page with `?facet.<index>=<value>` pre-set, which a [Search block](./search.md) reads from the URL. |
 | [Slider Block](./slider.md) | A carousel/slider that cycles through slides. Slides are stored as an `object_list` — each slide has a title, description, image, and optional button. |
+| [Suggest Block](./suggest.md) | A question whose answer is completed from a vocabulary the author picked. |
 ## Page Structure
 
 Each block doc page follows this template:
@@ -84,6 +86,7 @@ accordion
 button
 columns
 contextNavigation
+cookie-consent
 form
 grid
 heading
@@ -100,6 +103,7 @@ searchShortcuts
 separator
 slate
 slider
+suggest
 table
 teaser
 toc

@@ -4,6 +4,12 @@ Displays a list of content items from a query. The listing block fetches items f
 
 This is a **built-in** block.
 
+**Demonstrates:** the sidebar Volto already provides — `querystring` for the
+query and [`query_sort_on`](../custom-blocks.md#picking-a-catalog-index-querystringselect)
+for "Sort on", both registered widgets a hydra schema can name. Nothing here
+needs a custom picker; the [search block](search.md) shows the one case that
+does.
+
 ## Schema
 
 ```json
