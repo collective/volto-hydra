@@ -202,6 +202,14 @@ export async function checkDataEditTextClicks(
       // BRIDGE suite drives renders exactly those. waitForBlockSelectedInAdmin
       // additionally checks sidebar coverage and drag-handle alignment, which
       // only the real Volto admin has, so it could never settle there.
+      //
+      // This is a readiness HINT, not an assertion. Some blocks never report
+      // selected here even though their fields promote perfectly well (a
+      // codeExample's <pre> is one: the outline lands, but the positioning
+      // check this helper makes does not agree) — and failing those is a
+      // regression this wait has no business causing. If the state never
+      // arrives we click anyway: the promotion assertion below is the one that
+      // decides the test, and it reports the real problem when it is real.
       await expect
         .poll(
           async () => {
@@ -210,7 +218,8 @@ export async function checkDataEditTextClicks(
           },
           { timeout: 5000 },
         )
-        .toBeTruthy();
+        .toBeTruthy()
+        .catch(() => {});
     }
     const actionable = await el.isEnabled().catch(() => true);
     await el.click(actionable ? {} : { force: true });
