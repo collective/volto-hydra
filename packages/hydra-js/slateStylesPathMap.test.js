@@ -103,3 +103,35 @@ describe('a frontend that declares nothing', () => {
     expect(isStyleAllowed('blockquote', map.a.slateRules)).toBe(true);
   });
 });
+
+describe('_page declared as a plain object schema', () => {
+  // The offline gates (block-sanity discovery, the deploy schema check) read
+  // blocksConfig out of JSON, where a `schema()` FUNCTION cannot survive. Every
+  // other block type already accepts a plain `blockSchema`; `_page` was read
+  // only as `schema?.({intl})`, so from JSON it fell back to the bare default
+  // and the page's regions — allowedBlocks and the style rules alike — were
+  // invisible to anything running outside the browser.
+  const fromJson = JSON.parse(
+    JSON.stringify({
+      _page: {
+        id: '_page',
+        blockSchema: {
+          properties: {
+            items: { widget: 'blocks_layout', disallowedStyles: ['blockquote'] },
+          },
+        },
+      },
+      slate: { id: 'slate', blockSchema: { properties: { value: { widget: 'slate' } } } },
+    }),
+  );
+
+  test('its region rules reach the block path map', () => {
+    const map = buildBlockPathMap(
+      { blocks: { a: { '@type': 'slate' } }, blocks_layout: { items: ['a'] } },
+      fromJson,
+      {},
+    );
+    expect(isStyleAllowed('blockquote', map.a.slateRules)).toBe(false);
+    expect(isStyleAllowed('h2', map.a.slateRules)).toBe(true);
+  });
+});

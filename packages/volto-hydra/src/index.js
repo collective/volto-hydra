@@ -92,6 +92,21 @@ const applyConfig = (config) => {
     // not `settings.defaultBlockType` (the BLOCK default, 'slate').
     getSlateStyleAliases: () => config.settings.slate?.styleAliases,
     getSlateDefaultBlockType: () => config.settings.slate?.defaultBlockType,
+    // The vocabulary, derived rather than listed: the element registry is open
+    // (a plugin writes into it), so anything that judges "is this type defined"
+    // has to read it live. The style menu's cssClasses come too — a DS style is
+    // stored as the node's `styleName` and is a style in the same sense.
+    getSlateVocabulary: () => {
+      const slate = config.settings.slate || {};
+      const menu = slate.styleMenu || {};
+      return [
+        ...Object.keys(slate.elements || {}),
+        ...[...(menu.blockStyles || []), ...(menu.inlineStyles || [])]
+          .map((d) => d?.cssClass)
+          .filter(Boolean)
+          .map((c) => `.${c}`),
+      ];
+    },
   });
 
   // Patch setTimeout to catch focus errors from AddLinkForm

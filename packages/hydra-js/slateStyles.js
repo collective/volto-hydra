@@ -58,6 +58,35 @@ const BLOCK_TYPES = new Set([
   'ul', 'ol', 'li', 'blockquote', 'div', 'pre',
 ]);
 
+/**
+ * Slate element types the system actually DEFINES a rendering for.
+ *
+ * This is the FALLBACK, for callers with no live registry to read (an offline
+ * gate). Anything running inside Volto should pass the real vocabulary instead —
+ * `Object.keys(config.settings.slate.elements)` plus the styleMenu's cssClasses
+ * — because the registry is OPEN: `slate.elements['blockquote'] = …` is how the
+ * Blockquote plugin adds itself, and any addon can do the same.
+ *
+ * Kept honest by slateVocabulary.test.js, which compares this against the live
+ * registry with volto-slate's applyConfig chain run. It is not maintained by
+ * hand: the first hand-written version was already missing nine types
+ * (callout, img and the seven table elements), which is precisely the drift the
+ * test now catches.
+ *
+ * Note what is NOT here: `h5`/`h6`. They have `blockTagDeserializer` entries, so
+ * a paste can produce them, but no element renders either — types the editor can
+ * create and then not render, which is exactly what is worth reporting. A
+ * region's `allowedStyles` also defines a type, so a frontend that renders `h5`
+ * says so by listing it.
+ */
+export const DEFAULT_SLATE_VOCABULARY = [
+  'b', 'blockquote', 'callout', 'code', 'default', 'del', 'div', 'em',
+  'h1', 'h2', 'h3', 'h4', 'i', 'img', 'li', 'link', 'ol', 'p', 's',
+  'strong', 'sub', 'sup', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead',
+  'tr', 'u', 'ul',
+];
+const KNOWN_SLATE_TYPES = new Set(DEFAULT_SLATE_VOCABULARY);
+
 /** Union two string lists into a new deduped array, or null when both are empty. */
 function unionLists(a, b) {
   if (!a?.length && !b?.length) return null;
@@ -328,4 +357,44 @@ export function normalizeSlateFields(blockData, schema, rules, opts = {}) {
     changes.push(...result.changes.map((c) => ({ ...c, field: fieldName })));
   }
   return { block, changes };
+}
+
+/**
+ * Slate nodes whose `type` nothing defines a rendering for.
+ *
+ * Separate from the allow-list: a DISALLOWED style is a known style the region
+ * has turned off (normalization handles it), while an UNDEFINED one is a type
+ * no renderer knows — it survives in stored content and shows up as unstyled
+ * text, or nothing at all, depending on the frontend. Neither the editor nor the
+ * allow-list would ever produce it, so finding one means the content was written
+ * by something else (an import, a script, a hand edit).
+ *
+ * @param {Array} value - a slate value
+ * @param {Object|null} rules - resolved rules; a type it ALLOWS counts as defined
+ * @param {string[]} [vocabulary] - the types something renders, from the live
+ *   registry where there is one. Falls back to DEFAULT_SLATE_VOCABULARY, which
+ *   is only correct for a stock volto-slate — an addon that registers its own
+ *   element is invisible to it.
+ * @returns {Array<{path: number[], type: string}>} empty when everything is known
+ */
+export function undefinedSlateTypes(value, rules, vocabulary) {
+  const known = vocabulary ? new Set(vocabulary) : KNOWN_SLATE_TYPES;
+  const found = [];
+  const walk = (nodes, parentPath) => {
+    if (!Array.isArray(nodes)) return;
+    nodes.forEach((node, i) => {
+      if (!node || typeof node !== 'object' || isTextNode(node)) return;
+      const path = [...parentPath, i];
+      if (
+        typeof node.type === 'string' &&
+        !known.has(node.type) &&
+        !rules?.allowedStyles?.includes(node.type)
+      ) {
+        found.push({ path, type: node.type });
+      }
+      walk(node.children, path);
+    });
+  };
+  walk(value, []);
+  return found;
 }

@@ -3,6 +3,7 @@ import {
   isStyleAllowed,
   isMarkAllowed,
   normalizeSlateValue,
+  undefinedSlateTypes,
 } from './slateStyles.js';
 
 const p = (...kids) => ({ type: 'p', children: kids.map(t => (typeof t === 'string' ? { text: t } : t)) });
@@ -178,5 +179,46 @@ describe('depth decides the downgrade', () => {
     const value = [p(el('b', 'bold'))];
     const out = normalizeSlateValue(value, rules, { aliases: { b: 'strong' }, defaultBlockType: 'p' });
     expect(out.value).toEqual([p(el('strong', 'bold'))]);
+  });
+});
+
+describe('undefinedSlateTypes', () => {
+  test('a type nothing defines is reported, with where it sits', () => {
+    const value = [el('p', 'ok'), el('marquee', 'what is this')];
+    expect(undefinedSlateTypes(value, null)).toEqual([
+      { path: [1], type: 'marquee' },
+    ]);
+  });
+
+  test('volto-slate\'s own vocabulary is defined, plugins included', () => {
+    const value = [
+      el('h2', 'a'), el('blockquote', 'b'), el('ul', el('li', 'c')),
+      el('p', el('strong', 'd'), el('code', 'e'),
+        { type: 'link', data: { url: '/x' }, children: [{ text: 'f' }] }),
+    ];
+    expect(undefinedSlateTypes(value, null)).toEqual([]);
+  });
+
+  test('h5 has no element renderer in volto-slate — it is NOT defined by default', () => {
+    expect(undefinedSlateTypes([el('h5', 'deep heading')], null)).toEqual([
+      { path: [0], type: 'h5' },
+    ]);
+  });
+
+  test('a region that ALLOWS a style thereby defines it', () => {
+    const rules = foldSlateStyleRules(null, { allowedStyles: ['p', 'h5'] });
+    expect(undefinedSlateTypes([el('h5', 'deep heading')], rules)).toEqual([]);
+  });
+
+  test('being DISALLOWED is a different finding — not "undefined"', () => {
+    const rules = foldSlateStyleRules(null, { disallowedStyles: ['blockquote'] });
+    expect(undefinedSlateTypes([el('blockquote', 'q')], rules)).toEqual([]);
+  });
+
+  test('nested and inline positions are found too', () => {
+    const value = [el('p', 'a ', el('bogus', 'b'))];
+    expect(undefinedSlateTypes(value, null)).toEqual([
+      { path: [0, 1], type: 'bogus' },
+    ]);
   });
 });

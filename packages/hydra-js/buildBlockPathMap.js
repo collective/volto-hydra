@@ -403,7 +403,15 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
   // Get page schema from _page block type (registered at INIT time)
   // This contains the blocks_layout container field (which may declare regions)
   const rootConfig = blocksConfig?.['_page'];
-  const pageSchema = rootConfig?.schema?.({ intl }) || {
+  // `blockSchema || schema`, function or plain object — the same convention
+  // getBlockTypeSchema uses for every other type. Reading only `schema({intl})`
+  // meant a `_page` that came from JSON (the offline gates read blocksConfig out
+  // of a file, where a function cannot survive) silently fell back to the bare
+  // default below, hiding the page's regions from everything outside a browser.
+  const pageSchemaSource = rootConfig?.blockSchema || rootConfig?.schema;
+  const pageSchema = (typeof pageSchemaSource === 'function'
+    ? pageSchemaSource({ intl })
+    : pageSchemaSource) || {
     // Fallback before INIT (e.g. ensureAllContainersHaveBlocks runs the path map
     // before the frontend's _page schema is registered): the default blocks
     // field is named 'items', so its data lives at blocks_layout.items.

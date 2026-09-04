@@ -61,6 +61,19 @@ export function getInjectedBlocksConfig() {
  *
  * @returns {{ aliases: Object, defaultBlockType: string }}
  */
+/**
+ * The slate styles something actually renders, read from the LIVE registry:
+ * every registered element type, plus the DS classes the style menu offers
+ * (Volto stores the chosen one as the node's `styleName`). Returns null when
+ * nothing has been injected, so a caller can fall back rather than judge content
+ * against an empty vocabulary.
+ *
+ * @returns {string[]|null}
+ */
+export function getSlateVocabulary() {
+  return injected.getSlateVocabulary?.() ?? null;
+}
+
 export function getSlateStyleGlobals() {
   return {
     aliases: injected.getSlateStyleAliases?.() || {},

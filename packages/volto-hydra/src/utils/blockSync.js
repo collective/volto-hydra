@@ -37,8 +37,8 @@
  * inject `blockId` into the args at every Volto call site, the `hydraContext`
  * branch can be removed — until then, both branches are load-bearing.
  */
-import { getInjectedBlocksConfig, getSlateStyleGlobals } from './injectedVoltoConfig.js';
-import { normalizeSlateFields } from '../../../hydra-js/slateStyles.js';
+import { getInjectedBlocksConfig, getSlateStyleGlobals, getSlateVocabulary } from './injectedVoltoConfig.js';
+import { normalizeSlateFields, undefinedSlateTypes } from '../../../hydra-js/slateStyles.js';
 import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField, convertValueContainer, convertContainerBlock, getContainerRegionDescriptors, insertBlockInContainer, parseRegionPath, expandValueIntoRegion, collapseRegionToValue } from './blockPath.js';
 import { addableSiblingTypes, buildBlockPathMap } from '../../../hydra-js/buildBlockPathMap.js';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
@@ -1456,6 +1456,7 @@ export function reportDisallowedSlateNodes(formData, blockPathMap, blocksConfig,
   const report = [];
   if (!blockPathMap) return report;
   const globals = getSlateStyleGlobals();
+  const vocabulary = getSlateVocabulary();
   for (const blockId of Object.keys(blockPathMap)) {
     const rules = blockPathMap[blockId]?.slateRules;
     if (!rules) continue;
@@ -1471,6 +1472,15 @@ export function reportDisallowedSlateNodes(formData, blockPathMap, blocksConfig,
     if (!schema) continue;
     const { changes } = normalizeSlateFields(blockData, schema, rules, globals);
     for (const change of changes) report.push({ blockId, ...change });
+
+    // Types nothing renders. Judged against the LIVE registry when the addon has
+    // injected it — inside the editor it always has.
+    for (const [field, def] of Object.entries(schema.properties || {})) {
+      if (def?.widget !== 'slate' && def?.widget !== 'slate_richtext') continue;
+      for (const u of undefinedSlateTypes(blockData[field], rules, vocabulary)) {
+        report.push({ blockId, field, path: u.path, from: u.type, to: null, kind: 'undefined-type' });
+      }
+    }
   }
   return report;
 }
