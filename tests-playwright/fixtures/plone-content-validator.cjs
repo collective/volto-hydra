@@ -589,6 +589,16 @@ function imageDimensions(file) {
       const missing = [];
       if (!block.templateId) missing.push('templateId');
       if (!block.slotId) missing.push('slotId');
+      // `fixed` must be stated, true or false. Omitting it does not mean "not
+      // fixed" — it makes the block a SLOT for the page to fill, so on a page
+      // whose region is empty the block renders as nothing. Requiring the
+      // decision means a template block can no longer disappear because
+      // somebody forgot to say what kind of block it is.
+      if (typeof block.fixed !== 'boolean') {
+        missing.push(block.fixed === undefined
+          ? 'fixed (true = template-controlled, false = a slot the page fills)'
+          : `fixed as a boolean (got ${JSON.stringify(block.fixed)})`);
+      }
       if (missing.length) {
         stats.templateBlocksBroken = (stats.templateBlocksBroken || 0) + 1;
         errors.push(

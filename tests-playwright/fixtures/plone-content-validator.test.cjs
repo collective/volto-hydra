@@ -408,6 +408,63 @@ describe('plone-content-validator checkIntegrity()', () => {
       r.errors.join('\n'));
   });
 
+  it('FAILS on a template block that does not say whether it is fixed', () => {
+    // The third thing a template block must declare is how locked it is.
+    // Omitting `fixed` does not mean "not fixed" — it makes the block a SLOT,
+    // a region for the page to fill. An empty page region then renders an
+    // empty slot, so the block silently disappears. That is the bug that cost
+    // an hour: templateId and slotId were both present and correct.
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/templates/thing', '@type': 'Document', id: 'thing',
+        UID: 'pageauid1234567', parent: { '@id': '/' },
+        blocks: {
+          decided: { '@type': 'slate', templateId: '/templates/thing', slotId: 'decided', fixed: true },
+          vague: { '@type': 'slate', templateId: '/templates/thing', slotId: 'vague' },
+        },
+        blocks_layout: { items: ['decided', 'vague'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.ok(r.errors.some((e) => e.includes('vague') && e.includes('fixed')), r.errors.join('\n'));
+    assert.ok(!r.errors.some((e) => e.includes('decided')), r.errors.join('\n'));
+  });
+
+  it('accepts fixed: false — an explicit slot', () => {
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/templates/thing', '@type': 'Document', id: 'thing',
+        UID: 'pageauid1234567', parent: { '@id': '/' },
+        blocks: {
+          slot: { '@type': 'slate', templateId: '/templates/thing', slotId: 'slot', fixed: false },
+        },
+        blocks_layout: { items: ['slot'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.equal(r.errors.filter((e) => /fixed/.test(e)).length, 0, r.errors.join('\n'));
+  });
+
+  it('FAILS on a non-boolean fixed', () => {
+    // "false" is truthy. A string here would read as a slot to the validator
+    // and as fixed to anything doing a plain truthiness check.
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/templates/thing', '@type': 'Document', id: 'thing',
+        UID: 'pageauid1234567', parent: { '@id': '/' },
+        blocks: {
+          stringy: { '@type': 'slate', templateId: '/templates/thing', slotId: 'stringy', fixed: 'false' },
+        },
+        blocks_layout: { items: ['stringy'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.ok(r.errors.some((e) => e.includes('stringy') && e.includes('fixed')), r.errors.join('\n'));
+  });
+
   it('accepts a template whose blocks all carry both', () => {
     const { root, contentDir } = buildFixture({
       pageA: {
