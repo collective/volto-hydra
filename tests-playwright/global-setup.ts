@@ -135,10 +135,14 @@ async function warmFrontend(url: string): Promise<void> {
       .waitFor({ state: 'attached', timeout: 120000 });
     console.log(`[SETUP] ✓ ${url} rendered blocks`);
   } catch (error) {
-    throw new Error(
-      `Frontend never rendered a block at ${url} — every admin test that ` +
-        `drives this frontend would time out in waitForIframeReady. ` +
-        `(${(error as Error).message})`,
+    // BEST EFFORT, and deliberately so. This is a warm-up, not an assertion:
+    // the tests remain the judge of whether the app works. A CI job whose
+    // frontend does not serve this particular path (the bridge jobs mount
+    // different content) must not be failed by the warm-up — that turned one
+    // boot race into two red jobs.
+    console.log(
+      `[SETUP] ⚠ could not warm ${url} (${(error as Error).message.split('\n')[0]}) — ` +
+        `the first spec will pay for the first render instead`,
     );
   } finally {
     await browser.close();
@@ -318,7 +322,10 @@ async function globalSetup() {
   const projectArg =
     process.argv.find((arg) => arg.startsWith('--project='))?.split('=')[1] ||
     (projectArgIndex !== -1 ? process.argv[projectArgIndex + 1] : undefined);
-  if (!projectArg || projectArg.includes('nuxt')) {
+  // Only the ADMIN-driven projects: they are the ones whose helper waits for
+  // the iframe to render a block, so they are the ones that pay for a cold
+  // frontend. The bridge projects drive the frontend directly.
+  if (!projectArg || /admin-nuxt|nuxt-specific/.test(projectArg)) {
     await warmFrontend(`${URLS.nuxt}/test-page`);
   }
 
