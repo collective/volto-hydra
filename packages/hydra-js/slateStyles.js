@@ -47,6 +47,17 @@
  */
 const STRUCTURAL_TYPES = new Set(['link']);
 
+/**
+ * Block-level slate types — the ones that cannot legally sit inside another
+ * block. Only these are collapsed when a denied wrapper is retyped; an INLINE
+ * child (`strong`, `em`, a `link`) is valid there and is kept, because
+ * flattening it would silently strip the formatting it carries.
+ */
+const BLOCK_TYPES = new Set([
+  'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'ul', 'ol', 'li', 'blockquote', 'div', 'pre',
+]);
+
 /** Union two string lists into a new deduped array, or null when both are empty. */
 function unionLists(a, b) {
   if (!a?.length && !b?.length) return null;
@@ -191,24 +202,22 @@ function normalizeNodes(nodes, rules, opts, parentPath, changes) {
 
     // Disallowed, and no alias to rename it to. DEPTH decides what happens:
     //
-    //   top level — must stay a block element, so retype to the default UNLESS
-    //     it only wraps other elements (a `ul` around `li`s), where retyping
-    //     would leave `p > li`; that unwraps and the lifted children retype.
-    //   deeper    — it is inline (`b` inside a `p`), and retyping it to `p`
-    //     would nest a paragraph inside a paragraph. Unwrap: the children
-    //     splice up and the text survives without the formatting.
+    //   deeper than the top — it is inline (`b` inside a `p`), and retyping it
+    //     to `p` would nest a paragraph inside a paragraph. Unwrap: the children
+    //     splice into the parent and the text survives without the formatting.
+    //   top level — retype to the default block type. A wrapper of other
+    //     elements (a `ul` of `li`s) COLLAPSES: its grandchildren's inline
+    //     content is concatenated into that one node.
     //
-    // Either way nothing is deleted.
-    const isBlockWrapper = kids?.length > 0 && kids.every((k) => !isTextNode(k));
-    const unwrap = kids && !aliases[node.type] && (parentPath.length > 0 || isBlockWrapper);
-    if (unwrap) {
+    // The collapse is the invariant in docs/visual-editing.md — a slate field's
+    // value holds exactly ONE top-level node, and renderers are told they may
+    // assume it. Splicing the lifted `li`s in as siblings would hand back a
+    // two-node value, and a renderer reading value[0] would silently drop every
+    // word after the first item. Nothing is ever deleted.
+    if (parentPath.length > 0 && kids && !aliases[node.type]) {
       changes.push({ path, from: node.type, to: null, kind: 'style-unwrap' });
       out = out || [...nodes];
-      // Re-normalize the lifted children AT THE PARENT'S DEPTH — that is where
-      // they now sit, and depth is what decides retype-vs-unwrap. Passing the
-      // unwrapped node's own path instead made every lifted `li` look inline
-      // and dissolve into bare text.
-      const lifted = normalizeNodes(kids, rules, opts, parentPath, changes);
+      const lifted = normalizeNodes(kids, rules, opts, path, changes);
       out.splice(out.indexOf(node), 1, ...lifted);
       continue;
     }
@@ -226,9 +235,13 @@ function normalizeNodes(nodes, rules, opts, parentPath, changes) {
       kind: 'style',
       ...(configError && { configError }),
     });
-    const nextKids = kids
-      ? normalizeNodes(kids, rules, opts, path, changes)
-      : kids;
+    let nextKids = kids ? normalizeNodes(kids, rules, opts, path, changes) : kids;
+    // A retyped top-level wrapper would otherwise become `p > li`. Lift the
+    // grandchildren's inline content into it instead, so the result is one
+    // well-formed node rather than a paragraph full of list items.
+    if (nextKids?.length && nextKids.every((k) => BLOCK_TYPES.has(k?.type) && k.children)) {
+      nextKids = nextKids.flatMap((k) => k.children);
+    }
     write(i, { ...node, type: to, ...(kids && { children: nextKids }) });
   }
 

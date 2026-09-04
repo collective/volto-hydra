@@ -177,6 +177,13 @@ With no alias, a top-level node becomes `config.settings.slate.defaultBlockType`
 (`p`), and an inline one is unwrapped — its text stays, without the formatting.
 Nothing is ever deleted.
 
+A downgrade never changes how many top-level nodes a slate field holds, because
+[a field always holds exactly one](visual-editing.md#one-top-level-node-per-slate-field)
+and renderers are told they may assume it. So a denied *wrapper* collapses rather
+than splitting: denying `ul` turns `ul > li, li` into a single paragraph holding
+both items' content, not two paragraphs. Inline children survive the collapse —
+a `strong` inside a denied `blockquote` is still bold afterwards.
+
 ## object_list: a region stored inline
 
 The other storage choice for a region. Instead of ordering in the shared `blocks_layout` dict, all items share one inline schema and are stored as an array with an ID field, at the field itself. (To place the array deeper — e.g. `block.table.rows` — nest the field inside a `widget: 'object'`; see below.)

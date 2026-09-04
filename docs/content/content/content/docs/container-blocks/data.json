@@ -1592,7 +1592,90 @@
         }
       ]
     },
-    "h-40": {
+    "p-40": {
+      "@type": "slate",
+      "plaintext": "A downgrade never changes how many top-level nodes a slate field holds, because [a field always holds exactly one](visual-editing.md#one-top-level-node-per-slate-field) and renderers are told they may assume it. So a denied *wrapper* collapses rather than splitting: denying `ul` turns `ul > li, li` into a single paragraph holding both items' content, not two paragraphs. Inline children survive the collapse — a `strong` inside a denied `blockquote` is still bold afterwards.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A downgrade never changes how many top-level nodes a slate field holds, because "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "/docs/visual-editing#one-top-level-node-per-slate-field"
+              },
+              "children": [
+                {
+                  "text": "a field always holds exactly one"
+                }
+              ]
+            },
+            {
+              "text": " and renderers are told they may assume it. So a denied "
+            },
+            {
+              "type": "em",
+              "children": [
+                {
+                  "text": "wrapper"
+                }
+              ]
+            },
+            {
+              "text": " collapses rather than splitting: denying "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "ul"
+                }
+              ]
+            },
+            {
+              "text": " turns "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "ul > li, li"
+                }
+              ]
+            },
+            {
+              "text": " into a single paragraph holding both items' content, not two paragraphs. Inline children survive the collapse — a "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "strong"
+                }
+              ]
+            },
+            {
+              "text": " inside a denied "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "blockquote"
+                }
+              ]
+            },
+            {
+              "text": " is still bold afterwards."
+            }
+          ]
+        }
+      ]
+    },
+    "h-41": {
       "@type": "slate",
       "plaintext": "object_list: a region stored inline",
       "value": [
@@ -1606,7 +1689,7 @@
         }
       ]
     },
-    "p-41": {
+    "p-42": {
       "@type": "slate",
       "plaintext": "The other storage choice for a region. Instead of ordering in the shared `blocks_layout` dict, all items share one inline schema and are stored as an array with an ID field, at the field itself. (To place the array deeper — e.g. `block.table.rows` — nest the field inside a `widget: 'object'`; see below.)",
       "value": [
@@ -1653,18 +1736,18 @@
         }
       ]
     },
-    "ce-42": {
+    "ce-43": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-42-javascript-1ab2b0",
+          "@id": "ce-43-javascript-955908",
           "label": "Javascript",
           "language": "javascript",
           "code": "// Schema\nslides: {\n    title: 'Slides',\n    widget: 'object_list',\n    idField: '@id',\n    schema: {\n        properties: {\n            title: { title: 'Title' },\n            image: { title: 'Image', widget: 'image' },\n            description: { title: 'Description', widget: 'slate' },\n        }\n    }\n}\n\n// Resulting data — the array is stored at the field\n{\n  \"@type\": \"slider\",\n  \"slides\": [\n    { \"@id\": \"slide-1\", \"title\": \"First\", \"image\": \"...\" },\n    { \"@id\": \"slide-2\", \"title\": \"Second\", \"image\": \"...\" }\n  ]\n}"
         }
       ]
     },
-    "p-43": {
+    "p-44": {
       "@type": "slate",
       "plaintext": "**Worked examples:** [Accordion Block](./examples/accordion.md) — each panel an inline item holding its own region of child blocks; [Slider Block](./examples/slider.md) — slides as inline items with fields of their own.",
       "value": [
@@ -1714,7 +1797,7 @@
         }
       ]
     },
-    "h-44": {
+    "h-45": {
       "@type": "slate",
       "plaintext": "object_list with allowedBlocks: Typed Items",
       "value": [
@@ -1728,7 +1811,7 @@
         }
       ]
     },
-    "p-45": {
+    "p-46": {
       "@type": "slate",
       "plaintext": "When `allowedBlocks` is set on an `object_list`, items can have different types (like `blocks_layout`) but are still stored as an array. Each item's type is stored in the field specified by `typeField` (defaults to `'@type'`) and its schema is looked up from `blocks`:",
       "value": [
@@ -1808,18 +1891,18 @@
         }
       ]
     },
-    "ce-46": {
+    "ce-47": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-46-javascript-cecbb0",
+          "@id": "ce-47-javascript-6c6b84",
           "label": "Javascript",
           "language": "javascript",
           "code": "facets: {\n    title: 'Facets',\n    widget: 'object_list',\n    allowedBlocks: ['checkboxFacet', 'selectFacet'],\n    typeField: 'type',\n    defaultBlockType: 'checkboxFacet',\n}\n\n// Resulting data\n{\n  \"@type\": \"search\",\n  \"facets\": [\n    { \"@id\": \"facet-1\", \"type\": \"checkboxFacet\",\n      \"title\": \"Content Type\", \"field\": \"portal_type\" },\n    { \"@id\": \"facet-2\", \"type\": \"selectFacet\",\n      \"title\": \"Subject\", \"field\": \"Subject\" }\n  ]\n}"
         }
       ]
     },
-    "p-47": {
+    "p-48": {
       "@type": "slate",
       "plaintext": "Both `blocks_layout` and `object_list` look the same in the editing UI and blocks can be dragged between them — data is automatically adapted when moving between formats (ID fields added/stripped, type fields set appropriately).",
       "value": [
@@ -1855,7 +1938,7 @@
         }
       ]
     },
-    "p-48": {
+    "p-49": {
       "@type": "slate",
       "plaintext": "**Worked example:** [Form Block](./examples/form.md) — one item type per kind of field, chosen by `field_type`.",
       "value": [
@@ -1902,7 +1985,7 @@
         }
       ]
     },
-    "h-49": {
+    "h-50": {
       "@type": "slate",
       "plaintext": "widget: 'object': nesting fields (and containers) inside a block field",
       "value": [
@@ -1916,7 +1999,7 @@
         }
       ]
     },
-    "p-50": {
+    "p-51": {
       "@type": "slate",
       "plaintext": "A `widget: 'object'` field groups sub-fields under one key. Its `schema.properties` are first-class — plain fields OR nested containers — and everything nests **inside** the object, exactly where the schema puts it. No `dataPath` indirection.",
       "value": [
@@ -1974,7 +2057,7 @@
         }
       ]
     },
-    "p-51": {
+    "p-52": {
       "@type": "slate",
       "plaintext": "An **`object_list`** inside an object stores its array at `object.<field>`:",
       "value": [
@@ -2010,18 +2093,18 @@
         }
       ]
     },
-    "ce-52": {
+    "ce-53": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-52-javascript-654167",
+          "@id": "ce-53-javascript-232623",
           "label": "Javascript",
           "language": "javascript",
           "code": "// A table block whose rows live at block.table.rows\ntable: {\n    widget: 'object',\n    schema: { properties: {\n        rows: { widget: 'object_list', idField: 'key',\n                schema: { properties: { cells: { widget: 'object_list', idField: 'key' /* … */ } } } },\n    } },\n}\n// data\n{ \"@type\": \"slateTable\", \"table\": { \"rows\": [ { \"key\": \"r1\", \"cells\": [ /* … */ ] } ] } }"
         }
       ]
     },
-    "p-53": {
+    "p-54": {
       "@type": "slate",
       "plaintext": "A **`blocks_layout`** inside an object makes the object its own mini-container: it holds its own `blocks` dict + `blocks_layout`, just like a columns/grid container block, one level deeper:",
       "value": [
@@ -2068,18 +2151,18 @@
         }
       ]
     },
-    "ce-54": {
+    "ce-55": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-54-javascript-8b6597",
+          "@id": "ce-55-javascript-e7d871",
           "label": "Javascript",
           "language": "javascript",
           "code": "table: { widget: 'object', schema: { properties: {\n    body: { widget: 'blocks_layout' },\n} } }\n// data\n{ \"@type\": \"slateTable\",\n  \"table\": { \"blocks\": { \"b1\": { /* … */ } }, \"blocks_layout\": { \"body\": [\"b1\"] } } }"
         }
       ]
     },
-    "p-55": {
+    "p-56": {
       "@type": "slate",
       "plaintext": "A **plain field** inside an object is edited in the canvas like any top-level field — address it inline with its `/`-path (`data-edit-text=\"content/headline\"`, and the same for `data-edit-link` / `data-edit-media`). The object is *transparent*: `content/headline` writes back to `block.content.headline`, never a flat key. See [Field Path Syntax](visual-editing.md#field-path-syntax) for the full grammar (`/` object descent, `..` = parent block, `/field` = page).",
       "value": [
@@ -2228,7 +2311,7 @@
         }
       ]
     },
-    "p-56": {
+    "p-57": {
       "@type": "slate",
       "plaintext": "Blocks inside a nested container are edited in the canvas like any other container. The sidebar prefixes a nested container's **title** with the path (e.g. **Table / Rows**) so the nesting is visible.",
       "value": [
@@ -2264,7 +2347,7 @@
         }
       ]
     },
-    "p-57": {
+    "p-58": {
       "@type": "slate",
       "plaintext": "This replaces `dataPath`: declare the container inside the object rather than hoisting it to the block's top level with a `dataPath` back-reference.",
       "value": [
@@ -2300,7 +2383,7 @@
         }
       ]
     },
-    "h-58": {
+    "h-59": {
       "@type": "slate",
       "plaintext": "Container schema reference",
       "value": [
@@ -2314,7 +2397,7 @@
         }
       ]
     },
-    "p-59": {
+    "p-60": {
       "@type": "slate",
       "plaintext": "A block's schema is a standard [Volto block schema](https://6.docs.plone.org/volto/blocks/editcomponent.html) (fieldsets, `properties`, widgets, `default`, etc.). Hydra reads three container-oriented `widget` values plus a few per-field keys — those are:",
       "value": [
@@ -2375,7 +2458,7 @@
         }
       ]
     },
-    "tbl-60": {
+    "tbl-61": {
       "@type": "slateTable",
       "table": {
         "fixed": true,
@@ -2386,10 +2469,10 @@
         "striped": false,
         "rows": [
           {
-            "key": "tbl-60-r0",
+            "key": "tbl-61-r0",
             "cells": [
               {
-                "key": "tbl-60-r0c0",
+                "key": "tbl-61-r0c0",
                 "type": "header",
                 "value": [
                   {
@@ -2408,7 +2491,7 @@
                 ]
               },
               {
-                "key": "tbl-60-r0c1",
+                "key": "tbl-61-r0c1",
                 "type": "header",
                 "value": [
                   {
@@ -2422,7 +2505,7 @@
                 ]
               },
               {
-                "key": "tbl-60-r0c2",
+                "key": "tbl-61-r0c2",
                 "type": "header",
                 "value": [
                   {
@@ -2438,10 +2521,10 @@
             ]
           },
           {
-            "key": "tbl-60-r1",
+            "key": "tbl-61-r1",
             "cells": [
               {
-                "key": "tbl-60-r1c0",
+                "key": "tbl-61-r1c0",
                 "type": "data",
                 "value": [
                   {
@@ -2460,7 +2543,7 @@
                 ]
               },
               {
-                "key": "tbl-60-r1c1",
+                "key": "tbl-61-r1c1",
                 "type": "data",
                 "value": [
                   {
@@ -2493,7 +2576,7 @@
                 ]
               },
               {
-                "key": "tbl-60-r1c2",
+                "key": "tbl-61-r1c2",
                 "type": "data",
                 "value": [
                   {
@@ -2597,10 +2680,10 @@
             ]
           },
           {
-            "key": "tbl-60-r2",
+            "key": "tbl-61-r2",
             "cells": [
               {
-                "key": "tbl-60-r2c0",
+                "key": "tbl-61-r2c0",
                 "type": "data",
                 "value": [
                   {
@@ -2619,7 +2702,7 @@
                 ]
               },
               {
-                "key": "tbl-60-r2c1",
+                "key": "tbl-61-r2c1",
                 "type": "data",
                 "value": [
                   {
@@ -2633,7 +2716,7 @@
                 ]
               },
               {
-                "key": "tbl-60-r2c2",
+                "key": "tbl-61-r2c2",
                 "type": "data",
                 "value": [
                   {
@@ -2731,10 +2814,10 @@
             ]
           },
           {
-            "key": "tbl-60-r3",
+            "key": "tbl-61-r3",
             "cells": [
               {
-                "key": "tbl-60-r3c0",
+                "key": "tbl-61-r3c0",
                 "type": "data",
                 "value": [
                   {
@@ -2753,7 +2836,7 @@
                 ]
               },
               {
-                "key": "tbl-60-r3c1",
+                "key": "tbl-61-r3c1",
                 "type": "data",
                 "value": [
                   {
@@ -2767,7 +2850,7 @@
                 ]
               },
               {
-                "key": "tbl-60-r3c2",
+                "key": "tbl-61-r3c2",
                 "type": "data",
                 "value": [
                   {
@@ -2793,7 +2876,7 @@
         ]
       }
     },
-    "p-61": {
+    "p-62": {
       "@type": "slate",
       "plaintext": "All three can nest inside `object`, and a container may mix a `blocks_layout` region and an `object_list` region. Everything else in a field def (`title`, `default`, `type`, `choices`, `mode`, …) is plain Volto and behaves as documented there.",
       "value": [
@@ -2895,7 +2978,7 @@
         }
       ]
     },
-    "h-62": {
+    "h-63": {
       "@type": "slate",
       "plaintext": "Rendering Containers in Your Frontend",
       "value": [
@@ -2909,7 +2992,7 @@
         }
       ]
     },
-    "p-63": {
+    "p-64": {
       "@type": "slate",
       "plaintext": "Add `data-block-uid` to each child element. You don't need to mark the container element itself:",
       "value": [
@@ -2934,18 +3017,18 @@
         }
       ]
     },
-    "ce-64": {
+    "ce-65": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-64-html-1da8d3",
+          "@id": "ce-65-html-ede2b4",
           "label": "Html",
           "language": "html",
           "code": "<div class=\"slider\" data-block-uid=\"slider-1\">\n  <div class=\"slide\" data-block-uid=\"slide-1\"\n       data-block-add=\"right\">\n    <img src=\"/news.jpg\"/>\n    <h2>Big News</h2>\n  </div>\n  <div class=\"slide\" data-block-uid=\"slide-2\"\n       data-block-add=\"right\">\n    ...\n  </div>\n  <a data-block-selector=\"-1\">Prev</a>\n  <a data-block-selector=\"+1\">Next</a>\n</div>"
         }
       ]
     },
-    "ul-65": {
+    "ul-66": {
       "@type": "slate",
       "plaintext": "data-block-add=\"bottom|right\" — Controls where the '+' button appears. By default it will be the opposite of its parent. Use \"bottom\" for vertical stacking, \"right\" for horizontal. data-block-selector=\"-1|+1|blockId\" — Tag paging buttons so sidebar selection can navigate paged containers. data-block-selector=\"uid1 uid2 uid3 …\" — Space-separated list of uids this element should \"expose\" when any of them is selected from the admin. The bridge matches with the CSS word-list operator ([data-block-selector~=...]), so one trigger can cover many descendants. Use it on a disclosure trigger (collapsed details, accordion header, hidden tab panel button) so that picking any block within from the sidebar opens / scrolls / activates the enclosing container. For <summary> triggers the bridge sets details.open = true directly (idempotent — won't toggle an already-open disclosure); for everything else it .click()s the trigger, skipping the click if aria-expanded=\"true\". The contextNavigation <summary> and accordion panel buttons use this pattern; the carousel +1 / -1 / specific-slide-uid form above is a special case of the same attribute.",
       "value": [
@@ -3092,7 +3175,7 @@
         }
       ]
     },
-    "p-66": {
+    "p-67": {
       "@type": "slate",
       "plaintext": "The bridge resolves a **descendant** of a container that advertises itself: selecting a block nested below the handle walks up the block path map to the nearest ancestor that published one, so a container only has to name what it can reveal, not enumerate every block inside it. It also opens **outside in** — a handle that is itself inside a closed container is skipped until it can be reached, because clicking a hidden trigger opens its own container while the outer one stays shut. Enumerating uids is still worth doing for anything the path map cannot know, such as items a listing synthesises at render time.",
       "value": [
@@ -3128,7 +3211,7 @@
         }
       ]
     },
-    "ul-67": {
+    "ul-68": {
       "@type": "slate",
       "plaintext": "data-block-selector=\"uid#fieldName\" — a handle that reveals where one FIELD of that block is edited, rather than the block as a whole. Use it when a block is drawn in several places at once with a different field in each, and each place has its own trigger. The design system cookie-consent block is the case it was written for: its message is rendered into a banner and its category wording into a preferences dialog, both built by the component's own JavaScript into <body>, both hidden until their trigger is pressed — while the block's element (an editing bar) is on screen the whole time. A block-level handle is one handle and one click, so whichever half it opened, the other half's wording stayed unreachable from the sidebar. # is used because : already means navigation (uid:direction). Everything except which handle to click treats uid#field exactly like uid: a data-edit-* inside such a handle still edits that block — which is why the place a field is edited usually carries the handle too, not just the trigger that opens it. Several elements may name the same field; the bridge clicks the first one that is on screen, so a hidden half is never the thing it tries to click.",
       "value": [
@@ -3287,7 +3370,7 @@
         }
       ]
     },
-    "p-68": {
+    "p-69": {
       "@type": "slate",
       "plaintext": "A worked example, with the schema, the data and all four frontends: [Cookie Consent Block](./examples/cookie-consent.md).",
       "value": [
@@ -3315,7 +3398,7 @@
         }
       ]
     },
-    "p-69": {
+    "p-70": {
       "@type": "slate",
       "plaintext": "The reveal is driven from the sidebar, through the message that already existed for it: when the cursor lands in a sidebar field the admin sends `FOCUS_FIELD { blockId, fieldName, moveCaret: false }`. The bridge shows that field's place if it is hidden, and does nothing at all unless a `uid#field` handle advertises that exact field — so it is safe to send on every focus. There is deliberately **no fallback to the block's own handle**: most sidebar fields (an alignment, a link, any setting) have no element on the canvas and never will, so \"no element\" is the ordinary case rather than a hidden one, and falling back meant every sidebar focus clicked whatever handle the block or its ancestors published. A field's place, when it has none of its own, simply IS the block's — and selecting the block already reveals that, transitively. `moveCaret` defaults to **true** — the original meaning, \"reveal it and put the cursor in it\", which is what the admin sends when handing editing back (a LinkEditor closing). One message, two intents; not two messages.",
       "value": [
@@ -3384,7 +3467,7 @@
         }
       ]
     },
-    "ul-70": {
+    "ul-71": {
       "@type": "slate",
       "plaintext": "A block drawn in two places — put data-block-uid on the content, and data-block-selector on the trigger. A tab is the clearest case: its label lives on the button in the tab bar, its code in a panel that is hidden (or not rendered at all) unless that tab is active. If the button carried the uid, the bridge would see a visible element and conclude the block is on screen, so selecting an inactive tab from the sidebar would never reveal the code the author wants to edit. With the uid on the panel, the ordinary visibility check does the right thing, and data-block-selector on the button both reveals the tab and tells the bridge that a data-edit- inside it edits that* block, even though the uid element is elsewhere. Applies to any control that stands in for content it can show — tab buttons, thumbnail strips, step indicators.",
       "value": [
@@ -3477,7 +3560,7 @@
         }
       ]
     },
-    "h-71": {
+    "h-72": {
       "@type": "slate",
       "plaintext": "Table Mode",
       "value": [
@@ -3491,7 +3574,7 @@
         }
       ]
     },
-    "p-72": {
+    "p-73": {
       "@type": "slate",
       "plaintext": "Set `addMode: 'table'` for table-like structures (rows containing cells). This lets users add and remove columns as easily as rows. The rows live inside a `table` object field (`block.table.rows`) — no `dataPath`:",
       "value": [
@@ -3549,18 +3632,18 @@
         }
       ]
     },
-    "ce-73": {
+    "ce-74": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-73-javascript-7480db",
+          "@id": "ce-74-javascript-78c26a",
           "label": "Javascript",
           "language": "javascript",
           "code": "table: {\n    widget: 'object',\n    schema: { properties: {\n        rows: {\n            widget: 'object_list',\n            idField: 'key',\n            addMode: 'table',\n            schema: { properties: {\n                cells: {\n                    widget: 'object_list',\n                    idField: 'key',\n                    schema: { properties: {\n                        value: { title: 'Content', widget: 'slate' },\n                    } },\n                },\n            } },\n        },\n    } },\n}"
         }
       ]
     },
-    "p-74": {
+    "p-75": {
       "@type": "slate",
       "plaintext": "**Worked example:** [Table Block](./examples/table.md) — `addMode: \"table\"` with an `idField`, so every row has the same cells.",
       "value": [
@@ -3618,7 +3701,7 @@
         }
       ]
     },
-    "h-75": {
+    "h-76": {
       "@type": "slate",
       "plaintext": "Empty Blocks",
       "value": [
@@ -3632,7 +3715,7 @@
         }
       ]
     },
-    "p-76": {
+    "p-77": {
       "@type": "slate",
       "plaintext": "A container region can never be truly empty. When its last child is deleted, Hydra fills it back in — but *what* it inserts depends on the region's config:",
       "value": [
@@ -3657,7 +3740,7 @@
         }
       ]
     },
-    "ul-77": {
+    "ul-78": {
       "@type": "slate",
       "plaintext": "If the region has a defaultBlockType, that type is added. If the region allows exactly one allowedBlocks type, that type is added. Only when the region has no defaultBlockType and more than one allowedBlocks is the choice ambiguous — so Hydra inserts a placeholder child with @type: \"empty\" and shows a '+' for the user to pick a type in place.",
       "value": [
@@ -3747,7 +3830,7 @@
         }
       ]
     },
-    "p-78": {
+    "p-79": {
       "@type": "slate",
       "plaintext": "So the simplest way to never deal with empty placeholders in a region is to give it a `defaultBlockType` (or a single-entry `allowedBlocks`). Otherwise your frontend must render `empty`.",
       "value": [
@@ -3794,7 +3877,7 @@
         }
       ]
     },
-    "p-79": {
+    "p-80": {
       "@type": "slate",
       "plaintext": "Empty blocks are stripped before saving. Render them as empty space; Hydra puts a '+' button in the middle for the user to pick a real type in place. You can override the look of that '+' by rendering something inside the empty block and adding `data-block-add=\"button\"` to it.",
       "value": [
@@ -3819,7 +3902,7 @@
         }
       ]
     },
-    "h-80": {
+    "h-81": {
       "@type": "slate",
       "plaintext": "Making a region empty by default — defaultBlockType: \"empty\"",
       "value": [
@@ -3841,7 +3924,7 @@
         }
       ]
     },
-    "p-81": {
+    "p-82": {
       "@type": "slate",
       "plaintext": "The rules above mean a region with a `defaultBlockType`, or a single-entry `allowedBlocks`, is *never* empty — it always seeds a block of that type. To declare a region that should sit **empty until an editor adds something**, while still restricting **what** they can add, set **`defaultBlockType: \"empty\"`** and do **not** list `\"empty\"` in `allowedBlocks`:",
       "value": [
@@ -3954,18 +4037,18 @@
         }
       ]
     },
-    "ce-82": {
+    "ce-83": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-82-javascript-cbf14d",
+          "@id": "ce-83-javascript-096ab9",
           "label": "Javascript",
           "language": "javascript",
           "code": "announcement: {\n    widget: 'blocks_layout',\n    allowedLayouts: ['/templates/site-announcement'],\n    allowedBlocks: ['globalAlert'], // the only thing an editor can add\n    defaultBlockType: 'empty',      // ...but empty by default (no band shown)\n}"
         }
       ]
     },
-    "p-83": {
+    "p-84": {
       "@type": "slate",
       "plaintext": "This is the one case where `\"empty\"` is a **configured** default rather than the fallback Hydra inserts for an ambiguous region. The seed and the add diverge on purpose:",
       "value": [
@@ -4001,7 +4084,7 @@
         }
       ]
     },
-    "ul-84": {
+    "ul-85": {
       "@type": "slate",
       "plaintext": "Passive seed (region loaded, or its last child deleted): Hydra seeds a bare",
       "value": [
@@ -4028,7 +4111,7 @@
         }
       ]
     },
-    "p-85": {
+    "p-86": {
       "@type": "slate",
       "plaintext": "`@type: \"empty\"` placeholder — nothing renders. `defaultBlockType` wins over the   single-`allowedBlocks` auto-fill, so the region genuinely shows empty.",
       "value": [
@@ -4072,7 +4155,7 @@
         }
       ]
     },
-    "ul-86": {
+    "ul-87": {
       "@type": "slate",
       "plaintext": "The '+' (active add / fill): inserts a real block from allowedBlocks",
       "value": [
@@ -4107,7 +4190,7 @@
         }
       ]
     },
-    "p-87": {
+    "p-88": {
       "@type": "slate",
       "plaintext": "(converting the empty placeholder **in place**), never another `empty`. The add   path reads `allowedBlocks`, not `defaultBlockType` — so a single-entry   `allowedBlocks` fills straight to that type with no chooser.",
       "value": [
@@ -4176,7 +4259,7 @@
         }
       ]
     },
-    "ul-88": {
+    "ul-89": {
       "@type": "slate",
       "plaintext": "\"empty\" is never in allowedBlocks — it isn't a type an editor opts into;",
       "value": [
@@ -4203,7 +4286,7 @@
         }
       ]
     },
-    "p-89": {
+    "p-90": {
       "@type": "slate",
       "plaintext": "it's the \"region is empty\" state. On save the placeholder is stripped, so a   genuinely-empty region persists with no blocks.",
       "value": [
@@ -4217,7 +4300,7 @@
         }
       ]
     },
-    "p-90": {
+    "p-91": {
       "@type": "slate",
       "plaintext": "Use this for optional site chrome — e.g. a header announcement that is usually absent but can hold a single global alert when needed. (Because the seed is `\"empty\"`, the frontend must render `empty` as a selectable slot — see below.)",
       "value": [
@@ -4253,7 +4336,7 @@
         }
       ]
     },
-    "p-91": {
+    "p-92": {
       "@type": "slate",
       "plaintext": "**Forced regions are locked until unlocked.** When the region is a **forced layout** (`allowedLayouts`), it is template-controlled — its content lives in the shared template and is edited *centrally*, like a branded footer. So the seeded empty is stamped as a **locked template member** (`readOnly`, with the forced layout's `templateId`/`templateInstanceId`): it shows empty, but you cannot fill it until you **unlock** the template (enter template-edit-mode). This prevents an editor from silently filling it per-page — the announcement stays site-wide. Filling then happens in template-edit-mode and locking publishes it everywhere. (This stamping happens in the editor's empty-seeding — `ensureEmptyBlockIfEmpty` — so **view-mode merging still leaves an empty forced layout empty**; no empty is ever inserted at render time.)",
       "value": [
@@ -4385,7 +4468,7 @@
         }
       ]
     },
-    "h-92": {
+    "h-93": {
       "@type": "slate",
       "plaintext": "empty is a universal placeholder — renderers must tolerate it",
       "value": [
@@ -4407,7 +4490,7 @@
         }
       ]
     },
-    "p-93": {
+    "p-94": {
       "@type": "slate",
       "plaintext": "In a no-default, multi-allowed region, `@type: \"empty\"` can appear in **any** container — including transiently, the moment a child is deleted and before the user picks a replacement. You never list `\"empty\"` in `allowedBlocks`; it isn't a type you opt into. So every container renderer has to render an `empty` child without erroring.",
       "value": [
@@ -4476,7 +4559,7 @@
         }
       ]
     },
-    "p-94": {
+    "p-95": {
       "@type": "slate",
       "plaintext": "If your container renders its children by delegating each one to your central block dispatch (the function or component that switches on `@type`), you get this for free — just give that dispatch an `empty` case that renders a selectable placeholder.",
       "value": [
@@ -4512,7 +4595,7 @@
         }
       ]
     },
-    "p-95": {
+    "p-96": {
       "@type": "slate",
       "plaintext": "The trap is a **custom** container renderer that only expects specific child types — a `contextNavigation` that walks `navItem`/`listing` children, say. Don't hand-roll an allow-list that rejects anything else, or a seeded `empty` will throw and break the whole container. Route non-special children through your central dispatch instead of throwing:",
       "value": [
@@ -4581,18 +4664,18 @@
         }
       ]
     },
-    "ce-96": {
+    "ce-97": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-96-javascript-fed2cc",
+          "@id": "ce-97-javascript-ee2ef9",
           "label": "Javascript",
           "language": "javascript",
           "code": "for (const childId of items) {\n    const child = blocks[childId];\n    if (child['@type'] === 'navItem') { /* nav-specific rendering */ }\n    else if (child['@type'] === 'listing') { /* expand listing */ }\n    else renderBlock(childId, child);   // empty (or anything else) → central dispatch, never throw\n}"
         }
       ]
     },
-    "p-97": {
+    "p-98": {
       "@type": "slate",
       "plaintext": "Two more things a renderer must survive once the user picks a type for a seeded empty:",
       "value": [
@@ -4606,7 +4689,7 @@
         }
       ]
     },
-    "ul-98": {
+    "ul-99": {
       "@type": "slate",
       "plaintext": "Re-render on the type change. The child's @type flips from empty to the picked type in place (same data-block-uid). If your renderer memoises or does its work once (e.g. an async setup), make sure it re-runs when a child's type changes — otherwise it keeps showing the stale empty. Tolerate a freshly-typed child with no data yet. A just-picked navItem has no href; a just-picked form field has no value — render a placeholder, don't crash on the missing field.",
       "value": [
@@ -4715,7 +4798,7 @@
         }
       ]
     },
-    "h-99": {
+    "h-100": {
       "@type": "slate",
       "plaintext": "Synchronised Block Types in a Container",
       "value": [
@@ -4729,7 +4812,7 @@
         }
       ]
     },
-    "p-100": {
+    "p-101": {
       "@type": "slate",
       "plaintext": "You can have one container type whose children are all kept the same `@type`, with the editor picking that type once on the parent. When the type changes, every child is converted (using each child's `fieldMappings`); when a new child is added it gets the selected type.",
       "value": [
@@ -4765,7 +4848,7 @@
         }
       ]
     },
-    "p-101": {
+    "p-102": {
       "@type": "slate",
       "plaintext": "Declare `itemTypeField` on the *blocks field* — its value names a sibling field on the same schema whose value drives every child's `@type`. The sibling field is typically rendered with `widget: 'blockTypeSelect'`, which computes its `choices` from the blocks field's `allowedBlocks` at render time:",
       "value": [
@@ -4845,18 +4928,18 @@
         }
       ]
     },
-    "ce-102": {
+    "ce-103": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-102-javascript-0cfcac",
+          "@id": "ce-103-javascript-e04074",
           "label": "Javascript",
           "language": "javascript",
           "code": "blocks: {\n    gridBlock: {\n        blockSchema: {\n            properties: {\n                slides: {\n                    widget: 'blocks_layout',\n                    itemTypeField: 'variation',         // sync trigger\n                    allowedBlocks: ['teaser', 'image'],\n                },\n                variation: {\n                    widget: 'blockTypeSelect',          // dropdown\n                },\n            },\n        },\n    },\n    teaser: {\n        fieldMappings: {\n            '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },\n        },\n    },\n    image: {\n        fieldMappings: {\n            '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },\n        },\n    },\n}"
         }
       ]
     },
-    "p-103": {
+    "p-104": {
       "@type": "slate",
       "plaintext": "The relationship is local: read the schema and you can see \"the children of `slides` get their `@type` from `variation`\" right next to the field declaration. Works the same for `widget: 'blocks_layout'` and `widget: 'object_list'` children.",
       "value": [
@@ -4925,7 +5008,7 @@
         }
       ]
     },
-    "h-104": {
+    "h-105": {
       "@type": "slate",
       "plaintext": "Field-value syncing",
       "value": [
@@ -4939,7 +5022,7 @@
         }
       ]
     },
-    "p-105": {
+    "p-106": {
       "@type": "slate",
       "plaintext": "On top of type syncing you can also have field _values_ centrally controlled at the parent — set once on the parent, applied to every child. Add ONE enhancer on the parent:",
       "value": [
@@ -4953,18 +5036,18 @@
         }
       ]
     },
-    "ce-106": {
+    "ce-107": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-106-javascript-7009c7",
+          "@id": "ce-107-javascript-49b19e",
           "label": "Javascript",
           "language": "javascript",
           "code": "gridBlock: {\n    blockSchema: {\n        properties: {\n            slides: { widget: 'blocks_layout', itemTypeField: 'variation', allowedBlocks: ['teaser', 'image'] },\n            variation: { widget: 'blockTypeSelect' },\n        },\n    },\n    schemaEnhancer: { inheritSchemaFrom: {} },\n}"
         }
       ]
     },
-    "p-107": {
+    "p-108": {
       "@type": "slate",
       "plaintext": "`inheritSchemaFrom` does two things automatically:",
       "value": [
@@ -4986,7 +5069,7 @@
         }
       ]
     },
-    "ol-108": {
+    "ol-109": {
       "@type": "slate",
       "plaintext": "Surfaces the parent-claimed fields on the parent's sidebar under an \"Item Defaults\" fieldset. Auto-hides the same fields on every child's sidebar (via a hideParentOwnedFields enhancer that's applied to every block at INIT — no per-child opt-in).",
       "value": [
@@ -5035,7 +5118,7 @@
         }
       ]
     },
-    "p-109": {
+    "p-110": {
       "@type": "slate",
       "plaintext": "The parent declares **what it claims** per child block type via `parentControlled`. If absent, the default is: parent claims everything _not_ listed in the child's `fieldMappings['@default']` mapping. The default works for typical cases; set `parentControlled` only when you want a different split (e.g. keep a meta-toggle field editable per-child):",
       "value": [
@@ -5093,18 +5176,18 @@
         }
       ]
     },
-    "ce-110": {
+    "ce-111": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-110-javascript-52e380",
+          "@id": "ce-111-javascript-84c084",
           "label": "Javascript",
           "language": "javascript",
           "code": "listing: {\n    schemaEnhancer: {\n        inheritSchemaFrom: {\n            typeField: 'variation',\n            mappingField: 'fieldMapping',\n            // Only these fields are claimed by listing for teaser children.\n            // The rest (including teaser's `overwrite` toggle) stay editable.\n            parentControlled: {\n                teaser: ['head_title', 'openLinkInNewTab', 'styles'],\n            },\n        },\n    },\n}"
         }
       ]
     },
-    "p-111": {
+    "p-112": {
       "@type": "slate",
       "plaintext": "When `parentControlled[childType]` is set, it **replaces** the `@default` fallback for that child type. Both sides — the parent's \"Item Defaults\" fieldset and the child's hidden fields — are computed from the same single rule, so they can never get out of sync.",
       "value": [
@@ -5151,7 +5234,7 @@
         }
       ]
     },
-    "h-112": {
+    "h-113": {
       "@type": "slate",
       "plaintext": "Recipe options",
       "value": [
@@ -5165,7 +5248,7 @@
         }
       ]
     },
-    "ul-113": {
+    "ul-114": {
       "@type": "slate",
       "plaintext": "inheritSchemaFrom — schemaEnhancer recipe; surfaces parent-claimed fields on the parent and hides them on children. itemTypeField — declared on a blocks_layout/object_list field; names the sibling field whose value drives every child's @type. typeField — names the sibling field directly on inheritSchemaFrom. Use this when there is no blocks field to declare itemTypeField on (e.g. listings — see Listings). mappingField — name of the field where a per-block fieldMapping override is stored. Required for the FieldMappingWidget to appear. parentControlled — { childType: [fieldName, ...] } per-child-type override. Replaces the fieldMappings['@default'] fallback. defaultsField — prefix for the inherited fields on the parent's \"Item Defaults\" fieldset (default: 'itemDefaults'). blockTypeSelect widget options:",
       "value": [
@@ -5412,7 +5495,7 @@
         }
       ]
     },
-    "p-114": {
+    "p-115": {
       "@type": "slate",
       "plaintext": "- **`blocksField`** — which sub-blocks field's `allowedBlocks` to use for the choices. Auto-discovers if omitted. Set to `'..'` when the choices should come from the *enclosing parent's* `allowedSiblingTypes`.   - **`filterConvertibleFrom`** — only offer types whose `fieldMappings` accept the named source. Typically `'@default'` for listings (every item type must be populatable from canonical content fields).",
       "value": [
@@ -5557,81 +5640,82 @@
       "p-37",
       "ce-38",
       "p-39",
-      "h-40",
-      "p-41",
-      "ce-42",
-      "p-43",
-      "h-44",
-      "p-45",
-      "ce-46",
-      "p-47",
+      "p-40",
+      "h-41",
+      "p-42",
+      "ce-43",
+      "p-44",
+      "h-45",
+      "p-46",
+      "ce-47",
       "p-48",
-      "h-49",
-      "p-50",
+      "p-49",
+      "h-50",
       "p-51",
-      "ce-52",
-      "p-53",
-      "ce-54",
-      "p-55",
+      "p-52",
+      "ce-53",
+      "p-54",
+      "ce-55",
       "p-56",
       "p-57",
-      "h-58",
-      "p-59",
-      "tbl-60",
-      "p-61",
-      "h-62",
-      "p-63",
-      "ce-64",
-      "ul-65",
-      "p-66",
-      "ul-67",
-      "p-68",
+      "p-58",
+      "h-59",
+      "p-60",
+      "tbl-61",
+      "p-62",
+      "h-63",
+      "p-64",
+      "ce-65",
+      "ul-66",
+      "p-67",
+      "ul-68",
       "p-69",
-      "ul-70",
-      "h-71",
-      "p-72",
-      "ce-73",
-      "p-74",
-      "h-75",
-      "p-76",
-      "ul-77",
-      "p-78",
+      "p-70",
+      "ul-71",
+      "h-72",
+      "p-73",
+      "ce-74",
+      "p-75",
+      "h-76",
+      "p-77",
+      "ul-78",
       "p-79",
-      "h-80",
-      "p-81",
-      "ce-82",
-      "p-83",
-      "ul-84",
-      "p-85",
-      "ul-86",
-      "p-87",
-      "ul-88",
-      "p-89",
+      "p-80",
+      "h-81",
+      "p-82",
+      "ce-83",
+      "p-84",
+      "ul-85",
+      "p-86",
+      "ul-87",
+      "p-88",
+      "ul-89",
       "p-90",
       "p-91",
-      "h-92",
-      "p-93",
+      "p-92",
+      "h-93",
       "p-94",
       "p-95",
-      "ce-96",
-      "p-97",
-      "ul-98",
-      "h-99",
-      "p-100",
+      "p-96",
+      "ce-97",
+      "p-98",
+      "ul-99",
+      "h-100",
       "p-101",
-      "ce-102",
-      "p-103",
-      "h-104",
-      "p-105",
-      "ce-106",
-      "p-107",
-      "ol-108",
-      "p-109",
-      "ce-110",
-      "p-111",
-      "h-112",
-      "ul-113",
-      "p-114"
+      "p-102",
+      "ce-103",
+      "p-104",
+      "h-105",
+      "p-106",
+      "ce-107",
+      "p-108",
+      "ol-109",
+      "p-110",
+      "ce-111",
+      "p-112",
+      "h-113",
+      "ul-114",
+      "p-115"
     ]
   }
 }

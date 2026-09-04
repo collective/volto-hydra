@@ -124,3 +124,30 @@ describe('reportDisallowedSlateNodes', () => {
     );
   });
 });
+
+describe('the load pass keeps slate values well-formed', () => {
+  // docs/visual-editing.md: exactly one top-level node per slate field, and a
+  // renderer may assume it. A load-time downgrade must not be the thing that
+  // breaks that — a two-node value renders as its first node and the rest is
+  // gone with no error anywhere.
+  test('downgrading a list does not leave a multi-node value', () => {
+    const out = run(
+      { widget: 'blocks_layout', allowedStyles: ['p', 'strong'] },
+      [
+        {
+          type: 'ul',
+          children: [
+            { type: 'li', children: [{ text: 'one' }] },
+            { type: 'li', children: [{ text: 'two' }] },
+          ],
+        },
+      ],
+    );
+    expect(out.blocks.s1.value).toHaveLength(1);
+    expect(out.blocks.s1.value[0].type).toBe('p');
+    // Both words survive the collapse.
+    const text = JSON.stringify(out.blocks.s1.value);
+    expect(text).toContain('one');
+    expect(text).toContain('two');
+  });
+});

@@ -90,11 +90,43 @@ describe('normalizeSlateValue', () => {
     expect(normalizeSlateValue(value, NO_QUOTE, OPTS).value).toBe(value);
   });
 
-  test('a denied WRAPPER unwraps, then its children normalize — no text lost', () => {
+  // docs/visual-editing.md: a slate field's value always holds exactly ONE
+  // top-level node, and a frontend renderer is told it can assume that. A
+  // downgrade that splices siblings in at the top would hand renderers a
+  // multi-node value — which drops everything after the first.
+  test('a denied top-level WRAPPER collapses into ONE node, keeping every word', () => {
     const rules = foldSlateStyleRules(null, { allowedStyles: ['p', 'strong'] });
     const value = [el('ul', el('li', 'one'), el('li', 'two'))];
     const out = normalizeSlateValue(value, rules, OPTS);
-    expect(out.value).toEqual([p('one'), p('two')]);
+    expect(out.value).toHaveLength(1);
+    expect(out.value).toEqual([p('one', 'two')]);
+  });
+
+  test('collapsing a wrapper must not eat INLINE children', () => {
+    // blockquote is denied and holds only a `strong`. That is not a block
+    // wrapper — flattening it would silently un-bold the text.
+    const rules = foldSlateStyleRules(null, { disallowedStyles: ['blockquote'] });
+    const value = [el('blockquote', el('strong', 'bold'), ' rest')];
+    const out = normalizeSlateValue(value, rules, { defaultBlockType: 'p' });
+    expect(out.value).toEqual([p(el('strong', 'bold'), ' rest')]);
+  });
+
+  test('a wrapper of a single inline element keeps that element', () => {
+    const rules = foldSlateStyleRules(null, { disallowedStyles: ['blockquote'] });
+    const value = [el('blockquote', el('strong', 'bold'))];
+    const out = normalizeSlateValue(value, rules, { defaultBlockType: 'p' });
+    expect(out.value).toEqual([p(el('strong', 'bold'))]);
+  });
+
+  test('no downgrade ever grows the top level', () => {
+    const rules = foldSlateStyleRules(null, { allowedStyles: ['p'] });
+    for (const value of [
+      [el('ul', el('li', 'a'), el('li', 'b'), el('li', 'c'))],
+      [el('blockquote', el('p', 'a'), el('p', 'b'))],
+      [el('ol', el('li', el('strong', 'a')), el('li', 'b'))],
+    ]) {
+      expect(normalizeSlateValue(value, rules, OPTS).value).toHaveLength(1);
+    }
   });
 
   test('a denied leaf mark is stripped, its text kept', () => {
