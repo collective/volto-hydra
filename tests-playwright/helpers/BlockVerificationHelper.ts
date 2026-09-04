@@ -179,30 +179,7 @@ export async function checkDataEditTextClicks(
     // the ordinary checks — visible, stable, receives the event — keep their
     // value.
     const actionable = await el.isEnabled().catch(() => true);
-    // Click the element's LEFT edge, not its centre.
-    //
-    // The '+' add button sits 8px below the selected block, horizontally
-    // centred (mock parent) — which is where the real admin puts it too for a
-    // bottom-direction add. Sweeping fields in order, the '+' left over from
-    // the previous field lands squarely on the next one's centre, and
-    // Playwright refuses to click through it:
-    //   <div id="add-button" class="volto-hydra-add-button">+</div>
-    //     intercepts pointer events
-    // It then retries until the test times out — 166 retries and three minutes
-    // in the run that surfaced this.
-    //
-    // Clicking near the left edge lands on the same element, tests the same
-    // thing, and misses a centred overlay. Deliberately NOT fixed by making
-    // the harness's '+' non-interactive: that button covering content is a
-    // real product behaviour (hydra clamps it back inside the block elsewhere
-    // for exactly this reason), and a harness that cannot reproduce it cannot
-    // catch it.
-    const box = await el.boundingBox();
-    const position = box ? { x: Math.min(8, box.width / 2), y: box.height / 2 } : undefined;
-    await el.click({
-      ...(actionable ? {} : { force: true }),
-      ...(position ? { position } : {}),
-    });
+    await el.click(actionable ? {} : { force: true });
     // The warning below is asserted ABSENT, so give the bridge its frame to
     // raise one — see nextFrame. (Was a 300ms sleep.)
     await nextFrame(iframe);
