@@ -57,15 +57,21 @@ export function slateStyles(value: unknown): Map<string, string> {
       if (typeof node.type === 'string' && !out.has(node.type)) {
         out.set(node.type, text);
       }
-      // A design system's OWN styles — Volto's StyleMenu writes each one's
-      // `cssClass` into `styleName` (space separated), driven by
-      // `config.settings.slate.styleDefinitions`. They are styles in exactly the
-      // sense that matters here: an author picks one and expects to see
-      // something. Prefixed so a DS class can never collide with an element type.
+      // A design system's OWN styles, which Volto's style menu stores in TWO
+      // different shapes — both have to be counted or half the menu goes
+      // unmeasured:
+      //   block  -> `styleName` on the element, space separated
+      //   inline -> a leaf MARK named `style-<cssClass>` (StyleMenu/utils.js
+      //             toggleInlineStyleInSelection → Editor.addMark)
+      // Prefixed with a dot so a DS class can never collide with an element type.
       if (typeof node.styleName === 'string') {
         for (const cls of node.styleName.split(/\s+/).filter(Boolean)) {
           if (!out.has(`.${cls}`)) out.set(`.${cls}`, text);
         }
+      }
+      for (const key of Object.keys(node)) {
+        const cls = node[key] && /^style-(.+)$/.exec(key)?.[1];
+        if (cls && !out.has(`.${cls}`)) out.set(`.${cls}`, text);
       }
     }
     if (Array.isArray(node.children)) node.children.forEach(walk);

@@ -31,6 +31,16 @@ describe('slateStyles', () => {
     ]);
   });
 
+  test('an INLINE design-system style is a leaf mark, and counts', () => {
+    // The style menu stores an inline style as `style-<cssClass>` on the leaf,
+    // not as styleName. Counting only styleName measured half the menu.
+    const value = [{ type: 'p', children: [{ text: 'A', 'style-dropcap': true }, { text: 'enean…' }] }];
+    expect([...slateStyles(value)]).toEqual([
+      ['p', 'Aenean…'],
+      ['.dropcap', 'A'],
+    ]);
+  });
+
   test("a design system's own styles count too", () => {
     // Volto's StyleMenu writes the chosen definition's cssClass into styleName.
     // Those are what a DS actually offers an author beyond h2/bold, so they are
