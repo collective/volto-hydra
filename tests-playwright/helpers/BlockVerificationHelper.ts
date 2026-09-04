@@ -99,6 +99,12 @@ export async function checkDataEditTextClicks(
     (a, b) => String(owners[a] ?? '').localeCompare(String(owners[b] ?? '')) || a - b,
   );
   let revealedOwner: string | null = null;
+  // Whether a click in THIS pass has already selected the block. The first
+  // click is what selects it; every later one lands on a block the admin is
+  // still catching up with — see the wait before the click below.
+  let selected = false;
+
+  const admin = new AdminUIHelper(page);
 
   for (const i of order) {
     const el = editTextEls.nth(i);
@@ -111,7 +117,6 @@ export async function checkDataEditTextClicks(
       // transit lands where it used to be, which reads as "element is outside
       // of the viewport" once Playwright has scrolled (a transform cannot be
       // scrolled to).
-      const admin = new AdminUIHelper(page);
       await admin.getStableBlockCount();
       const ownerEl = iframe.locator(`[data-block-uid="${owner}"]`).first();
       if (await ownerEl.count()) {
@@ -178,8 +183,47 @@ export async function checkDataEditTextClicks(
     // So the actionability veto is bypassed only for that case; everywhere else
     // the ordinary checks — visible, stable, receives the event — keep their
     // value.
+    // The bridge promotes a field to contenteditable ONCE, on the click that
+    // reaches it — there is no retry. A click that lands while the admin is
+    // still settling the previous selection is answered by a re-render
+    // (restoreContentEditableOnFields, whose own comment notes that it "would
+    // change the DOM and shift event.target"), and the promotion is simply
+    // lost: the assertion below then waits out its full timeout for an
+    // attribute that was never coming, and reads as a mystery flake.
+    //
+    // So wait for the admin to agree the block is selected before clicking
+    // again — the same observable state the integration specs wait on (toolbar
+    // visible AND positioned over the block, handles aligned, nothing covering
+    // it). Not on the first click: that click is what selects the block.
+    if (selected) {
+      // isBlockSelectedInIframe, not waitForBlockSelectedInAdmin: the state we
+      // need is "the admin has caught up with the last click" — the toolbar and
+      // outline are up and positioned over this block — and the mock parent the
+      // BRIDGE suite drives renders exactly those. waitForBlockSelectedInAdmin
+      // additionally checks sidebar coverage and drag-handle alignment, which
+      // only the real Volto admin has, so it could never settle there.
+      //
+      // This is a readiness HINT, not an assertion. Some blocks never report
+      // selected here even though their fields promote perfectly well (a
+      // codeExample's <pre> is one: the outline lands, but the positioning
+      // check this helper makes does not agree) — and failing those is a
+      // regression this wait has no business causing. If the state never
+      // arrives we click anyway: the promotion assertion below is the one that
+      // decides the test, and it reports the real problem when it is real.
+      await expect
+        .poll(
+          async () => {
+            const res = await admin.isBlockSelectedInIframe([blockUid]);
+            return typeof res === 'boolean' ? res : !!res?.ok;
+          },
+          { timeout: 5000 },
+        )
+        .toBeTruthy()
+        .catch(() => {});
+    }
     const actionable = await el.isEnabled().catch(() => true);
     await el.click(actionable ? {} : { force: true });
+    selected = true;
     // The warning below is asserted ABSENT, so give the bridge its frame to
     // raise one — see nextFrame. (Was a 300ms sleep.)
     await nextFrame(iframe);

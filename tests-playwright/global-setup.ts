@@ -109,6 +109,46 @@ function writeStorageStates(): void {
   }
 }
 
+/**
+ * Load a frontend once, in a browser, and wait until it has rendered an
+ * annotated block.
+ *
+ * A dev-server frontend is slow on its FIRST real page load (Vite optimises
+ * dependencies then), and whichever spec happens to run first pays for it:
+ * `waitForIframeReady` gives up at 30s and its retries fire while the same
+ * first compile is still running. On CI that made allowed-layouts fail three
+ * times in a row as tests #1-#6 while all 851 later tests passed — a boot
+ * race wearing the costume of a broken feature.
+ *
+ * This is not a wait-and-hope: it waits for the app's OWN signal (a block
+ * carrying data-block-uid) and throws with the URL if that never arrives,
+ * which is a genuinely broken environment worth failing on.
+ */
+async function warmFrontend(url: string): Promise<void> {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await page
+      .locator('[data-block-uid]')
+      .first()
+      .waitFor({ state: 'attached', timeout: 120000 });
+    console.log(`[SETUP] ✓ ${url} rendered blocks`);
+  } catch (error) {
+    // BEST EFFORT, and deliberately so. This is a warm-up, not an assertion:
+    // the tests remain the judge of whether the app works. A CI job whose
+    // frontend does not serve this particular path (the bridge jobs mount
+    // different content) must not be failed by the warm-up — that turned one
+    // boot race into two red jobs.
+    console.log(
+      `[SETUP] ⚠ could not warm ${url} (${(error as Error).message.split('\n')[0]}) — ` +
+        `the first spec will pay for the first render instead`,
+    );
+  } finally {
+    await browser.close();
+  }
+}
+
 async function globalSetup() {
   // Before anything else: the storageStates have to name the ports THIS run uses.
   writeStorageStates();
@@ -274,6 +314,19 @@ async function globalSetup() {
     const emptyOutPath = path.resolve(__dirname, '../.discovered-empty-regions.json');
     fs.writeFileSync(emptyOutPath, JSON.stringify(emptyRegions, null, 2));
     console.log(`[SETUP] Wrote ${emptyRegions.length} empty-seeding container region(s) to ${emptyOutPath}`);
+  }
+
+  // Same --project logic playwright.config uses to decide which frontends to
+  // start: warm exactly the one the run will drive.
+  const projectArgIndex = process.argv.indexOf('--project');
+  const projectArg =
+    process.argv.find((arg) => arg.startsWith('--project='))?.split('=')[1] ||
+    (projectArgIndex !== -1 ? process.argv[projectArgIndex + 1] : undefined);
+  // Only the ADMIN-driven projects: they are the ones whose helper waits for
+  // the iframe to render a block, so they are the ones that pay for a cold
+  // frontend. The bridge projects drive the frontend directly.
+  if (!projectArg || /admin-nuxt|nuxt-specific/.test(projectArg)) {
+    await warmFrontend(`${URLS.nuxt}/test-page`);
   }
 
   // Bridge-only CI jobs don't run Volto — skip the health check
