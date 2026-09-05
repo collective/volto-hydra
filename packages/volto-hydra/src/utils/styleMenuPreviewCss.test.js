@@ -18,28 +18,42 @@ describe('buildStyleMenuPreviewCss', () => {
     expect(buildStyleMenuPreviewCss({ blockStyles: [], inlineStyles: [] })).toBe('');
   });
 
-  test('labels a block style with the name the menu shows', () => {
+  test('marks each styled run at BOTH ends, so its extent is visible', () => {
+    // A style over three words looks identical to one over the whole paragraph
+    // unless you can see where it stops.
     const css = buildStyleMenuPreviewCss(menu);
     expect(css).toContain('.slate-editor .lead::before');
-    expect(css).toContain('content: "Lead"');
-  });
-
-  test('brackets an inline style at BOTH ends, so its extent is visible', () => {
-    // An inline style over three words looks identical to one over the whole
-    // paragraph unless you can see where it stops.
-    const css = buildStyleMenuPreviewCss(menu);
     expect(css).toContain('.slate-editor .dropcap::before');
     expect(css).toContain('.slate-editor .dropcap::after');
   });
 
+  test('the markers are chevrons, never words', () => {
+    // The first version wrote the style NAME inline. A drop cap styles one
+    // letter at the start of a word, so the closing marker landed between `D`
+    // and `esign-system` and the word read as two.
+    const css = buildStyleMenuPreviewCss(menu);
+    expect(css).toContain('content: "\\2039"'); // ‹
+    expect(css).toContain('content: "\\203A"'); // ›
+    // No name is rendered until the run is clicked.
+    const beforeClickRules = css.slice(0, css.indexOf('data-hydra-style-open'));
+    expect(beforeClickRules).not.toContain('Lead');
+    expect(beforeClickRules).not.toContain('Drop cap');
+  });
+
+  test('clicking a run reveals its name, from the attribute', () => {
+    const css = buildStyleMenuPreviewCss(menu);
+    expect(css).toContain('[data-hydra-style-open]::after');
+    // attr() means one rule covers every style, rather than one per class.
+    expect(css).toContain('attr(data-hydra-style-open)');
+  });
+
   test('the shared appearance actually applies to the generated selectors', () => {
-    // The first version styled `[data-hydra-style]`, an attribute nothing sets,
-    // so every label rendered unstyled — the rules existed and did nothing.
+    // An early version styled `[data-hydra-style]`, an attribute nothing set, so
+    // every marker rendered unstyled — the rules existed and did nothing.
     const css = buildStyleMenuPreviewCss(menu);
     const shared = css.slice(0, css.indexOf('content:'));
     expect(shared).toContain('.slate-editor .lead::before');
     expect(shared).toContain('.slate-editor .dropcap::after');
-    expect(css).not.toContain('data-hydra-style');
   });
 
   test('never escapes its scope — admin slate only, never the canvas', () => {
@@ -54,12 +68,14 @@ describe('buildStyleMenuPreviewCss', () => {
       blockStyles: [{ cssClass: 'a.b"c', label: 'He said "hi"' }],
       inlineStyles: [],
     });
+    // The class is escaped for the selector; the label never reaches CSS at all
+    // now — it rides on an attribute — so it cannot break out of a string.
     expect(css).toContain('.slate-editor .a\\.b\\"c');
-    expect(css).toContain('content: "He said \\"hi\\""');
+    expect(css).not.toContain('He said');
   });
 
-  test('falls back to the class when a definition has no label', () => {
+  test('a definition with no label still gets its markers', () => {
     const css = buildStyleMenuPreviewCss({ blockStyles: [{ cssClass: 'lead' }], inlineStyles: [] });
-    expect(css).toContain('content: "lead"');
+    expect(css).toContain('.slate-editor .lead::before');
   });
 });

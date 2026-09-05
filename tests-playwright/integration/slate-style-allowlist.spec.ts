@@ -202,8 +202,8 @@ test.describe('design-system style menu', () => {
  * this had (the shared appearance hung on an attribute nothing sets). So this
  * reads the COMPUTED pseudo-element content off the real sidebar editor.
  */
-test.describe('style labels in the sidebar', () => {
-  test('a block style is labelled, and an inline one is bracketed at both ends', async ({ page }) => {
+test.describe('style markers in the sidebar', () => {
+  test('a styled run is marked at both ends, and names itself when clicked', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/restricted-styles-page');
@@ -213,39 +213,47 @@ test.describe('style labels in the sidebar', () => {
     const sidebarEditor = helper.getSidebarSlateEditor('value');
     await expect(sidebarEditor).toBeVisible({ timeout: 10000 });
 
-    const labels = await sidebarEditor.evaluate((root: HTMLElement) => {
-      const read = (el: Element | null, pseudo: string) =>
-        el ? getComputedStyle(el, pseudo).content : '(no element)';
-      const block = root.querySelector('.lead');
-      const inline = root.querySelector('.dropcap');
-      return {
-        blockBefore: read(block, '::before'),
-        inlineBefore: read(inline, '::before'),
-        inlineAfter: read(inline, '::after'),
-        // The class has to be there for any of this to mean anything.
-        classesFound: { lead: !!block, dropcap: !!inline },
-      };
-    });
+    const read = (cls: string, pseudo: string) =>
+      sidebarEditor.evaluate(
+        (root: HTMLElement, [c, p]: string[]) => {
+          const el = root.querySelector(`.${c}`);
+          return el ? getComputedStyle(el, p).content : '(no element)';
+        },
+        [cls, pseudo],
+      );
 
-    expect(labels.classesFound).toEqual({ lead: true, dropcap: true });
-    // The name the style menu shows, rendered where the author can see it.
-    expect(labels.blockBefore).toContain('Lead');
-    expect(labels.inlineBefore).toContain('Drop cap');
-    // Both ends, so the extent of an inline style is visible.
-    expect(labels.inlineAfter).not.toBe('none');
-    expect(labels.inlineAfter).not.toBe('');
+    // The classes have to be there for any of this to mean anything.
+    expect(
+      await sidebarEditor.evaluate((r: HTMLElement) => ({
+        lead: !!r.querySelector('.lead'),
+        dropcap: !!r.querySelector('.dropcap'),
+      })),
+    ).toEqual({ lead: true, dropcap: true });
+
+    // Chevrons at both ends: enough to see a style is applied and where it
+    // stops, without putting a word inside the sentence. A drop cap styles ONE
+    // letter at the start of a word — a name here split `D` from `esign-system`.
+    for (const cls of ['lead', 'dropcap']) {
+      expect(await read(cls, '::before'), `${cls} opening marker`).toContain('\u2039');
+      expect(await read(cls, '::after'), `${cls} closing marker`).toContain('\u203A');
+      expect(await read(cls, '::after'), `${cls} must not name itself unclicked`)
+        .not.toContain('Lead');
+    }
+
+    // Clicking into the run is when you want to know which style it is.
+    await sidebarEditor.locator('.dropcap').click();
+    await expect
+      .poll(() => read('dropcap', '::after'), { timeout: 5000 })
+      .toContain('Drop cap');
+
+    // Only one at a time — clicking elsewhere closes it again.
+    await sidebarEditor.locator('.lead').click({ position: { x: 200, y: 5 } });
+    await expect
+      .poll(() => read('dropcap', '::after'), { timeout: 5000 })
+      .not.toContain('Drop cap');
   });
 });
 
-/**
- * Applying a design-system style from the SIDEBAR's own toolbar.
- *
- * The canvas path is covered above, but the sidebar has a different toolbar
- * (volto-slate's floating `.slate-inline-toolbar`, from expandedToolbarButtons)
- * living in a different container. hydra swaps the style menu for one that
- * portals out of the quanta toolbar; that this still works in a toolbar it was
- * not written for is a claim, not a given.
- */
 test.describe('style menu in the sidebar toolbar', () => {
   test('a style can be applied from the sidebar, and shows there', async ({ page }) => {
     const helper = new AdminUIHelper(page);
