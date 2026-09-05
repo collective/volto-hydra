@@ -222,27 +222,40 @@ test.describe('style markers in the sidebar', () => {
         [cls, pseudo],
       );
 
-    // The classes have to be there for any of this to mean anything.
-    expect(
-      await sidebarEditor.evaluate((r: HTMLElement) => ({
-        lead: !!r.querySelector('.lead'),
-        dropcap: !!r.querySelector('.dropcap'),
-      })),
-    ).toEqual({ lead: true, dropcap: true });
+    // WAIT ON THE RIGHT THING. The stylesheet is installed when the frontend's
+    // voltoConfig is merged at INIT, which can land after the sidebar editor is
+    // visible — so reading a computed marker straight away races it, and the
+    // NEGATIVE assertions below would pass for the wrong reason if it lost.
+    // Wait until a marker is actually applied; everything else is then readable
+    // in one go, with nothing left in flight.
+    await expect
+      .poll(() => read('lead', '::before'), { timeout: 10000 })
+      .toContain('\u00AB');
 
-    // Chevrons at both ends: enough to see a style is applied and where it
-    // stops, without putting a word inside the sentence. A drop cap styles ONE
-    // letter at the start of a word — a name here split `D` from `esign-system`.
+    const marks = await sidebarEditor.evaluate((root: HTMLElement) => {
+      const at = (c: string, p: string) => {
+        const el = root.querySelector(`.${c}`);
+        return el ? getComputedStyle(el, p).content : '(no element)';
+      };
+      return {
+        leadOpen: at('lead', '::before'),
+        leadClose: at('lead', '::after'),
+        capOpen: at('dropcap', '::before'),
+        capClose: at('dropcap', '::after'),
+      };
+    });
+
     // A block style and an inline mark claim different things — a paragraph
     // versus a run inside one — so they are marked differently: doubles for the
     // wider scope, singles for the narrower.
-    expect(await read('lead', '::before'), 'block style opens with «').toContain('\u00AB');
-    expect(await read('lead', '::after'), 'block style closes with »').toContain('\u00BB');
-    expect(await read('dropcap', '::before'), 'inline mark opens with ‹').toContain('\u2039');
-    expect(await read('dropcap', '::after'), 'inline mark closes with ›').toContain('\u203A');
-    // …and neither names itself until it is clicked.
-    expect(await read('lead', '::after')).not.toContain('Lead');
-    expect(await read('dropcap', '::after')).not.toContain('Drop cap');
+    expect(marks.leadOpen, 'block style opens with «').toContain('\u00AB');
+    expect(marks.leadClose, 'block style closes with »').toContain('\u00BB');
+    expect(marks.capOpen, 'inline mark opens with ‹').toContain('\u2039');
+    expect(marks.capClose, 'inline mark closes with ›').toContain('\u203A');
+    // …and neither names itself until it is clicked. Meaningful now: the
+    // stylesheet is known applied, so an absent name is a real absence.
+    expect(marks.leadClose).not.toContain('Lead');
+    expect(marks.capClose).not.toContain('Drop cap');
 
     // Clicking into the run is when you want to know which style it is.
     await sidebarEditor.locator('.dropcap').click();
@@ -295,8 +308,12 @@ test.describe('style menu in the sidebar toolbar', () => {
     // Marked, so the author can see a style took — the marker stands in for the
     // design system's CSS, which Volto never loads. The NAME is on click, and is
     // covered by the markers test above.
-    const marker = await styled.evaluate((el) => getComputedStyle(el, '::before').content);
-    expect(marker).toContain('\u00AB');
+    await expect
+      .poll(
+        () => styled.evaluate((el) => getComputedStyle(el, '::before').content),
+        { timeout: 5000 },
+      )
+      .toContain('\u00AB');
     expect(toolbar).toBeTruthy();
   });
 });
