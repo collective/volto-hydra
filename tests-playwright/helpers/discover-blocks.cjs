@@ -1590,8 +1590,18 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   // a failing test each) so the aggregate can report the whole list at once —
   // an option with no example is a documentation and regression gap, and the
   // list is only useful whole.
+  // Only the FRONTEND's own registered types, for the reason the render-coverage
+  // set below gives: mock-parent ships a baseline of schemas (hero, slate,
+  // mock-*, and a fuller set for its own test frontend), and holding a project
+  // to another project's options reads as a backlog it cannot act on. Measured
+  // without this, one run reported 84 options against a frontend that declares
+  // none of them.
+  const frontendKeySetForOptions = new Set(frontendKeys || []);
   for (const entry of optionUsage.values()) {
     if (entry.used) continue;
+    if (frontendKeySetForOptions.size && !frontendKeySetForOptions.has(entry.blockType)) {
+      continue;
+    }
     result.push({
       blockType: entry.blockType,
       field: entry.field,

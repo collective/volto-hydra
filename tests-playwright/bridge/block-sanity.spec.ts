@@ -110,7 +110,7 @@ const test = base.extend<{ helper: AdminUIHelper }>({
 
 // Schema options that no discovered example sets — filled by the loop below,
 // reported by the coverage aggregate at the end.
-const unexercisedOptions: Array<{ blockType: string; field: string }> = [];
+const unexercisedOptions: Array<{ blockType: string; field: string; frontend: string }> = [];
 
 test.describe('Block sanity (auto-discovered)', () => {
   for (const block of discoveredBlocks) {
@@ -223,7 +223,15 @@ test.describe('Block sanity (auto-discovered)', () => {
     // than failed one-by-one: the list is a coverage backlog and only reads as
     // one. Not a renderable block, so it never reaches the render checks.
     if (block.unexercisedOption) {
-      unexercisedOptions.push({ blockType: block.blockType, field: block.field });
+      // WHICH frontend: discovery runs per registered frontend, and each brings
+      // its own schemas (hydra's test-frontend registers a mock set of its own).
+      // Without the source, a project reads another project's options as its
+      // own backlog — which is exactly what happened the first time this ran.
+      unexercisedOptions.push({
+        blockType: block.blockType,
+        field: block.field,
+        frontend: block.frontend || '(unknown)',
+      });
       continue;
     }
     // A field present in stored data but not declared in the block schema — one
@@ -412,7 +420,7 @@ test.describe('Block sanity (auto-discovered)', () => {
         (n) => `  - ${n.blockType}.${n.field} (${n.kind}) — no edit annotation in any example\n      e.g. ${n.example}`,
       ),
       ...unexercisedOptions.map(
-        (o) => `  - ${o.blockType}.${o.field} (option) — no example sets it`,
+        (o) => `  - [${o.frontend}] ${o.blockType}.${o.field} (option) — no example sets it`,
       ),
     ];
     expect(
