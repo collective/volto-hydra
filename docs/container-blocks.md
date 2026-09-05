@@ -102,6 +102,88 @@ Each blocks field has its own `allowedBlocks` / `maxLength`. A declared field ap
 
 The backend deserializer only saves values for **registered fields**. `blocks` and `blocks_layout` are registered behavior fields, so the entire `blocks_layout` dict — every list inside it — is stored verbatim. An ad-hoc top-level field like `footer_blocks` is **not** a registered field, so the backend **silently drops it on save**. (A footer might still appear on the live site if a layout template re-injects it on every load — but that footer is never actually persisted.) Keeping every region inside the registered `blocks_layout` dict makes them all persist for real.
 
+## Restricting slate styles per region
+
+A region can also declare which **slate styles** its text may carry — the same
+idea as `allowedBlocks`, one level down. Four optional keys, all lists of slate
+element `type` values:
+
+<!-- codeExample: javascript -->
+```javascript
+properties: {
+    items: {
+        widget: 'blocks_layout',
+        allowedBlocks: ['slate', 'image'],
+        allowedStyles: ['p', 'h2', 'h3', 'ul', 'ol', 'li', 'strong', 'em'],
+        disallowedStyles: ['blockquote'],
+        // Leaf marks, for plugins that use Editor.addMark. Rarely needed.
+        allowedMarks: null,
+        disallowedMarks: ['highlight'],
+    },
+}
+```
+
+`allowedStyles` names element types, which covers block-level formats (`p`,
+`h2`, `ul`, `li`) **and** inline ones — volto-slate models bold and italic as
+inline *elements* (`strong`, `em`, `del`, `sub`, `sup`, `u`, `code`), so one
+list matches what the toolbar actually toggles. `link` is structural rather than
+styling and is never restrictable: dropping it would lose an href.
+
+Declaring nothing leaves every style available, so this changes nothing for a
+frontend that doesn't opt in.
+
+### It applies everywhere, not just the toolbar
+
+Hiding a toolbar button is cosmetic — the format still arrives by paste, by
+hotkey, or by a markdown shortcut. A declaration here is enforced at all of
+them: the block-format dropdown, `Ctrl+B`-style hotkeys, the `>`-space markdown
+shortcuts, paste (the pasted HTML is normalized before it becomes blocks), and
+the stored value itself, which is normalized when the editor loads the page.
+Anything the load pass would rewrite is also logged to the console, so a
+migration shows up while editing rather than as a surprise diff on the next
+save.
+
+### There is no global level, and no per-field level
+
+The page's own blocks fields — declared on the `_page` schema — are the
+outermost regions, so declaring there **is** the site-wide default. And every
+slate value belongs to a block, and every block to a region, so a region
+declaration already reaches a block's own slate fields (a teaser's
+`description`, a table cell) without a per-field key.
+
+### Inheritance: deny accumulates, allow replaces
+
+Rules fold from the outermost region inwards:
+
+- **`disallowedStyles` accumulates.** A style banned at the page level stays
+  banned for everything nested inside it — a child region cannot re-enable it by
+  listing it in `allowedStyles`.
+- **`allowedStyles` replaces.** A nested region restates the list for its own
+  subtree, and may deliberately widen it — an article region can allow `h4` even
+  when the page's default list stops at `h3`.
+
+### What a disallowed style becomes
+
+`config.settings.slate.styleAliases` maps a style to what it should become. It
+is a rename, not a permission — one global map, because a downgrade target has
+to be valid wherever the downgrade lands:
+
+<!-- codeExample: javascript -->
+```javascript
+config.settings.slate.styleAliases = { b: 'strong', i: 'em', blockquote: 'p' };
+```
+
+With no alias, a top-level node becomes `config.settings.slate.defaultBlockType`
+(`p`), and an inline one is unwrapped — its text stays, without the formatting.
+Nothing is ever deleted.
+
+A downgrade never changes how many top-level nodes a slate field holds, because
+[a field always holds exactly one](visual-editing.md#one-top-level-node-per-slate-field)
+and renderers are told they may assume it. So a denied *wrapper* collapses rather
+than splitting: denying `ul` turns `ul > li, li` into a single paragraph holding
+both items' content, not two paragraphs. Inline children survive the collapse —
+a `strong` inside a denied `blockquote` is still bold afterwards.
+
 ## object_list: a region stored inline
 
 The other storage choice for a region. Instead of ordering in the shared `blocks_layout` dict, all items share one inline schema and are stored as an array with an ID field, at the field itself. (To place the array deeper — e.g. `block.table.rows` — nest the field inside a `widget: 'object'`; see below.)
@@ -208,7 +290,7 @@ A block's schema is a standard [Volto block schema](https://6.docs.plone.org/vol
 
 | `widget` | Storage | Key fields |
 |---|---|---|
-| `blocks_layout` | children are ids in the parent's shared `blocks` dict; this field's name is a region key under `blocks_layout` | `allowedBlocks`, `maxLength`, `allowedTemplates` |
+| `blocks_layout` | children are ids in the parent's shared `blocks` dict; this field's name is a region key under `blocks_layout` | `allowedBlocks`, `maxLength`, `allowedTemplates`, `allowedStyles` / `disallowedStyles` / `allowedMarks` / `disallowedMarks` ([slate styles](#restricting-slate-styles-per-region)) |
 | `object_list` | inline array on the field itself | `idField` (default `@id`), `schema` (item schema), `allowedBlocks` + `typeField` (typed items), `defaultBlockType`, `maxLength`, `addMode: 'table'` |
 | `object` | groups sub-fields under one key; sub-fields (plain OR the two container widgets above) nest inside | `schema` (the nested properties) |
 

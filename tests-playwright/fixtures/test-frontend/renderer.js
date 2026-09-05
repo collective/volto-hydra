@@ -451,6 +451,26 @@ if (typeof document !== 'undefined') {
     );
 }
 
+/**
+ * The class attribute a design-system style produces.
+ *
+ * Volto's style menu stores its two kinds differently, and a frontend has to
+ * render BOTH or half the menu silently does nothing:
+ *   block  -> `styleName` on the element (space separated, several can apply)
+ *   inline -> a leaf MARK `style-<cssClass>` (StyleMenu/utils.js, Editor.addMark)
+ * This example frontend renders them so the contract is demonstrated, not just
+ * described.
+ */
+function styleClassAttr(node) {
+    const classes = [];
+    if (typeof node.styleName === 'string') classes.push(node.styleName);
+    for (const key of Object.keys(node)) {
+        const m = node[key] && /^style-(.+)$/.exec(key);
+        if (m) classes.push(m[1]);
+    }
+    return classes.length ? ` class="${classes.join(' ').trim()}"` : '';
+}
+
 function renderSlateBlock(block) {
     // An EMPTY slate block (no `value` at all — the state a just-added block is
     // in) still has to render one node, or there is nothing carrying
@@ -467,7 +487,8 @@ function renderSlateBlock(block) {
     value.forEach((node) => {
         // nodeId is required for edit mode (hydra.js adds it), but optional for view mode
         // If missing in edit mode, hydra.js should add it - but we don't throw here to allow view mode
-        const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
+        const nodeIdAttr = (node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '')
+            + styleClassAttr(node);
 
         // Deep-link anchor. This frontend CHOOSES to make every heading linkable:
         // a real id (the #fragment) + data-linkable-id (the picker label), which
@@ -606,6 +627,13 @@ function renderChildren(children) {
         //    (characterData mutation). The MutationObserver must handle both.
         // 3. Select-all + type replaces the entire <span> content, which is a
         //    childList change that characterData-only observers miss entirely.
+        // A leaf carrying an inline design-system style needs an element to put
+        // the class on; a plain leaf still renders as bare text.
+        const leafStyles = child.text !== undefined ? styleClassAttr(child) : '';
+        if (leafStyles) {
+            let content = child.text || '';
+            return `<span${leafStyles}>${content}</span>`;
+        }
         if (child.text !== undefined) {
             let content = child.text || '';
 

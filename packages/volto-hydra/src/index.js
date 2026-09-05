@@ -77,6 +77,7 @@ import columnAfterSVG from '@plone/volto/icons/column-after.svg';
 import columnDeleteSVG from '@plone/volto/icons/column-delete.svg';
 import { applyBlockDefaults } from '@plone/volto/helpers';
 import { setInjectedVoltoConfig } from './utils/injectedVoltoConfig';
+import StyleDropdown from './components/Toolbar/StyleDropdown';
 
 const applyConfig = (config) => {
   // Inject the Volto-config-derived values the pure block-path / schema utils
@@ -87,6 +88,35 @@ const applyConfig = (config) => {
     applyBlockDefaults,
     getDefaultBlockType: () => config.settings.defaultBlockType,
     getBlocksConfig: () => config.blocks.blocksConfig,
+    // #295: what a disallowed slate style is renamed to, and what it falls back
+    // to. `settings.slate.defaultBlockType` is the slate ELEMENT default ('p'),
+    // not `settings.defaultBlockType` (the BLOCK default, 'slate').
+    getSlateStyleAliases: () => config.settings.slate?.styleAliases,
+    getSlateDefaultBlockType: () => config.settings.slate?.defaultBlockType,
+    // The vocabulary, derived rather than listed: the element registry is open
+    // (a plugin writes into it), so anything that judges "is this type defined"
+    // has to read it live. The style menu's cssClasses come too — a DS style is
+    // stored as the node's `styleName` and is a style in the same sense.
+    getSlateVocabulary: () => {
+      const slate = config.settings.slate || {};
+      const menu = slate.styleMenu || {};
+      // `elements` answers "can the editor DRAW this", which is not the same as
+      // "may this be STORED". volto-slate registers renderers for `table`/`td`/…
+      // and `img`, but the block emitters (extractTables, extractImages) lift
+      // those out of the slate value into blocks of their own — hydra turns a
+      // pasted table into a `slateTable` BLOCK. They exist mid-paste and never
+      // in saved content, so a stored one means extraction failed: reportable,
+      // not permitted. Table types come from slate.tableTypes rather than a list
+      // written here.
+      const extracted = new Set([...(slate.tableTypes || []), 'img']);
+      return [
+        ...Object.keys(slate.elements || {}).filter((t) => !extracted.has(t)),
+        ...[...(menu.blockStyles || []), ...(menu.inlineStyles || [])]
+          .map((d) => d?.cssClass)
+          .filter(Boolean)
+          .map((c) => `.${c}`),
+      ];
+    },
   });
 
   // Patch setTimeout to catch focus errors from AddLinkForm
@@ -856,6 +886,15 @@ config.settings.additionalToolbarComponents = {
   // Also remove the old backspaceInList keyboard handler which merges list
   // items instead of demoting them.
   if (config.settings.slate) {
+    // Replace volto-slate's StyleMenu with one that portals out of the toolbar.
+    // Its semantic Dropdown renders the menu inline, and the quanta toolbar is a
+    // fixed-height bar with `overflow: hidden` — the menu opened above the bar,
+    // outside its box, and was clipped away entirely. See StyleDropdown.
+    config.settings.slate.buttons = {
+      ...config.settings.slate.buttons,
+      styleMenu: (props) => <StyleDropdown {...props} />,
+    };
+
     const { backspaceListItem } = require('./extensions/backspaceListItem');
     // Register as a base editor extension so it applies to ALL Slate editors
     // (sidebar widgets, synced toolbar, etc.) — not just textblock editors.
