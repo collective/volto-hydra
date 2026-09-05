@@ -28,6 +28,18 @@ async function formatOptions(page, helper: AdminUIHelper, blockId: string) {
 }
 
 test.describe('slate style allow-list', () => {
+  // The restricted-styles fixture's rules, its style menu and its column
+  // override are declared by the MOCK test frontend only — a page-path switch in
+  // its index.html. On admin-nuxt / admin-nextjs / admin-f7 the same content is
+  // served by a frontend that declares none of it, so every assertion here is
+  // about a configuration that isn't present. Same idiom as dnd-convert's
+  // mock-only conversion blocks.
+  test.beforeEach(({}, testInfo) => {
+    test.skip(
+      testInfo.project.name !== 'admin-mock',
+      'the restricted-styles configuration is declared by the mock frontend',
+    );
+  });
   test('the format dropdown drops a disallowed style and keeps the rest', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
@@ -160,6 +172,18 @@ test.describe('slate style allow-list', () => {
  * the menu opens, a style applies, and the frontend renders the class.
  */
 test.describe('design-system style menu', () => {
+  // The restricted-styles fixture's rules, its style menu and its column
+  // override are declared by the MOCK test frontend only — a page-path switch in
+  // its index.html. On admin-nuxt / admin-nextjs / admin-f7 the same content is
+  // served by a frontend that declares none of it, so every assertion here is
+  // about a configuration that isn't present. Same idiom as dnd-convert's
+  // mock-only conversion blocks.
+  test.beforeEach(({}, testInfo) => {
+    test.skip(
+      testInfo.project.name !== 'admin-mock',
+      'the restricted-styles configuration is declared by the mock frontend',
+    );
+  });
   test('a block style applies and reaches the rendered element', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
@@ -203,6 +227,18 @@ test.describe('design-system style menu', () => {
  * reads the COMPUTED pseudo-element content off the real sidebar editor.
  */
 test.describe('style markers in the sidebar', () => {
+  // The restricted-styles fixture's rules, its style menu and its column
+  // override are declared by the MOCK test frontend only — a page-path switch in
+  // its index.html. On admin-nuxt / admin-nextjs / admin-f7 the same content is
+  // served by a frontend that declares none of it, so every assertion here is
+  // about a configuration that isn't present. Same idiom as dnd-convert's
+  // mock-only conversion blocks.
+  test.beforeEach(({}, testInfo) => {
+    test.skip(
+      testInfo.project.name !== 'admin-mock',
+      'the restricted-styles configuration is declared by the mock frontend',
+    );
+  });
   test('a styled run is marked at both ends, and names itself when clicked', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
@@ -272,6 +308,18 @@ test.describe('style markers in the sidebar', () => {
 });
 
 test.describe('style menu in the sidebar toolbar', () => {
+  // The restricted-styles fixture's rules, its style menu and its column
+  // override are declared by the MOCK test frontend only — a page-path switch in
+  // its index.html. On admin-nuxt / admin-nextjs / admin-f7 the same content is
+  // served by a frontend that declares none of it, so every assertion here is
+  // about a configuration that isn't present. Same idiom as dnd-convert's
+  // mock-only conversion blocks.
+  test.beforeEach(({}, testInfo) => {
+    test.skip(
+      testInfo.project.name !== 'admin-mock',
+      'the restricted-styles configuration is declared by the mock frontend',
+    );
+  });
   test('a style can be applied from the sidebar, and shows there', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
@@ -329,6 +377,18 @@ test.describe('style menu in the sidebar toolbar', () => {
  * everything is off.
  */
 test.describe('region rules inherit into nested containers', () => {
+  // The restricted-styles fixture's rules, its style menu and its column
+  // override are declared by the MOCK test frontend only — a page-path switch in
+  // its index.html. On admin-nuxt / admin-nextjs / admin-f7 the same content is
+  // served by a frontend that declares none of it, so every assertion here is
+  // about a configuration that isn't present. Same idiom as dnd-convert's
+  // mock-only conversion blocks.
+  test.beforeEach(({}, testInfo) => {
+    test.skip(
+      testInfo.project.name !== 'admin-mock',
+      'the restricted-styles configuration is declared by the mock frontend',
+    );
+  });
   test('a nested region cannot re-allow what the page denied', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
@@ -354,6 +414,18 @@ test.describe('region rules inherit into nested containers', () => {
  * (an import, a plugin), which is exactly when normalize-on-load matters.
  */
 test.describe('disallowed leaf marks', () => {
+  // The restricted-styles fixture's rules, its style menu and its column
+  // override are declared by the MOCK test frontend only — a page-path switch in
+  // its index.html. On admin-nuxt / admin-nextjs / admin-f7 the same content is
+  // served by a frontend that declares none of it, so every assertion here is
+  // about a configuration that isn't present. Same idiom as dnd-convert's
+  // mock-only conversion blocks.
+  test.beforeEach(({}, testInfo) => {
+    test.skip(
+      testInfo.project.name !== 'admin-mock',
+      'the restricted-styles configuration is declared by the mock frontend',
+    );
+  });
   test('are stripped on load, keeping their text', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
@@ -397,6 +469,18 @@ test.describe('disallowed leaf marks', () => {
  * not the frontend's.
  */
 test.describe('a frontend rendering design-system styles', () => {
+  // The restricted-styles fixture's rules, its style menu and its column
+  // override are declared by the MOCK test frontend only — a page-path switch in
+  // its index.html. On admin-nuxt / admin-nextjs / admin-f7 the same content is
+  // served by a frontend that declares none of it, so every assertion here is
+  // about a configuration that isn't present. Same idiom as dnd-convert's
+  // mock-only conversion blocks.
+  test.beforeEach(({}, testInfo) => {
+    test.skip(
+      testInfo.project.name !== 'admin-mock',
+      'the restricted-styles configuration is declared by the mock frontend',
+    );
+  });
   test('emits the class for both storage shapes', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
