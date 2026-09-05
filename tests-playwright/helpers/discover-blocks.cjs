@@ -668,7 +668,7 @@ function collectFieldMappingIssues(blockData, blockSchema, blocksConfig, issues)
 
 function collectWidgetShapeIssues(
   blockData, blockSchema, pagePath, blockId, out, blockType, undeclaredFields, blockConfig, blocksConfig,
-  effectiveRequired, pathInfo,
+  effectiveRequired, pathInfo, optionUsage,
 ) {
   const props = blockSchema?.properties;
   if (!props || !blockData || typeof blockData !== 'object') return;
@@ -985,6 +985,33 @@ function collectWidgetShapeIssues(
     }
   }
 
+  // The INVERSE of the stray-field pass above. That one catches content the
+  // schema does not declare; this catches a declared OPTION no content ever
+  // sets — nothing renders it, so nothing can tell you whether it still works,
+  // and a doc page shows authors a setting whose effect it never demonstrates.
+  // The sibling of the canvas-field rule ("editable in at least one example"),
+  // for the half of a block's surface that carries no canvas annotation and so
+  // was excluded there.
+  //
+  // Scoped to what the sidebar offers as a CHOICE — `choices` / Choice factory
+  // / boolean — so a free-text field, whose "coverage" would be any string at
+  // all, is not demanded.
+  if (blockType && optionUsage) {
+    for (const name of Object.keys(props)) {
+      const field = props[name];
+      const isOption =
+        Array.isArray(field && field.choices) ||
+        (field && field.factory === 'Choice') ||
+        (field && field.type === 'boolean');
+      if (!isOption) continue;
+      const usageKey = `${blockType}\0${name}`;
+      const entry = optionUsage.get(usageKey) ||
+        { blockType, field: name, used: false, example: pagePath };
+      if (name in blockData) entry.used = true;
+      optionUsage.set(usageKey, entry);
+    }
+  }
+
   if (issues.length) {
     out.push({ pagePath, blockId, blockType: blockData['@type'], issues });
   }
@@ -1163,6 +1190,9 @@ async function discoverBlocks(
   // (blockType, field) → one example location, for fields present in data but
   // absent from the schema. Deduped so each missing field is reported once.
   const undeclaredFields = new Map();
+  // (blockType, option) → whether ANY example sets it; see the option-coverage
+  // pass in collectWidgetShapeIssues.
+  const optionUsage = new Map();
   // Containment: a non-fixed block whose @type isn't in its container's resolved
   // allowedSiblingTypes can't be reordered within its container (the mobile
   // chevron / drag walks it OUT to the nearest ancestor that accepts the type,
@@ -1328,7 +1358,7 @@ async function discoverBlocks(
         collectWidgetShapeIssues(
           blockData, schema, pagePath, blockId, shapeIssues, blockType, undeclaredFields,
           blockType ? blocksConfig[blockType] : undefined, blocksConfig, effectiveRequired,
-          pathMap?.[blockId],
+          pathMap?.[blockId], optionUsage,
         );
 
         // Unregistered block type: any real @type the frontend can't render is
@@ -1567,6 +1597,30 @@ async function discoverBlocks(
   // (these fields can't be edited in the sidebar until declared).
   for (const { blockType, field, blockId, pagePath } of undeclaredFields.values()) {
     result.push({ blockType, blockId, pagePath, field, undeclaredField: true });
+  }
+
+  // The inverse backlog: a schema OPTION no example sets. Emitted as data (not
+  // a failing test each) so the aggregate can report the whole list at once —
+  // an option with no example is a documentation and regression gap, and the
+  // list is only useful whole.
+  // Only the FRONTEND's own registered types, for the reason the render-coverage
+  // set below gives: mock-parent ships a baseline of schemas (hero, slate,
+  // mock-*, and a fuller set for its own test frontend), and holding a project
+  // to another project's options reads as a backlog it cannot act on. Measured
+  // without this, one run reported 84 options against a frontend that declares
+  // none of them.
+  const frontendKeySetForOptions = new Set(frontendKeys || []);
+  for (const entry of optionUsage.values()) {
+    if (entry.used) continue;
+    if (frontendKeySetForOptions.size && !frontendKeySetForOptions.has(entry.blockType)) {
+      continue;
+    }
+    result.push({
+      blockType: entry.blockType,
+      field: entry.field,
+      pagePath: entry.example,
+      unexercisedOption: true,
+    });
   }
 
   // Graph integrity over what the API actually served: the SAME

@@ -206,6 +206,14 @@ error and no clue in the DOM. Either declare both (`type: 'string', widget:
 to be annotated, and every annotated field has to become editable and take the
 caret when clicked.
 
+It asks the same question of the fields that never reach the canvas. A sidebar
+OPTION — one offering a choice, so `choices` / a `Choice` factory / a boolean —
+has no annotation to look for, so it proves itself by being SET in at least one
+of your content examples. An option no example sets is reported by name: nothing
+renders it, so nothing can tell you it has stopped working, and no doc page
+shows an author what it does. Set it somewhere — a content fixture is enough,
+it does not have to be a page you ship — or drop the option.
+
 ## Widgets hydra registers
 
 A schema names a widget by string, so anything in `config.widgets.widget` is
