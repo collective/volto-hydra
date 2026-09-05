@@ -52,3 +52,4 @@ docs/examples/_images/
 
 # Storage states are generated per-run from ports.ts (see global-setup)
 tests-playwright/.generated/
+.text-style-coverage/

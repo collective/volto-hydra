@@ -23,6 +23,7 @@ import { test as base, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 import { verifyBlockRendering } from '../helpers/BlockVerificationHelper';
 import { fieldsNeverEditable } from '../helpers/field-coverage';
+import { measureTextStyles, recordTextStyles, slateStyles, stylesNeverRendered, stylesRenderingAsPlainText, stylesSeenInContent } from '../helpers/text-style-coverage';
 import { axeCheckPage, formatViolations } from '../helpers/axe-sanity';
 import { getFrontendUrl, SANITY_PROJECTS } from './fixtures';
 import { URLS } from '../ports';
@@ -364,6 +365,31 @@ test.describe('Block sanity (auto-discovered)', () => {
         checkEditTextClicks: true,
       });
 
+      // TEXT-STYLE COVERAGE (#295). A style the author can apply has to render,
+      // and has to render DIFFERENTLY from body text — otherwise picking it does
+      // nothing visible and nothing says why. Measured by APPEARANCE, never by
+      // markup: the frontend picks its own tags (this one renders `strong` as a
+      // styled span deliberately), so we locate the style's text, take a
+      // signature of how it actually looks, and compare against body text on the
+      // same page. The aggregates at the end of the file do the judging.
+      for (const value of Object.values(block.blockData || {})) {
+        if (!Array.isArray(value)) continue;
+        const wanted = [...slateStyles(value)].map(([style, text]) => ({ style, text }));
+        if (wanted.length === 0) continue;
+        const measured = await measureTextStyles(
+          iframe.locator(`[data-block-uid="${block.blockId}"]`).first(),
+          wanted,
+        );
+
+        recordTextStyles(
+          block.blockType,
+          block.pagePath,
+          value,
+          measured.out,
+          measured.baseline,
+        );
+      }
+
       // Accessibility pass (axe-core) over the WHOLE rendered fixture page —
       // not scoped to this one block — so document-outline rules (heading-order)
       // are judged in context. serious/critical WCAG A/AA violations (incl.
@@ -408,6 +434,48 @@ test.describe('Block sanity (auto-discovered)', () => {
   // (e.g. an image block's sidebar-only `alt`) are excluded — they carry no
   // canvas annotation. This runs last (defined after the per-block loop;
   // block-sanity is serial) so coverage is fully accumulated.
+  // The dual of the content-side style check: that one proves no stored node
+  // breaks its region's rules, this proves every style actually in use has a
+  // working example. A style that renders nothing fails HERE rather than as a
+  // reader wondering where a paragraph went.
+  test('every text style in the content renders in at least one example', () => {
+    const never = stylesNeverRendered();
+    expect(
+      never,
+      `Slate styles present in content whose text renders NOWHERE ` +
+        `(an author can apply these and the words disappear):\n` +
+        never
+          .map((n) => `  - ${n.style} (in ${n.blockType} on ${n.pagePath})\n      text: ${JSON.stringify(n.text.slice(0, 60))}`)
+          .join('\n'),
+    ).toEqual([]);
+  });
+
+  // Rendering is not enough: a style has to look like something. If "Subtitle"
+  // produces text indistinguishable from a paragraph, the author picked it, saw
+  // no change, and has nothing to go on.
+  test('every text style renders differently from body text', () => {
+    const flat = stylesRenderingAsPlainText();
+    expect(
+      flat,
+      `Slate styles that render, but identically to ordinary body text ` +
+        `(choosing them changes nothing an author or reader can see):\n` +
+        flat
+          .map((n) => `  - ${n.style} (in ${n.blockType} on ${n.pagePath})\n      text: ${JSON.stringify(n.text.slice(0, 60))}`)
+          .join('\n'),
+    ).toEqual([]);
+  });
+
+  // Fail closed. With no examples recorded the check above passes while
+  // measuring nothing — the exact shape of a gate that reports success over an
+  // empty set. Any real content has paragraphs.
+  test('text-style coverage actually saw some content', () => {
+    expect(
+      stylesSeenInContent(),
+      'no slate styles were recorded from any discovered block — the coverage ' +
+        'check above would pass vacuously',
+    ).not.toEqual([]);
+  });
+
   test('every field has an example — canvas-editable and sidebar option alike', () => {
     const never = fieldsNeverEditable();
     // Same rule, two surfaces. A canvas field proves itself by carrying its edit

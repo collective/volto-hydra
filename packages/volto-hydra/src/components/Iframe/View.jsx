@@ -261,6 +261,7 @@ import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
 import { buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, getEmptyBlockType, getContainerRegionDescriptors } from '../../utils/blockPath';
 import { mergeAnchorsIntoContent } from '../../utils/linkableAnchors';
+import { installStyleMenuPreviewCss } from '../../utils/styleMenuPreviewCss';
 import { canContainAll, getChildBlockEntries, setBlockType, clearBlockType } from '@volto-hydra/helpers';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
@@ -278,6 +279,7 @@ import {
   convertBlockType,
   reshapeContainerBlock,
   validateFieldMappings,
+  reportDisallowedSlateNodes,
 } from '../../utils/blockSync';
 import {
   installCopyFromTargetEnhancers,
@@ -1554,6 +1556,29 @@ const Iframe = (props) => {
   useEffect(() => {
     validateAndLog(properties, 'properties (from Form)', blockFieldTypes);
   }, [properties, blockFieldTypes]);
+
+  // Say what the slate style allow-list would rewrite (#295). The normalization
+  // itself happens in applySchemaDefaultsToFormData; reporting it here means the
+  // migration is visible while editing instead of turning up as a diff on a save
+  // the author didn't think changed anything.
+  useEffect(() => {
+    const disallowed = reportDisallowedSlateNodes(
+      properties,
+      iframeSyncState.blockPathMap,
+      config.blocks.blocksConfig,
+      intl,
+    );
+    if (!disallowed.length) return;
+    console.warn(
+      `[slateStyles] ${disallowed.length} slate node(s) outside this page's allowed styles; they normalize on load:`,
+    );
+    for (const d of disallowed) {
+      console.warn(
+        `  block=${d.blockId} field=${d.field} path=[${d.path.join(',')}] ${d.from} → ${d.to ?? '(unwrapped)'}` +
+          (d.configError ? `  (alias "${d.configError}" is itself disallowed)` : ''),
+      );
+    }
+  }, [properties, iframeSyncState.blockPathMap, intl]);
 
   useEffect(() => {
     // Only update iframeSrc if admin path, mode, or frontend URL differs from iframe's current state
@@ -3554,6 +3579,15 @@ const Iframe = (props) => {
           // 1c. Merge any additional voltoConfig (non-block settings)
           if (event.data.voltoConfig) {
             recurseUpdateVoltoConfig(event.data.voltoConfig);
+            // A design-system style is a FRONTEND class. On the canvas that is
+            // fine — the canvas is the frontend. But slate is also edited in the
+            // sidebar, which renders inside Volto, where the site's stylesheet
+            // does not exist: volto-slate applies the class there and it
+            // resolves to nothing, so picking "Lead" changes nothing visible.
+            // Label them from what the menu already declares. Installed here
+            // because this is when the style menu first becomes known — a
+            // frontend declares it at INIT, long after applyConfig.
+            installStyleMenuPreviewCss(config.settings.slate?.styleMenu);
           }
 
           // 1d. Install variation field enhancers for blocks with `variations.length>1`.
@@ -3607,6 +3641,13 @@ const Iframe = (props) => {
               defaultBlockType: fieldDef.defaultBlockType || null,
               maxLength: fieldDef.maxLength || null,
               title: fieldDef.title || fieldName,
+              // Slate styles this region permits (#295). This rebuild is a
+              // fixed key list, so anything not named here is silently dropped
+              // on the way in — which is why these four are spelled out.
+              allowedStyles: fieldDef.allowedStyles || null,
+              disallowedStyles: fieldDef.disallowedStyles || null,
+              allowedMarks: fieldDef.allowedMarks || null,
+              disallowedMarks: fieldDef.disallowedMarks || null,
             };
           }
 

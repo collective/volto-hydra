@@ -510,12 +510,17 @@ const UNDECLARED_EXEMPT = new Set([
   'required',
 ]);
 
-// Block-level slate STYLES a person can actually choose from the editor's style
-// menu (Volto's slate styleName plugin). There is no slate style menu yet, so
-// this is EMPTY: any `styleName` on a slate node is content a person cannot
-// author — it was hand-injected — and block-sanity must flag it. When a style
-// menu is added, list its style values here (or derive from the slate config).
-const AUTHORABLE_SLATE_STYLES = new Set([]);
+// Slate STYLES a person can actually choose from the editor's style menu
+// (Volto's `settings.slate.styleMenu`, stored as a node's `styleName`). Any
+// other `styleName` is content nobody can author — hand-injected — and
+// block-sanity flags it.
+//
+// DERIVED, not listed: the set comes from what the FRONTEND declares at INIT,
+// harvested by mock-parent and threaded in below. A hardcoded list would be
+// wrong for every frontend but one, and this rule is asked per frontend — the
+// same content is authorable against one and not another. The default stays
+// empty, so a frontend that declares no menu is judged exactly as before.
+let AUTHORABLE_SLATE_STYLES = new Set([]);
 
 // Hydra's own value validator (packages/volto-hydra/.../schemaValidation.mjs) —
 // the SAME `isValidValue` Hydra runs to strip un-authorable values on load, so
@@ -1153,7 +1158,15 @@ function isContainmentExempt(entry, blockData, rules = { slots: [] }, pagePath =
   return !!slotId && (rules.slots || []).includes(slotId);
 }
 
-async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, frontendKeys = []) {
+async function discoverBlocks(
+  apiUrl,
+  maxPages = Infinity,
+  blocksConfig = {},
+  frontendKeys = [],
+  styleMenuClasses = [],
+) {
+  // What this frontend says an author can pick. See AUTHORABLE_SLATE_STYLES.
+  AUTHORABLE_SLATE_STYLES = new Set(styleMenuClasses);
   // Use hydra's canonical buildBlockPathMap to walk content — it knows
   // the schema-defined container fields (blocks_layout, object_list,
   // columns, …) and distinguishes real blocks from inline sub-items.

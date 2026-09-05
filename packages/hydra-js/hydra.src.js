@@ -30,6 +30,7 @@ import {
 import { expelAllowedTypes, findOnlyEmptyChildUid } from './containerOps.js';
 import { acceptableAt } from './conversionMap.js';
 import { collectLinkableAnchors } from './linkableAnchors.js';
+import { isStyleAllowed } from './slateStyles.js';
 
 /**
  * This IS a large file and it needs to be written in one file so for better understanding and
@@ -2578,6 +2579,10 @@ export class Bridge {
             (hasAlt ? evt.altKey : !evt.altKey) &&
             key?.toLowerCase() === hotkey && config.type === 'inline') {
           if (!this.isSlateField(blockId, this.focusedFieldName)) return true;
+          // Swallow rather than fall through: letting Ctrl+B reach the browser
+          // would apply ITS bold to the contenteditable, which is the format we
+          // were asked to withhold.
+          if (!this.slateStylePermits(blockId, config.format)) return true;
           this.sendTransformRequest(blockId, 'format', { format: config.format });
           return true;
         }
@@ -3223,6 +3228,9 @@ export class Bridge {
 
       for (const pattern of blockPatterns) {
         if (textBeforeCursor === pattern.markup) {
+          // Not permitted here → not a shortcut at all: fall through so the
+          // space just types, leaving the literal "> " the author wrote.
+          if (!this.slateStylePermits(blockUid, pattern.type)) break;
           log('Markdown block shortcut detected:', pattern.markup, '→', pattern.type);
           this.sendTransformRequest(blockUid, 'markdown', {
             markdownType: 'block',
@@ -3234,7 +3242,7 @@ export class Bridge {
 
       // Check * separately for block-level (UL) — only when it's the full text
       // This avoids conflict with inline *text* pattern
-      if (textBeforeCursor === '*') {
+      if (textBeforeCursor === '*' && this.slateStylePermits(blockUid, 'ul')) {
         log('Markdown block shortcut detected: * → ul');
         this.sendTransformRequest(blockUid, 'markdown', {
           markdownType: 'block',
@@ -3265,6 +3273,7 @@ export class Bridge {
       if (inner.length === 0 || inner.trim() !== inner) continue;
       // Opening delimiter must be preceded by whitespace or be at start
       if (openIdx > 0 && !/\s/.test(searchText[openIdx - 1])) continue;
+      if (!this.slateStylePermits(blockUid, pattern.type)) continue;
       log('Markdown inline shortcut detected:', open + '...' + close, '→', pattern.type);
       this.sendTransformRequest(blockUid, 'markdown', {
         markdownType: 'inline',
@@ -13218,6 +13227,23 @@ export class Bridge {
    */
   isSlateField(blockUid, fieldName) {
     return this.fieldTypeIsSlate(this.getFieldType(blockUid, fieldName));
+  }
+
+  /**
+   * May a slate node of this type exist in this block? (#295)
+   *
+   * The allow-list is resolved per region by buildBlockPathMap and rides on the
+   * pathMap entry, which the bridge already receives whole — no extra message.
+   * Checked HERE rather than admin-side because a hotkey and a markdown
+   * shortcut both consume the keystroke before the admin sees it: rejecting the
+   * transform after the fact would leave the character eaten.
+   *
+   * @param {string} blockUid
+   * @param {string} type - a slate element type ('blockquote', 'h2', 'strong')
+   * @returns {boolean} true when unrestricted or explicitly allowed
+   */
+  slateStylePermits(blockUid, type) {
+    return isStyleAllowed(type, this.blockPathMap?.[blockUid]?.slateRules);
   }
 
   /**
