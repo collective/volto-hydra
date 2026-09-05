@@ -23,7 +23,11 @@ async function fetchBlocksConfig(
   mockParentUrl: string,
   frontendUrl: string,
   apiUrl: string,
-): Promise<{ blocksConfig: Record<string, any>; frontendKeys: string[] }> {
+): Promise<{
+  blocksConfig: Record<string, any>;
+  frontendKeys: string[];
+  styleMenuClasses: string[];
+}> {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();
@@ -34,8 +38,13 @@ async function fetchBlocksConfig(
         const mp = (window as any).mockParent;
         const c = mp?.getBlocksConfig?.();
         const fk = mp?.getFrontendBlockKeys?.() || [];
+        // The styles the frontend says it offers — what makes stored `styleName`
+        // content authorable or not. Only the frontend knows.
+        const sm = mp?.getStyleMenuClasses?.() || [];
         // Wait past mock-parent's own baseline (~10 types) for the frontend's INIT to land
-        return c && Object.keys(c).length > 10 ? { blocksConfig: c, frontendKeys: fk } : null;
+        return c && Object.keys(c).length > 10
+          ? { blocksConfig: c, frontendKeys: fk, styleMenuClasses: sm }
+          : null;
       });
       if (result) return result;
       await new Promise((r) => setTimeout(r, 200));
@@ -45,7 +54,7 @@ async function fetchBlocksConfig(
   } finally {
     await browser.close();
   }
-  return { blocksConfig: {}, frontendKeys: [] };
+  return { blocksConfig: {}, frontendKeys: [], styleMenuClasses: [] };
 }
 
 /** Is a frontend actually serving in this job? */
@@ -180,9 +189,10 @@ async function globalSetup() {
     // aren't set.
     let blocksConfig: Record<string, any> = {};
     let frontendKeys: string[] = [];
+    let styleMenuClasses: string[] = [];
     if (process.env.MOCK_PARENT_URL && process.env.FRONTEND_URL) {
       console.log(`[SETUP] Fetching blocksConfig via ${process.env.MOCK_PARENT_URL}...`);
-      ({ blocksConfig, frontendKeys } = await fetchBlocksConfig(
+      ({ blocksConfig, frontendKeys, styleMenuClasses } = await fetchBlocksConfig(
         process.env.MOCK_PARENT_URL,
         process.env.FRONTEND_URL,
         schemaApi,
@@ -246,7 +256,7 @@ async function globalSetup() {
         console.warn(`[SETUP] ${project} (${url}) returned no schemas — skipped`);
         continue;
       }
-      const found = await discoverBlocks(discoverApi, maxPages, cfg, keys);
+      const found = await discoverBlocks(discoverApi, maxPages, cfg, keys, styleMenuClasses);
       for (const b of found) blocks.push({ ...b, frontend: project });
       perFrontend[project] = found.length;
       blocksConfig = cfg;      // last one wins for the legacy single-config uses
