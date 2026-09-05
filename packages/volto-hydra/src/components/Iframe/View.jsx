@@ -3562,7 +3562,15 @@ const Iframe = (props) => {
               if (!blockDef?.blockSchema || blockType === 'slate') continue;
               if (blockDef.variations) continue; // the frontend declared its own
               const target = config.blocks.blocksConfig[blockType];
-              if (target?.variations) delete target.variations;
+              // EMPTIED, not deleted. Admin code reads this key without
+              // guarding it (the listing/search item-type and facet paths walk
+              // `variations` to resolve a renderer), so removing it threw and
+              // took the whole preview down with it: 18 admin tests timed out
+              // waiting for any block to appear in the iframe, all of them on
+              // the listing/facet paths. An empty list means "this block has no
+              // variations", which is the intent, and every `.find`/`.map` on it
+              // still answers.
+              if (target?.variations) target.variations = [];
             }
 
             // 1b. Create schemaEnhancers from frontend recipes
