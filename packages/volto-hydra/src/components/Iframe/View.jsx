@@ -3474,6 +3474,35 @@ const Iframe = (props) => {
               if (blockConfig.blockSchema && blockConfig.sidebarTab === undefined) {
                 blockConfig.sidebarTab = 1;
               }
+              // A frontend that declares a block's schema is AUTHORITATIVE for
+              // it: it is the thing that renders, so it decides what can be set.
+              // Without this the admin's own Edit component keeps rendering the
+              // sidebar (ToC/Edit.jsx imports its schema directly and hands it
+              // to BlockDataForm), so an override was silently ignored for every
+              // type Volto already knows — our ToC offered core's `hide_title`
+              // and `ordered` beside the one field the frontend declared, and
+              // the frontend implemented neither. Settings the site cannot
+              // honour, with nothing able to catch it.
+              //
+              // Reuses the existing per-block opt-out rather than adding a
+              // mechanism: `disableCustomSidebarEditForm` already routes a block
+              // to the schema-driven BlockDataForm (see ParentBlocksWidget's
+              // `useSchemaOnly`). Declaring a schema simply defaults it on.
+              //
+              // A frontend can still opt back in per block by sending
+              // `disableCustomSidebarEditForm: false` — for a block whose admin
+              // Edit does something a JSON schema cannot express.
+              //
+              // `slate` is exempt: hydra's own slate schema carries the `value`
+              // field that block-sync and the shadowed text editor depend on,
+              // which no frontend can know to send (see index.js).
+              if (
+                blockConfig.blockSchema &&
+                blockType !== 'slate' &&
+                blockConfig.disableCustomSidebarEditForm === undefined
+              ) {
+                blockConfig.disableCustomSidebarEditForm = true;
+              }
               // Auto-generate default fieldset if missing (only for new blocks, not overrides)
               // Also ensure required is an array (Volto expects this)
               // Recurse into object_list inner schemas too (Volto's InlineForm needs fieldsets).
