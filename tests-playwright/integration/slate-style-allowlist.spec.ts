@@ -346,3 +346,106 @@ test.describe('frontends that declare no styles', () => {
     await expect(page.locator('#hydra-style-menu-preview')).toHaveCount(0);
   });
 });
+
+/**
+ * Inheritance, through a real nested container.
+ *
+ * The fold is unit-tested, but "deny accumulates, allow replaces" is the rule an
+ * author actually meets, and it had never been driven through the editor. The
+ * page denies `blockquote`; the COLUMN's own region re-lists it in
+ * `allowedStyles`. A nested region must not be able to re-allow what an ancestor
+ * banned — and its allow half must still work, or the test proves only that
+ * everything is off.
+ */
+test.describe('region rules inherit into nested containers', () => {
+  test('a nested region cannot re-allow what the page denied', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/restricted-styles-page');
+    await helper.waitForIframeReady();
+
+    const titles = await formatOptions(page, helper, 'deep');
+    // The allow half took effect for this subtree…
+    expect(titles, 'the column allows h2').toContain('Title');
+    // …but the page-level deny survived two levels of nesting, even though the
+    // column's own allowedStyles names blockquote.
+    expect(
+      titles.some((t) => t?.toLowerCase().includes('quote')),
+      'blockquote was denied by the page and must stay denied inside the column',
+    ).toBe(false);
+  });
+});
+
+/**
+ * Leaf MARKS. Nothing in the default toolbar produces one — the inline formats
+ * are elements — so `allowedMarks`/`disallowedMarks` had no end-to-end cover at
+ * all, only the normalizer's unit tests. Stored content can still carry them
+ * (an import, a plugin), which is exactly when normalize-on-load matters.
+ */
+test.describe('disallowed leaf marks', () => {
+  test('are stripped on load, keeping their text', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/restricted-styles-page');
+    await helper.waitForIframeReady();
+    await helper.waitForBridgeConnected();
+
+    // Ask the bridge for the block as the editor now holds it — the mark is a
+    // data concern, and this frontend has no rendering for it to observe.
+    const frame = page.frames().find((f) => f !== page.mainFrame())!;
+    const leaves = await frame.evaluate(() => {
+      const data = (window as any).__hydraBridge?.getBlockData('marked');
+      const out: any[] = [];
+      const walk = (n: any) => {
+        if (Array.isArray(n)) return n.forEach(walk);
+        if (!n || typeof n !== 'object') return;
+        if (typeof n.text === 'string') out.push({ ...n });
+        (n.children || []).forEach(walk);
+      };
+      walk(data?.value);
+      return out;
+    });
+
+    const texts = leaves.map((l: any) => l.text).join('');
+    expect(texts, 'no text may be lost').toContain('kept');
+    for (const leaf of leaves) {
+      expect(Object.keys(leaf), 'the denied mark is gone').not.toContain('highlight');
+    }
+    // The allowed one is untouched — otherwise this passes by stripping everything.
+    expect(leaves.some((l: any) => l.underline === true), 'an allowed mark survives').toBe(true);
+  });
+});
+
+/**
+ * The renderer's half of the contract.
+ *
+ * A frontend has to emit BOTH storage shapes or half a style menu silently does
+ * nothing — `styleName` on the element, and the `style-<cssClass>` leaf marks
+ * inline styles use. hydra's example frontend demonstrates it, and that was only
+ * ever exercised through the sidebar tests, which read the ADMIN's rendering,
+ * not the frontend's.
+ */
+test.describe('a frontend rendering design-system styles', () => {
+  test('emits the class for both storage shapes', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/restricted-styles-page');
+    await helper.waitForIframeReady();
+
+    const block = helper.getIframe().locator('[data-block-uid="styled"]');
+    // Block style: styleName on the element the block renders as — which may be
+    // the block's own root, so ask the DOM rather than assuming a descendant.
+    expect(
+      await block.evaluate(
+        (el: HTMLElement) => el.classList.contains('lead') || !!el.querySelector('.lead'),
+      ),
+      'the block style class is emitted',
+    ).toBe(true);
+    // Inline style: a leaf mark needs an element to hang the class on, so the
+    // renderer has to wrap it — a bare text leaf has nowhere to put it.
+    await expect(block.locator('.dropcap')).toHaveCount(1);
+    await expect(block.locator('.dropcap')).toHaveText('D');
+    // And the text either side is untouched.
+    await expect(block).toContainText('Design-system styles');
+  });
+});

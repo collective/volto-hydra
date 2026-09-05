@@ -69,6 +69,59 @@
         }
       ],
       "plaintext": "Design-system styles, as the sidebar shows them."
+    },
+    "cols": {
+      "@type": "columns",
+      "blocks": {
+        "col-a": {
+          "@type": "column",
+          "blocks": {
+            "deep": {
+              "@type": "slate",
+              "value": [
+                {
+                  "type": "p",
+                  "children": [
+                    {
+                      "text": "Nested inside a column."
+                    }
+                  ]
+                }
+              ],
+              "plaintext": "Nested inside a column."
+            }
+          },
+          "blocks_layout": {
+            "items": [
+              "deep"
+            ]
+          }
+        }
+      },
+      "blocks_layout": {
+        "columns": [
+          "col-a"
+        ]
+      }
+    },
+    "marked": {
+      "@type": "slate",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "kept ",
+              "highlight": true
+            },
+            {
+              "text": "and kept",
+              "underline": true
+            }
+          ]
+        }
+      ],
+      "plaintext": "kept and kept"
     }
   },
   "blocks_layout": {
@@ -76,7 +129,9 @@
       "title-block",
       "legacy",
       "target",
-      "styled"
+      "styled",
+      "cols",
+      "marked"
     ]
   }
 }

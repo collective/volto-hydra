@@ -491,7 +491,7 @@
                                         allowedTemplates: ['/_test_data/templates/test-layout'],
                                         allowedLayouts: contextNavLayoutForced
                                             || [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
-                                        ...(restrictStyles ? { disallowedStyles: ['blockquote', 'b', 'del'] } : {}),
+                                        ...(restrictStyles ? { disallowedStyles: ['blockquote', 'b', 'del'], disallowedMarks: ['highlight'] } : {}),
                                     },
                                     footer: {
                                         title: 'Footer',
@@ -502,7 +502,29 @@
                                 },
                             },
                         },
-                        blocks: { ...sharedBlocksConfig },
+                        blocks: {
+                            ...sharedBlocksConfig,
+                            // #295 inheritance, page-scoped so no other spec sees it:
+                            // the column's own region re-lists `blockquote`, which the
+                            // PAGE denies. Deny accumulates down the tree and cannot be
+                            // re-allowed by a nested region; `h2` proves the allow half
+                            // still takes effect.
+                            ...(restrictStyles ? {
+                                column: {
+                                    ...sharedBlocksConfig.column,
+                                    blockSchema: {
+                                        ...sharedBlocksConfig.column.blockSchema,
+                                        properties: {
+                                            ...sharedBlocksConfig.column.blockSchema.properties,
+                                            items: {
+                                                ...sharedBlocksConfig.column.blockSchema.properties.items,
+                                                allowedStyles: ['p', 'h2', 'blockquote'],
+                                            },
+                                        },
+                                    },
+                                },
+                            } : {}),
+                        },
                         ...(restrictStyles
                             ? {
                                 voltoConfig: {
