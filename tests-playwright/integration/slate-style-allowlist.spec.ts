@@ -149,3 +149,41 @@ test.describe('slate style allow-list', () => {
     await expect(iframe.locator('body')).toContainText('after');
   });
 });
+
+/**
+ * The style menu — how a design system's OWN styles reach an author.
+ *
+ * Volto ships the menu and both toolbars list it, but hydra's canvas toolbar
+ * intercepts mousedown on its buttons to flush the iframe's text buffer before
+ * a format applies. A dropdown is not a format button, so "it is in the list"
+ * is not evidence that picking a style works. This checks the whole path:
+ * the menu opens, a style applies, and the frontend renders the class.
+ */
+test.describe('design-system style menu', () => {
+  test('a block style applies and reaches the rendered element', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/restricted-styles-page');
+    await helper.waitForIframeReady();
+
+    const iframe = helper.getIframe();
+    const block = iframe.locator('[data-block-uid="target"]');
+    await expect(block.locator('.lead')).toHaveCount(0);
+
+    await helper.clickBlockInIframe('target');
+    const editor = await helper.getEditorLocator('target');
+    await editor.click();
+
+    const trigger = page.locator('.quanta-toolbar #style-menu');
+    await expect(trigger, 'the style menu is in toolbarButtons — it should render').toBeVisible();
+    await trigger.click();
+
+    const lead = page.locator('.block-style-lead');
+    await expect(lead).toBeVisible();
+    await lead.click();
+
+    // The class the design system styles on, on the element the author edited.
+    await expect(iframe.locator('[data-block-uid="target"] .lead, [data-block-uid="target"].lead'))
+      .toHaveCount(1, { timeout: 5000 });
+  });
+});

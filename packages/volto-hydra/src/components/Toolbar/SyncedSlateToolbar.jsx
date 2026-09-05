@@ -1148,6 +1148,16 @@ const SyncedSlateToolbar = ({
         return;
       }
 
+      // Nor the design-system style menu. It is a dropdown, not a format button:
+      // intercepting its mousedown preventDefault'd the click that opens it, so
+      // the menu never appeared and every DS style was unreachable — the buffer
+      // flushed and nothing else happened. Its ITEMS live inside the trigger's
+      // subtree (Dropdown.Item renders as a span), so excluding the trigger alone
+      // would still leave them swallowed; the whole menu is excluded.
+      if (e.target.closest('#style-menu')) {
+        return;
+      }
+
       const button =
         e.target.closest('button') || e.target.closest('[data-toolbar-button]');
       if (!button) return;
@@ -1182,6 +1192,9 @@ const SyncedSlateToolbar = ({
 
   const handleButtonClickCapture = useCallback(
     (e) => {
+      // Same exclusion as the mousedown handler: a style-menu click must reach
+      // the dropdown.
+      if (e.target.closest('#style-menu')) return;
       const button =
         e.target.closest('button') || e.target.closest('[data-toolbar-button]');
       if (!button) return;
