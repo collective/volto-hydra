@@ -236,3 +236,52 @@ test.describe('style labels in the sidebar', () => {
     expect(labels.inlineAfter).not.toBe('');
   });
 });
+
+/**
+ * Applying a design-system style from the SIDEBAR's own toolbar.
+ *
+ * The canvas path is covered above, but the sidebar has a different toolbar
+ * (volto-slate's floating `.slate-inline-toolbar`, from expandedToolbarButtons)
+ * living in a different container. hydra swaps the style menu for one that
+ * portals out of the quanta toolbar; that this still works in a toolbar it was
+ * not written for is a claim, not a given.
+ */
+test.describe('style menu in the sidebar toolbar', () => {
+  test('a style can be applied from the sidebar, and shows there', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/restricted-styles-page');
+    await helper.waitForIframeReady();
+
+    await helper.clickBlockInIframe('target');
+    await helper.waitForSidebarOpen();
+
+    const sidebarEditor = helper.getSidebarSlateEditor('value');
+    await expect(sidebarEditor).toBeVisible({ timeout: 10000 });
+    // Nothing is styled yet — otherwise the assertion at the end proves nothing.
+    await expect(sidebarEditor.locator('.lead')).toHaveCount(0);
+
+    await sidebarEditor.click();
+    await sidebarEditor.press('ControlOrMeta+a');
+
+    const toolbar = await helper.waitForSidebarSlateToolbar();
+    const trigger = page.locator('.slate-inline-toolbar:not(.quanta-toolbar) #style-menu');
+    await expect(
+      trigger,
+      'styleMenu is in expandedToolbarButtons — the sidebar toolbar should offer it',
+    ).toBeVisible({ timeout: 5000 });
+    await trigger.click();
+
+    const lead = page.locator('.style-dropdown-menu .block-style-lead');
+    await expect(lead).toBeVisible({ timeout: 5000 });
+    await lead.click();
+
+    // Applied to the value, and visible where the author is working — the label
+    // is what stands in for the design system's CSS, which Volto never loads.
+    const styled = sidebarEditor.locator('.lead');
+    await expect(styled).toHaveCount(1, { timeout: 5000 });
+    const label = await styled.evaluate((el) => getComputedStyle(el, '::before').content);
+    expect(label).toContain('Lead');
+    expect(toolbar).toBeTruthy();
+  });
+});
