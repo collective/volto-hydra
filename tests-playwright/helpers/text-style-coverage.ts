@@ -218,69 +218,87 @@ export function resetTextStyleCoverage(): void {
  *
  * @returns { out: style -> signature|null, baseline: signature|null }
  */
+/**
+ * Measure, in the page, how each style actually looks — and how body text looks
+ * next to it.
+ *
+ * SELF-CONTAINED on purpose: Playwright serialises this to run it in the page,
+ * so it can close over nothing. That also makes it directly testable, which it
+ * needs to be — every rule in here cost a wrong finding first:
+ *
+ *   - the baseline was "the longest leaf run", so in a mostly-bold block BOLD
+ *     became the baseline and bold was then reported as looking like body text;
+ *   - `p` and `strong` resolve to the SAME element in a fully-bold paragraph,
+ *     which read as "bold is invisible" until identity was checked;
+ *   - `querySelectorAll` returns descendants only, so a slate block rendering AS
+ *     the styled element (`<h3 data-block-uid=…>`) was reported as rendering
+ *     nowhere.
+ *
+ * Knows nothing about markup: it finds the innermost element whose whole text is
+ * the style's text and takes a signature of its COMPUTED style, so a frontend
+ * rendering a heading as a `<div>`, or bold as a styled `<span>`, passes on its
+ * merits.
+ */
+export function measureStylesInPage(
+  root: HTMLElement,
+  wanted: Array<{ style: string; text: string }>,
+): {
+  out: Record<string, { sig: string; node: number } | null>;
+  baseline: { sig: string; node: number } | null;
+} {
+  // Match with ALL whitespace removed. A container style's slate text is its
+  // children concatenated with no separator ("oneTwo"), while the DOM puts them
+  // in separate elements and reads back "one Two".
+  const norm = (t: string) => t.replace(/[\u200b\ufeff\u00a0\s]/g, '');
+
+  // What something LOOKS like, reduced to the properties that make one style
+  // visibly distinct from another. No tag name on purpose.
+  const signature = (el: Element) => {
+    const c = getComputedStyle(el);
+    return [
+      c.fontSize, c.fontWeight, c.fontStyle, c.fontFamily,
+      c.textDecorationLine, c.textTransform, c.letterSpacing,
+      c.verticalAlign, c.display, c.color,
+    ].join('|');
+  };
+
+  // `root` itself counts, and the INNERMOST match wins — the element the style
+  // produced, not an ancestor that merely contains it.
+  const locate = (text: string) => {
+    const target = norm(text);
+    if (!target) return null;
+    const all = [root, ...root.querySelectorAll('*')].filter(
+      (el) => norm(el.textContent || '') === target,
+    );
+    return all.length ? (all[all.length - 1] as HTMLElement) : null;
+  };
+
+  const ids = new Map<Element, number>();
+  const idOf = (el: Element) => {
+    if (!ids.has(el)) ids.set(el, ids.size);
+    return ids.get(el) as number;
+  };
+
+  const out: Record<string, { sig: string; node: number } | null> = {};
+  for (const { style, text } of wanted) {
+    const el = locate(text);
+    out[style] = el ? { sig: signature(el), node: idOf(el) } : null;
+  }
+  // Body text is how the DEFAULT BLOCK TYPE renders, which is already measured.
+  return { out, baseline: out['p'] ?? null };
+}
+
+/**
+ * Run {@link measureStylesInPage} against a rendered block.
+ *
+ * `blockLocator` is a Playwright Locator, typed loosely so this module stays
+ * importable by the unit tests (no playwright dependency).
+ */
 export async function measureTextStyles(
   blockLocator: { evaluate: Function },
   items: Array<{ style: string; text: string }>,
 ): Promise<{ out: Record<string, Measured | null>; baseline: Measured | null }> {
   return await blockLocator
-    .evaluate((root: HTMLElement, wanted: Array<{ style: string; text: string }>) => {
-      // Match with ALL whitespace removed. A container style's slate text is
-      // its children concatenated with no separator ("oneTwo"), while the DOM
-      // puts them in separate elements and reads back "one Two" — comparing on
-      // collapsed-but-present whitespace reported every `ol`/`ul` as rendering
-      // nowhere.
-      const norm = (t: string) => t.replace(/[\u200b\ufeff\u00a0\s]/g, '');
-
-      // What something LOOKS like, reduced to properties that make one style
-      // visibly distinct from another. No tag name on purpose.
-      const signature = (el: Element) => {
-        const c = getComputedStyle(el);
-        return [
-          c.fontSize, c.fontWeight, c.fontStyle, c.fontFamily,
-          c.textDecorationLine, c.textTransform, c.letterSpacing,
-          c.verticalAlign, c.display, c.color,
-        ].join('|');
-      };
-
-      // The INNERMOST element whose whole text is this style's text — the
-      // element the style produced, not an ancestor that merely contains it.
-      const locate = (text: string) => {
-        const target = norm(text);
-        if (!target) return null;
-        // `root` itself counts. A slate block often renders AS the styled
-        // element (`<h3 data-block-uid=…>`), in which case no descendant holds
-        // the text and searching only descendants reported every such heading
-        // as rendering nowhere.
-        const all = [root, ...root.querySelectorAll('*')].filter(
-          (el) => norm(el.textContent || '') === target,
-        );
-        return all.length ? (all[all.length - 1] as HTMLElement) : null;
-      };
-
-      // Tag each located element so the caller can tell "these two styles are
-      // the same element" from "these two styles look alike". A paragraph that
-      // is entirely bold resolves `p` and `strong` to ONE element, and without
-      // identity that reads as "bold renders like body text" — which was
-      // reported, and was wrong.
-      const ids = new Map<Element, number>();
-      const idOf = (el: Element) => {
-        if (!ids.has(el)) ids.set(el, ids.size);
-        return ids.get(el) as number;
-      };
-
-      const out: Record<string, { sig: string; node: number } | null> = {};
-      for (const { style, text } of wanted) {
-        const el = locate(text);
-        out[style] = el ? { sig: signature(el), node: idOf(el) } : null;
-      }
-
-      // Body text is how the DEFAULT BLOCK TYPE renders, which we have already
-      // measured — not "the longest leaf run". That was the first attempt and it
-      // was wrong: in a block whose only long run happens to be bold, the
-      // heuristic made BOLD the baseline and then reported bold as looking like
-      // body text. `p` is the definition of body text, so use it.
-      const baseline = out['p'] ?? null;
-      return { out, baseline };
-    }, items)
+    .evaluate(measureStylesInPage, items)
     .catch(() => ({ out: {}, baseline: null }));
 }
