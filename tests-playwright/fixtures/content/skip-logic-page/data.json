@@ -42,114 +42,108 @@
           "field_type": "text",
           "label": "Shown when the first question is answered (text)",
           "plaintext": "Shown when the first question is answered (text)",
-          "show_when_when": "trigger",
           "show_when_is": "value_is",
-          "show_when_to": "Yes"
+          "show_when_field": "trigger"
         },
         {
           "field_id": "dependent-textarea",
           "field_type": "textarea",
           "label": "Shown when the first question is answered (textarea)",
           "plaintext": "Shown when the first question is answered (textarea)",
-          "show_when_when": "trigger",
-          "show_when_is": "filled"
+          "show_when_is": "filled",
+          "show_when_field": "trigger"
         },
         {
           "field_id": "dependent-select",
           "field_type": "select",
           "label": "Shown when the first question is answered (select)",
           "plaintext": "Shown when the first question is answered (select)",
-          "show_when_when": "trigger",
           "show_when_is": "value_is",
-          "show_when_to": "Yes",
           "input_values": [
             "First",
             "Second"
-          ]
+          ],
+          "show_when_field": "trigger"
         },
         {
           "field_id": "dependent-single_choice",
           "field_type": "single_choice",
           "label": "Shown when the first question is answered (single_choice)",
           "plaintext": "Shown when the first question is answered (single_choice)",
-          "show_when_when": "trigger",
           "show_when_is": "filled",
           "input_values": [
             "First",
             "Second"
-          ]
+          ],
+          "show_when_field": "trigger"
         },
         {
           "field_id": "dependent-multiple_choice",
           "field_type": "multiple_choice",
           "label": "Shown when the first question is answered (multiple_choice)",
           "plaintext": "Shown when the first question is answered (multiple_choice)",
-          "show_when_when": "trigger",
           "show_when_is": "value_is",
-          "show_when_to": "Yes",
           "input_values": [
             "First",
             "Second"
-          ]
+          ],
+          "show_when_field": "trigger"
         },
         {
           "field_id": "dependent-checkbox",
           "field_type": "checkbox",
           "label": "Shown when the first question is answered (checkbox)",
           "plaintext": "Shown when the first question is answered (checkbox)",
-          "show_when_when": "trigger",
-          "show_when_is": "filled"
+          "show_when_is": "filled",
+          "show_when_field": "trigger"
         },
         {
           "field_id": "dependent-date",
           "field_type": "date",
           "label": "Shown when the first question is answered (date)",
           "plaintext": "Shown when the first question is answered (date)",
-          "show_when_when": "trigger",
           "show_when_is": "value_is",
-          "show_when_to": "Yes"
+          "show_when_field": "trigger"
         },
         {
           "field_id": "dependent-number",
           "field_type": "number",
           "label": "Shown when the first question is answered (number)",
           "plaintext": "Shown when the first question is answered (number)",
-          "show_when_when": "trigger",
-          "show_when_is": "filled"
+          "show_when_is": "filled",
+          "show_when_field": "trigger"
         },
         {
           "field_id": "dependent-attachment",
           "field_type": "attachment",
           "label": "Shown when the first question is answered (attachment)",
           "plaintext": "Shown when the first question is answered (attachment)",
-          "show_when_when": "trigger",
           "show_when_is": "value_is",
-          "show_when_to": "Yes"
+          "show_when_field": "trigger"
         },
         {
           "field_id": "dependent-from",
           "field_type": "from",
           "label": "Shown when the first question is answered (from)",
           "plaintext": "Shown when the first question is answered (from)",
-          "show_when_when": "trigger",
-          "show_when_is": "filled"
+          "show_when_is": "filled",
+          "show_when_field": "trigger"
         },
         {
           "field_id": "dependent-hidden",
           "field_type": "hidden",
           "label": "Shown when the first question is answered (hidden)",
           "plaintext": "Shown when the first question is answered (hidden)",
-          "show_when_when": "trigger",
           "show_when_is": "value_is",
-          "show_when_to": "Yes"
+          "show_when_field": "trigger"
         },
         {
           "field_id": "dependent-static_text",
           "field_type": "static_text",
           "label": "Some guidance, shown once the first question is answered",
           "plaintext": "Shown when the first question is answered (static_text)",
-          "show_when_when": "trigger",
-          "show_when_is": "filled"
+          "show_when_is": "filled",
+          "show_when_field": "trigger"
         }
       ]
     },
