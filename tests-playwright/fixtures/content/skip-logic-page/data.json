@@ -145,7 +145,12 @@
           "show_when_is": "filled",
           "show_when_field": "trigger"
         }
-      ]
+      ],
+      "default_to": "admin@example.com",
+      "default_from": "noreply@example.com",
+      "default_subject": "Skip-logic example submission",
+      "captcha": "honeypot",
+      "store": true
     },
     "search-1": {
       "@type": "search",
