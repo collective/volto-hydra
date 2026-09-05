@@ -108,6 +108,10 @@ const test = base.extend<{ helper: AdminUIHelper }>({
   },
 });
 
+// Schema options that no discovered example sets — filled by the loop below,
+// reported by the coverage aggregate at the end.
+const unexercisedOptions: Array<{ blockType: string; field: string }> = [];
+
 test.describe('Block sanity (auto-discovered)', () => {
   for (const block of discoveredBlocks) {
     // Run each discovered case only on the frontend it came from. Discovery is
@@ -213,6 +217,13 @@ test.describe('Block sanity (auto-discovered)', () => {
             (block.issues || []).map((m) => `  - ${m}`).join('\n'),
         );
       });
+      continue;
+    }
+    // A schema OPTION no example sets. Collected for the aggregate below rather
+    // than failed one-by-one: the list is a coverage backlog and only reads as
+    // one. Not a renderable block, so it never reaches the render checks.
+    if (block.unexercisedOption) {
+      unexercisedOptions.push({ blockType: block.blockType, field: block.field });
       continue;
     }
     // A field present in stored data but not declared in the block schema — one
@@ -389,15 +400,28 @@ test.describe('Block sanity (auto-discovered)', () => {
   // (e.g. an image block's sidebar-only `alt`) are excluded — they carry no
   // canvas annotation. This runs last (defined after the per-block loop;
   // block-sanity is serial) so coverage is fully accumulated.
-  test('every canvas-editable field is editable in at least one example', () => {
+  test('every field has an example — canvas-editable and sidebar option alike', () => {
     const never = fieldsNeverEditable();
+    // Same rule, two surfaces. A canvas field proves itself by carrying its edit
+    // annotation somewhere; a sidebar OPTION has no annotation to carry, so it
+    // proves itself by being SET in some example. Excluded from the canvas rule
+    // for want of an annotation, options were the half of a block nothing
+    // covered: undemonstrated in the docs and unguarded against regression.
+    const missing = [
+      ...never.map(
+        (n) => `  - ${n.blockType}.${n.field} (${n.kind}) — no edit annotation in any example\n      e.g. ${n.example}`,
+      ),
+      ...unexercisedOptions.map(
+        (o) => `  - ${o.blockType}.${o.field} (option) — no example sets it`,
+      ),
+    ];
     expect(
-      never,
-      `Canvas-editable fields with NO edit annotation in ANY discovered example ` +
-        `(each is uneditable everywhere it appears):\n` +
-        never
-          .map((n) => `  - ${n.blockType}.${n.field} (${n.kind})\n      e.g. ${n.example}`)
-          .join('\n'),
+      missing,
+      `Fields with no example anywhere. A canvas field with no edit annotation ` +
+        `is uneditable everywhere it appears; an option no example sets is a ` +
+        `setting nobody can see the effect of, and nothing would catch it ` +
+        `breaking. Add an example, or drop the field:\n` +
+        missing.join('\n'),
     ).toEqual([]);
   });
 });
