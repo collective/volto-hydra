@@ -77,6 +77,7 @@ import columnAfterSVG from '@plone/volto/icons/column-after.svg';
 import columnDeleteSVG from '@plone/volto/icons/column-delete.svg';
 import { applyBlockDefaults } from '@plone/volto/helpers';
 import { setInjectedVoltoConfig } from './utils/injectedVoltoConfig';
+import StyleDropdown from './components/Toolbar/StyleDropdown';
 
 const applyConfig = (config) => {
   // Inject the Volto-config-derived values the pure block-path / schema utils
@@ -885,6 +886,15 @@ config.settings.additionalToolbarComponents = {
   // Also remove the old backspaceInList keyboard handler which merges list
   // items instead of demoting them.
   if (config.settings.slate) {
+    // Replace volto-slate's StyleMenu with one that portals out of the toolbar.
+    // Its semantic Dropdown renders the menu inline, and the quanta toolbar is a
+    // fixed-height bar with `overflow: hidden` — the menu opened above the bar,
+    // outside its box, and was clipped away entirely. See StyleDropdown.
+    config.settings.slate.buttons = {
+      ...config.settings.slate.buttons,
+      styleMenu: (props) => <StyleDropdown {...props} />,
+    };
+
     const { backspaceListItem } = require('./extensions/backspaceListItem');
     // Register as a base editor extension so it applies to ALL Slate editors
     // (sidebar widgets, synced toolbar, etc.) — not just textblock editors.
