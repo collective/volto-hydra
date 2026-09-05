@@ -1792,14 +1792,35 @@ export const sharedBlocksConfig = {
       title: 'Title',
       group: 'text',
       restricted: true,
-      blockSchema: { fieldsets: [], properties: {}, required: [] },
+      // The field, and the hint shown while it is empty. A frontend owns its
+      // block's schema, and a placeholder is part of that schema — the admin
+      // used to supply this one, which meant hydra decided the wording for a
+      // block the frontend declares. An empty `properties` here said "this
+      // block has no fields", and got exactly that.
+      blockSchema: {
+        fieldsets: [{ id: 'default', title: 'Default', fields: ['title'] }],
+        properties: {
+          title: { title: 'Title', type: 'string', placeholder: 'Type the title…' },
+        },
+        required: [],
+      },
     },
     description: {
       id: 'description',
       title: 'Description',
       group: 'text',
       restricted: true,
-      blockSchema: { fieldsets: [], properties: {}, required: [] },
+      blockSchema: {
+        fieldsets: [{ id: 'default', title: 'Default', fields: ['description'] }],
+        properties: {
+          description: {
+            title: 'Description',
+            type: 'string',
+            placeholder: 'Add a description…',
+          },
+        },
+        required: [],
+      },
     },
     leadimage: {
       id: 'leadimage',

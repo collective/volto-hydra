@@ -3474,6 +3474,35 @@ const Iframe = (props) => {
               if (blockConfig.blockSchema && blockConfig.sidebarTab === undefined) {
                 blockConfig.sidebarTab = 1;
               }
+              // A frontend that declares a block's schema is AUTHORITATIVE for
+              // it: it is the thing that renders, so it decides what can be set.
+              // Without this the admin's own Edit component keeps rendering the
+              // sidebar (ToC/Edit.jsx imports its schema directly and hands it
+              // to BlockDataForm), so an override was silently ignored for every
+              // type Volto already knows — our ToC offered core's `hide_title`
+              // and `ordered` beside the one field the frontend declared, and
+              // the frontend implemented neither. Settings the site cannot
+              // honour, with nothing able to catch it.
+              //
+              // Reuses the existing per-block opt-out rather than adding a
+              // mechanism: `disableCustomSidebarEditForm` already routes a block
+              // to the schema-driven BlockDataForm (see ParentBlocksWidget's
+              // `useSchemaOnly`). Declaring a schema simply defaults it on.
+              //
+              // A frontend can still opt back in per block by sending
+              // `disableCustomSidebarEditForm: false` — for a block whose admin
+              // Edit does something a JSON schema cannot express.
+              //
+              // `slate` is exempt: hydra's own slate schema carries the `value`
+              // field that block-sync and the shadowed text editor depend on,
+              // which no frontend can know to send (see index.js).
+              if (
+                blockConfig.blockSchema &&
+                blockType !== 'slate' &&
+                blockConfig.disableCustomSidebarEditForm === undefined
+              ) {
+                blockConfig.disableCustomSidebarEditForm = true;
+              }
               // Auto-generate default fieldset if missing (only for new blocks, not overrides)
               // Also ensure required is an array (Volto expects this)
               // Recurse into object_list inner schemas too (Volto's InlineForm needs fieldsets).
@@ -3519,6 +3548,30 @@ const Iframe = (props) => {
               }
             }
             recurseUpdateVoltoConfig({ blocks: { blocksConfig } });
+
+            // Variations follow the schema. They are a SECOND registry the admin
+            // fills in (core attaches ToCVariations, ListingVariations, … in
+            // Blocks.jsx), so a frontend that replaced a block's schema still had
+            // the admin's `variation` picker sitting on top of it — offering
+            // renderings the frontend does not have. Same defect as the fields,
+            // one registry over: the author picks and nothing changes.
+            //
+            // So a frontend that declares a schema owns the variations too. Send
+            // them and they are used; send none and the block has none.
+            for (const [blockType, blockDef] of Object.entries(blocksConfig)) {
+              if (!blockDef?.blockSchema || blockType === 'slate') continue;
+              if (blockDef.variations) continue; // the frontend declared its own
+              const target = config.blocks.blocksConfig[blockType];
+              // EMPTIED, not deleted. Admin code reads this key without
+              // guarding it (the listing/search item-type and facet paths walk
+              // `variations` to resolve a renderer), so removing it threw and
+              // took the whole preview down with it: 18 admin tests timed out
+              // waiting for any block to appear in the iframe, all of them on
+              // the listing/facet paths. An empty list means "this block has no
+              // variations", which is the intent, and every `.find`/`.map` on it
+              // still answers.
+              if (target?.variations) target.variations = [];
+            }
 
             // 1b. Create schemaEnhancers from frontend recipes
             // When the frontend sends a recipe (e.g., { inheritSchemaFrom: {...} }),
