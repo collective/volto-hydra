@@ -4967,7 +4967,15 @@ export class AdminUIHelper {
    * (It used to sleep 100ms per turn and, on timeout, RETURN the last count —
    * so a never-settling page silently handed the caller a number.)
    *
-   * @param timeout - Maximum time to wait in milliseconds (default 5000)
+   * TWO PHASES, because "no measurement yet" and "the count keeps changing" are
+   * different faults. One budget for both let a single slow round trip fail the
+   * whole thing: on a saturated machine `getBlockOrder()` outlasted the entire
+   * 5s, so the poll never completed one sample and reported "the page kept
+   * re-rendering" having seen NOTHING (`counts seen: []`) — sending the reader
+   * after a re-render that never happened. Phase 1 waits for a count to come
+   * back at all; phase 2 judges stability with its own budget.
+   *
+   * @param timeout - Budget for EACH phase in milliseconds (default 5000)
    * @returns The stable block count
    */
   async getStableBlockCount(timeout: number = 5000): Promise<number> {
@@ -4986,6 +4994,19 @@ export class AdminUIHelper {
     };
 
     const seen: number[] = [];
+
+    // PHASE 1 — a measurement, any measurement. Until one arrives there is
+    // nothing to call stable or unstable.
+    await expect
+      .poll(async () => safeCount(), {
+        timeout,
+        message:
+          `The iframe never returned a block count within ${timeout}ms — ` +
+          `navigation had not finished, or the machine was too loaded for the ` +
+          `round trip to complete. This is NOT a re-rendering page.`,
+      })
+      .toBeGreaterThanOrEqual(0);
+
     let lastCount = -1;
     let stableChecks = 0;
 
@@ -5010,7 +5031,8 @@ export class AdminUIHelper {
             `Block count never settled within ${timeout}ms — counts seen: ` +
             `[${seen.join(', ')}] (-1 = iframe was navigating). The page kept ` +
             `re-rendering; if you know the count you expect, assert it with ` +
-            `toHaveCount instead of waiting for quiescence.`,
+            `toHaveCount instead of waiting for quiescence. (A count DID come ` +
+            `back — phase 1 passed — so this is genuinely instability.)`,
         },
       )
       .toBeGreaterThanOrEqual(2);
