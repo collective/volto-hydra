@@ -525,24 +525,27 @@
                                 },
                             } : {}),
                         },
-                        ...(restrictStyles
-                            ? {
-                                voltoConfig: {
-                                    settings: {
-                                        slate: {
-                                            styleAliases: { b: 'strong' },
-                                            // A design system's own styles. Scoped to this
-                                            // fixture so the toolbar-button counts other
-                                            // specs assert stay as they are.
-                                            styleMenu: {
-                                                blockStyles: [{ cssClass: 'lead', label: 'Lead' }],
-                                                inlineStyles: [{ cssClass: 'dropcap', label: 'Drop cap' }],
-                                            },
-                                        },
+                        voltoConfig: {
+                            settings: {
+                                slate: {
+                                    // A design system's own styles, declared for the
+                                    // WHOLE frontend rather than one fixture page.
+                                    // Discovery harvests blocksConfig from a single page
+                                    // load, so a page-scoped menu meant stored content
+                                    // using `styleName` was judged against a config that
+                                    // offered no styles — "not an authorable style", and
+                                    // rightly so.
+                                    styleMenu: {
+                                        blockStyles: [{ cssClass: 'lead', label: 'Lead' }],
+                                        inlineStyles: [{ cssClass: 'dropcap', label: 'Drop cap' }],
                                     },
+                                    // The allow-list rules stay page-scoped: they are what
+                                    // the restriction specs vary, and every other spec
+                                    // must keep seeing an unrestricted editor.
+                                    ...(restrictStyles ? { styleAliases: { b: 'strong' } } : {}),
                                 },
-                            }
-                            : {}),
+                            },
+                        },
                         debug: true,
                         // Pass onEditChange before init() sends INIT to avoid race condition
                         onEditChange: (formData) => {

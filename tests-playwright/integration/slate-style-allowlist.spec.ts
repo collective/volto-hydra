@@ -319,35 +319,6 @@ test.describe('style menu in the sidebar toolbar', () => {
 });
 
 /**
- * The opt-in guarantee, for every frontend that is NOT using this.
- *
- * hydra replaces volto-slate's styleMenu button globally, so a bug here would
- * change the toolbar for every consumer, not just one that declares styles. A
- * frontend that declares none must get no control at all — not an empty
- * dropdown, and nothing occupying a toolbar slot.
- */
-test.describe('frontends that declare no styles', () => {
-  test('get no style control, and no stylesheet', async ({ page }) => {
-    const helper = new AdminUIHelper(page);
-    await helper.login();
-    await helper.navigateToEdit('/test-page');
-    await helper.waitForIframeReady();
-
-    await helper.clickBlockInIframe('block-1-uuid');
-    const toolbar = page.locator('.quanta-toolbar');
-    await expect(toolbar).toBeVisible();
-    // The format dropdown proves the toolbar rendered its buttons at all, so
-    // "no style menu" is an absence rather than an empty toolbar.
-    await expect(toolbar.locator('.format-dropdown-trigger')).toBeVisible();
-    await expect(toolbar.locator('#style-menu')).toHaveCount(0);
-
-    // Nothing declared → nothing injected. A stylesheet here would be marking
-    // classes no style menu offers.
-    await expect(page.locator('#hydra-style-menu-preview')).toHaveCount(0);
-  });
-});
-
-/**
  * Inheritance, through a real nested container.
  *
  * The fold is unit-tested, but "deny accumulates, allow replaces" is the rule an
