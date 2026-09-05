@@ -65,8 +65,8 @@ blocks: {
     mostUsed: true,
     blockSchema: { properties: { /* fields */ } },
   },
-  slate: {                           // override the built-in slate block
-    blockSchema: { /* override */ },
+  toc: {                             // override a built-in block
+    blockSchema: { /* YOUR fields — see "Overriding a built-in block" */ },
   },
 }
 ```
@@ -79,12 +79,43 @@ Per-block options (most are passed through to Volto's block config):
 - **`group`** — chooser group (e.g. `'common'`).
 - **`restricted`** — `true` hides the block from the chooser; can also be a function for conditional restrictions.
 - **`mostUsed`** — pin to the top of the chooser.
-- **`disableCustomSidebarEditForm`** — set `true` to use only the schema form in the sidebar (no custom edit component).
+- **`disableCustomSidebarEditForm`** — use only the schema form in the sidebar (no custom edit component). **Defaults to `true` for any block you give a `blockSchema`** — see [Overriding a built-in block](#overriding-a-built-in-block). Set `false` to keep the admin's own edit component for a block whose sidebar does something a JSON schema cannot express.
 - **`blockSchema`** — JSON-schema-style definition of the block's fields. See [Schema Enhancers](#schema-enhancers) below and the [Block reference](examples/README.md).
 - **`fieldMappings`** — block-to-block conversion rules. See [Block Conversion & fieldMappings](#block-conversion--fieldmappings) below.
 - **`schemaEnhancer`** — recipe-based schema modifier; supports `fieldRules`, `inheritSchemaFrom`, etc. See [Schema Enhancers](#schema-enhancers).
 
 `page` and `blocks` interact via name lookup: a region's `allowedBlocks: ['slate', 'slider']` references keys of the `blocks` registry. You can use one without the other — `page` alone restricts placement of built-in blocks; `blocks` alone registers custom types and gets a default `blocks_layout` region accepting everything.
+
+### Overriding a built-in block
+
+Your frontend is the thing that renders, so it decides what an author can set. Give a built-in block a `blockSchema` and **your schema is the whole schema**: the sidebar shows your fields and nothing else.
+
+```js
+blocks: {
+  toc: {
+    blockSchema: {
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['levels'] }],
+      properties: {
+        levels: { title: 'Heading levels', type: 'array', items: { choices: [['h2', 'Heading 2']] } },
+      },
+      required: [],
+    },
+  },
+}
+```
+
+That sidebar offers `levels`. It does not offer the admin's `hide_title`, `ordered`, `title` or `variation`, because your frontend never said it renders them.
+
+This is deliberate: before, the admin's fields were merged in and its edit component kept rendering the sidebar, so an author was offered settings the frontend could not honour — they ticked a box and the page did not change.
+
+Two consequences worth knowing:
+
+- **Variations follow the schema.** Variations are a separate registry the admin fills in. Declare a `blockSchema` and the admin's variations for that block are dropped too; send your own `variations` to keep a picker.
+- **Labels are yours.** The admin's built-in labels come from its translation catalogue. A schema sent over the bridge carries plain strings, so an overriding frontend supplies its own — in whatever language it wants them.
+
+`slate` is the one exception: the admin's slate schema carries the `value` field that block-sync and inline editing depend on, which a frontend cannot know to send, so declaring a slate schema adds to it rather than replacing it.
+
+To keep the admin's edit component for one block — a picker or upload UI a schema cannot describe — send `disableCustomSidebarEditForm: false` for that block.
 
 ### Other top-level options
 
