@@ -12,19 +12,71 @@
     "title": "Site"
   },
   "blocks": {
-    "title-block": { "@type": "title" },
+    "title-block": {
+      "@type": "title"
+    },
     "legacy": {
       "@type": "slate",
-      "value": [{ "type": "p", "children": [{ "text": "was " }, { "type": "b", "children": [{ "text": "bold" }] }] }],
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "was "
+            },
+            {
+              "type": "b",
+              "children": [
+                {
+                  "text": "bold"
+                }
+              ]
+            }
+          ]
+        }
+      ],
       "plaintext": "was bold"
     },
     "target": {
       "@type": "slate",
-      "value": [{ "type": "p", "children": [{ "text": "paste here" }] }],
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "paste here"
+            }
+          ]
+        }
+      ],
       "plaintext": "paste here"
+    },
+    "styled": {
+      "@type": "slate",
+      "value": [
+        {
+          "type": "p",
+          "styleName": "lead",
+          "children": [
+            {
+              "text": "D",
+              "style-dropcap": true
+            },
+            {
+              "text": "esign-system styles, as the sidebar shows them."
+            }
+          ]
+        }
+      ],
+      "plaintext": "Design-system styles, as the sidebar shows them."
     }
   },
   "blocks_layout": {
-    "items": ["title-block", "legacy", "target"]
+    "items": [
+      "title-block",
+      "legacy",
+      "target",
+      "styled"
+    ]
   }
 }

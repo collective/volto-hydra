@@ -187,3 +187,52 @@ test.describe('design-system style menu', () => {
       .toHaveCount(1, { timeout: 5000 });
   });
 });
+
+/**
+ * Design-system styles in the SIDEBAR, where the design system's CSS does not
+ * exist.
+ *
+ * volto-slate applies the classes there (render.jsx puts `styleName` on the
+ * element and each `style-*` mark on the leaf), but Volto never loads the site's
+ * stylesheet, so they resolve to nothing: the author picks a style and sees no
+ * change at all. hydra labels them from what the style menu declares.
+ *
+ * Asserting the generated CSS *string* proves nothing — the rules can be perfect
+ * and still apply to no element, which is exactly the bug an earlier version of
+ * this had (the shared appearance hung on an attribute nothing sets). So this
+ * reads the COMPUTED pseudo-element content off the real sidebar editor.
+ */
+test.describe('style labels in the sidebar', () => {
+  test('a block style is labelled, and an inline one is bracketed at both ends', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/restricted-styles-page');
+    await helper.waitForIframeReady();
+
+    await helper.clickBlockInIframe('styled');
+    const sidebarEditor = helper.getSidebarSlateEditor('value');
+    await expect(sidebarEditor).toBeVisible({ timeout: 10000 });
+
+    const labels = await sidebarEditor.evaluate((root: HTMLElement) => {
+      const read = (el: Element | null, pseudo: string) =>
+        el ? getComputedStyle(el, pseudo).content : '(no element)';
+      const block = root.querySelector('.lead');
+      const inline = root.querySelector('.dropcap');
+      return {
+        blockBefore: read(block, '::before'),
+        inlineBefore: read(inline, '::before'),
+        inlineAfter: read(inline, '::after'),
+        // The class has to be there for any of this to mean anything.
+        classesFound: { lead: !!block, dropcap: !!inline },
+      };
+    });
+
+    expect(labels.classesFound).toEqual({ lead: true, dropcap: true });
+    // The name the style menu shows, rendered where the author can see it.
+    expect(labels.blockBefore).toContain('Lead');
+    expect(labels.inlineBefore).toContain('Drop cap');
+    // Both ends, so the extent of an inline style is visible.
+    expect(labels.inlineAfter).not.toBe('none');
+    expect(labels.inlineAfter).not.toBe('');
+  });
+});
