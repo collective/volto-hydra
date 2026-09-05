@@ -233,12 +233,16 @@ test.describe('style markers in the sidebar', () => {
     // Chevrons at both ends: enough to see a style is applied and where it
     // stops, without putting a word inside the sentence. A drop cap styles ONE
     // letter at the start of a word — a name here split `D` from `esign-system`.
-    for (const cls of ['lead', 'dropcap']) {
-      expect(await read(cls, '::before'), `${cls} opening marker`).toContain('\u2039');
-      expect(await read(cls, '::after'), `${cls} closing marker`).toContain('\u203A');
-      expect(await read(cls, '::after'), `${cls} must not name itself unclicked`)
-        .not.toContain('Lead');
-    }
+    // A block style and an inline mark claim different things — a paragraph
+    // versus a run inside one — so they are marked differently: doubles for the
+    // wider scope, singles for the narrower.
+    expect(await read('lead', '::before'), 'block style opens with «').toContain('\u00AB');
+    expect(await read('lead', '::after'), 'block style closes with »').toContain('\u00BB');
+    expect(await read('dropcap', '::before'), 'inline mark opens with ‹').toContain('\u2039');
+    expect(await read('dropcap', '::after'), 'inline mark closes with ›').toContain('\u203A');
+    // …and neither names itself until it is clicked.
+    expect(await read('lead', '::after')).not.toContain('Lead');
+    expect(await read('dropcap', '::after')).not.toContain('Drop cap');
 
     // Clicking into the run is when you want to know which style it is.
     await sidebarEditor.locator('.dropcap').click();
@@ -288,8 +292,11 @@ test.describe('style menu in the sidebar toolbar', () => {
     // is what stands in for the design system's CSS, which Volto never loads.
     const styled = sidebarEditor.locator('.lead');
     await expect(styled).toHaveCount(1, { timeout: 5000 });
-    const label = await styled.evaluate((el) => getComputedStyle(el, '::before').content);
-    expect(label).toContain('Lead');
+    // Marked, so the author can see a style took — the marker stands in for the
+    // design system's CSS, which Volto never loads. The NAME is on click, and is
+    // covered by the markers test above.
+    const marker = await styled.evaluate((el) => getComputedStyle(el, '::before').content);
+    expect(marker).toContain('\u00AB');
     expect(toolbar).toBeTruthy();
   });
 });

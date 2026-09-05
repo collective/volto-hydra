@@ -54,27 +54,45 @@ const OPEN_APPEARANCE = `{
  * @returns {string} CSS; empty when nothing is declared, so a frontend that
  *   offers no styles gets no stylesheet at all
  */
+/**
+ * The two kinds are marked differently, because they mean different things: a
+ * block style claims a whole paragraph, an inline mark claims a run inside one.
+ * Doubles read as the wider scope, singles as the narrower — and neither is a
+ * word, so nothing joins the sentence.
+ */
+const MARKERS = {
+  block: { open: '\\00AB', close: '\\00BB' }, // « »
+  inline: { open: '\\2039', close: '\\203A' }, // ‹ ›
+};
+
 export function buildStyleMenuPreviewCss(styleMenu) {
-  const defs = [
-    ...(styleMenu?.blockStyles || []),
-    ...(styleMenu?.inlineStyles || []),
-  ].filter((d) => d?.cssClass);
-  if (defs.length === 0) return '';
+  const groups = [
+    { kind: 'block', defs: (styleMenu?.blockStyles || []).filter((d) => d?.cssClass) },
+    { kind: 'inline', defs: (styleMenu?.inlineStyles || []).filter((d) => d?.cssClass) },
+  ].filter((g) => g.defs.length > 0);
+  if (groups.length === 0) return '';
 
   const sel = (d) => `.slate-editor .${escapeClass(d.cssClass)}`;
-  const before = defs.map((d) => `${sel(d)}::before`);
-  const after = defs.map((d) => `${sel(d)}::after`);
+  const rules = [];
 
-  return [
-    // Chevrons on each side. No text, so nothing joins the sentence.
-    `${[...before, ...after].join(',\n')} ${APPEARANCE}`,
-    `${before.join(',\n')} { content: "\\2039"; margin-right: 1px; }`,
-    `${after.join(',\n')} { content: "\\203A"; margin-left: 1px; }`,
-    // Clicked: say which style it is. The name rides on the attribute, so this
-    // is one rule for every style rather than one per class.
-    `${defs.map((d) => `${sel(d)}[data-hydra-style-open]::after`).join(',\n')} { content: "\\203A" " " attr(data-hydra-style-open); }`,
-    `${defs.map((d) => `${sel(d)}[data-hydra-style-open]::after`).join(',\n')} ${OPEN_APPEARANCE}`,
-  ].join('\n');
+  // Shared appearance, attached to the selectors these definitions produce.
+  const every = groups.flatMap((g) =>
+    g.defs.flatMap((d) => [`${sel(d)}::before`, `${sel(d)}::after`]),
+  );
+  rules.push(`${every.join(',\n')} ${APPEARANCE}`);
+
+  for (const { kind, defs } of groups) {
+    const m = MARKERS[kind];
+    rules.push(
+      `${defs.map((d) => `${sel(d)}::before`).join(',\n')} { content: "${m.open}"; margin-right: 1px; }`,
+      `${defs.map((d) => `${sel(d)}::after`).join(',\n')} { content: "${m.close}"; margin-left: 1px; }`,
+      // Clicked: keep this kind's closing marker, then name the style. The name
+      // rides on the attribute, so one rule covers every style of the kind.
+      `${defs.map((d) => `${sel(d)}[data-hydra-style-open]::after`).join(',\n')} { content: "${m.close}" " " attr(data-hydra-style-open); }`,
+      `${defs.map((d) => `${sel(d)}[data-hydra-style-open]::after`).join(',\n')} ${OPEN_APPEARANCE}`,
+    );
+  }
+  return rules.join('\n');
 }
 
 const STYLE_ELEMENT_ID = 'hydra-style-menu-preview';

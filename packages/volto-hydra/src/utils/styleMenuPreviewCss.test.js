@@ -27,17 +27,45 @@ describe('buildStyleMenuPreviewCss', () => {
     expect(css).toContain('.slate-editor .dropcap::after');
   });
 
-  test('the markers are chevrons, never words', () => {
+  test('the markers are punctuation, never words', () => {
     // The first version wrote the style NAME inline. A drop cap styles one
     // letter at the start of a word, so the closing marker landed between `D`
     // and `esign-system` and the word read as two.
     const css = buildStyleMenuPreviewCss(menu);
-    expect(css).toContain('content: "\\2039"'); // ‹
-    expect(css).toContain('content: "\\203A"'); // ›
     // No name is rendered until the run is clicked.
     const beforeClickRules = css.slice(0, css.indexOf('data-hydra-style-open'));
     expect(beforeClickRules).not.toContain('Lead');
     expect(beforeClickRules).not.toContain('Drop cap');
+  });
+
+  test('a block style and an inline mark are marked DIFFERENTLY', () => {
+    // They claim different things — a paragraph versus a run inside one — so one
+    // marker for both tells the author less than it looks like it does.
+    const css = buildStyleMenuPreviewCss(menu);
+    // Find the rule that sets `content` for this selector — the selector also
+    // appears in the shared-appearance rule, and indexOf finds that one first.
+    const rule = (sel) =>
+      css
+        .split('}')
+        .find((r) => r.includes(sel) && r.includes('content:')) || '';
+    expect(rule('.slate-editor .lead::before')).toContain('00AB'); // «
+    expect(rule('.slate-editor .lead::after')).toContain('00BB'); // »
+    expect(rule('.slate-editor .dropcap::before')).toContain('2039'); // ‹
+    expect(rule('.slate-editor .dropcap::after')).toContain('203A'); // ›
+  });
+
+  test('a clicked run keeps ITS OWN closing marker alongside the name', () => {
+    const css = buildStyleMenuPreviewCss(menu);
+    const open = (cls) =>
+      css
+        .split('}')
+        .find(
+          (r) =>
+            r.includes(`.slate-editor .${cls}[data-hydra-style-open]::after`) &&
+            r.includes('content:'),
+        ) || '';
+    expect(open('lead')).toContain('00BB');
+    expect(open('dropcap')).toContain('203A');
   });
 
   test('clicking a run reveals its name, from the attribute', () => {
