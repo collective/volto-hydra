@@ -268,8 +268,15 @@ const SyncedSlateToolbar = ({
   // Slate styles this block's REGION permits (#295), resolved by
   // buildBlockPathMap and carried on the pathmap entry. null → unrestricted.
   const slateRules = blockPathMap?.[selectedBlock]?.slateRules || null;
-  const slateStyleAliases = config.settings.slate?.styleAliases || {};
-  const slateDefaultType = config.settings.slate?.defaultBlockType || 'p';
+  // Read from the config singleton at USE time, not captured into a value here.
+  // `config.settings.slate?.styleAliases || {}` built a NEW object on every
+  // render; with that in the transform effect's dependency array the effect
+  // re-ran on every render, and the format transform it processes was the
+  // casualty — bold stopped applying. Everything else in this component reads
+  // `config.settings.slate.*` the same way, without deps, because the registry
+  // is process-stable.
+  const slateStyleAliases = () => config.settings.slate?.styleAliases || {};
+  const slateDefaultType = () => config.settings.slate?.defaultBlockType || 'p';
 
 
   // The move target is computed by hydra.js from RENDER geometry (reusing the
@@ -752,7 +759,7 @@ const SyncedSlateToolbar = ({
           // is deserialized by volto-slate before we see it — so the allow-list
           // is applied to the result instead. Before the split below, so the
           // blocks that split out are already normalized.
-          enforceSlateStyles(editor, slateRules, slateStyleAliases, slateDefaultType);
+          enforceSlateStyles(editor, slateRules, slateStyleAliases(), slateDefaultType());
 
           // Run voltoBlockEmiters (extractImages, extractTables) on the editor
           // to extract inline images/tables into separate block tuples.
@@ -1078,7 +1085,7 @@ const SyncedSlateToolbar = ({
         }
       }
     }
-  }, [selectedBlock, form, currentSelection, editor, blockUI?.focusedFieldName, dispatch, completedFlushRequestId, blockFieldTypes, getBlock, applyInlineFormat, replaceEditorContent, transformAction, onTransformApplied, slateRules, slateStyleAliases, slateDefaultType]);
+  }, [selectedBlock, form, currentSelection, editor, blockUI?.focusedFieldName, dispatch, completedFlushRequestId, blockFieldTypes, getBlock, applyInlineFormat, replaceEditorContent, transformAction, onTransformApplied, slateRules]);
 
   // NOTE: editor.hydra is set later (after toolbar position is calculated)
   // to include toolbarTop/toolbarLeft for LinkEditor positioning
