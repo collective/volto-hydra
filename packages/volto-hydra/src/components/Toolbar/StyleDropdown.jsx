@@ -57,9 +57,26 @@ const StyleDropdown = ({ onMouseDownCapture, onClickCapture }) => {
   if (blockStyles.length === 0 && inlineStyles.length === 0) return null;
 
   const triggerRect = triggerRef.current?.getBoundingClientRect();
+
+  // Active state is decoration, and it must never be able to break editing.
+  // These read the editor's CURRENT selection, and the toolbar re-renders
+  // mid-transform — while a list item is being demoted, the selection can point
+  // at a path that is no longer a leaf, and `Editor.marks` throws
+  // "Cannot get the leaf node at path [0,0] because it refers to a non-leaf
+  // node". Nothing rendered a style menu before this, so the throw had nowhere
+  // to come from; with one always present it took out Backspace-demotes-list-item.
+  const activeSafely = (fn, cssClass) => {
+    try {
+      return fn(editor, cssClass);
+    } catch {
+      return false;
+    }
+  };
+  const isActiveFor = (d, isBlock) =>
+    activeSafely(isBlock ? isBlockStyleActive : isInlineStyleActive, d.cssClass);
   const anyActive =
-    blockStyles.some((d) => isBlockStyleActive(editor, d.cssClass)) ||
-    inlineStyles.some((d) => isInlineStyleActive(editor, d.cssClass));
+    blockStyles.some((d) => isActiveFor(d, true)) ||
+    inlineStyles.some((d) => isActiveFor(d, false));
 
   const renderGroup = (label, defs, isBlock) =>
     defs.length > 0 && (
@@ -76,9 +93,7 @@ const StyleDropdown = ({ onMouseDownCapture, onClickCapture }) => {
           {label}
         </div>
         {defs.map((def) => {
-          const active = isBlock
-            ? isBlockStyleActive(editor, def.cssClass)
-            : isInlineStyleActive(editor, def.cssClass);
+          const active = isActiveFor(def, isBlock);
           return (
             <button
               key={def.cssClass}
