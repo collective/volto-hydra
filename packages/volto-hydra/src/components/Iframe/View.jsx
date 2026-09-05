@@ -3549,6 +3549,22 @@ const Iframe = (props) => {
             }
             recurseUpdateVoltoConfig({ blocks: { blocksConfig } });
 
+            // Variations follow the schema. They are a SECOND registry the admin
+            // fills in (core attaches ToCVariations, ListingVariations, … in
+            // Blocks.jsx), so a frontend that replaced a block's schema still had
+            // the admin's `variation` picker sitting on top of it — offering
+            // renderings the frontend does not have. Same defect as the fields,
+            // one registry over: the author picks and nothing changes.
+            //
+            // So a frontend that declares a schema owns the variations too. Send
+            // them and they are used; send none and the block has none.
+            for (const [blockType, blockDef] of Object.entries(blocksConfig)) {
+              if (!blockDef?.blockSchema || blockType === 'slate') continue;
+              if (blockDef.variations) continue; // the frontend declared its own
+              const target = config.blocks.blocksConfig[blockType];
+              if (target?.variations) delete target.variations;
+            }
+
             // 1b. Create schemaEnhancers from frontend recipes
             // When the frontend sends a recipe (e.g., { inheritSchemaFrom: {...} }),
             // chain it with any existing function enhancer from admin plugins (e.g., listing's
