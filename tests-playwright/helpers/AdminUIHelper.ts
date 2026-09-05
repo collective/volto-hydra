@@ -1425,9 +1425,22 @@ export class AdminUIHelper {
 
   /**
    * Get the type of block currently being edited in the sidebar.
+   *
+   * Reads the block-editor's own type class FIRST (`block-editor-<type>`, which
+   * Volto renders for every block), so this answers for any type. The
+   * hand-listed slate/image checks below only ever covered those two, and
+   * returned null for everything else — indistinguishable from "the sidebar is
+   * showing nothing", which is the state a caller usually wants to rule out.
    */
   async getSidebarBlockType(): Promise<string | null> {
     const sidebar = this.page.locator('#sidebar-properties');
+
+    const typed = sidebar.locator('[class*="block-editor-"]').first();
+    if (await typed.isVisible().catch(() => false)) {
+      const cls = (await typed.getAttribute('class')) || '';
+      const match = cls.match(/block-editor-([\w-]+)/);
+      if (match) return match[1];
+    }
 
     // Check for common block type indicators
     const selectors = [
@@ -3460,7 +3473,11 @@ export class AdminUIHelper {
    * Set the value of a text field in the sidebar.
    * Matches Cypress pattern: #sidebar-properties #field-{fieldname}
    */
-  async setSidebarFieldValue(fieldName: string, value: string, options: { container?: string } = {}): Promise<void> {
+  async setSidebarFieldValue(
+    fieldName: string,
+    value: string | boolean,
+    options: { container?: string } = {},
+  ): Promise<void> {
     const container = options.container || '#sidebar-properties';
     const fieldWrapper = this.page.locator(`${container} .field-wrapper-${fieldName}`);
 
@@ -3487,6 +3504,38 @@ export class AdminUIHelper {
     // nothing.
     const asSelect = fieldWrapper.locator('.react-select__control');
     const isSelect = await asSelect.isVisible().catch(() => false);
+
+    // A BOOLEAN field is a checkbox, which fill() cannot drive — it needs
+    // check/uncheck. Callers already pass booleans (the columns clip sets
+    // `gap`), and before this they fell through every branch below and returned
+    // silently, so the field simply never changed.
+    if (typeof value === 'boolean') {
+      const checkbox = fieldWrapper.locator('input[type="checkbox"]').first();
+      await checkbox.waitFor({ state: 'attached', timeout: 5000 });
+      // Click the LABEL, which is what a user clicks: Volto styles the checkbox
+      // by covering the real input, so check()/uncheck() report the input as
+      // visible and then time out because the label intercepts the pointer.
+      // Only click when the state actually needs to change — clicking a checkbox
+      // already in the wanted state would toggle it away.
+      if ((await checkbox.isChecked()) !== value) {
+        const label = fieldWrapper.locator('label').first();
+        if (await label.count()) {
+          await label.click();
+        } else {
+          await checkbox.click({ force: true });
+        }
+      }
+      await expect(checkbox).toBeChecked({ checked: value, timeout: 5000 });
+      return;
+    }
+
+    // A native <select> is not a react-select and not a text input, so it
+    // used to fall through every branch to the throw below.
+    const nativeSelect = fieldWrapper.locator('select').first();
+    if (await nativeSelect.count()) {
+      await nativeSelect.selectOption(value);
+      return;
+    }
 
     // Try text input
     const input = fieldWrapper.locator('input[type="text"], input[type="url"], textarea');
@@ -3579,10 +3628,19 @@ export class AdminUIHelper {
     // silently, so a spec that set a dropdown asserted against a sidebar that
     // had never been touched, and a demo clip recorded a video of nothing
     // happening.
+    const available = await this.page
+      .locator(`${container} [class*="field-wrapper-"]`)
+      .evaluateAll((els) =>
+        els
+          .map((e) => (e.className.match(/field-wrapper-([\w-]+)/) || [])[1])
+          .filter(Boolean),
+      );
     throw new Error(
-      `setSidebarFieldValue("${fieldName}"): no text input, slate editor or ` +
-        `react-select inside ${container} .field-wrapper-${fieldName}. ` +
-        `Check the field name, or that the field is in the open fieldset.`,
+      `setSidebarFieldValue("${fieldName}"): no text input, slate editor, ` +
+        `checkbox, select or react-select inside ${container} ` +
+        `.field-wrapper-${fieldName}. Fields present: ` +
+        `[${available.join(', ') || 'none'}]. An empty list means the sidebar ` +
+        `is not showing a block form at all — open it, or select the block first.`,
     );
   }
 
