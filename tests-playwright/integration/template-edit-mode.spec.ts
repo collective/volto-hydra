@@ -517,6 +517,34 @@ test.describe('Template Edit Mode - Save', () => {
 });
 
 test.describe('Template Edit Mode - Editability', () => {
+  test('a fixed member can be REMOVED once the template is unlocked', async ({ page }) => {
+    // `fixed` means "not yours to remove from THIS page" — the point of a
+    // template's chrome. It is not meant to survive unlocking: an author who
+    // has taken the template into edit mode is editing the template itself,
+    // and a member they can retype but never delete is a dead end.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+
+    // Only the unlocked half is expressible from the canvas: a fixed member of
+    // a LOCKED template is read-only, so it never registers as selected in the
+    // admin and its toolbar menu cannot be opened to inspect.
+    await helper.unlockTemplate(headerBlockId);
+    await helper.waitForBlockEditable(footerBlockId);
+
+    await helper.clickBlockInIframe(footerBlockId);
+    await helper.openQuantaToolbarMenu(footerBlockId);
+    const dropdown = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdown).toBeVisible({ timeout: 5000 });
+    await expect(
+      dropdown.locator('.volto-hydra-dropdown-item:has-text("Remove")'),
+      'an unlocked template\'s fixed member can be removed',
+    ).toBeVisible({ timeout: 5000 });
+  });
+
   test('fixed readonly blocks inside template become editable in edit mode', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
