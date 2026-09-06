@@ -526,19 +526,37 @@ test.describe('Template Edit Mode - Editability', () => {
     await helper.login();
     await helper.navigateToEdit('/template-test-page');
 
+    const iframe = helper.getIframe();
     const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
     const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const dropdown = page.locator('.volto-hydra-dropdown-menu');
 
-    // Only the unlocked half is expressible from the canvas: a fixed member of
-    // a LOCKED template is read-only, so it never registers as selected in the
-    // admin and its toolbar menu cannot be opened to inspect.
+    // Select and open the menu directly rather than through the helpers: those
+    // assert the toolbar's drag handle lines up with the block, which is a
+    // race against their own scroll-into-view here and is beside the point.
+    // (A fixed member IS selectable while locked — outline and toolbar appear
+    // exactly as they do for any block.)
+    const openMenuOn = async (blockId: string) => {
+      await iframe.locator(`[data-block-uid="${blockId}"]`).click({ force: true });
+      const toolbar = page.locator('.quanta-toolbar');
+      await expect(toolbar).toBeVisible({ timeout: 10000 });
+      await toolbar.locator('[title*="options" i]').first().click();
+      await expect(dropdown).toBeVisible({ timeout: 5000 });
+    };
+
+    // LOCKED: the page may not remove the template's chrome.
+    await openMenuOn(footerBlockId);
+    await expect(
+      dropdown.locator('.volto-hydra-dropdown-item:has-text("Remove")'),
+      'a locked template\'s fixed member offers no Remove',
+    ).toHaveCount(0);
+    await page.keyboard.press('Escape');
+
+    // UNLOCKED: the same member is the template author's to delete.
     await helper.unlockTemplate(headerBlockId);
     await helper.waitForBlockEditable(footerBlockId);
 
-    await helper.clickBlockInIframe(footerBlockId);
-    await helper.openQuantaToolbarMenu(footerBlockId);
-    const dropdown = page.locator('.volto-hydra-dropdown-menu');
-    await expect(dropdown).toBeVisible({ timeout: 5000 });
+    await openMenuOn(footerBlockId);
     await expect(
       dropdown.locator('.volto-hydra-dropdown-item:has-text("Remove")'),
       'an unlocked template\'s fixed member can be removed',
