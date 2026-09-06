@@ -299,6 +299,19 @@ import ParentBlocksWidget from '../Sidebar/ParentBlocksWidget';
 const NoPreview = () => null;
 
 /**
+ * Block types that keep their admin Edit component in the sidebar even though a
+ * schema is declared for them.
+ *
+ * `slate`: hydra's own schema carries the `value` field block-sync and the
+ * shadowed text editor depend on, which no frontend can know to send.
+ *
+ * `title` / `description`: windows onto the PAGE's fields, not blocks with data
+ * of their own — the page metadata form already edits those. Their schema is
+ * still what gives the canvas its placeholder.
+ */
+const SCHEMA_KEEPS_ADMIN_FORM = new Set(['slate', 'title', 'description']);
+
+/**
  * Validate frontend configuration passed to initBridge.
  * Collects all validation errors and throws a single error with all issues.
  *
@@ -3496,9 +3509,18 @@ const Iframe = (props) => {
               // `slate` is exempt: hydra's own slate schema carries the `value`
               // field that block-sync and the shadowed text editor depend on,
               // which no frontend can know to send (see index.js).
+              //
+              // `title` and `description` are exempt for a different reason:
+              // they are not blocks with data, they are windows onto the PAGE's
+              // own fields, and the page metadata form already edits those. A
+              // schema-driven block form for them renders a second, always-empty
+              // `#field-title` beside the metadata form's — a duplicate DOM id,
+              // and an input whose writes land in block data nothing reads.
+              // Their schema still stands: it is where the canvas placeholder
+              // ("Type the title…") comes from.
               if (
                 blockConfig.blockSchema &&
-                blockType !== 'slate' &&
+                !SCHEMA_KEEPS_ADMIN_FORM.has(blockType) &&
                 blockConfig.disableCustomSidebarEditForm === undefined
               ) {
                 blockConfig.disableCustomSidebarEditForm = true;
@@ -3642,7 +3664,31 @@ const Iframe = (props) => {
           // BLOCKS FIELDS, keyed by field name. Each field name is a key in the
           // shared blocks_layout dict; the default field is named 'items'.
           const pageProperties = event.data.page?.schema?.properties || {};
-          const pageBlocksFieldsDef = { ...pageProperties };
+          // A page schema describes two different things. Entries carrying
+          // `widget: 'blocks_layout'` are REGIONS (a key in the shared
+          // blocks_layout dict); an entry naming one of the page's OWN fields
+          // — `title`, `description` — is that frontend describing the field
+          // it renders inline, placeholder included. The content type tells
+          // them apart, since a page field carries no distinguishing widget of
+          // its own. Anything else stays a region, as it was before, so a
+          // frontend that declares a region without the widget still gets one.
+          //
+          // Without the split, EVERY property was coerced into a region: a
+          // frontend that described its own title got a phantom blocks region
+          // and no say over the wording the author sees.
+          const contentTypeProperties = schema?.properties || {};
+          const pageFieldOverrides = {};
+          const pageBlocksFieldsDef = {};
+          for (const [fieldName, fieldDef] of Object.entries(pageProperties)) {
+            const isRegion =
+              fieldDef?.widget === 'blocks_layout' ||
+              !(fieldName in contentTypeProperties);
+            if (isRegion) {
+              pageBlocksFieldsDef[fieldName] = fieldDef;
+            } else {
+              pageFieldOverrides[fieldName] = fieldDef;
+            }
+          }
           if (Object.keys(pageBlocksFieldsDef).length === 0) {
             pageBlocksFieldsDef.items = { title: 'Blocks' };
           }
@@ -3705,8 +3751,17 @@ const Iframe = (props) => {
           // Merge content-type field definitions (title, description, etc.) alongside
           // blocks_layout fields so buildBlockPathMap includes them in resolvedBlockSchema.
           // This lets hydra.js derive page-level field types from blockPathMap['_page'].
-          const contentTypeFields = schema?.properties || {};
-          // Add placeholders for common page-level fields
+          // The frontend's description of a page field wins over the backend's:
+          // it is the thing that renders the field, so it decides the wording
+          // the author is shown. Same rule as a block's schema, one level up.
+          const contentTypeFields = { ...contentTypeProperties };
+          for (const [fieldName, fieldDef] of Object.entries(pageFieldOverrides)) {
+            contentTypeFields[fieldName] = {
+              ...(contentTypeFields[fieldName] || {}),
+              ...fieldDef,
+            };
+          }
+          // Fallback wording, for a frontend that described neither.
           if (contentTypeFields.title && !contentTypeFields.title.placeholder) {
             contentTypeFields.title = { ...contentTypeFields.title, placeholder: intl.formatMessage({ id: 'Type the title…', defaultMessage: 'Type the title…' }) };
           }
