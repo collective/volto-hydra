@@ -2910,7 +2910,16 @@ export async function loadTemplates(
 
     // Load in parallel with a per-template timeout so a hanging request
     // doesn't block INITIAL_DATA indefinitely.
-    const TEMPLATE_LOAD_TIMEOUT = 5000;
+    //
+    // The bound is settable, because this race wraps the CALLER's loadTemplate:
+    // a frontend that retries a transient failure (ours retries three times,
+    // for a backend busy enough to time out a fetch) never gets to finish, the
+    // race cancels it at 5s and the page fails with "not found in pre-loaded
+    // templates". Environments where the backend is legitimately slow to warm
+    // — a mock serving a whole distribution from disk on its first request —
+    // raise it; the default is unchanged and a hang is still bounded.
+    const TEMPLATE_LOAD_TIMEOUT =
+      Number(globalThis.process?.env?.HYDRA_TEMPLATE_LOAD_TIMEOUT) || 5000;
     const results = await Promise.all(
       toLoad.map(async (id) => {
         try {
