@@ -3605,7 +3605,23 @@ export class AdminUIHelper {
       // value to the wrong field while this one keeps its placeholder.
       const menu = fieldWrapper.locator('.react-select__menu');
       await menu.waitFor({ state: 'visible', timeout: 10000 });
-      const option = menu.locator('.react-select__option', { hasText: value });
+      // Match the option case-insensitively, and say what IS on the menu when
+      // nothing matches. `hasText` waits, so an unmatched value used to sit in
+      // `click()` until the test's own timeout — four minutes of a demo
+      // recording spent on a menu that was never going to contain the word.
+      // The caller passes what the AUTHOR sees, since a Choice renders its
+      // title ("Content block"), not its token ("listItem").
+      const wanted = new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const option = menu.locator('.react-select__option').filter({ hasText: wanted });
+      if ((await option.count()) === 0) {
+        const offered = await menu
+          .locator('.react-select__option')
+          .allTextContents();
+        throw new Error(
+          `setSidebarFieldValue("${fieldName}"): the menu has no option matching ` +
+            `"${value}". Offered: [${offered.join(', ')}]`,
+        );
+      }
       await option.first().click();
       // Deliberately NO blur afterwards. Blurring the control once the value is
       // chosen loses it — the field reads back empty a second later, which is
@@ -3617,10 +3633,16 @@ export class AdminUIHelper {
       // per chosen entry, and a locator that matches several trips strict mode
       // — reporting "the menu closed without taking it" for a field that took
       // it twice over.
+      // Case-INSENSITIVELY: callers pass the stored token (`collapsed`) and the
+      // control shows the choice's title (`Collapsed`). Comparing them as-is
+      // failed on nothing more than the capital, and only quietly worked where
+      // a title happened to contain its own token verbatim ("Always open").
       await expect(
         fieldWrapper.locator('.react-select__value-container'),
         `setSidebarFieldValue("${fieldName}"): the menu closed without taking "${value}"`,
-      ).toContainText(value, { timeout: 5000 });
+      ).toContainText(new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), {
+        timeout: 5000,
+      });
       return;
     }
 
