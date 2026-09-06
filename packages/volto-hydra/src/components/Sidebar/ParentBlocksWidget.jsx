@@ -374,7 +374,15 @@ const ParentBlockSection = ({
                 addDirection={pathInfo?.addDirection}
                 convertibleTypes={convertibleTypes}
                 onConvertBlock={handleConvertBlock}
-                isFixed={!!blockData?.fixed}
+                // Same rule as the canvas toolbar: `fixed` withholds removal
+                // from a PAGE, not from the template's own author. Once the
+                // template a block BELONGS to is unlocked, it is removable.
+                // (`isEditingThisTemplate` is about the instance itself, so it
+                // is the wrong question for a member.)
+                isFixed={
+                  !!blockData?.fixed &&
+                  !(templateEditMode || []).includes(blockData?.templateInstanceId)
+                }
                 isReadonly={!!blockData?.readOnly}
                 isInTemplate={!!blockData?.templateId}
                 onMakeTemplate={onBlockAction ? () => onBlockAction('makeTemplate', blockId) : null}

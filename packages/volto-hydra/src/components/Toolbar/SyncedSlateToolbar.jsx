@@ -1740,7 +1740,15 @@ const SyncedSlateToolbar = ({
         onOpenWrapChooser={onOpenWrapChooser}
         canUnwrap={canUnwrap}
         onUnwrap={onUnwrap}
-        isFixed={blockPathMap?.[selectedBlock]?.isFixed}
+        // `fixed` means "not yours to remove from THIS page" — the point of a
+        // template's chrome. It is not meant to survive unlocking: once the
+        // author has taken the template into edit mode, they are editing the
+        // template itself, and a member they can retype but never delete is a
+        // dead end (the site announcement's alert could be reworded forever and
+        // never taken out).
+        isFixed={
+          !!blockPathMap?.[selectedBlock]?.isFixed && !isEditingToolbarTemplate
+        }
         isInTemplate={!!block?.templateId}
         onMakeTemplate={onMakeTemplate}
         // Template edit/lock straight from the toolbar ⋯ menu (no sidebar needed):
