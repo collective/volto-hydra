@@ -583,11 +583,38 @@ function imageDimensions(file) {
     const own = new Set([data.UID && `resolveuid/${data.UID}`, data['@id']].filter(Boolean));
     const isTemplate = top.some((bid) => blocks[bid] && own.has(blocks[bid].templateId));
     if (!isTemplate) continue;
-    for (const bid of top) {
-      const block = blocks[bid];
-      if (!block || typeof block !== 'object') continue;
+    // EVERY depth, not just the top. fillRegionEntries is the same function for
+    // a nested container's regions as for the page's, and it opens with
+    //     if (!child || !child.templateId) continue; // orphan / missing → drop
+    // so a block buried in a column is dropped on the same rule — and takes its
+    // own children with it, since they are only reachable through it. Measured:
+    // removing `templateId` from one widget nested in a footer column removed
+    // that widget AND its three slates from the merged footer.
+    const walk = (container, prefix) => {
+      // Descend into FIXED containers only. A fixed block is template-owned
+      // structure: the merge re-derives its children from the template, so each
+      // one needs its own tags or it is dropped. A NON-fixed block is a SLOT —
+      // its children are the page's content, carried through as-is and needing
+      // no tags at all. Checked: /templates/contact-cta's `cta-section` is
+      // `fixed: false` and its untagged `cta-btn` survives the merge intact, so
+      // flagging it would be a false alarm on shipping content.
+      if (container.fixed !== true && prefix) return;
+      const kids = container.blocks || {};
+      const order = Object.values(container.blocks_layout || {}).flat();
+      for (const bid of order.length ? order : Object.keys(kids)) {
+        const block = kids[bid];
+        if (!block || typeof block !== 'object') continue;
+        yieldBlock(prefix ? `${prefix} > ${bid}` : bid, block);
+        walk(block, prefix ? `${prefix} > ${bid}` : bid);
+      }
+    };
+    const yieldBlock = (label, block) => {
       const missing = [];
       if (!block.templateId) missing.push('templateId');
+      // A non-fixed child is a SLOT, matched to the page's content by slotId
+      // (`else if (child.slotId)`); without one it matches neither branch and is
+      // dropped too. A fixed child needs it to be matched when the page has
+      // overridden it, and the top-level rule has always required it.
       if (!block.slotId) missing.push('slotId');
       // `fixed` must be stated, true or false. Omitting it does not mean "not
       // fixed" — it makes the block a SLOT for the page to fill, so on a page
@@ -602,13 +629,19 @@ function imageDimensions(file) {
       if (missing.length) {
         stats.templateBlocksBroken = (stats.templateBlocksBroken || 0) + 1;
         errors.push(
-          `  ${rel}: template block ${bid} (${block['@type']}) is missing ` +
+          `  ${rel}: template block ${label} (${block['@type']}) is missing ` +
           `${missing.join(' and ')} — forced-layout expansion skips it silently, ` +
           `so it will never render`,
         );
       } else {
         stats.templateBlocksOk = (stats.templateBlocksOk || 0) + 1;
       }
+    };
+    for (const bid of top) {
+      const block = blocks[bid];
+      if (!block || typeof block !== 'object') continue;
+      yieldBlock(bid, block);
+      walk(block, bid);
     }
   }
 
