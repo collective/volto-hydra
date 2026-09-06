@@ -11,7 +11,7 @@
  */
 import React from 'react';
 import { describe, test, expect, vi } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, fireEvent } from '@testing-library/react';
 import config from '@plone/volto/registry';
 
 vi.mock('slate-react', () => ({ useSlate: () => ({}) }));
@@ -54,5 +54,61 @@ describe('StyleDropdown', () => {
     withMenu({ blockStyles: [], inlineStyles: [{ cssClass: 'dropcap', label: 'Drop cap' }] });
     const { container } = render(<StyleDropdown />);
     expect(container.querySelector('#style-menu')).not.toBeNull();
+  });
+
+  // A region's slate rules reach the styles a DESIGN SYSTEM ships, not just
+  // slate's own element types — a style menu entry is keyed by its class
+  // (`.nsw-small`), the shape getSlateVocabulary reports it under. Without
+  // this the declaration was enforced everywhere EXCEPT the one surface an
+  // author uses to apply it.
+  /** The menu opens into a PORTAL, so its items are never in `container`. */
+  const openedLabels = ({ container }) => {
+    // The trigger opens on mouseDown, not click.
+    fireEvent.mouseDown(container.querySelector('#style-menu'));
+    return [...document.querySelectorAll('.style-dropdown-item')].map(
+      (i) => i.textContent,
+    );
+  };
+
+  const RULES = {
+    allowedStyles: null,
+    disallowedStyles: ['.small'],
+    allowedMarks: null,
+    disallowedMarks: null,
+  };
+
+  test('a style this region disallows is not offered', () => {
+    withMenu({
+      blockStyles: [
+        { cssClass: 'lead', label: 'Lead' },
+        { cssClass: 'small', label: 'Small' },
+      ],
+      inlineStyles: [],
+    });
+    expect(openedLabels(render(<StyleDropdown slateRules={RULES} />))).toEqual([
+      'Lead',
+    ]);
+  });
+
+  test('inline styles are gated the same way', () => {
+    withMenu({
+      blockStyles: [],
+      inlineStyles: [{ cssClass: 'small', label: 'Small' }],
+    });
+    // Nothing left to offer, so there is no control at all — the same call the
+    // empty-menu case makes, rather than a dropdown that opens onto nothing.
+    const { container } = render(<StyleDropdown slateRules={RULES} />);
+    expect(container.innerHTML).toBe('');
+  });
+
+  test('with no rules every declared style is offered, as before', () => {
+    withMenu({
+      blockStyles: [
+        { cssClass: 'lead', label: 'Lead' },
+        { cssClass: 'small', label: 'Small' },
+      ],
+      inlineStyles: [],
+    });
+    expect(openedLabels(render(<StyleDropdown />))).toEqual(['Lead', 'Small']);
   });
 });
