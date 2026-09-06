@@ -2727,6 +2727,47 @@ function mintChildBlockId(instanceId, tplChildId, uuidGenerator) {
   return uuidGenerator ? uuidGenerator() : `${instanceId}::${tplChildId}`;
 }
 
+/**
+ * The fields an EDITABLE block carries back from the page.
+ *
+ * A fixed block that is not readOnly belongs to the page: the author can change
+ * ANY field on it, and it is saved into the page as they left it. The merge
+ * therefore keeps the page's fields wholesale — it does not pick out the ones it
+ * imagines are content. Taking only `value` (which is what it used to do) meant
+ * `plaintext` reverted to the template's, so a page rendered the author's words
+ * out of `value` while the text Plone indexes into SearchableText said something
+ * else; and every other edited field — a colour, an alignment, a link — was
+ * silently reverted with it.
+ *
+ * What the TEMPLATE keeps is identity, ownership and structure:
+ *   - templateId / slotId / templateInstanceId: how the next merge finds this
+ *     block again. A page cannot rename its own slot.
+ *   - fixed / readOnly: the template's declaration of who owns the block. A lock
+ *     added to the template later has to take hold on pages already using it.
+ *   - blocks / blocks_layout: a container's children are re-derived per region
+ *     by fillContainerInto, region by region.
+ *   - nextSlotId / fieldPlaceholders: hints recomputed on every apply.
+ */
+const TEMPLATE_OWNED_FIELDS = new Set([
+  'templateId',
+  'slotId',
+  'templateInstanceId',
+  'fixed',
+  'readOnly',
+  'blocks',
+  'blocks_layout',
+  'nextSlotId',
+  'fieldPlaceholders',
+]);
+
+function editedFieldsOf(block) {
+  const out = {};
+  for (const [field, value] of Object.entries(block || {})) {
+    if (!TEMPLATE_OWNED_FIELDS.has(field)) out[field] = value;
+  }
+  return out;
+}
+
 function fillRegionEntries(entries, templateState, options) {
   const { instanceId, templateId } = templateState;
   const ctx = templateState.instances?.[instanceId];
@@ -2761,7 +2802,7 @@ function fillRegionEntries(entries, templateState, options) {
       const stamped = {
         ...child,
         templateInstanceId: instanceId,
-        ...(existingFixed?.block ? { value: existingFixed.block.value } : {}),
+        ...(existingFixed?.block ? editedFieldsOf(existingFixed.block) : {}),
         ...(nextSlotId && { nextSlotId }),
       };
       if (firstInsert && editable) {
@@ -3647,7 +3688,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
 
       let blockContent = tplBlock;
       if (!tplBlock.readOnly && existing?.block) {
-        blockContent = { ...tplBlock, value: existing.block.value };
+        blockContent = { ...tplBlock, ...editedFieldsOf(existing.block) };
       }
 
       // Look ahead in template layout for the next non-fixed slot at this level.

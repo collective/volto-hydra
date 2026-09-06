@@ -367,6 +367,257 @@ describe('plone-content-validator checkIntegrity()', () => {
     assert.equal(r.stats.resolveuidBroken, 1);
   });
 
+  it('FAILS on a template block with no templateId', () => {
+    // A forced-layout template's blocks are matched to a page's region by
+    // templateId + slotId. A block carrying only slotId is silently skipped by
+    // the expansion: no error anywhere, the block simply never renders. That
+    // cost an hour of "why is my footer button missing" — the validator, the
+    // schema gate and block-sanity were all green while it was broken.
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/templates/thing', '@type': 'Document', id: 'thing',
+        UID: 'pageauid1234567', parent: { '@id': '/' },
+        blocks: {
+          good: { '@type': 'slate', templateId: 'resolveuid/pageauid1234567', slotId: 'good' },
+          orphan: { '@type': 'slate', slotId: 'orphan' },
+        },
+        blocks_layout: { items: ['good', 'orphan'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.ok(r.errors.some((e) => e.includes('orphan') && e.includes('templateId')),
+      r.errors.join('\n'));
+  });
+
+  it('FAILS on a NESTED template block with no templateId', () => {
+    // The drop is not a top-level rule. fillRegionEntries runs for EVERY region
+    // at every depth and opens with
+    //     if (!child || !child.templateId) continue; // orphan / missing → drop
+    // so a block two levels down goes the same way — and takes its own children
+    // with it, because they are only reachable through it.
+    //
+    // Measured, not assumed: dropping `templateId` from ONE widget nested inside
+    // a footer column took that widget and its three address/phone slates out of
+    // the merged footer (4 widgets/8 leaves -> 3/5). Dropping `slotId` from the
+    // same widget changed nothing. That is the shape a real footer shipped in,
+    // and every gate was green while the content was gone.
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/templates/thing', '@type': 'Document', id: 'thing',
+        UID: 'pageauid1234567', parent: { '@id': '/' },
+        blocks: {
+          row: {
+            '@type': 'columns', templateId: 'resolveuid/pageauid1234567', slotId: 'row', fixed: true,
+            blocks: {
+              col: {
+                '@type': 'column', templateId: 'resolveuid/pageauid1234567', slotId: 'col', fixed: true,
+                blocks: {
+                  buried: { '@type': 'slate', slotId: 'buried', fixed: true },
+                },
+                blocks_layout: { items: ['buried'] },
+              },
+            },
+            blocks_layout: { columns: ['col'] },
+          },
+        },
+        blocks_layout: { items: ['row'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.ok(r.errors.some((e) => e.includes('buried') && e.includes('templateId')),
+      r.errors.join('\n'));
+  });
+
+  it('FAILS on a nested SLOT with no slotId', () => {
+    // A non-fixed child is a placeholder the page fills, matched by slotId
+    // (`else if (child.slotId)`). Without one it matches neither branch of
+    // fillRegionEntries and is dropped just as silently.
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/templates/thing', '@type': 'Document', id: 'thing',
+        UID: 'pageauid1234567', parent: { '@id': '/' },
+        blocks: {
+          row: {
+            '@type': 'columns', templateId: 'resolveuid/pageauid1234567', slotId: 'row', fixed: true,
+            blocks: {
+              nameless: { '@type': 'slate', templateId: 'resolveuid/pageauid1234567', fixed: false },
+            },
+            blocks_layout: { columns: ['nameless'] },
+          },
+        },
+        blocks_layout: { items: ['row'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.ok(r.errors.some((e) => e.includes('nameless') && e.includes('slotId')),
+      r.errors.join('\n'));
+  });
+
+  it('PASSES an untagged block inside a non-fixed SLOT', () => {
+    // A slot's children are the PAGE's content, not the template's: the merge
+    // fills the slot from the page and carries its nesting through untouched,
+    // so those blocks need no templateId/slotId of their own. /templates/
+    // contact-cta ships exactly this shape — a `fixed: false` section whose
+    // `cta-btn` carries nothing — and the button comes through the merge intact.
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/templates/thing', '@type': 'Document', id: 'thing',
+        UID: 'pageauid1234567', parent: { '@id': '/' },
+        blocks: {
+          slot: {
+            '@type': 'section', templateId: 'resolveuid/pageauid1234567', slotId: 'slot', fixed: false,
+            blocks: { btn: { '@type': 'button' } },
+            blocks_layout: { items: ['btn'] },
+          },
+        },
+        blocks_layout: { items: ['slot'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.ok(!r.errors.some((e) => e.includes('btn')), r.errors.join('\n'));
+  });
+
+  it('PASSES a fully-tagged nested template', () => {
+    const tag = (extra) => ({ templateId: 'resolveuid/pageauid1234567', fixed: true, ...extra });
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/templates/thing', '@type': 'Document', id: 'thing',
+        UID: 'pageauid1234567', parent: { '@id': '/' },
+        blocks: {
+          row: {
+            ...tag({ '@type': 'columns', slotId: 'row' }),
+            blocks: {
+              col: {
+                ...tag({ '@type': 'column', slotId: 'col' }),
+                blocks: { leaf: tag({ '@type': 'slate', slotId: 'leaf' }) },
+                blocks_layout: { items: ['leaf'] },
+              },
+            },
+            blocks_layout: { columns: ['col'] },
+          },
+        },
+        blocks_layout: { items: ['row'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.ok(!r.errors.some((e) => e.includes('template block')), r.errors.join('\n'));
+  });
+
+  it('FAILS on a template block with no slotId', () => {
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/templates/thing', '@type': 'Document', id: 'thing',
+        UID: 'pageauid1234567', parent: { '@id': '/' },
+        blocks: {
+          good: { '@type': 'slate', templateId: 'resolveuid/pageauid1234567', slotId: 'good' },
+          noslot: { '@type': 'slate', templateId: 'resolveuid/pageauid1234567' },
+        },
+        blocks_layout: { items: ['good', 'noslot'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.ok(r.errors.some((e) => e.includes('noslot') && e.includes('slotId')),
+      r.errors.join('\n'));
+  });
+
+  it('FAILS on a template block that does not say whether it is fixed', () => {
+    // The third thing a template block must declare is how locked it is.
+    // Omitting `fixed` does not mean "not fixed" — it makes the block a SLOT,
+    // a region for the page to fill. An empty page region then renders an
+    // empty slot, so the block silently disappears. That is the bug that cost
+    // an hour: templateId and slotId were both present and correct.
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/templates/thing', '@type': 'Document', id: 'thing',
+        UID: 'pageauid1234567', parent: { '@id': '/' },
+        blocks: {
+          decided: { '@type': 'slate', templateId: '/templates/thing', slotId: 'decided', fixed: true },
+          vague: { '@type': 'slate', templateId: '/templates/thing', slotId: 'vague' },
+        },
+        blocks_layout: { items: ['decided', 'vague'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.ok(r.errors.some((e) => e.includes('vague') && e.includes('fixed')), r.errors.join('\n'));
+    assert.ok(!r.errors.some((e) => e.includes('decided')), r.errors.join('\n'));
+  });
+
+  it('accepts fixed: false — an explicit slot', () => {
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/templates/thing', '@type': 'Document', id: 'thing',
+        UID: 'pageauid1234567', parent: { '@id': '/' },
+        blocks: {
+          slot: { '@type': 'slate', templateId: '/templates/thing', slotId: 'slot', fixed: false },
+        },
+        blocks_layout: { items: ['slot'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.equal(r.errors.filter((e) => /fixed/.test(e)).length, 0, r.errors.join('\n'));
+  });
+
+  it('FAILS on a non-boolean fixed', () => {
+    // "false" is truthy. A string here would read as a slot to the validator
+    // and as fixed to anything doing a plain truthiness check.
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/templates/thing', '@type': 'Document', id: 'thing',
+        UID: 'pageauid1234567', parent: { '@id': '/' },
+        blocks: {
+          stringy: { '@type': 'slate', templateId: '/templates/thing', slotId: 'stringy', fixed: 'false' },
+        },
+        blocks_layout: { items: ['stringy'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.ok(r.errors.some((e) => e.includes('stringy') && e.includes('fixed')), r.errors.join('\n'));
+  });
+
+  it('accepts a template whose blocks all carry both', () => {
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/templates/thing', '@type': 'Document', id: 'thing',
+        UID: 'pageauid1234567', parent: { '@id': '/' },
+        blocks: {
+          a: { '@type': 'slate', templateId: 'resolveuid/pageauid1234567', slotId: 'a' },
+          b: { '@type': 'slate', templateId: '/templates/thing', slotId: 'b' },
+        },
+        blocks_layout: { items: ['a', 'b'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.equal(r.errors.filter((e) => /templateId|slotId/.test(e)).length, 0,
+      r.errors.join('\n'));
+  });
+
+  it('leaves ordinary pages alone', () => {
+    // Only pages that ARE templates are checked. A normal page's blocks have
+    // no templateId and must not be nagged about one.
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/page-a', '@type': 'Document', id: 'page-a',
+        UID: 'pageauid1234567', parent: { '@id': '/' },
+        blocks: { plain: { '@type': 'slate' } },
+        blocks_layout: { items: ['plain'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.equal(r.errors.filter((e) => /templateId|slotId/.test(e)).length, 0,
+      r.errors.join('\n'));
+  });
+
   it('FAILS on a broken path inside a SLATE link node', () => {
     // Slate links live at value[].data.url, not in a block field, so pass 2c's
     // LINK_FIELDS scan never saw them. Only resolveuid refs were caught (by a
