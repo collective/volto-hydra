@@ -8013,6 +8013,16 @@ export class Bridge {
     const field = this.getEditableFieldByName(blockElement, this.focusedFieldName);
     if (!field || document.activeElement === field) return;
     log('observeBlockDomChanges: re-render lost the focused field, restoring', this.focusedFieldName);
+    // Make it editable BEFORE focusing it. What brought us here is the old
+    // node being detached, so this one is new and nothing has restored its
+    // contenteditable yet — the domChange pass that does runs after us. And
+    // focus() on an element that is not editable is a silent no-op: the
+    // element is connected and on screen, the attribute is simply absent, so
+    // activeElement stays on the body and the author's next keystroke goes
+    // nowhere. The FORM_DATA path has always restored editability first
+    // (updateBlockUIAfterFormData); this one only looked like it did.
+    // Idempotent — the later pass logs "already editable" and moves on.
+    this.restoreContentEditableOnFields(blockElement, 'restoreFocusIfFieldLost');
     this.restoreFocusFromSavedClick(blockElement);
   }
 
