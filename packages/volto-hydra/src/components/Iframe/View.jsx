@@ -305,11 +305,19 @@ const NoPreview = () => null;
  * `slate`: hydra's own schema carries the `value` field block-sync and the
  * shadowed text editor depend on, which no frontend can know to send.
  *
- * `title` / `description`: windows onto the PAGE's fields, not blocks with data
- * of their own — the page metadata form already edits those. Their schema is
- * still what gives the canvas its placeholder.
+ * `title` / `description` / `leadimage`: windows onto the PAGE's fields, not
+ * blocks with data of their own — the page metadata form already edits those.
+ * Their schema is still what gives the canvas its placeholder. Routing them to
+ * the schema form costs the page field itself: the leadimage's own schema
+ * describes only `align`, so `/preview_image` — the thing it renders — stopped
+ * being reachable and clicking the image raised no toolbar.
  */
-const SCHEMA_KEEPS_ADMIN_FORM = new Set(['slate', 'title', 'description']);
+const SCHEMA_KEEPS_ADMIN_FORM = new Set([
+  'slate',
+  'title',
+  'description',
+  'leadimage',
+]);
 
 /**
  * Validate frontend configuration passed to initBridge.
@@ -3767,6 +3775,14 @@ const Iframe = (props) => {
           }
           if (contentTypeFields.description && !contentTypeFields.description.placeholder) {
             contentTypeFields.description = { ...contentTypeFields.description, placeholder: intl.formatMessage({ id: 'Add a description…', defaultMessage: 'Add a description…' }) };
+          }
+          // The page metadata form in the sidebar renders from the content
+          // type's own schema, so the merged definitions go back onto it:
+          // otherwise the canvas shows the frontend's placeholder and the
+          // sidebar shows none, which is how the old in-place mutation of
+          // `schema.properties` happened to behave before this merge existed.
+          if (schema?.properties) {
+            Object.assign(schema.properties, contentTypeFields);
           }
           config.blocks.blocksConfig['_page'] = {
             id: '_page',
