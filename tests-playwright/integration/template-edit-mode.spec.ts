@@ -544,6 +544,17 @@ test.describe('Template Edit Mode - Editability', () => {
       await expect(dropdown).toBeVisible({ timeout: 5000 });
     };
 
+    // LOCKED: its settings are SHOWN but disabled — an empty sidebar reads as
+    // broken; greyed fields say the setting exists and is not editable here.
+    await iframe.locator(`[data-block-uid="${footerBlockId}"]`).click({ force: true });
+    const readOnlyFields = page.locator('#sidebar-properties [class*="field-wrapper-"]');
+    if (await readOnlyFields.count()) {
+      await expect(
+        page.locator('#sidebar-properties input:not([disabled]), #sidebar-properties textarea:not([disabled])'),
+        'a read-only block offers no ENABLED input',
+      ).toHaveCount(0);
+    }
+
     // LOCKED: the page may not remove the template's chrome.
     await openMenuOn(footerBlockId);
     await expect(

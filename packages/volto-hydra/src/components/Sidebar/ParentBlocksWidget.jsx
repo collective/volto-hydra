@@ -133,6 +133,21 @@ const filterBlocksFields = (schema) => {
  * Returns filtered schema (without blocks-type fields) or null.
  * For object_list items, uses the cached itemSchema from blockPathMap.
  */
+/**
+ * The same schema with every field disabled — what a READ-ONLY block shows.
+ * Volto's widgets take `isDisabled`, and InlineForm spreads a field's schema
+ * onto its widget, so marking the properties is all it takes.
+ */
+const disableEveryField = (schema) => ({
+  ...schema,
+  properties: Object.fromEntries(
+    Object.entries(schema.properties || {}).map(([id, field]) => [
+      id,
+      { ...field, isDisabled: true },
+    ]),
+  ),
+});
+
 const getFilteredBlockSchema = (blockType, intl, blockPathMap, blockId, blockData) => {
   const pathInfo = blockPathMap?.[blockId];
 
@@ -449,12 +464,22 @@ const ParentBlockSection = ({
       )}
 
       {/* Fallback: If no Edit component but has schema, render BlockDataForm directly */}
-      {!BlockEdit && schema && !isReadonly && !pathInfo?.isTemplateInstance && (() => {
+      {!BlockEdit && schema && !pathInfo?.isTemplateInstance && (() => {
+        // A read-only block SHOWS its settings, disabled, rather than nothing:
+        // an empty sidebar reads as broken, while greyed fields say "this is
+        // the setting, and it is not yours to change from this page" — unlock
+        // the template to change it. Volto's widgets already honour
+        // `isDisabled`, and InlineForm spreads each field's schema onto them.
+        const formSchema = isReadonly ? disableEveryField(schema) : schema;
         const formContent = (
           <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef, onChangeBlock }}>
             <BlockDataForm
-              schema={schema}
+              schema={formSchema}
               onChangeField={(fieldId, value) => {
+                // Belt and braces: the widgets are disabled, and a change that
+                // reaches here anyway (a widget that ignores `isDisabled`) is
+                // not written to a block the page may not edit.
+                if (isReadonly) return;
                 // Use lodash set for nested paths like 'itemDefaults.overwrite'
                 const newBlockData = cloneDeep(blockData);
                 set(newBlockData, fieldId, value);
