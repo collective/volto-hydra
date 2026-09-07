@@ -32,6 +32,21 @@ export default function PageClient({ initialData, apiUrl }) {
 
   useEffect(() => {
     initBridge({
+      // A design system's own text styles (#295). Declared here because stored
+      // content carrying `styleName` is validated against EVERY frontend that
+      // serves it: block-sanity asks whether an author could have produced it,
+      // and a style no menu offers fails that — correctly. The shared fixtures
+      // use these, so the example frontends that run block-sanity declare them.
+      voltoConfig: {
+        settings: {
+          slate: {
+            styleMenu: {
+              blockStyles: [{ cssClass: 'lead', label: 'Lead' }],
+              inlineStyles: [{ cssClass: 'dropcap', label: 'Drop cap' }],
+            },
+          },
+        },
+      },
       page: {
         schema: {
           properties: {

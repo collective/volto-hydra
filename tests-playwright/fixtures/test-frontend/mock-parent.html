@@ -176,6 +176,8 @@
     // fixtures (hero, slate, mock-*) when checking that every frontend-
     // registered block type has a content example.
     const frontendBlockKeys = new Set();
+    // cssClasses of the style menu the frontend declares at INIT (#295).
+    const styleMenuClasses = new Set();
 
     // blocksConfig for schema-driven buildBlockPathMap (no Volto deps)
     const mockBlocksConfig = {
@@ -662,6 +664,15 @@
           // exactly this reason).
           const pageBlocksFields =
             message.page?.schema?.properties || mockBlocksConfig._page.schema().properties;
+          {
+            const menu = message.voltoConfig?.settings?.slate?.styleMenu;
+            for (const d of [
+              ...(menu?.blockStyles || []),
+              ...(menu?.inlineStyles || []),
+            ]) {
+              if (d?.cssClass) styleMenuClasses.add(d.cssClass);
+            }
+          }
           if (message.page?.schema?.properties) {
             // Adopt the frontend's page schema, exactly as the admin does: it is
             // what tells buildBlockPathMap which regions exist (a property with
@@ -1058,6 +1069,11 @@
     window.mockParent = {
       getFormData: () => mockFormData,
       getBlocksConfig: () => mockBlocksConfig,
+      // The style menu the FRONTEND declared at INIT. block-sanity asks whether
+      // stored `styleName` content could have been authored, and only the
+      // frontend knows which styles it offers — the alternative is a hardcoded
+      // list that is wrong for every frontend but one.
+      getStyleMenuClasses: () => Array.from(styleMenuClasses),
       getFrontendBlockKeys: () => Array.from(frontendBlockKeys),
       getBlock: (blockId) => mockFormData.blocks[blockId],
       buildBlockPathMap: () => buildBlockPathMap(mockFormData, mockBlocksConfig),

@@ -1493,21 +1493,20 @@ function parseConceptsMd(mdContent) {
  * `#anchor`, an already-absolute path — is returned untouched.
  *
  * @param {string} url - the href as written in the markdown
- * @param {string} folder - content folder of the page being generated, e.g. "docs/architecture"
+ * @param {string} base - content folder the page's markdown SIBLINGS live in,
+ *   e.g. "docs" for docs/architecture.md, "docs/what-editors-will-experience"
+ *   for anything inside that directory (its index.md included)
  * @returns {string} the site path, anchor included
  */
-function resolveMarkdownLink(url, folder) {
+function resolveMarkdownLink(url, base) {
   if (!url || /^(https?:|mailto:|#|\/)/.test(url)) return url;
   const [target, ...anchorParts] = url.split('#');
   if (!target.endsWith('.md')) return url;
   const anchor = anchorParts.length ? `#${anchorParts.join('#')}` : '';
-  let base = target.slice(0, -'.md'.length);
-  if (/\/(index|README)$/.test(base)) base = base.replace(/\/(index|README)$/, '');
-  // A page generated from `foo.md` sits in the folder holding that file, so its
-  // markdown siblings resolve against the PARENT of its own content folder.
-  const parent = folder.includes('/') ? folder.slice(0, folder.lastIndexOf('/')) : '';
+  let rel = target.slice(0, -'.md'.length);
+  if (/\/(index|README)$/.test(rel)) rel = rel.replace(/\/(index|README)$/, '');
   const segments = [];
-  for (const part of `${parent}/${base}`.split('/')) {
+  for (const part of `${base}/${rel}`.split('/')) {
     if (!part || part === '.') continue;
     if (part === '..') segments.pop();
     else segments.push(part);
@@ -1515,13 +1514,24 @@ function resolveMarkdownLink(url, folder) {
   return `/${segments.join('/')}${anchor}`;
 }
 
-/** Rewrite every markdown link in a page's blocks to the path the site serves. */
-function resolveMarkdownLinksInBlocks(blocks, folder) {
+/**
+ * Rewrite every markdown link in a page's blocks to the path the site serves.
+ *
+ * `base` is where the page's markdown SIBLINGS live, which is the directory
+ * holding its .md file — NOT the parent of its content folder. Those coincide
+ * for a leaf page (docs/architecture.md → folder docs/architecture, siblings in
+ * docs/) but not for a folder index: what-editors-will-experience/index.md sits
+ * in the same directory as its siblings, so `[Selecting blocks](selecting-blocks.md)`
+ * resolves to /docs/what-editors-will-experience/selecting-blocks. Deriving the
+ * base by stripping a segment off the content folder sent it to /docs/selecting-blocks,
+ * a 404, on the two links on that page.
+ */
+function resolveMarkdownLinksInBlocks(blocks, base) {
   const walk = (node) => {
     if (Array.isArray(node)) return node.forEach(walk);
     if (!node || typeof node !== 'object') return;
     if (node.type === 'link' && node.data && typeof node.data.url === 'string') {
-      node.data.url = resolveMarkdownLink(node.data.url, folder);
+      node.data.url = resolveMarkdownLink(node.data.url, base);
     }
     for (const value of Object.values(node)) walk(value);
   };
@@ -1546,7 +1556,12 @@ for (const mdFile of docsMdFiles) {
   // Markdown links point at .md files; the site serves paths (see
   // resolveMarkdownLink). Resolve here, where the page's folder is known.
   // `folder` is relative to DOCS_CONTENT_DIR, which the site serves at /docs.
-  resolveMarkdownLinksInBlocks(newBlocks, `docs/${folder}`);
+  // Siblings live in the directory holding this page's .md file.
+  const mdDir = dirname(mdFile);
+  resolveMarkdownLinksInBlocks(
+    newBlocks,
+    mdDir === '.' ? 'docs' : `docs/${mdDir}`,
+  );
 
   // Build the shell every run — title, description, parent metadata, and
   // is_folderish are derived from CONCEPTS_MD_TO_FOLDER + the markdown's H1
@@ -1631,7 +1646,7 @@ for (const mdFile of docsMdFiles) {
     // The landing page lives at /docs, so its markdown links resolve there too
     // (this page is generated here rather than in the loop above, and was the
     // one place still emitting .md hrefs).
-    resolveMarkdownLinksInBlocks(parsedBlocks, 'docs/index');
+    resolveMarkdownLinksInBlocks(parsedBlocks, 'docs');
     const originalRootJson = readFileSync(indexJsonPath, 'utf-8');
     const rootData = JSON.parse(originalRootJson);
 

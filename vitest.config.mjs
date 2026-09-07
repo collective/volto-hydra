@@ -41,6 +41,12 @@ export default defineConfig({
       // The pure data helpers (buildQuerystringSearchBody etc.) — server-safe,
       // no DOM, so their unit tests live alongside them here.
       'packages/helpers/**/*.{test,spec}.{js,jsx,ts,tsx}',
+      // Pure aggregation helpers used BY the playwright suites (coverage
+      // bookkeeping, no browser). Their contract — "one example is enough",
+      // "reported only when no example covers it" — is worth testing directly
+      // rather than inferring it from a green e2e run. `.test.` only: the
+      // playwright specs themselves are `.spec.ts` and must not be collected.
+      'tests-playwright/helpers/**/*.test.{js,ts}',
     ],
     // hydra-js has its own jest harness; covered by `cd packages/hydra-js && pnpm test` in CI.
     exclude: ['**/node_modules/**', 'packages/hydra-js/**'],

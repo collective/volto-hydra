@@ -50,10 +50,12 @@ async function readBlock(page, path: string, blockUid: string) {
  */
 async function selectFormBlock(helper: AdminUIHelper, page) {
   await helper.clickBlockInIframe('form-block-1', {
-    // The heading LEVEL is the frontend's choice — the mock renders the form's
-    // title in an h2, the Nuxt example in an h3 — so match the editable, not
-    // the tag. Within a form block only the heading carries `title`; its fields
-    // carry `label`.
+    // Any element carrying the annotation, not an h2: the heading LEVEL is the
+    // frontend's styling choice (nuxt's form block renders an h3, the mock an
+    // h2) and this helper only needs to select the block. Hardcoding h2 failed
+    // admin-nuxt on every picker test while the same tests passed elsewhere.
+    // Within a form block only the heading carries `title`; its fields carry
+    // `label`.
     selector: '[data-edit-text="title"]',
   });
   await expect(page.locator('.quanta-toolbar')).toBeVisible({ timeout: 10000 });

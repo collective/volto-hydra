@@ -563,6 +563,88 @@ function imageDimensions(file) {
     }
   }
 
+  // Pass 2c-bis: a TEMPLATE's top-level blocks must carry templateId AND slotId.
+  //
+  // Forced-layout expansion matches a template's blocks onto a page's region by
+  // those two fields. A block missing either is silently skipped — no error is
+  // raised anywhere, the block just never renders. Nothing else catches it: the
+  // schema gate only checks declared fields (neither is one), and block-sanity
+  // only sees blocks that DID render.
+  //
+  // "Is a template" means a page whose own blocks point at ITSELF — that is what
+  // distinguishes a template from a page that merely EMBEDS one. An ordinary
+  // page (e.g. /services/onyx) carries a block with a templateId referencing the
+  // shared contact-CTA template; treating that as "this is a template" flagged
+  // every other block on the page. Inferred from content, not from the path, so
+  // a template stored outside /templates is still checked.
+  for (const { rel, data } of items) {
+    const blocks = data.blocks || {};
+    const top = (data.blocks_layout || {}).items || [];
+    const own = new Set([data.UID && `resolveuid/${data.UID}`, data['@id']].filter(Boolean));
+    const isTemplate = top.some((bid) => blocks[bid] && own.has(blocks[bid].templateId));
+    if (!isTemplate) continue;
+    // EVERY depth, not just the top. fillRegionEntries is the same function for
+    // a nested container's regions as for the page's, and it opens with
+    //     if (!child || !child.templateId) continue; // orphan / missing → drop
+    // so a block buried in a column is dropped on the same rule — and takes its
+    // own children with it, since they are only reachable through it. Measured:
+    // removing `templateId` from one widget nested in a footer column removed
+    // that widget AND its three slates from the merged footer.
+    const walk = (container, prefix) => {
+      // Descend into FIXED containers only. A fixed block is template-owned
+      // structure: the merge re-derives its children from the template, so each
+      // one needs its own tags or it is dropped. A NON-fixed block is a SLOT —
+      // its children are the page's content, carried through as-is and needing
+      // no tags at all. Checked: /templates/contact-cta's `cta-section` is
+      // `fixed: false` and its untagged `cta-btn` survives the merge intact, so
+      // flagging it would be a false alarm on shipping content.
+      if (container.fixed !== true && prefix) return;
+      const kids = container.blocks || {};
+      const order = Object.values(container.blocks_layout || {}).flat();
+      for (const bid of order.length ? order : Object.keys(kids)) {
+        const block = kids[bid];
+        if (!block || typeof block !== 'object') continue;
+        yieldBlock(prefix ? `${prefix} > ${bid}` : bid, block);
+        walk(block, prefix ? `${prefix} > ${bid}` : bid);
+      }
+    };
+    const yieldBlock = (label, block) => {
+      const missing = [];
+      if (!block.templateId) missing.push('templateId');
+      // A non-fixed child is a SLOT, matched to the page's content by slotId
+      // (`else if (child.slotId)`); without one it matches neither branch and is
+      // dropped too. A fixed child needs it to be matched when the page has
+      // overridden it, and the top-level rule has always required it.
+      if (!block.slotId) missing.push('slotId');
+      // `fixed` must be stated, true or false. Omitting it does not mean "not
+      // fixed" — it makes the block a SLOT for the page to fill, so on a page
+      // whose region is empty the block renders as nothing. Requiring the
+      // decision means a template block can no longer disappear because
+      // somebody forgot to say what kind of block it is.
+      if (typeof block.fixed !== 'boolean') {
+        missing.push(block.fixed === undefined
+          ? 'fixed (true = template-controlled, false = a slot the page fills)'
+          : `fixed as a boolean (got ${JSON.stringify(block.fixed)})`);
+      }
+      if (missing.length) {
+        stats.templateBlocksBroken = (stats.templateBlocksBroken || 0) + 1;
+        errors.push(
+          `  ${rel}: template block ${label} (${block['@type']}) is missing ` +
+          `${missing.join(' and ')} — forced-layout expansion skips it silently, ` +
+          `so it will never render`,
+        );
+      } else {
+        stats.templateBlocksOk = (stats.templateBlocksOk || 0) + 1;
+      }
+    };
+    for (const bid of top) {
+      const block = blocks[bid];
+      if (!block || typeof block !== 'object') continue;
+      yieldBlock(bid, block);
+      walk(block, bid);
+    }
+  }
+
   // Pass 2d: blocks_layout references must resolve to a block in the SAME
   // container. A uid listed in a container's blocks_layout but absent from its
   // `blocks` dict is a dangling reference — exactly what a partial block deletion
