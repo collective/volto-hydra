@@ -290,13 +290,21 @@ export function measureStylesInPage(
   // with different fields in each (a cookie banner and its preferences dialog),
   // and revealing the second HIDES the first — clicking them all would measure
   // neither.
+  // Some frontends stamp the attribute on an element that DOES hold the field —
+  // an accordion header wrapping its panel — so claimed elements stay roots.
+  const claimed = uid
+    ? [...document.querySelectorAll(`[data-block-selector^="${uid}#"]`)]
+    : [];
+  // …but the design system's is a BUTTON beside the thing it opens, so the one
+  // naming this field is clicked, and the document becomes searchable for this
+  // block once it has been.
   const handle = uid && field
     ? document.querySelector(`[data-block-selector~="${uid}#${field}"]`)
     : null;
   if (handle instanceof HTMLElement) {
     handle.click();
   }
-  const roots = handle ? [root, document.body] : [root];
+  const roots = handle ? [root, ...claimed, document.body] : [root, ...claimed];
 
   // A root itself counts, and the INNERMOST match wins — the element the style
   // produced, not an ancestor that merely contains it.
