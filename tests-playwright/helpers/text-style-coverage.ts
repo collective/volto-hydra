@@ -241,7 +241,7 @@ export function resetTextStyleCoverage(): void {
  */
 export function measureStylesInPage(
   root: HTMLElement,
-  wanted: Array<{ style: string; text: string }>,
+  { wanted, uid }: { wanted: Array<{ style: string; text: string }>; uid?: string },
 ): {
   out: Record<string, { sig: string; node: number } | null>;
   baseline: { sig: string; node: number } | null;
@@ -262,14 +262,25 @@ export function measureStylesInPage(
     ].join('|');
   };
 
-  // `root` itself counts, and the INNERMOST match wins — the element the style
+  // A block's own element is not the only place its text can land: design
+  // system JavaScript builds some fields elsewhere in the document — a cookie
+  // banner, a dialog — and that markup says whose it is,
+  // `data-block-selector="uid#field"`, the same handle the bridge clicks to
+  // reveal it. Measuring the block's element alone reported those styles as
+  // rendering NOWHERE while the words were on screen the whole time.
+  const claimed = uid
+    ? [...document.querySelectorAll(`[data-block-selector^="${uid}#"]`)]
+    : [];
+  const roots = [root, ...claimed];
+
+  // A root itself counts, and the INNERMOST match wins — the element the style
   // produced, not an ancestor that merely contains it.
   const locate = (text: string) => {
     const target = norm(text);
     if (!target) return null;
-    const all = [root, ...root.querySelectorAll('*')].filter(
-      (el) => norm(el.textContent || '') === target,
-    );
+    const all = roots
+      .flatMap((r) => [r, ...r.querySelectorAll('*')])
+      .filter((el) => norm(el.textContent || '') === target);
     return all.length ? (all[all.length - 1] as HTMLElement) : null;
   };
 
@@ -297,8 +308,9 @@ export function measureStylesInPage(
 export async function measureTextStyles(
   blockLocator: { evaluate: Function },
   items: Array<{ style: string; text: string }>,
+  uid?: string,
 ): Promise<{ out: Record<string, Measured | null>; baseline: Measured | null }> {
   return await blockLocator
-    .evaluate(measureStylesInPage, items)
+    .evaluate(measureStylesInPage, { wanted: items, uid })
     .catch(() => ({ out: {}, baseline: null }));
 }
