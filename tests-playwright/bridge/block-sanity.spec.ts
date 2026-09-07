@@ -113,6 +113,24 @@ const test = base.extend<{ helper: AdminUIHelper }>({
 // reported by the coverage aggregate at the end.
 const unexercisedOptions: Array<{ blockType: string; field: string; frontend: string }> = [];
 
+/**
+ * Whether an OPTION with no example is a failure here.
+ *
+ * An option proves itself by being SET in some example, so this half of the
+ * check measures the CONTENT as much as the schema — and a project whose run
+ * sees only part of the content cannot answer it. A component library is
+ * exactly that: its fixtures hold one example per block by convention, while
+ * the options are demonstrated by the SITE that consumes it, whose pages this
+ * run never loads. Every one of those then reads as missing (122, the first
+ * time this ran against one), and the backlog is permanent rather than real.
+ *
+ * So a partial corpus says so — `SANITY_OPTION_EXAMPLES=false` — and the run
+ * that DOES see the whole corpus keeps the check. The canvas half is not
+ * gated: a field carries its edit annotation wherever it renders, so any
+ * example proves it.
+ */
+const CHECK_OPTION_EXAMPLES = process.env.SANITY_OPTION_EXAMPLES !== 'false';
+
 test.describe('Block sanity (auto-discovered)', () => {
   for (const block of discoveredBlocks) {
     // Run each discovered case only on the frontend it came from. Discovery is
@@ -487,7 +505,7 @@ test.describe('Block sanity (auto-discovered)', () => {
       ...never.map(
         (n) => `  - ${n.blockType}.${n.field} (${n.kind}) — no edit annotation in any example\n      e.g. ${n.example}`,
       ),
-      ...unexercisedOptions.map(
+      ...(CHECK_OPTION_EXAMPLES ? unexercisedOptions : []).map(
         (o) => `  - [${o.frontend}] ${o.blockType}.${o.field} (option) — no example sets it`,
       ),
     ];

@@ -9,6 +9,7 @@ import {
   isInlineStyleActive,
   toggleStyle,
 } from '@plone/volto-slate/editor/plugins/StyleMenu/utils';
+import { isStyleAllowed } from '../../../../hydra-js/slateStyles.js';
 
 /**
  * The design system's own text styles, as a dropdown that escapes the toolbar.
@@ -26,15 +27,24 @@ import {
  * positioned from the trigger. Same reason, same shape — a toolbar built for
  * buttons cannot contain a dropdown.
  */
-const StyleDropdown = ({ onMouseDownCapture, onClickCapture }) => {
+const StyleDropdown = ({ onMouseDownCapture, onClickCapture, slateRules }) => {
   const editor = useSlate();
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef(null);
   const menuRef = useRef(null);
 
   const menu = config.settings.slate?.styleMenu || {};
-  const blockStyles = menu.blockStyles || [];
-  const inlineStyles = menu.inlineStyles || [];
+  // A region can say which styles it offers, and a DESIGN SYSTEM's styles are
+  // keyed by class with a leading dot (`.nsw-small`) — the shape
+  // getSlateVocabulary reports them under, and the one the stored `styleName`
+  // is normalized against. Gating here is what makes the declaration mean
+  // something to an author: this dropdown is the only surface that applies
+  // these styles, so without it the rule held everywhere except where it is
+  // used.
+  const offered = (defs) =>
+    (defs || []).filter((d) => isStyleAllowed(`.${d?.cssClass}`, slateRules));
+  const blockStyles = offered(menu.blockStyles);
+  const inlineStyles = offered(menu.inlineStyles);
 
   useEffect(() => {
     if (!isOpen) return undefined;

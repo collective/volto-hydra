@@ -129,6 +129,27 @@ inline *elements* (`strong`, `em`, `del`, `sub`, `sup`, `u`, `code`), so one
 list matches what the toolbar actually toggles. `link` is structural rather than
 styling and is never restrictable: dropping it would lose an href.
 
+### A design system's own styles
+
+The style menu's entries are named by their CSS class with a **leading dot** —
+`.nsw-small`, the shape `getSlateVocabulary` reports them under, so a class
+called `p` cannot collide with the element type `p`:
+
+<!-- codeExample: javascript -->
+```javascript
+properties: {
+    items: { widget: 'blocks_layout', disallowedStyles: ['.nsw-small'] },
+    footer: { widget: 'blocks_layout' },   // still offers it
+}
+```
+
+They need their own key because volto-slate does not retype the node for them:
+`toggleBlockStyleInSelection` writes `styleName: "nsw-small"` (space separated
+when several apply), beside a `type` that stays `p`. A disallowed one is
+**stripped** rather than retyped — the paragraph was always a paragraph, it was
+only wearing a style this region does not offer — and the style dropdown stops
+offering it, which is the surface an author applies it from.
+
 Declaring nothing leaves every style available, so this changes nothing for a
 frontend that doesn't opt in.
 

@@ -212,6 +212,38 @@ function retypeTarget(type, rules, aliases, defaultBlockType) {
   return { to: defaultBlockType };
 }
 
+/**
+ * A design system's own styles ride on `styleName`, not on the node's type:
+ * volto-slate's StyleMenu writes `Transforms.setNodes(editor, { styleName })`,
+ * space separated when several apply. A rule naming types could never reach
+ * one, so the allow-list had nothing to say about the styles a design system
+ * actually ships — the case it exists for.
+ *
+ * Keyed by CSS class with a leading dot (`.nsw-small`), the shape
+ * getSlateVocabulary already reports them under, so a class named `p` cannot
+ * collide with the element type `p`.
+ *
+ * Stripped rather than retyped: the node is a perfectly good paragraph, it is
+ * only wearing a style this region does not offer. Nothing is deleted but the
+ * class.
+ */
+function normalizeStyleName(node, rules, path, changes) {
+  if (!rules || typeof node.styleName !== 'string') return node;
+  const tokens = node.styleName.split(/\s+/).filter(Boolean);
+  const kept = tokens.filter((t) => isStyleAllowed(`.${t}`, rules));
+  if (kept.length === tokens.length) return node;
+  for (const t of tokens) {
+    if (!kept.includes(t)) {
+      changes.push({ path, from: `.${t}`, to: null, kind: 'style-name' });
+    }
+  }
+  const out = { ...node };
+  if (kept.length) out.styleName = kept.join(' ');
+  else delete out.styleName;
+  return out;
+}
+
+
 function normalizeNodes(nodes, rules, opts, parentPath, changes) {
   const { aliases, defaultBlockType } = opts;
   let out = null; // stays null while nothing has changed
@@ -221,7 +253,7 @@ function normalizeNodes(nodes, rules, opts, parentPath, changes) {
   };
 
   for (let i = 0; i < nodes.length; i++) {
-    const node = nodes[i];
+    let node = nodes[i];
     const path = [...parentPath, i];
 
     if (isTextNode(node)) {
@@ -230,6 +262,15 @@ function normalizeNodes(nodes, rules, opts, parentPath, changes) {
       continue;
     }
     if (!node || typeof node !== 'object') continue;
+
+    // The design system's own styles, which sit BESIDE the type rather than in
+    // it — a styled paragraph stays a paragraph, so this runs before (and
+    // independently of) the retyping below.
+    const styled = normalizeStyleName(node, rules, path, changes);
+    if (styled !== node) {
+      write(i, styled);
+      node = styled;
+    }
 
     const kids = Array.isArray(node.children) ? node.children : null;
 

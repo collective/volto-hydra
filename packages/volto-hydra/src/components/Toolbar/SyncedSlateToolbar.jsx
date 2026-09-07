@@ -1237,8 +1237,11 @@ const SyncedSlateToolbar = ({
     const format = buttonFormat(Btn);
     if (format && !isStyleAllowed(format, slateRules)) return;
 
-    // Create element for later rendering
-    const element = <Btn />;
+    // Create element for later rendering. The region's rules go to every
+    // button: a plain format button is already gated by name above, but the
+    // style menu holds MANY styles behind one button and has to filter its own
+    // entries. Ignored by the buttons that don't take it.
+    const element = <Btn slateRules={slateRules} />;
 
     // Check if this is a BlockButton (block-level format like h2, h3, ul, ol)
     // isBlockButton compares element.type to imported BlockButton reference
