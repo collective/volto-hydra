@@ -59,8 +59,14 @@ test.describe('Page Metadata Editing', () => {
     // Verify the page title was updated in the iframe
     await expect(pageTitle).toHaveText('Updated Page Title');
 
-    // Verify the sidebar title field also shows the updated value
-    const sidebarTitleField = page.locator('.field-wrapper-title input, .field-wrapper-title textarea');
+    // Verify the sidebar title field also shows the updated value. Scoped to
+    // the PAGE metadata form: blurring selects the block clicked, and a block
+    // whose schema has its own `title` (image, here) renders a second
+    // `.field-wrapper-title` — Volto's InlineForm gives both the same
+    // `field-title` id — in `#sidebar-properties` right beside it.
+    const sidebarTitleField = page.locator(
+      '#sidebar-metadata .field-wrapper-title input, #sidebar-metadata .field-wrapper-title textarea',
+    );
     await expect(sidebarTitleField).toHaveValue('Updated Page Title', { timeout: 5000 });
   });
 

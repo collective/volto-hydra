@@ -1,4 +1,4 @@
-import { buildQuerystringSearchBody } from './index.js';
+import { buildQuerystringSearchBody, loadTemplates } from './index.js';
 
 // Unit tests for buildQuerystringSearchBody — the pure builder that turns a
 // listing's queryConfig + paging + extraCriteria into the @querystring-search
@@ -348,5 +348,57 @@ describe('buildQuerystringSearchBody — depth', () => {
     );
     expect(criterion(body, 'path').v).toBe('.');
     expect(body.depth).toBeUndefined();
+  });
+});
+
+describe('loadTemplates — the per-template timeout', () => {
+  const page = { blocks: { b1: { templateId: '/templates/one' } } };
+  const template = { blocks: {}, blocks_layout: { items: [] } };
+
+  afterEach(() => {
+    delete process.env.HYDRA_TEMPLATE_LOAD_TIMEOUT;
+  });
+
+  it('gives a slow loader the time the environment allows', async () => {
+    process.env.HYDRA_TEMPLATE_LOAD_TIMEOUT = '400';
+    const slow = () =>
+      new Promise((resolve) => setTimeout(() => resolve(template), 120));
+
+    const { templates } = await loadTemplates(page, slow);
+
+    expect(Object.keys(templates)).toContain('/templates/one');
+  });
+
+  it('still gives up on one that outlasts it', async () => {
+    // The point of the race: a hanging request must not block INITIAL_DATA.
+    process.env.HYDRA_TEMPLATE_LOAD_TIMEOUT = '60';
+    const hanging = () =>
+      new Promise((resolve) => setTimeout(() => resolve(template), 400));
+
+    const { templates } = await loadTemplates(page, hanging);
+
+    expect(Object.keys(templates)).not.toContain('/templates/one');
+  });
+
+  it("lets the CALLER's own retry finish, which the fixed 5s race cancelled", async () => {
+    // A frontend that retries a transient failure — ours retries three times —
+    // must be allowed to complete inside the race, or its retry is pointless.
+    process.env.HYDRA_TEMPLATE_LOAD_TIMEOUT = '900';
+    let attempts = 0;
+    // The retry lives INSIDE the caller's loader, which is where ours is: the
+    // race wraps this whole function, so three 100ms attempts have to fit.
+    const retryingLoader = async () => {
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        attempts += 1;
+        await new Promise((r) => setTimeout(r, 100));
+        if (attempt === 3) return template;
+      }
+      throw new Error('unreachable');
+    };
+
+    const { templates } = await loadTemplates(page, retryingLoader);
+
+    expect(attempts).toBe(3);
+    expect(Object.keys(templates)).toContain('/templates/one');
   });
 });

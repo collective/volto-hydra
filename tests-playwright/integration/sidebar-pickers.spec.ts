@@ -54,6 +54,8 @@ async function selectFormBlock(helper: AdminUIHelper, page) {
     // frontend's styling choice (nuxt's form block renders an h3, the mock an
     // h2) and this helper only needs to select the block. Hardcoding h2 failed
     // admin-nuxt on every picker test while the same tests passed elsewhere.
+    // Within a form block only the heading carries `title`; its fields carry
+    // `label`.
     selector: '[data-edit-text="title"]',
   });
   await expect(page.locator('.quanta-toolbar')).toBeVisible({ timeout: 10000 });

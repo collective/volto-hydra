@@ -499,6 +499,20 @@
                                         allowedBlocks: ['slate', 'image'],
                                         ...(forceFooterLayout ? { allowedLayouts: ['/_test_data/templates/footer-layout'] } : {}),
                                     },
+                                    // The page's OWN fields, not regions: this
+                                    // frontend renders the title and description
+                                    // inline (see #page-title), so it is the one
+                                    // that says what an empty one should invite.
+                                    title: {
+                                        title: 'Title',
+                                        type: 'string',
+                                        placeholder: 'Type the title…',
+                                    },
+                                    description: {
+                                        title: 'Description',
+                                        type: 'string',
+                                        placeholder: 'Add a description…',
+                                    },
                                 },
                             },
                         },
