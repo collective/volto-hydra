@@ -241,7 +241,16 @@ export function resetTextStyleCoverage(): void {
  */
 export function measureStylesInPage(
   root: HTMLElement,
-  { wanted, uid }: { wanted: Array<{ style: string; text: string }>; uid?: string },
+  {
+    wanted,
+    uid,
+    field,
+  }: {
+    wanted: Array<{ style: string; text: string }>;
+    uid?: string;
+    /** The field these styles came from, so the RIGHT handle is clicked. */
+    field?: string;
+  },
 ): {
   out: Record<string, { sig: string; node: number } | null>;
   baseline: { sig: string; node: number } | null;
@@ -268,10 +277,26 @@ export function measureStylesInPage(
   // `data-block-selector="uid#field"`, the same handle the bridge clicks to
   // reveal it. Measuring the block's element alone reported those styles as
   // rendering NOWHERE while the words were on screen the whole time.
-  const claimed = uid
-    ? [...document.querySelectorAll(`[data-block-selector^="${uid}#"]`)]
-    : [];
-  const roots = [root, ...claimed];
+  //
+  // The handle is the CONTROL, not the markup: reading its subtree finds the
+  // button's own label ("Show cookie consent"), never the field. So click it,
+  // exactly as the bridge does when an author puts the cursor in that field,
+  // and then let the whole document be searchable for this block — the block
+  // claimed that markup by stamping its uid there, and `locate` matches a
+  // field's WHOLE text, so the wider root cannot drift onto someone else's
+  // words.
+  //
+  // ONE handle, the one naming THIS field. A block can be drawn in two places
+  // with different fields in each (a cookie banner and its preferences dialog),
+  // and revealing the second HIDES the first — clicking them all would measure
+  // neither.
+  const handle = uid && field
+    ? document.querySelector(`[data-block-selector~="${uid}#${field}"]`)
+    : null;
+  if (handle instanceof HTMLElement) {
+    handle.click();
+  }
+  const roots = handle ? [root, document.body] : [root];
 
   // A root itself counts, and the INNERMOST match wins — the element the style
   // produced, not an ancestor that merely contains it.
@@ -309,8 +334,9 @@ export async function measureTextStyles(
   blockLocator: { evaluate: Function },
   items: Array<{ style: string; text: string }>,
   uid?: string,
+  field?: string,
 ): Promise<{ out: Record<string, Measured | null>; baseline: Measured | null }> {
   return await blockLocator
-    .evaluate(measureStylesInPage, { wanted: items, uid })
+    .evaluate(measureStylesInPage, { wanted: items, uid, field })
     .catch(() => ({ out: {}, baseline: null }));
 }

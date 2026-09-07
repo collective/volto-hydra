@@ -6,6 +6,7 @@
  * causes and different fixes.
  */
 import {
+  measureStylesInPage,
   slateStyles,
   recordTextStyles,
   stylesNeverRendered,
@@ -160,5 +161,68 @@ describe('merging across workers', () => {
     recordTextStyles('slate', '/a', [el('p', 'x')], { p: { sig: 'P|400|16px', node: 1 } }, { sig: 'P|400|16px', node: 0 });
     expect(() => stylesSeenInContent()).not.toThrow();
     expect(stylesSeenInContent()).toEqual(['p']);
+  });
+});
+
+
+/**
+ * Where a block's text is ALLOWED to be.
+ *
+ * Design system JavaScript builds some fields elsewhere in the document — a
+ * cookie banner, a dialog — and stamps `data-block-selector="uid#field"` on the
+ * control that reveals them. That attribute is a HANDLE, not a container: its
+ * subtree holds the button's own label, never the field. Reading it instead of
+ * clicking it reported the field as rendering NOWHERE while the words were one
+ * click from the screen.
+ */
+describe('measureStylesInPage — fields the design system draws elsewhere', () => {
+  const setup = () => {
+    document.body.innerHTML = `
+      <div data-block-uid="uid" id="root">
+        <a data-block-selector="uid#message" id="handle">Show cookie consent</a>
+      </div>
+      <div id="banner" style="display: none">
+        <p>We use cookies. You can <a id="link">manage your cookie settings</a> at any time.</p>
+      </div>
+    `;
+    // The design system opens it from a document-level click handler.
+    document.getElementById('handle').addEventListener('click', () => {
+      document.getElementById('banner').style.display = 'block';
+    });
+    return document.getElementById('root');
+  };
+
+  test('the handle is clicked, and the revealed text is measured', () => {
+    const root = setup();
+    const { out } = measureStylesInPage(root, {
+      wanted: [{ style: 'link', text: 'manage your cookie settings' }],
+      uid: 'uid',
+      field: 'message',
+    });
+    expect(out.link).not.toBeNull();
+  });
+
+  test('without the field, the handle is not clicked and nothing is found', () => {
+    // The block alone cannot say WHICH surface to open: a block drawn in two
+    // places (a banner and its preferences dialog) has a handle for each, and
+    // revealing the second hides the first.
+    const root = setup();
+    const { out } = measureStylesInPage(root, {
+      wanted: [{ style: 'link', text: 'manage your cookie settings' }],
+      uid: 'uid',
+    });
+    expect(out.link).toBeNull();
+  });
+
+  test("a block with no handle is still measured inside itself", () => {
+    document.body.innerHTML = `
+      <div data-block-uid="uid" id="root"><p id="p">ordinary body text</p></div>
+    `;
+    const { out } = measureStylesInPage(document.getElementById('root'), {
+      wanted: [{ style: 'p', text: 'ordinary body text' }],
+      uid: 'uid',
+      field: 'value',
+    });
+    expect(out.p).not.toBeNull();
   });
 });
