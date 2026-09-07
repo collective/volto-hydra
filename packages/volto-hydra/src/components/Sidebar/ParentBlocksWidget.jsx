@@ -143,7 +143,20 @@ const disableEveryField = (schema) => ({
   properties: Object.fromEntries(
     Object.entries(schema.properties || {}).map(([id, field]) => [
       id,
-      { ...field, isDisabled: true },
+      {
+        ...field,
+        isDisabled: true,
+        // `isDisabled` is not enough for a link/image field. Volto's
+        // ObjectBrowserWidget passes it to the BROWSE BUTTON only; the
+        // manual-link <input> it renders while the field is empty takes no
+        // disabled prop at all (core ObjectBrowserWidget.jsx, the
+        // `allowExternals && items.length === 0` branch), so it stays typeable
+        // in a read-only block — the author types a URL and the change is
+        // dropped by the guard in onChangeField, which is worse than not
+        // offering it. Turning externals off removes that input, so there is
+        // nothing to type into, which is what disabling was supposed to mean.
+        allowExternals: false,
+      },
     ]),
   ),
 });

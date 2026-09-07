@@ -1571,8 +1571,11 @@ test.describe('Template Edit Mode - UI Restrictions', () => {
     const headerBlockId = await helper.clickBlockByContent(TEMPLATE_HEADER_CONTENT);
     await helper.waitForSidebarOpen();
 
-    // Sidebar form should not have interactive inputs (readonly block)
-    const sidebarInputs = page.locator('#sidebar-properties input:not([type="hidden"]), #sidebar-properties textarea, #sidebar-properties [contenteditable="true"]');
+    // Sidebar form should not have interactive inputs (readonly block).
+    // A read-only block still SHOWS its settings — rendered with every field
+    // disabled (see ParentBlocksWidget's disableEveryField) — so "not
+    // interactive" means no ENABLED control, not no control.
+    const sidebarInputs = page.locator('#sidebar-properties input:not([type="hidden"]):not([disabled]), #sidebar-properties textarea:not([disabled]), #sidebar-properties [contenteditable="true"]');
     await expect(sidebarInputs).toHaveCount(0, { timeout: 3000 });
   });
 
@@ -1882,7 +1885,13 @@ test.describe('Template Edit Mode - Lock affordance + metadata gating', () => {
       await helper.waitForBlockSelectedInAdmin(id);
       await helper.waitForSidebarOpen();
       await expect(props.locator('.readonly-form')).toBeVisible({ timeout: 5000 });
-      await expect(props.locator('input, textarea, [contenteditable="true"]')).toHaveCount(0);
+      // No ENABLED control. The panel now also renders the block's own schema
+      // with every field disabled beside the static values, so counting every
+      // control would count those too — the property being protected is that
+      // none of them can be typed into.
+      await expect(
+        props.locator('input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), [contenteditable="true"]'),
+      ).toHaveCount(0);
       // The block's own content is shown as a read-only value.
       await expect(props.locator('.readonly-field-value').filter({ hasText: content })).toBeVisible();
     }
