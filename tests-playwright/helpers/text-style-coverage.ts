@@ -301,20 +301,35 @@ export function measureStylesInPage(
   const handle = uid && field
     ? document.querySelector(`[data-block-selector~="${uid}#${field}"]`)
     : null;
-  if (handle instanceof HTMLElement) {
-    handle.click();
-  }
-  const roots = handle ? [root, ...claimed, document.body] : [root, ...claimed];
+  const roots = [root, ...claimed];
 
   // A root itself counts, and the INNERMOST match wins — the element the style
   // produced, not an ancestor that merely contains it.
-  const locate = (text: string) => {
-    const target = norm(text);
-    if (!target) return null;
-    const all = roots
+  const find = (target: string, where: Element[]) => {
+    const all = where
       .flatMap((r) => [r, ...r.querySelectorAll('*')])
       .filter((el) => norm(el.textContent || '') === target);
     return all.length ? (all[all.length - 1] as HTMLElement) : null;
+  };
+
+  // Clicking is a LAST RESORT, and at most once.
+  //
+  // The handle reveals a field the design system draws elsewhere, and opening
+  // it is a real interaction: it can put a dialog over the page and leave the
+  // editor somewhere the next test did not expect. So look first, and only
+  // reach for the handle when the words are genuinely not on screen — which is
+  // the case it exists for, and no other block pays for it.
+  let clicked = false;
+  const locate = (text: string) => {
+    const target = norm(text);
+    if (!target) return null;
+    const found = find(target, roots);
+    if (found || !(handle instanceof HTMLElement)) return found;
+    if (!clicked) {
+      clicked = true;
+      handle.click();
+    }
+    return find(target, [...roots, document.body]);
   };
 
   const ids = new Map<Element, number>();
