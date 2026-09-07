@@ -1381,12 +1381,7 @@ test.describe('Template Edit Mode - Object List Items', () => {
     await helper.waitForSidebarCurrentBlock('Slide');
 
     // Sidebar form should NOT have interactive inputs (readOnly slide)
-    // A read-only block still SHOWS its settings — they are rendered with
-    // every field disabled (see ParentBlocksWidget's disableEveryField), which
-    // is what "not interactive" means now. It used to render static text, so
-    // this counted controls; count the ENABLED ones instead, the same way the
-    // fixed-template check above does.
-    const sidebarInputs = page.locator('#sidebar-properties input:not([type="hidden"]):not([disabled]), #sidebar-properties textarea:not([disabled]), #sidebar-properties [contenteditable="true"]');
+    const sidebarInputs = page.locator('#sidebar-properties input:not([type="hidden"]), #sidebar-properties textarea, #sidebar-properties [contenteditable="true"]');
     await expect(sidebarInputs).toHaveCount(0, { timeout: 3000 });
 
     // Navigate to slide 2 via carousel next button and verify it's also locked
@@ -1419,12 +1414,7 @@ test.describe('Template Edit Mode - Object List Items', () => {
 
     // The parent slider's sidebar form should NOT have interactive inputs
     // (the slider block is readOnly — its settings like autoplayEnabled should be disabled)
-    // A read-only block still SHOWS its settings — they are rendered with
-    // every field disabled (see ParentBlocksWidget's disableEveryField), which
-    // is what "not interactive" means now. It used to render static text, so
-    // this counted controls; count the ENABLED ones instead, the same way the
-    // fixed-template check above does.
-    const sidebarInputs = page.locator('#sidebar-properties input:not([type="hidden"]):not([disabled]), #sidebar-properties textarea:not([disabled]), #sidebar-properties [contenteditable="true"]');
+    const sidebarInputs = page.locator('#sidebar-properties input:not([type="hidden"]), #sidebar-properties textarea, #sidebar-properties [contenteditable="true"]');
     await expect(sidebarInputs).toHaveCount(0, { timeout: 3000 });
   });
 
@@ -1571,11 +1561,8 @@ test.describe('Template Edit Mode - UI Restrictions', () => {
     const headerBlockId = await helper.clickBlockByContent(TEMPLATE_HEADER_CONTENT);
     await helper.waitForSidebarOpen();
 
-    // Sidebar form should not have interactive inputs (readonly block).
-    // A read-only block still SHOWS its settings — rendered with every field
-    // disabled (see ParentBlocksWidget's disableEveryField) — so "not
-    // interactive" means no ENABLED control, not no control.
-    const sidebarInputs = page.locator('#sidebar-properties input:not([type="hidden"]):not([disabled]), #sidebar-properties textarea:not([disabled]), #sidebar-properties [contenteditable="true"]');
+    // Sidebar form should not have interactive inputs (readonly block)
+    const sidebarInputs = page.locator('#sidebar-properties input:not([type="hidden"]), #sidebar-properties textarea, #sidebar-properties [contenteditable="true"]');
     await expect(sidebarInputs).toHaveCount(0, { timeout: 3000 });
   });
 
@@ -1885,13 +1872,7 @@ test.describe('Template Edit Mode - Lock affordance + metadata gating', () => {
       await helper.waitForBlockSelectedInAdmin(id);
       await helper.waitForSidebarOpen();
       await expect(props.locator('.readonly-form')).toBeVisible({ timeout: 5000 });
-      // No ENABLED control. The panel now also renders the block's own schema
-      // with every field disabled beside the static values, so counting every
-      // control would count those too — the property being protected is that
-      // none of them can be typed into.
-      await expect(
-        props.locator('input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), [contenteditable="true"]'),
-      ).toHaveCount(0);
+      await expect(props.locator('input, textarea, [contenteditable="true"]')).toHaveCount(0);
       // The block's own content is shown as a read-only value.
       await expect(props.locator('.readonly-field-value').filter({ hasText: content })).toBeVisible();
     }

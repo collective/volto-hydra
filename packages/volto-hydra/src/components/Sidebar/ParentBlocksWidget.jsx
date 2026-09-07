@@ -133,34 +133,6 @@ const filterBlocksFields = (schema) => {
  * Returns filtered schema (without blocks-type fields) or null.
  * For object_list items, uses the cached itemSchema from blockPathMap.
  */
-/**
- * The same schema with every field disabled — what a READ-ONLY block shows.
- * Volto's widgets take `isDisabled`, and InlineForm spreads a field's schema
- * onto its widget, so marking the properties is all it takes.
- */
-const disableEveryField = (schema) => ({
-  ...schema,
-  properties: Object.fromEntries(
-    Object.entries(schema.properties || {}).map(([id, field]) => [
-      id,
-      {
-        ...field,
-        isDisabled: true,
-        // `isDisabled` is not enough for a link/image field. Volto's
-        // ObjectBrowserWidget passes it to the BROWSE BUTTON only; the
-        // manual-link <input> it renders while the field is empty takes no
-        // disabled prop at all (core ObjectBrowserWidget.jsx, the
-        // `allowExternals && items.length === 0` branch), so it stays typeable
-        // in a read-only block — the author types a URL and the change is
-        // dropped by the guard in onChangeField, which is worse than not
-        // offering it. Turning externals off removes that input, so there is
-        // nothing to type into, which is what disabling was supposed to mean.
-        allowExternals: false,
-      },
-    ]),
-  ),
-});
-
 const getFilteredBlockSchema = (blockType, intl, blockPathMap, blockId, blockData) => {
   const pathInfo = blockPathMap?.[blockId];
 
@@ -476,14 +448,17 @@ const ParentBlockSection = ({
         </HydraSchemaProvider>
       )}
 
-      {/* Fallback: If no Edit component but has schema, render BlockDataForm directly */}
-      {!BlockEdit && schema && !pathInfo?.isTemplateInstance && (() => {
-        // A read-only block SHOWS its settings, disabled, rather than nothing:
-        // an empty sidebar reads as broken, while greyed fields say "this is
-        // the setting, and it is not yours to change from this page" — unlock
-        // the template to change it. Volto's widgets already honour
-        // `isDisabled`, and InlineForm spreads each field's schema onto them.
-        const formSchema = isReadonly ? disableEveryField(schema) : schema;
+      {/* Fallback: If no Edit component but has schema, render BlockDataForm directly.
+          NOT for a read-only block: that one renders its values as static text
+          through ReadOnlyForm below, and rendering an editable form as well —
+          however thoroughly disabled — means every widget has to honour
+          `isDisabled` for the panel to be trustworthy. Volto's object browser
+          does not: it disables its browse button but still renders a typeable
+          <input> for an empty field, so a locked block had a box an author
+          could type into whose value was then dropped on the way out. A form
+          that isn't rendered has nothing to lock. */}
+      {!BlockEdit && schema && !isReadonly && !pathInfo?.isTemplateInstance && (() => {
+        const formSchema = schema;
         const formContent = (
           <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef, onChangeBlock }}>
             <BlockDataForm

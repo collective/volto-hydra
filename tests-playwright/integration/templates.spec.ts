@@ -209,22 +209,14 @@ test.describe('Templates', () => {
     expect(buttonTitles).not.toContain('underline');
     expect(buttonTitles).not.toContain('strikethrough');
 
-    // 3. The sidebar shows the block's content READ-ONLY: the fields are there,
-    // carrying their values, with every one of them DISABLED. (It used to
-    // render static text through ReadOnlyForm, and before that nothing at all —
-    // the field is now the frontend's own, disabled rather than replaced, so an
-    // author sees the same form they would edit if the template were unlocked.)
+    // 3. The sidebar shows the block's content READ-ONLY — visible as static text,
+    // but with no editable control (ReadOnlyForm). It used to show nothing at all.
     await helper.waitForSidebarOpen();
     const props = page.locator('#sidebar-properties');
-    const valueField = props
-      .locator('.field-wrapper-value input, .field-wrapper-value textarea, .field-wrapper-value [contenteditable]')
-      .first();
-    await expect(valueField).toBeVisible({ timeout: 5000 });
-    await expect(valueField).toBeDisabled();
-    // Nothing in the panel is editable.
-    await expect(
-      props.locator('input:not([disabled]), textarea:not([disabled]), [contenteditable="true"]'),
-    ).toHaveCount(0);
+    await expect(props.locator('.readonly-form')).toBeVisible({ timeout: 5000 });
+    // The value is shown (read-only), and there's no editable input for it.
+    await expect(props.locator('.field-wrapper-value .readonly-field-value')).toBeVisible();
+    await expect(props.locator('input, textarea, [contenteditable="true"]')).toHaveCount(0);
 
     // 4. Try typing in iframe - nothing should happen
     await h1Element.click();
