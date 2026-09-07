@@ -397,6 +397,7 @@ test.describe('Block sanity (auto-discovered)', () => {
         const measured = await measureTextStyles(
           iframe.locator(`[data-block-uid="${block.blockId}"]`).first(),
           wanted,
+          block.blockId,
         );
 
         recordTextStyles(
