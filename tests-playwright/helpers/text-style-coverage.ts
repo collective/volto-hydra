@@ -241,7 +241,16 @@ export function resetTextStyleCoverage(): void {
  */
 export function measureStylesInPage(
   root: HTMLElement,
-  { wanted, uid }: { wanted: Array<{ style: string; text: string }>; uid?: string },
+  {
+    wanted,
+    uid,
+    field,
+  }: {
+    wanted: Array<{ style: string; text: string }>;
+    uid?: string;
+    /** The field these styles came from, so the RIGHT handle is clicked. */
+    field?: string;
+  },
 ): {
   out: Record<string, { sig: string; node: number } | null>;
   baseline: { sig: string; node: number } | null;
@@ -268,20 +277,59 @@ export function measureStylesInPage(
   // `data-block-selector="uid#field"`, the same handle the bridge clicks to
   // reveal it. Measuring the block's element alone reported those styles as
   // rendering NOWHERE while the words were on screen the whole time.
+  //
+  // The handle is the CONTROL, not the markup: reading its subtree finds the
+  // button's own label ("Show cookie consent"), never the field. So click it,
+  // exactly as the bridge does when an author puts the cursor in that field,
+  // and then let the whole document be searchable for this block — the block
+  // claimed that markup by stamping its uid there, and `locate` matches a
+  // field's WHOLE text, so the wider root cannot drift onto someone else's
+  // words.
+  //
+  // ONE handle, the one naming THIS field. A block can be drawn in two places
+  // with different fields in each (a cookie banner and its preferences dialog),
+  // and revealing the second HIDES the first — clicking them all would measure
+  // neither.
+  // Some frontends stamp the attribute on an element that DOES hold the field —
+  // an accordion header wrapping its panel — so claimed elements stay roots.
   const claimed = uid
     ? [...document.querySelectorAll(`[data-block-selector^="${uid}#"]`)]
     : [];
+  // …but the design system's is a BUTTON beside the thing it opens, so the one
+  // naming this field is clicked, and the document becomes searchable for this
+  // block once it has been.
+  const handle = uid && field
+    ? document.querySelector(`[data-block-selector~="${uid}#${field}"]`)
+    : null;
   const roots = [root, ...claimed];
 
   // A root itself counts, and the INNERMOST match wins — the element the style
   // produced, not an ancestor that merely contains it.
-  const locate = (text: string) => {
-    const target = norm(text);
-    if (!target) return null;
-    const all = roots
+  const find = (target: string, where: Element[]) => {
+    const all = where
       .flatMap((r) => [r, ...r.querySelectorAll('*')])
       .filter((el) => norm(el.textContent || '') === target);
     return all.length ? (all[all.length - 1] as HTMLElement) : null;
+  };
+
+  // Clicking is a LAST RESORT, and at most once.
+  //
+  // The handle reveals a field the design system draws elsewhere, and opening
+  // it is a real interaction: it can put a dialog over the page and leave the
+  // editor somewhere the next test did not expect. So look first, and only
+  // reach for the handle when the words are genuinely not on screen — which is
+  // the case it exists for, and no other block pays for it.
+  let clicked = false;
+  const locate = (text: string) => {
+    const target = norm(text);
+    if (!target) return null;
+    const found = find(target, roots);
+    if (found || !(handle instanceof HTMLElement)) return found;
+    if (!clicked) {
+      clicked = true;
+      handle.click();
+    }
+    return find(target, [...roots, document.body]);
   };
 
   const ids = new Map<Element, number>();
@@ -309,8 +357,9 @@ export async function measureTextStyles(
   blockLocator: { evaluate: Function },
   items: Array<{ style: string; text: string }>,
   uid?: string,
+  field?: string,
 ): Promise<{ out: Record<string, Measured | null>; baseline: Measured | null }> {
   return await blockLocator
-    .evaluate(measureStylesInPage, { wanted: items, uid })
+    .evaluate(measureStylesInPage, { wanted: items, uid, field })
     .catch(() => ({ out: {}, baseline: null }));
 }

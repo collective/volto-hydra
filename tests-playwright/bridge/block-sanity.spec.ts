@@ -390,14 +390,18 @@ test.describe('Block sanity (auto-discovered)', () => {
       // styled span deliberately), so we locate the style's text, take a
       // signature of how it actually looks, and compare against body text on the
       // same page. The aggregates at the end of the file do the judging.
-      for (const value of Object.values(block.blockData || {})) {
+      for (const [field, value] of Object.entries(block.blockData || {})) {
         if (!Array.isArray(value)) continue;
         const wanted = [...slateStyles(value)].map(([style, text]) => ({ style, text }));
         if (wanted.length === 0) continue;
+        // The FIELD name, not just the block's: a field the design system draws
+        // elsewhere is revealed by the handle that names it
+        // (`data-block-selector="uid#field"`).
         const measured = await measureTextStyles(
           iframe.locator(`[data-block-uid="${block.blockId}"]`).first(),
           wanted,
           block.blockId,
+          field,
         );
 
         recordTextStyles(
