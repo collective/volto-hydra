@@ -293,6 +293,64 @@ export async function checkDataEditTextClicks(
  * A block that is already visible, or whose container publishes nothing, is
  * left exactly as it was.
  */
+/**
+ * Do everything the EDITOR would do to make a block's fields editable, in the
+ * order an author would, and say whether anything changed.
+ *
+ * The harness had these steps scattered: `revealBlock` for a block hidden
+ * behind an accordion or a tab, a `data-block-selector="uid#field"` press for a
+ * field the design system draws elsewhere, and `unlockTemplate` in the template
+ * specs — so a check that needed a step nobody had wired in reported the block
+ * as uneditable rather than un-revealed. The footer template's cookie banner
+ * failed exactly that way, while the same block on an ordinary page passed:
+ * nothing had unlocked the template, and a locked member carries no annotation
+ * because it genuinely is not editable yet.
+ *
+ * Each step is skipped when it does not apply, so this is safe to call whenever
+ * a field looks absent, and returns false when it did nothing (there is then no
+ * point looking again).
+ */
+export async function makeEditable(
+  block: Locator,
+  blockData?: Record<string, unknown>,
+  iframe?: FrameLocator,
+): Promise<boolean> {
+  const uid = await block.getAttribute('data-block-uid');
+  if (!uid) return false;
+  let acted = false;
+
+  // 1. Hidden behind a container's own control (accordion header, tab, slide).
+  //    revealBlock owns this: it asks the bridge whether the block is really
+  //    visible (an off-screen slide still has client rects), copes with a
+  //    query-gated block that has no element at all, and steps +1/-1 to reach
+  //    one. Re-clicking the selector here would be a worse copy of it.
+  if (iframe && !(await block.isVisible().catch(() => false))) {
+    await revealBlock(iframe, uid);
+    acted = true;
+  }
+
+  // 2. Drawn ELSEWHERE by design system JavaScript (a cookie banner, a dialog).
+  //    The control that opens it names the field it holds.
+  const handles = block.page().locator(`[data-block-selector^="${uid}#"]`);
+  if ((await handles.count()) > 0) {
+    await handles.first().click().catch(() => {});
+    acted = true;
+  }
+
+  // 3. A LOCKED TEMPLATE MEMBER: not editable in place until the template is
+  //    unlocked, which is a gesture the editor offers rather than a missing
+  //    feature.
+  if (blockData?.templateInstanceId && (blockData.fixed || blockData.readOnly)) {
+    try {
+      await new AdminUIHelper(block.page()).unlockTemplate(uid);
+      acted = true;
+    } catch {
+      // No toggle, or already unlocked — report what is actually there.
+    }
+  }
+  return acted;
+}
+
 export async function revealBlock(iframe: FrameLocator, blockUid: string): Promise<void> {
   const block = iframe.locator(`[data-block-uid="${blockUid}"]`).first();
   // A query-gated block (data-block-selector-input) has NO element until its
@@ -805,6 +863,7 @@ export async function checkSlateAnnotations(
   block: Locator,
   blockData: Record<string, unknown> | undefined,
   blockSchema?: { properties?: Record<string, any> },
+  iframe?: FrameLocator,
 ): Promise<void> {
   if (!blockData) return;
 
@@ -863,9 +922,21 @@ export async function checkSlateAnnotations(
     ...annotatedFields.map(([f, a]) => [a.attr, f] as [string, string]),
   ];
 
-  const found = await settleAnnotations(block, await editableFieldsIn(block), expected);
-  const present = namesByAttr(found);
-  const revealable = await revealableFieldsOf(block);
+  const look = async () => {
+    const f = await settleAnnotations(block, await editableFieldsIn(block), expected);
+    return { found: f, present: namesByAttr(f), revealable: await revealableFieldsOf(block) };
+  };
+  let { found, present, revealable } = await look();
+
+  // Everything the editor would do to make this block's fields editable — see
+  // makeEditable. Anything still missing afterwards is genuinely missing.
+  const missing = () =>
+    slateFields.some(
+      (f) => !present['data-edit-text'].has(f) && !revealable.has(f),
+    );
+  if (missing() && (await makeEditable(block, blockData, iframe))) {
+    ({ found, present, revealable } = await look());
+  }
 
   for (const field of slateFields) {
     // Accept either a descendant [data-edit-text="<field>"] OR the block
@@ -1176,7 +1247,7 @@ export async function verifyBlockRendering(
 
   // Schema-driven slate check — checkSlateAnnotations pulls the schema
   // from the bridge itself (authoritative, schemaEnhancer-resolved).
-  await checkSlateAnnotations(block, blockData);
+  await checkSlateAnnotations(block, blockData, undefined, iframe);
 
   // Schema-INDEPENDENT coverage: every rendered nested block + editable field
   // must be known to the pathMap. Catches incomplete frontend schemas that the
@@ -1244,7 +1315,7 @@ export async function verifyBlockRendering(
       if (await loc.isVisible()) {
         anyVisible = true;
         await checkEditAnnotations(loc, data);
-        await checkSlateAnnotations(loc, data);
+        await checkSlateAnnotations(loc, data, undefined, iframe);
       }
     }
     if (subBlocks.length > 0) {
