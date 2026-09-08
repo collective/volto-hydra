@@ -832,6 +832,41 @@ async function settleAnnotations(
  * own optional-fields spec — it doesn't need re-proving for every block in every
  * example. What this check needs is only the reason an annotation is missing.
  */
+/**
+ * Fields this block says are edited SOMEWHERE ELSE.
+ *
+ * A block does not always own the element its field is rendered into. Design
+ * system JavaScript builds the cookie banner and its dialog into <body>, so the
+ * paragraph carrying `data-edit-text="message"` is a sibling of the whole app,
+ * not a descendant of the block — `editableFieldsIn` looks inside the block and
+ * cannot see it, and the field reads as "uneditable everywhere it appears" when
+ * it is editable exactly where the reader finds it.
+ *
+ * The block says so itself: `data-block-selector="<uid>#<field>"` is the
+ * frontend declaring "this control reaches that field of mine", and it is the
+ * same handle the bridge clicks when the author picks the field in the sidebar.
+ * Trusting the declaration is what keeps the coverage rule about whether the
+ * author can reach a field, rather than about where the markup happens to sit.
+ */
+async function advertisedFieldsOf(block: Locator): Promise<Set<string>> {
+  const uid = await block.getAttribute('data-block-uid');
+  if (!uid) return new Set();
+  // Page-wide, not block-scoped: the handle usually IS inside the block (the
+  // "Manage cookies" button), but the point of the mechanism is that either end
+  // may sit outside, so neither end is assumed.
+  const tokens = await block
+    .page()
+    .locator(`[data-block-selector*="${uid}#"]`)
+    .evaluateAll((nodes) =>
+      nodes.flatMap((n) => (n.getAttribute('data-block-selector') || '').split(/\s+/)),
+    );
+  const fields = tokens
+    .filter((t) => t.startsWith(`${uid}#`))
+    .map((t) => t.slice(uid.length + 1))
+    .filter(Boolean);
+  return new Set(fields);
+}
+
 async function revealableFieldsOf(block: Locator): Promise<Set<string>> {
   const uid = await block.getAttribute('data-block-uid');
   if (!uid) return new Set();
@@ -924,9 +959,14 @@ export async function checkSlateAnnotations(
 
   const look = async () => {
     const f = await settleAnnotations(block, await editableFieldsIn(block), expected);
-    return { found: f, present: namesByAttr(f), revealable: await revealableFieldsOf(block) };
+    return {
+      found: f,
+      present: namesByAttr(f),
+      revealable: await revealableFieldsOf(block),
+      advertised: await advertisedFieldsOf(block),
+    };
   };
-  let { found, present, revealable } = await look();
+  let { found, present, revealable, advertised } = await look();
 
   // Everything the editor would do to make this block's fields editable — see
   // makeEditable. Anything still missing afterwards is genuinely missing.
@@ -935,7 +975,7 @@ export async function checkSlateAnnotations(
       (f) => !present['data-edit-text'].has(f) && !revealable.has(f),
     );
   if (missing() && (await makeEditable(block, blockData, iframe))) {
-    ({ found, present, revealable } = await look());
+    ({ found, present, revealable, advertised } = await look());
   }
 
   for (const field of slateFields) {
@@ -1051,7 +1091,13 @@ export async function checkSlateAnnotations(
         a.kind,
         blockType,
         field,
-        present[a.attr].has(field) || revealable.has(field),
+        // Three ways a field is genuinely reachable: its annotation is in the
+        // block; it is an empty optional field with nothing yet to annotate; or
+        // the block advertises a control that reaches it, because the element
+        // itself is drawn outside the block by design system JavaScript.
+        present[a.attr].has(field) ||
+          revealable.has(field) ||
+          advertised.has(field),
         `[${coverageUid}] widget=${(prop as { widget?: string })?.widget}`,
       );
     }
