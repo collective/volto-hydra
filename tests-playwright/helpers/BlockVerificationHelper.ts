@@ -851,15 +851,23 @@ async function settleAnnotations(
 async function advertisedFieldsOf(block: Locator): Promise<Set<string>> {
   const uid = await block.getAttribute('data-block-uid');
   if (!uid) return new Set();
-  // Page-wide, not block-scoped: the handle usually IS inside the block (the
-  // "Manage cookies" button), but the point of the mechanism is that either end
-  // may sit outside, so neither end is assumed.
-  const tokens = await block
-    .page()
-    .locator(`[data-block-selector*="${uid}#"]`)
-    .evaluateAll((nodes) =>
-      nodes.flatMap((n) => (n.getAttribute('data-block-selector') || '').split(/\s+/)),
+  // Searched through the block's OWN document, not `block.page()`. The block is
+  // inside the editor's iframe, and `page.locator()` only ever sees the
+  // top-level document — so a page-wide search found nothing at all, however
+  // plainly the handle was there. `ownerDocument` is the frame the block is
+  // actually in.
+  //
+  // Document-wide within that frame, not block-scoped: the handle usually IS
+  // inside the block (the "Show cookie consent" button), but the whole point of
+  // the mechanism is that either end may sit outside it, so neither is assumed.
+  const tokens: string[] = await block.evaluate((el, blockUid) => {
+    const nodes = el.ownerDocument.querySelectorAll(
+      `[data-block-selector*="${blockUid}#"]`,
     );
+    return Array.from(nodes).flatMap((n) =>
+      (n.getAttribute('data-block-selector') || '').split(/\s+/),
+    );
+  }, uid);
   const fields = tokens
     .filter((t) => t.startsWith(`${uid}#`))
     .map((t) => t.slice(uid.length + 1))
@@ -1001,6 +1009,21 @@ export async function checkSlateAnnotations(
     // example. A final aggregate test (slateFieldsNeverEditable) fails only if
     // a field is never editable in ANY example. On a miss, capture which
     // data-edit-text values ARE present for the aggregate's diagnostic.
+    // The block may say the field lives somewhere else. `data-block-selector`
+    // "<uid>#<field>" is the frontend declaring which control reaches it, and
+    // for cookieConsent that is the whole story: design system JavaScript draws
+    // the banner into <body>, and in the editor the block itself renders a
+    // stand-in with no field in it at all. The annotation is real and the author
+    // can reach it; it is simply not a descendant of this element.
+    //
+    // The sibling recording path already accepted that (a field is editable if
+    // present OR revealable OR advertised). This one did not, so a slate field
+    // drawn elsewhere still read as uneditable everywhere — which is exactly
+    // what `cookieConsent.message` kept reporting after the first fix.
+    if (!hasContainer && advertised.has(field)) {
+      recordSlateFieldContainer(blockType, field, true, `[${coverageUid}] advertised`);
+      continue;
+    }
     if (!hasContainer) {
       const context = await block.evaluate((el) => {
         const outer = (el.outerHTML || '').slice(0, 200);
