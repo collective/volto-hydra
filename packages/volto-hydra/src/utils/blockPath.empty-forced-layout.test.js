@@ -185,7 +185,22 @@ describe('forced empty layout is empty but LOCKED until the template is unlocked
     );
     map = buildBlockPathMap(seeded, cfg, intl);
     const id = seeded.blocks_layout.announcement[0];
-    return { seed: seeded.blocks[id], id };
+    return { seed: seeded.blocks[id], id, seeded, map };
+  }
+
+  // The walk SyncedSlateToolbar does to decide whether to draw the lock: from the
+  // selected block, up through parentId, looking for a top-level template
+  // instance. Null means no lock control — on the toolbar OR in the sidebar.
+  function instanceOf(map, blockId) {
+    let instanceId = null;
+    let cur = blockId;
+    while (cur) {
+      const info = map[cur];
+      if (!info) break;
+      if (info.isTemplateInstance && !info.isNestedTemplateInstance) instanceId = cur;
+      cur = info.parentId;
+    }
+    return instanceId;
   }
 
   test('the seeded empty is a template member (has a templateInstanceId)', async () => {
@@ -207,6 +222,86 @@ describe('forced empty layout is empty but LOCKED until the template is unlocked
       seed?.readOnly,
       'a forced-layout empty must be locked until the template is unlocked',
     ).toBe(true);
+  });
+
+  // The empty is only half the story. An author unlocks the region, fills it, and
+  // then has to LOCK it again to publish — and the lock is drawn only if the walk
+  // above finds a template instance from the selected block. On the docs site
+  // that walk came up empty after adding a global alert into an emptied
+  // announcement: no lock on the toolbar, none in the sidebar, no way to publish
+  // what had just been written.
+  //
+  // Membership on an add is otherwise inherited from a NEIGHBOUR, and an emptied
+  // forced region has none — which is why this case needs pinning separately from
+  // the object_list one.
+  test('the walk that draws the lock reaches the instance from the seeded empty', async () => {
+    const { map, id, seed } = await seedForcedEmpty();
+    expect(
+      instanceOf(map, id),
+      'no template instance above the seeded empty — nothing would draw a lock',
+    ).toBe(seed.templateInstanceId);
+  });
+
+  test('a block that REPLACES the empty is still inside the instance', async () => {
+    // What filling the placeholder produces: convertBlockInPlace builds the new
+    // block from the chosen type and carries the empty's membership across
+    // (templateId/templateInstanceId/slotId/fixed/readOnly).
+    const { seeded, id, seed, map: seedMap } = await seedForcedEmpty();
+    const filled = {
+      ...seeded,
+      blocks: {
+        ...seeded.blocks,
+        [id]: {
+          '@type': 'globalAlert',
+          templateId: seed.templateId,
+          templateInstanceId: seed.templateInstanceId,
+          slotId: seed.slotId,
+          fixed: seed.fixed,
+          readOnly: seed.readOnly,
+        },
+      },
+    };
+    expect(instanceOf(seedMap, id)).toBe(seed.templateInstanceId);
+    const map = buildBlockPathMap(filled, cfg, intl);
+    expect(
+      instanceOf(map, id),
+      'the filled block lost the instance the empty belonged to — the lock disappears',
+    ).toBe(seed.templateInstanceId);
+  });
+
+  // The docs-site flow that lost its lock does not start from an empty region: it
+  // starts from a region with an alert in it, which the author REMOVES before
+  // adding a new one. So the placeholder has to be re-seeded mid-session, not
+  // just at load — and it has to come back with the same membership, or the
+  // block that replaces it is per-page content and cannot be locked.
+  test('re-seeding after the member is removed restores the membership', async () => {
+    const { seeded, id, seed } = await seedForcedEmpty();
+    // The author removes what was there: the region is empty again.
+    const emptied = {
+      ...seeded,
+      blocks: Object.fromEntries(
+        Object.entries(seeded.blocks).filter(([key]) => key !== id),
+      ),
+      blocks_layout: { ...seeded.blocks_layout, announcement: [] },
+    };
+    const map = buildBlockPathMap(emptied, cfg, intl);
+    const reseeded = ensureEmptyBlockIfEmpty(
+      emptied,
+      { parentId: PAGE_BLOCK_UID },
+      map,
+      () => 're-seed',
+      cfg,
+      { intl, properties: emptied },
+    );
+    const newId = reseeded.blocks_layout.announcement[0];
+    expect(newId, 'the region was not re-seeded at all').toBeTruthy();
+    expect(
+      reseeded.blocks[newId]?.templateInstanceId,
+      'the re-seeded empty lost the template instance — nothing to lock',
+    ).toBe(seed.templateInstanceId);
+    expect(instanceOf(buildBlockPathMap(reseeded, cfg, intl), newId)).toBe(
+      seed.templateInstanceId,
+    );
   });
 
   test('locked outside template-edit-mode, replaceable once the template is unlocked', async () => {
