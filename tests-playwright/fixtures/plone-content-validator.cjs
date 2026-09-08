@@ -698,9 +698,99 @@ function imageDimensions(file) {
   return { errors, warnings, stats };
 }
 
+
+/**
+ * Every block field the schemas do not declare.
+ *
+ * A conversion writes blocks, and the only way to know it wrote them correctly
+ * is to compare what it produced against the schema those blocks are edited by.
+ * Nothing did that outside a browser: block-sanity holds the equivalent check,
+ * but it needs a frontend, a discovery pass and a mock parent, so it only ever
+ * ran over content we commit. A converted export is generated on a server and
+ * never comes local, and there it went unchecked — `contentBlock` held its link
+ * as `url` where the schema says `linkUrl`, so a "View more" link stopped
+ * rendering and no test anywhere had an opinion.
+ *
+ * This asks the same question with nothing but the content and a field map:
+ * `{ blockType: ["field", ...] }`, which the frontend emits from its own
+ * schemas. It runs over a directory or an in-memory array, like checkIntegrity,
+ * so the same call serves a CI corpus and a live site's pages.
+ *
+ * A block type absent from the map is REPORTED, not skipped: an unknown type is
+ * either a block the frontend cannot render or a map gone stale, and both are
+ * worth hearing about.
+ */
+function checkBlockSchemas(source, declaredFields) {
+  const onDisk = typeof source === 'string';
+  const errors = [];
+  const warnings = [];
+  const stats = { items: 0, blocks: 0, undeclared: 0, unknownTypes: 0 };
+  const unknown = new Set();
+  // One report per (blockType, field): a stray field is a converter bug, and a
+  // converter repeats itself across every page it touched.
+  const strays = new Map();
+
+  const visit = (block, rel) => {
+    if (!block || typeof block !== 'object') return;
+    const type = block['@type'];
+    if (typeof type === 'string') {
+      stats.blocks += 1;
+      const declared = declaredFields[type];
+      if (!declared) {
+        if (!unknown.has(type)) {
+          unknown.add(type);
+          stats.unknownTypes += 1;
+          warnings.push(
+            `  ${rel}: block type "${type}" is in the content but not in the ` +
+              `field map — an unrenderable block, or a stale map`,
+          );
+        }
+      } else {
+        for (const field of Object.keys(block)) {
+          // `@`-prefixed keys are the block's identity, not schema fields, and
+          // container children live under keys the parent block owns.
+          if (field.startsWith('@') || field === 'blocks' || field === 'blocks_layout') continue;
+          if (declared.includes(field)) continue;
+          const key = `${type}.${field}`;
+          if (!strays.has(key)) strays.set(key, rel);
+        }
+      }
+    }
+    for (const value of Object.values(block)) {
+      if (Array.isArray(value)) value.forEach((v) => visit(v, rel));
+      else if (value && typeof value === 'object') visit(value, rel);
+    }
+  };
+
+  for (const entry of onDisk ? walkData(source) : source) {
+    const { rel, data } = entry;
+    stats.items += 1;
+    visit(data.blocks, rel);
+  }
+
+  for (const [key, rel] of [...strays.entries()].sort()) {
+    stats.undeclared += 1;
+    errors.push(
+      `  ${key} is not declared by the block's schema (e.g. ${rel}) — ` +
+        `the field cannot be edited, and whatever reads it renders nothing`,
+    );
+  }
+  return { errors, warnings, stats };
+}
+
 function formatReport(title, result) {
   const lines = [];
-  if (title === 'validate') {
+  if (title === 'schema') {
+    lines.push(
+      `Content: ${result.stats.items} items, ${result.stats.blocks} blocks`,
+    );
+    lines.push(
+      `Fields:  ${result.stats.undeclared} undeclared` +
+        (result.stats.unknownTypes
+          ? `, ${result.stats.unknownTypes} block type(s) not in the field map`
+          : ''),
+    );
+  } else if (title === 'validate') {
     lines.push(`Content export OK: ${result.stats.dataFiles} data files, ${result.stats.blobFiles} blob files`);
   } else {
     lines.push(`Content: ${result.stats.items} items`);
@@ -727,4 +817,4 @@ function formatReport(title, result) {
   return lines.join('\n');
 }
 
-module.exports = { validate, checkIntegrity, formatReport };
+module.exports = { validate, checkIntegrity, checkBlockSchemas, formatReport };
