@@ -4,7 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { validate, checkIntegrity } = require('./plone-content-validator.cjs');
+const { validate, checkIntegrity, checkBlockSchemas } = require('./plone-content-validator.cjs');
 
 /**
  * Build a minimal plone.exportimport content tree under a temp dir.
@@ -944,6 +944,83 @@ describe('checkIntegrity over in-memory items (API-fed)', () => {
         data: { '@id': '/page-a', '@type': 'Document', id: 'page-a', UID: 'aaaabbbbcccc', blocks: {}, blocks_layout: { items: [] } },
       },
     ]);
+    assert.deepEqual(r.errors, []);
+  });
+});
+
+describe('checkBlockSchemas()', () => {
+  const FIELDS = {
+    contentBlock: ['title', 'description', 'linkUrl'],
+    slateish: ['value'],
+  };
+  const page = (blocks) => [{ rel: 'content/x', data: { blocks } }];
+
+  it('reports a field the block schema does not declare', () => {
+    // The shape that went unnoticed for months: the right value under a key the
+    // schema has never heard of, so the field is uneditable and unrendered.
+    const r = checkBlockSchemas(
+      page({ b1: { '@type': 'contentBlock', title: 'T', url: '/somewhere' } }),
+      FIELDS,
+    );
+    assert.equal(r.errors.length, 1);
+    assert.match(r.errors[0], /contentBlock\.url/);
+    assert.equal(r.stats.undeclared, 1);
+  });
+
+  it('says nothing about a block whose fields are all declared', () => {
+    const r = checkBlockSchemas(
+      page({ b1: { '@type': 'contentBlock', title: 'T', linkUrl: '/somewhere' } }),
+      FIELDS,
+    );
+    assert.deepEqual(r.errors, []);
+  });
+
+  it('reports each stray field once, however many pages repeat it', () => {
+    // A converter bug repeats on every page it touched; one report per
+    // (blockType, field) keeps the output about the bug, not its blast radius.
+    const items = ['a', 'b', 'c'].map((rel) => ({
+      rel: `content/${rel}`,
+      data: { blocks: { b1: { '@type': 'contentBlock', url: '/x' } } },
+    }));
+    const r = checkBlockSchemas(items, FIELDS);
+    assert.equal(r.errors.length, 1);
+    assert.equal(r.stats.items, 3);
+  });
+
+  it('finds blocks nested inside other blocks', () => {
+    const r = checkBlockSchemas(
+      page({
+        g: {
+          '@type': 'slateish',
+          value: [],
+          columns: [{ '@type': 'contentBlock', url: '/x' }],
+        },
+      }),
+      FIELDS,
+    );
+    assert.match(r.errors[0], /contentBlock\.url/);
+  });
+
+  it('warns about a block type missing from the field map', () => {
+    const r = checkBlockSchemas(page({ b1: { '@type': 'mystery' } }), FIELDS);
+    assert.equal(r.errors.length, 0);
+    assert.equal(r.stats.unknownTypes, 1);
+    assert.match(r.warnings[0], /mystery/);
+  });
+
+  it('ignores identity keys and a container\'s child storage', () => {
+    const r = checkBlockSchemas(
+      page({
+        b1: {
+          '@type': 'contentBlock',
+          '@id': 'x',
+          title: 'T',
+          blocks: { inner: { '@type': 'contentBlock', linkUrl: '/y' } },
+          blocks_layout: { items: ['inner'] },
+        },
+      }),
+      FIELDS,
+    );
     assert.deepEqual(r.errors, []);
   });
 });
