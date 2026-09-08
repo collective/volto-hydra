@@ -1756,6 +1756,10 @@ async function discoverBlocks(
 }
 
 module.exports = {
+  // Exported so the content validator asks the same question this does — a
+  // second list of "fields that are not schema fields" would drift, and the
+  // drift would show up as a validator shouting about `slotId` on every block.
+  UNDECLARED_EXEMPT,
   collectFieldMappingIssues,
   discoverBlocks,
   extractBlocks,

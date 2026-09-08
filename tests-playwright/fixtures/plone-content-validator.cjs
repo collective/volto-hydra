@@ -21,6 +21,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { UNDECLARED_EXEMPT } = require('../helpers/discover-blocks.cjs');
 
 /**
  * Content ids that break their PARENT, not themselves.
@@ -720,7 +721,16 @@ function imageDimensions(file) {
  * either a block the frontend cannot render or a map gone stale, and both are
  * worth hearing about.
  */
-function checkBlockSchemas(source, declaredFields) {
+function checkBlockSchemas(source, fieldMap) {
+  // `{ blocks: { type: { fields, defaultsPrefix } }, identityFields: [...] }`.
+  // A bare `{ type: [fields] }` map still works, for a caller that has one.
+  const declaredFields = fieldMap && fieldMap.blocks ? fieldMap.blocks : fieldMap;
+  // Keys a CONTAINER stamps onto its children — an object_list's `idField` /
+  // `typeField`. The table block keys its cells by `key`, and the cell's own
+  // schema has no reason to declare it.
+  const identityFields = new Set(
+    (fieldMap && fieldMap.identityFields) || ['@id', '@type'],
+  );
   const onDisk = typeof source === 'string';
   const errors = [];
   const warnings = [];
@@ -735,7 +745,10 @@ function checkBlockSchemas(source, declaredFields) {
     const type = block['@type'];
     if (typeof type === 'string') {
       stats.blocks += 1;
-      const declared = declaredFields[type];
+      const entry = declaredFields[type];
+      // `{ fields, defaultsPrefix }`, or a bare array from an older map.
+      const declared = Array.isArray(entry) ? entry : entry && entry.fields;
+      const defaultsPrefix = Array.isArray(entry) ? null : entry && entry.defaultsPrefix;
       if (!declared) {
         if (!unknown.has(type)) {
           unknown.add(type);
@@ -747,9 +760,22 @@ function checkBlockSchemas(source, declaredFields) {
         }
       } else {
         for (const field of Object.keys(block)) {
-          // `@`-prefixed keys are the block's identity, not schema fields, and
-          // container children live under keys the parent block owns.
-          if (field.startsWith('@') || field === 'blocks' || field === 'blocks_layout') continue;
+          // `@`-prefixed keys are the block's identity, and UNDECLARED_EXEMPT is
+          // the same set block-sanity uses: fields that ride on a block without
+          // being schema fields. Template machinery is the big one —
+          // `templateId`, `templateInstanceId`, `slotId`, `fixed`, `readOnly` —
+          // and it is not unchecked, it is checked by the pass that owns it
+          // (a template's blocks must carry templateId AND slotId, above).
+          // Reporting them here would bury the real findings under three lines
+          // for every block on every templated page: 151 of them on content
+          // that has nothing wrong with it.
+          if (field.startsWith('@') || UNDECLARED_EXEMPT.has(field)) continue;
+          // A container's per-item defaults (`itemDefaults_colour`) are not
+          // properties of the container, and which are valid depends on the
+          // item type — resolvable only with the bridge's registry, which is
+          // exactly why discovery exempts the prefix rather than flagging it.
+          if (defaultsPrefix && field.startsWith(defaultsPrefix)) continue;
+          if (identityFields.has(field)) continue;
           if (declared.includes(field)) continue;
           const key = `${type}.${field}`;
           if (!strays.has(key)) strays.set(key, rel);
