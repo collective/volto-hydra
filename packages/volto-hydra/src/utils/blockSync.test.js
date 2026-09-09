@@ -1033,3 +1033,130 @@ describe('fieldRules — numeric operators count ONE blocks_layout region', () =
     ).toBe(false);
   });
 });
+
+/**
+ * fieldRules — an `error` action, and operands that name another field.
+ *
+ * A cross-field check ("the maximum is below the minimum") needed two things
+ * the grammar could not say: comparing a field to ANOTHER FIELD rather than to
+ * a literal, and raising an error rather than showing or hiding something.
+ *
+ * It is written on the field that should show the error, not on the block: an
+ * error keyed to a field is the only shape Volto acts on — the widget goes red,
+ * the form summarises, and the save is blocked — so a block-level address would
+ * have been a new concept that did less.
+ */
+describe('fieldRules — error action with a field-reference operand', () => {
+  const baseSchema = () => ({
+    fieldsets: [{ id: 'default', title: 'Default', fields: ['minItems', 'maxItems'] }],
+    properties: {
+      minItems: { title: 'Minimum', type: 'number' },
+      maxItems: { title: 'Maximum', type: 'number' },
+    },
+    required: [],
+  });
+
+  const recipe = {
+    fieldRules: {
+      maxItems: {
+        when: { maxItems: { isSet: true, lt: { field: 'minItems' } } },
+        error: 'The maximum is below the minimum.',
+      },
+    },
+  };
+
+  test('marks the field when it compares badly against the other field', () => {
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const out = enhancer({
+      schema: baseSchema(),
+      formData: { minItems: 10, maxItems: 4 },
+    });
+    expect(out.properties.maxItems.hydraRuleError).toBe(
+      'The maximum is below the minimum.',
+    );
+  });
+
+  test('says nothing when the two fields agree', () => {
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const out = enhancer({
+      schema: baseSchema(),
+      formData: { minItems: 4, maxItems: 10 },
+    });
+    expect(out.properties.maxItems.hydraRuleError).toBeUndefined();
+  });
+
+  test('says nothing while the field is still empty', () => {
+    // An author part-way through filling the form has not made a mistake yet.
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const out = enhancer({
+      schema: baseSchema(),
+      formData: { minItems: 4 },
+    });
+    expect(out.properties.maxItems.hydraRuleError).toBeUndefined();
+  });
+
+  test('an unresolvable reference is unset, not a throw', () => {
+    const enhancer = createSchemaEnhancerFromRecipe({
+      fieldRules: {
+        maxItems: {
+          when: { maxItems: { lt: { field: 'noSuchField' } } },
+          error: 'never mind',
+        },
+      },
+    });
+    const out = enhancer({
+      schema: baseSchema(),
+      formData: { maxItems: 4 },
+    });
+    expect(out.properties.maxItems.hydraRuleError).toBeUndefined();
+  });
+
+  test('an error composes with a `set` from the same rule', () => {
+    const enhancer = createSchemaEnhancerFromRecipe({
+      fieldRules: {
+        maxItems: {
+          when: { maxItems: { isSet: true, lt: { field: 'minItems' } } },
+          set: { title: 'Maximum (check this)' },
+          error: 'The maximum is below the minimum.',
+        },
+      },
+    });
+    const out = enhancer({
+      schema: baseSchema(),
+      formData: { minItems: 10, maxItems: 4 },
+    });
+    expect(out.properties.maxItems.title).toBe('Maximum (check this)');
+    expect(out.properties.maxItems.hydraRuleError).toBe(
+      'The maximum is below the minimum.',
+    );
+  });
+
+  test('a reference does not smuggle a value past the surface rules', () => {
+    // Operators are typed by the field's DECLARED type, and a reference operand
+    // changes nothing about that: `lt` on a string surface is still an error,
+    // whether the operand is a literal or another field. So comparing two date
+    // STRINGS is not expressible — it would need a date surface, which is a
+    // separate question from where the operand comes from.
+    const enhancer = createSchemaEnhancerFromRecipe({
+      fieldRules: {
+        endDate: {
+          when: { endDate: { lt: { field: 'startDate' } } },
+          error: 'never reached',
+        },
+      },
+    });
+    expect(() =>
+      enhancer({
+        schema: {
+          fieldsets: [{ id: 'default', title: 'Default', fields: ['startDate', 'endDate'] }],
+          properties: {
+            startDate: { title: 'Start', type: 'string' },
+            endDate: { title: 'End', type: 'string' },
+          },
+          required: [],
+        },
+        formData: { startDate: '2026-03-01', endDate: '2026-02-01' },
+      }),
+    ).toThrow(/not valid for a string/);
+  });
+});

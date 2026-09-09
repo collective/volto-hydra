@@ -1567,3 +1567,101 @@ test.describe('Block Type Conversion via fieldMappings', () => {
     await helper.cancelBlockChooser();
   });
 });
+
+/**
+ * fieldRules — a rule that REFUSES a value.
+ *
+ * The other rules on this page show and hide fields. This one raises an error,
+ * and the point of the test is that nothing about the consequence is ours: the
+ * message goes on the field DEFINITION, and Volto's own machinery does the
+ * rest. `Form.onSubmit` validates every block against its enhanced schema, so
+ * the rule is evaluated on the way to the server and the save is refused.
+ *
+ * The rssFeed fixture refuses "fewer than no items". No other fixture asks for
+ * that — the listings page uses the default 6 — so the rule is inert
+ * everywhere except the page written for it here.
+ */
+test.describe('fieldRules - a rule that refuses a value', () => {
+  test('a page holding a refused value does not save', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/refused-value-page');
+
+    // The page is up and being edited before anything is asked of it.
+    await expect(
+      helper.getIframe().locator('[data-block-uid="intro-1"]'),
+    ).toBeVisible({ timeout: 15000 });
+
+    // Not helper.saveContent(): that waits for the redirect a SUCCESSFUL save
+    // makes, and the whole point here is that there isn't one.
+    await page.locator('#toolbar-save, button:has-text("Save")').first().click();
+
+    // Refused: the editor says which field, and the page is still being edited.
+    // The shadow reports a block error as a toast naming the field, which is
+    // how an author learns about a block they may not be looking at.
+    await expect(
+      page.getByRole('alert').filter({ hasText: 'Max items' }).first(),
+    ).toBeVisible({ timeout: 10000 });
+    await expect(page).toHaveURL(/\/edit(\?|$)/);
+
+    // And the field itself says so, in the sidebar, where it gets fixed. The
+    // refused save selects the offending block and opens its Block tab, so the
+    // form on screen is the one holding the bad value.
+    await expect(
+      page.locator('#sidebar-properties').getByText('Max items cannot be negative.'),
+    ).toBeVisible({ timeout: 10000 });
+  });
+  /**
+   * The same machinery, with Volto's OWN validators rather than a hydra rule.
+   *
+   * Every standard validator is covered as a unit in validateBlocks.test.js;
+   * these two prove the wiring an author actually meets: a block whose schema
+   * requires a value it hasn't got, and a bad value NESTED inside a container —
+   * which core's validation, walking `blocks_layout.items`, would never open.
+   */
+  test('a block missing a required value does not save', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/required-missing-page');
+    await expect(
+      helper.getIframe().locator('[data-block-uid="intro-1"]'),
+    ).toBeVisible({ timeout: 15000 });
+
+    await page.locator('#toolbar-save, button:has-text("Save")').first().click();
+
+    await expect(page.getByRole('alert').first()).toBeVisible({ timeout: 10000 });
+    await expect(page).toHaveURL(/\/edit(\?|$)/);
+  });
+
+  test('a string longer than its schema allows does not save', async ({ page }) => {
+    // maxLength — a standard Volto validator, on a plain string field of a
+    // fixture block. Every slide in the fixtures has a short kicker, so the
+    // constraint is inert until this page writes a long one.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/too-long-string-page');
+    await expect(
+      helper.getIframe().locator('[data-block-uid="intro-1"]'),
+    ).toBeVisible({ timeout: 15000 });
+
+    await page.locator('#toolbar-save, button:has-text("Save")').first().click();
+
+    await expect(page.getByRole('alert').first()).toBeVisible({ timeout: 10000 });
+    await expect(page).toHaveURL(/\/edit(\?|$)/);
+  });
+
+  test('a bad value inside a container does not save', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/nested-bad-url-page');
+    await expect(
+      helper.getIframe().locator('[data-block-uid="intro-1"]'),
+    ).toBeVisible({ timeout: 15000 });
+
+    await page.locator('#toolbar-save, button:has-text("Save")').first().click();
+
+    await expect(page.getByRole('alert').first()).toBeVisible({ timeout: 10000 });
+    await expect(page).toHaveURL(/\/edit(\?|$)/);
+  });
+});
+

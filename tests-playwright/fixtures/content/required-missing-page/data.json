@@ -1,0 +1,14 @@
+{
+  "@id": "/required-missing-page",
+  "@type": "Document",
+  "title": "A block missing a value its schema requires",
+  "UID": "required-missing-page-uid",
+  "blocks": {
+    "intro-1": {
+      "@type": "slate",
+      "value": [{ "type": "p", "children": [{ "text": "The image block below has no image. Its schema requires one." }] }]
+    },
+    "image-empty": { "@type": "image" }
+  },
+  "blocks_layout": { "items": ["intro-1", "image-empty"] }
+}

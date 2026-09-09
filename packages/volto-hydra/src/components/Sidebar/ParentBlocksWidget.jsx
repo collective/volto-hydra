@@ -172,6 +172,7 @@ const getFilteredBlockSchema = (blockType, intl, blockPathMap, blockId, blockDat
 // React/Volto component tree. Imported at the top of this file.
 
 const ParentBlockSection = ({
+  blocksErrors = {},
   blockId,
   blockType,
   blockData,
@@ -462,6 +463,7 @@ const ParentBlockSection = ({
         const formContent = (
           <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef, onChangeBlock }}>
             <BlockDataForm
+              errors={blocksErrors?.[blockId] ? { [blockId]: blocksErrors[blockId] } : {}}
               schema={formSchema}
               onChangeField={(fieldId, value) => {
                 // Belt and braces: the widgets are disabled, and a change that
@@ -625,6 +627,11 @@ const ParentBlockSection = ({
 const ParentBlocksWidget = ({
   selectedBlock,
   multiSelected = [],
+  // blockId → { field: [messages] }, from the last refused save. Volto's
+  // InlineForm takes `errors` keyed the same way and marks the field, so the
+  // author sees WHICH field is wrong where they would fix it — the toast only
+  // names the block.
+  blocksErrors = {},
   formData,
   blockPathMap,
   onSelectBlock,
@@ -823,6 +830,7 @@ const ParentBlocksWidget = ({
             return (
               <ParentBlockSection
                 key={parentId}
+                blocksErrors={blocksErrors}
                 blockId={parentId}
                 blockType={parentType}
                 blockData={parentData}
@@ -849,6 +857,7 @@ const ParentBlocksWidget = ({
           {/* Current block form (ChildBlocksWidget renders inside its schema fields) */}
           <ParentBlockSection
             key={selectedBlock}
+            blocksErrors={blocksErrors}
             blockId={selectedBlock}
             blockType={currentBlockType}
             blockData={currentBlockData}

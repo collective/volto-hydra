@@ -474,8 +474,9 @@ const bridge = initBridge({
 - `{ when: { fieldName: { gte: 2 } }, set: { ... } }` — conditional definition override
 - `[rule, rule, ...]` — switch: first matching rule wins. A bare `false` in the array is a catch-all hide: `[{ when: A }, { when: B }, false]` shows on A or B, hides otherwise.
 - `'parent.child': false` — hide a field inside a widget's inner schema
+- `{ when: { ... }, error: 'message' }` — mark the field invalid when the condition holds
 
-Condition operators: `is`, `isNot`, `isSet`, `isNotSet`, `oneOf`, `notOneOf`, `contains`, `notContains`, `containsAny`, `notContainsAny`, `containsAll`, `notContainsAll`, `regex`, `notRegex`, `gt`, `gte`, `lt`, `lte`. A bare value (`{ mode: 'advanced' }`) is shorthand for `is`.
+Condition operators: `is`, `isNot`, `isSet`, `isNotSet`, `oneOf`, `notOneOf`, `contains`, `notContains`, `containsAny`, `notContainsAny`, `containsAll`, `notContainsAll`, `regex`, `notRegex`, `gt`, `gte`, `lt`, `lte`. A bare value (`{ mode: 'advanced' }`) is shorthand for `is`. An operand may be a literal or `{ field: '<path>' }` — see [compare against another field](#-field----compare-against-another-field).
 
 Each operator is driven by the field's **declared type**, never the value shape. A field reduces to one of four **surfaces**, and an operator used off its surface raises an error (a mis-authored rule fails loudly rather than silently mismatching):
 
@@ -487,6 +488,62 @@ Each operator is driven by the field's **declared type**, never the value shape.
 | **array** | multiselect (its values), **region** (its child block **types**) | `isSet`, `is`/`isNot` = **set-equality**, `contains`/`notContains` = membership, `containsAny`/`containsAll` (+inverses), `gt`/`gte`/`lt`/`lte` = **count** |
 
 `oneOf` (scalar value ∈ set) and `containsAny` (array shares any with a set) differ only on the field side — `oneOf` is for a single-valued field, `containsAny` for a multiselect; `oneOf` on an array throws (use `containsAny`).
+
+### `error` — a rule that refuses a value
+
+A rule can raise a validation error instead of showing or hiding something:
+
+```javascript
+fieldRules: {
+    maxItems: {
+        when: { maxItems: { isSet: true, lt: { field: 'minItems' } } },
+        error: 'The maximum is below the minimum.',
+    },
+},
+```
+
+The message lands on the field, and everything an author sees is Volto's own: the
+widget goes red, the form shows its error summary, and **the save is blocked**
+(`Form.onSubmit` validates every block against its enhanced schema and refuses
+to submit while any block has errors).
+
+An `error` composes with a `set` in the same rule — the field can be re-titled
+*and* marked — and it is skipped entirely when the rule's `when` does not match,
+so a form that has not been filled in yet is not scolded for it.
+
+**Write a cross-field rule on the field that should show the error.** There is no
+block-level address, and adding one would do less: an error keyed to a field is
+the only shape Volto acts on, so a block-level error would show a banner and let
+the save through. If a constraint genuinely belongs to no single field, list the
+same rule under each field it concerns.
+
+There is no **warning** severity. A rule's `error` blocks the save; advice that
+should not block ("this SVG is not on the 48×48 grid") has nowhere to live in the
+form and belongs on the canvas instead.
+
+### `{ field: '...' }` — compare against another field
+
+Any operand may name a field instead of a literal:
+
+```javascript
+{ when: { maxItems: { lt: { field: 'minItems' } } } }        // this block
+{ when: { b_size:   { gt: { field: '../pageSize' } } } }     // parent's field
+```
+
+The reference goes through the same path grammar as a `when` key, so `../` steps
+work in an operand exactly as they do in a key.
+
+Two things to know:
+
+- **Surfaces still apply.** A reference does not smuggle a value past the
+  operator table — `lt` on a `string` surface throws whether the operand is a
+  literal or a field. Comparing two date strings is therefore not expressible;
+  that needs a date surface, which is a separate question from where the operand
+  comes from.
+- **An empty reference makes the condition false.** If the named field holds
+  nothing there is no value to compare against, and reading that as "no
+  constraint" would fire the rule on every form where the other field has not
+  been filled in yet.
 
 Two extras drive **position-** and **type-**aware rules:
 

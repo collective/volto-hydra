@@ -2069,11 +2069,28 @@ function evaluateFieldRule(rule, formData, args) {
     return undefined; // no match → keep current
   }
 
-  // Object with 'when' or 'set' → single rule
-  if (rule && typeof rule === 'object' && ('when' in rule || 'set' in rule)) {
+  // Object with 'when', 'set' or 'error' → single rule
+  if (
+    rule &&
+    typeof rule === 'object' &&
+    ('when' in rule || 'set' in rule || 'error' in rule)
+  ) {
     if (!rule.when || evaluateWhenCondition(rule.when, formData, args)) {
       // Condition met (or no condition)
-      return 'set' in rule ? rule.set : undefined;
+      const set = 'set' in rule ? rule.set : undefined;
+      // An `error` rides on the field DEFINITION as `hydraRuleError`, which a
+      // registered validator turns into a form error: the widget goes red, the
+      // form shows its summary, and the save is blocked — all of that is
+      // Volto's, already wired, and keyed on the field. Which is why a rule
+      // that spans two fields is written on the field that should show the
+      // error, rather than needing a block-level address of its own.
+      if ('error' in rule && set !== false) {
+        return {
+          ...(set && typeof set === 'object' ? set : {}),
+          hydraRuleError: rule.error,
+        };
+      }
+      return set;
     }
     // Condition not met → use else (default: undefined = keep current)
     return 'else' in rule ? rule.else : undefined;
@@ -2223,9 +2240,51 @@ function evaluateWhenCondition(when, formData, args) {
       expected && typeof expected === 'object' && !Array.isArray(expected)
         ? expected
         : { is: expected };
-    if (!evaluateOperators(surface, operators)) return false;
+    const resolved = resolveOperands(operators, formData, args);
+    // A reference to a field that holds nothing cannot be compared against, and
+    // must not read as "no constraint" — that would silently make the condition
+    // TRUE and fire the rule on every form where the other field is not filled
+    // in yet.
+    if (resolved === UNCOMPARABLE) return false;
+    if (!evaluateOperators(surface, resolved)) return false;
   }
   return true;
+}
+
+/**
+ * Resolve `{ field: <path> }` operands to the value that field holds.
+ *
+ * Every operand was a literal, so a rule could only ever compare a field to a
+ * constant — `{ endDate: { lt: '2026-01-01' } }`. Comparing one field to
+ * ANOTHER is the ordinary case for a cross-field check (an end date before its
+ * start date, a maximum below its minimum), and there was no way to say it.
+ *
+ * The reference goes through the same path grammar as a `when` key, so `../`
+ * steps and value sub-paths work in an operand exactly as they do in a key. A
+ * reference to a field holding NOTHING returns UNCOMPARABLE and the whole
+ * condition is false — there is nothing to compare against, and treating that
+ * as "no constraint" would fire the rule on every form where the other field is
+ * not filled in yet.
+ * @private
+ */
+const UNCOMPARABLE = Symbol('uncomparable');
+
+function resolveOperands(operators, formData, args) {
+  let resolved;
+  for (const [op, operand] of Object.entries(operators)) {
+    if (
+      operand &&
+      typeof operand === 'object' &&
+      !Array.isArray(operand) &&
+      typeof operand.field === 'string'
+    ) {
+      const value = resolveWhenField(operand.field, formData, args).value;
+      if (value === undefined || value === null) return UNCOMPARABLE;
+      resolved = resolved || { ...operators };
+      resolved[op] = value;
+    }
+  }
+  return resolved || operators;
 }
 
 /** Throw when an operator is used on a field surface it can't act on. @private */
