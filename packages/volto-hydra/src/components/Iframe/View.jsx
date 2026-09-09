@@ -3368,6 +3368,11 @@ const Iframe = (props) => {
               // Where a stand-in for this block sits (a tab's label on its trigger), so
               // chrome can be placed clear of a field the author needs to click.
               standInRect: event.data.standInRect,
+              // The block's content lives in a nested browsing context (video,
+              // map, PDF preview). Its mouse events are the embed's, not ours,
+              // so the toolbar must not fade waiting for activity that cannot
+              // arrive — see SyncedSlateToolbar.
+              hasEmbed: event.data.hasEmbed,
               focusedFieldName: event.data.focusedFieldName, // Track which editable field is focused
               focusedFieldRect: event.data.focusedFieldRect, // Rect of focused field for underline positioning
               focusedLinkableField: event.data.focusedLinkableField, // Track which linkable field is focused
@@ -5448,6 +5453,7 @@ const Iframe = (props) => {
             currentSelection={iframeSyncState.selection}
             _selectionSource={iframeSyncState._selectionSource}
             mouseActivityCounter={mouseActivityCounter}
+            blockHasEmbed={!!blockUI?.hasEmbed}
             completedFlushRequestId={iframeSyncState.completedFlushRequestId}
             transformAction={iframeSyncState.transformAction}
             onTransformApplied={() => setIframeSyncState(prev => ({ ...prev, transformAction: null }))}

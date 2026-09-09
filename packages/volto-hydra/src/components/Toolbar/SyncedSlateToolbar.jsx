@@ -222,6 +222,7 @@ const SyncedSlateToolbar = ({
   currentSelection,
   _selectionSource,
   mouseActivityCounter,
+  blockHasEmbed,
   onChangeFormData,
   completedFlushRequestId,
   transformAction,
@@ -494,16 +495,24 @@ const SyncedSlateToolbar = ({
   // Keep ref in sync for use in event handlers
   isCollapsedRef.current = isSelectionCollapsed;
 
+  // Fading is for blocks the author is READING past: the toolbar sits over their
+  // content, their mouse keeps it alive, and it gets out of the way when they
+  // stop. A block whose content is an EMBED — a video, a map, a PDF preview —
+  // reports no mouse activity at all: those events belong to the embed's own
+  // document and never reach us. Fade there and the controls disappear seconds
+  // into the interaction, with nothing able to bring them back.
   const startFadeTimer = useCallback(() => {
     clearTimeout(fadeTimerRef.current);
+    if (blockHasEmbed) return;
     fadeTimerRef.current = setTimeout(() => setIsFaded(true), 5000);
-  }, []);
+  }, [blockHasEmbed]);
 
-  // Reset to faded on block change — each block starts hidden
+  // Reset to faded on block change — each block starts hidden, EXCEPT one whose
+  // activity the embed is taking.
   useEffect(() => {
-    setIsFaded(true);
+    setIsFaded(!blockHasEmbed);
     clearTimeout(fadeTimerRef.current);
-  }, [selectedBlock]);
+  }, [selectedBlock, blockHasEmbed]);
 
   // Text selection shows toolbar; collapsing starts fade timer
   useEffect(() => {

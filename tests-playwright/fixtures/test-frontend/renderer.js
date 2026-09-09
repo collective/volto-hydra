@@ -233,6 +233,15 @@ async function renderBlock(blockId, block) {
         case 'maps':
             wrapper.innerHTML = renderMapsBlock(block);
             break;
+        case 'shadowEmbed':
+            // An embed inside a CUSTOM ELEMENT's shadow root — the shape of a
+            // real PDF preview (`<pdfjs-viewer-element>` is PDF.js in an iframe
+            // in a shadow root). Worth its own fixture because the shadow
+            // boundary changes both halves of selection: document.activeElement
+            // reports the HOST, not the iframe, and the iframe's closest()
+            // cannot see the block it is in.
+            wrapper.appendChild(renderShadowEmbedBlock(block));
+            break;
         case 'multifield':
             wrapper.innerHTML = renderMultiFieldBlock(block);
             break;
@@ -1020,6 +1029,29 @@ function renderMapsBlock(block) {
         </div>`;
     }
     return `<div class="maps-block"><p>No map URL set</p></div>`;
+}
+
+function renderShadowEmbedBlock(block) {
+    if (!customElements.get('test-shadow-embed')) {
+        customElements.define(
+            'test-shadow-embed',
+            class extends HTMLElement {
+                connectedCallback() {
+                    if (this.shadowRoot) return;
+                    const root = this.attachShadow({ mode: 'open' });
+                    const frame = document.createElement('iframe');
+                    frame.src = this.getAttribute('src') || 'about:blank';
+                    frame.title = 'Embedded document';
+                    frame.style.cssText = 'width:100%;height:220px;border:0;display:block';
+                    root.appendChild(frame);
+                }
+            },
+        );
+    }
+    const host = document.createElement('test-shadow-embed');
+    host.setAttribute('src', block.url || 'about:blank');
+    host.style.cssText = 'display:block;width:100%';
+    return host;
 }
 
 function renderVideoBlock(block) {
