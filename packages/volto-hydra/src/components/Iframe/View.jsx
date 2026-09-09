@@ -262,7 +262,7 @@ import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
 import { removeReplacedPlaceholder, buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, getEmptyBlockType, getContainerRegionDescriptors } from '../../utils/blockPath';
 import { mergeAnchorsIntoContent } from '../../utils/linkableAnchors';
 import { installStyleMenuPreviewCss } from '../../utils/styleMenuPreviewCss';
-import { canContainAll, getBlockAddability, getChildBlockEntries, setBlockType, clearBlockType } from '@volto-hydra/helpers';
+import { canContainAll, getChildBlockEntries, setBlockType, clearBlockType } from '@volto-hydra/helpers';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
   applySchemaDefaultsToFormData,
@@ -272,6 +272,7 @@ import {
   applyMembershipAfterMove,
   settleBlockStructure,
   deleteBlocks,
+  canInsertBesideBlock,
   createSchemaEnhancerFromRecipe,
   installVariationFieldEnhancers,
   installChildBlockEnhancers,
@@ -992,22 +993,20 @@ const Iframe = (props) => {
 
       if (cloneWithIds.length === 0) return;
 
-      // The same backstop delete and move carry, and paste had none. Hydra's own
-      // answer to "may anything go here" is getBlockAddability, so ask it rather
-      // than trust the iframe-side filter to be the only gate: pasting after
-      // locked template chrome is exactly the injection the lock exists to stop.
-      const afterBlockData = getBlockById(properties, bpm, afterBlockId);
-      if (afterBlockData) {
-        const addability = getBlockAddability(
+      // The same backstop delete and move carry, and paste had none: pasting
+      // after locked template chrome is exactly the injection the lock exists to
+      // stop. The decision is canInsertBesideBlock, in the edit layer with the
+      // rest of them, so it can be tested without driving this handler.
+      if (
+        !canInsertBesideBlock(
           afterBlockId,
           bpm,
-          afterBlockData,
+          getBlockById(properties, bpm, afterBlockId),
           iframeSyncState.templateEditMode,
-        );
-        if (!addability.canInsertAfter && !addability.canReplace) {
-          log('hydra-paste: target refuses inserts (locked template content?)', afterBlockId);
-          return;
-        }
+        )
+      ) {
+        log('hydra-paste: target refuses inserts (locked template content?)', afterBlockId);
+        return;
       }
 
       const containerConfig = getContainerFieldConfig(afterBlockId, bpm, properties, blocksConfig, intl);

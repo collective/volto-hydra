@@ -56,6 +56,7 @@ import {
   slateNodesText,
   isBlockReadonly,
   isBlockPositionLocked,
+  getBlockAddability,
 } from '@volto-hydra/helpers';
 import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '../context/index.js';
 // Pure validation/default-application logic lives in schemaValidation.js
@@ -3333,13 +3334,7 @@ export function deleteBlocks(formData, blockPathMap, blockIds, options = {}) {
     const blockData = getBlockById(out, map, blockId);
     // Missing, or locked and not being edited: leave it alone. A backstop — the
     // iframe filters first (hydra._filterMutableBlockUids).
-    if (
-      !blockData ||
-      isBlockReadonly(blockData, templateEditMode) ||
-      isBlockPositionLocked(blockData, templateEditMode)
-    ) {
-      continue;
-    }
+    if (!canMutateBlock(blockData, templateEditMode)) continue;
     const containerConfig = getContainerFieldConfig(
       blockId,
       map,
@@ -3354,4 +3349,49 @@ export function deleteBlocks(formData, blockPathMap, blockIds, options = {}) {
   }
   const settled = settleBlockStructure(out, map, { emptiedContainers }, options);
   return { ...settled, deleted };
+}
+
+/**
+ * May a block be mutated in place — moved, deleted, retyped?
+ *
+ * The backstop behind the iframe-side filter (hydra._filterMutableBlockUids). A
+ * block that is read-only, or whose position is locked, belongs to a template
+ * nobody has unlocked.
+ */
+export function canMutateBlock(blockData, templateEditMode) {
+  if (!blockData) return false;
+  return (
+    !isBlockReadonly(blockData, templateEditMode) &&
+    !isBlockPositionLocked(blockData, templateEditMode)
+  );
+}
+
+/**
+ * May something be inserted next to this block?
+ *
+ * A different question from canMutateBlock — "put something beside it" is not
+ * "change it" — but the same backstop, and paste had neither. Delete and move
+ * guarded themselves and paste didn't, so pasting after locked template chrome
+ * injected content into a template nobody had unlocked.
+ *
+ * getBlockAddability is hydra's own answer, used by the toolbar to decide
+ * whether to draw a '+'. Asking it here means the mutation agrees with the UI
+ * rather than re-deciding.
+ */
+export function canInsertBesideBlock(
+  blockId,
+  blockPathMap,
+  blockData,
+  templateEditMode,
+) {
+  // No target block (a paste into an empty page-level region) is for the region
+  // to allow or refuse, not this guard.
+  if (!blockData) return true;
+  const addability = getBlockAddability(
+    blockId,
+    blockPathMap,
+    blockData,
+    templateEditMode,
+  );
+  return !!(addability.canInsertAfter || addability.canReplace);
 }
