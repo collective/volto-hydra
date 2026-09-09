@@ -22,8 +22,20 @@
  * element swallows the click whether or not the provider answers, so the tests
  * carry no network dependency.
  */
-import { test, expect } from './fixtures';
+import { test, expect, getFrontendUrl } from './fixtures';
 import { URLS } from '../ports';
+
+// Which frontend the mock parent frames.
+//
+// mock-parent.html resolves its frontend as `?frontend=` → `window._frontendOrigin`
+// → its own origin. A beforeEach that re-navigates without the parameter
+// therefore tests whatever the JOB happens to have injected: the mock renderer
+// locally (nothing injected) and the job's own frontend in CI. That is not a
+// choice, it is a coin toss, and it read as a bridge failure in the nextjs/f7
+// job while passing everywhere else. Say which frontend the test means.
+const parentUrl = (frontend: string, path: string) =>
+  `${URLS.testFrontend}/mock-parent.html?frontend=${encodeURIComponent(frontend)}` +
+  `&api_path=${encodeURIComponent(`${URLS.mockApi}${path}`)}`;
 
 const PAGE = '/_test_data/iframe-block-page';
 const BLOCK = 'video-embed-1';
@@ -41,11 +53,12 @@ const selectedUid = (helper: any) =>
     );
 
 test.describe('a block whose body is an iframe', () => {
-  test.beforeEach(async ({ page, helper }) => {
+  // Runs against each project's OWN frontend: the mock renderer, nextjs and f7
+  // all render a video block as an iframe, so the shape under test is real in
+  // every one of them.
+  test.beforeEach(async ({ page, helper }, testInfo) => {
     await page.goto(
-      `${URLS.testFrontend}/mock-parent.html?api_path=${encodeURIComponent(
-        `${URLS.mockApi}${PAGE}`,
-      )}`,
+      parentUrl(getFrontendUrl(testInfo.project.name) || URLS.testFrontend, PAGE),
     );
     await helper
       .getIframe()
@@ -108,12 +121,13 @@ test.describe('a block whose embed is inside a shadow root', () => {
   // It is a real, registered block type carrying real content, so every other
   // frontend's block sanity is happy with the fixture page. An invented @type
   // was not: shared content is served to all of them.
+  // Pinned to the test frontend, which is the one that renders maps through
+  // <map-embed> (see its renderer, and docs/examples/maps.md). The example
+  // frontends render maps as a bare iframe — a legitimate way to write the
+  // block, and already covered by the video case above. Pinning runs this
+  // everywhere rather than skipping it somewhere.
   test.beforeEach(async ({ page, helper }) => {
-    await page.goto(
-      `${URLS.testFrontend}/mock-parent.html?api_path=${encodeURIComponent(
-        `${URLS.mockApi}${PAGE}`,
-      )}`,
-    );
+    await page.goto(parentUrl(URLS.testFrontend, PAGE));
     await helper
       .getIframe()
       .locator(`[data-block-uid="${SHADOW_BLOCK}"] map-embed`)
