@@ -1625,6 +1625,25 @@ test.describe('fieldRules - a rule that refuses a value', () => {
    * change now enforces. Testing it in the browser needs the state made at
    * RUNTIME — an author emptying the field and pressing save — not stored.
    */
+  test('a warned value is said, not refused — the page still saves', async ({
+    page,
+  }) => {
+    // The difference between the two actions, in the only terms that matter to
+    // an author: an error stops the save, a warning does not. Advice about
+    // artwork that is merely unwise must not hold a page hostage.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/warned-value-page');
+    await expect(
+      helper.getIframe().locator('[data-block-uid="intro-1"]'),
+    ).toBeVisible({ timeout: 15000 });
+
+    await page.locator('#toolbar-save, button:has-text("Save")').first().click();
+
+    // Saved: the editor leaves edit mode, which a refused save never does.
+    await expect(page).not.toHaveURL(/\/edit(\?|$)/, { timeout: 15000 });
+  });
+
   test('a string longer than its schema allows does not save', async ({ page }) => {
     // maxLength — a standard Volto validator, on a plain string field of a
     // fixture block. Every slide in the fixtures has a short kicker, so the

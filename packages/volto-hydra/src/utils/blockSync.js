@@ -2052,6 +2052,30 @@ function createFieldRulesEnhancer(rulesConfig) {
  * Returns: false (hide), object (field definition), or undefined (no change).
  * @private
  */
+/**
+ * What a MATCHED rule yields: its `set` definition, carrying any `error` or
+ * `warning` it also declares.
+ *
+ * An ERROR is refused — a registered validator turns `hydraRuleError` into a
+ * form error, so the save does not go through. A WARNING is said, not refused:
+ * it is deliberately NOT a validator, because advice ("this SVG is not drawn to
+ * the 48×48 grid") must not block a save over artwork that may be a little off
+ * and still be the right artwork. The sidebar renders it; nothing blocks.
+ *
+ * Shared by both rule forms — a single `{ when, … }` and an entry in a switch —
+ * so `error` and `warning` mean the same thing wherever they are written.
+ * @private
+ */
+function matchedRuleResult(rule) {
+  const set = 'set' in rule ? rule.set : undefined;
+  if (!('error' in rule || 'warning' in rule) || set === false) return set;
+  return {
+    ...(set && typeof set === 'object' ? set : {}),
+    ...('error' in rule ? { hydraRuleError: rule.error } : {}),
+    ...('warning' in rule ? { hydraRuleWarning: rule.warning } : {}),
+  };
+}
+
 function evaluateFieldRule(rule, formData, args) {
   // false → always hide
   if (rule === false) return false;
@@ -2062,35 +2086,27 @@ function evaluateFieldRule(rule, formData, args) {
       // Bare false acts as a catch-all "hide" (matches with no condition)
       if (r === false) return false;
       if (!r.when || evaluateWhenCondition(r.when, formData, args)) {
-        if ('set' in r) return r.set;
-        return undefined; // matched but no set → keep current
+        if ('set' in r || 'error' in r || 'warning' in r) {
+          return matchedRuleResult(r);
+        }
+        return undefined; // matched but says nothing → keep current
       }
     }
     return undefined; // no match → keep current
   }
 
-  // Object with 'when', 'set' or 'error' → single rule
+  // Object with 'when', 'set', 'error' or 'warning' → single rule
   if (
     rule &&
     typeof rule === 'object' &&
-    ('when' in rule || 'set' in rule || 'error' in rule)
+    ('when' in rule || 'set' in rule || 'error' in rule || 'warning' in rule)
   ) {
     if (!rule.when || evaluateWhenCondition(rule.when, formData, args)) {
       // Condition met (or no condition)
-      const set = 'set' in rule ? rule.set : undefined;
-      // An `error` rides on the field DEFINITION as `hydraRuleError`, which a
-      // registered validator turns into a form error: the widget goes red, the
-      // form shows its summary, and the save is blocked — all of that is
-      // Volto's, already wired, and keyed on the field. Which is why a rule
-      // that spans two fields is written on the field that should show the
-      // error, rather than needing a block-level address of its own.
-      if ('error' in rule && set !== false) {
-        return {
-          ...(set && typeof set === 'object' ? set : {}),
-          hydraRuleError: rule.error,
-        };
-      }
-      return set;
+      // Keyed on the field, which is why a rule spanning two fields is written
+      // on the field that should show the message rather than needing a
+      // block-level address of its own.
+      return matchedRuleResult(rule);
     }
     // Condition not met → use else (default: undefined = keep current)
     return 'else' in rule ? rule.else : undefined;

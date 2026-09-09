@@ -1160,3 +1160,67 @@ describe('fieldRules — error action with a field-reference operand', () => {
     ).toThrow(/not valid for a string/);
   });
 });
+
+/**
+ * fieldRules — a rule that SAYS something rather than refusing it.
+ *
+ * Some constraints are advice. "This SVG is not drawn to the 48×48 grid" should
+ * reach the author, but refusing to save over it would be hostile: the artwork
+ * may be a little off and still be the right artwork. An error blocks; a
+ * warning does not, and the difference is the whole point of having both.
+ */
+describe('fieldRules — warning action', () => {
+  const baseSchema = () => ({
+    fieldsets: [{ id: 'default', title: 'Default', fields: ['image'] }],
+    properties: { image: { title: 'Pictogram', type: 'string' } },
+    required: [],
+  });
+
+  const recipe = {
+    fieldRules: {
+      image: {
+        when: { image: { regex: '\\.png$' } },
+        warning: 'A pictogram should be an SVG drawn to the 48×48 grid.',
+      },
+    },
+  };
+
+  test('marks the field when the condition holds', () => {
+    const out = createSchemaEnhancerFromRecipe(recipe)({
+      schema: baseSchema(),
+      formData: { image: '/images/photo.png' },
+    });
+    expect(out.properties.image.hydraRuleWarning).toBe(
+      'A pictogram should be an SVG drawn to the 48×48 grid.',
+    );
+  });
+
+  test('does NOT produce an error — a warning must not block the save', () => {
+    const out = createSchemaEnhancerFromRecipe(recipe)({
+      schema: baseSchema(),
+      formData: { image: '/images/photo.png' },
+    });
+    expect(out.properties.image.hydraRuleError).toBeUndefined();
+  });
+
+  test('says nothing when the condition does not hold', () => {
+    const out = createSchemaEnhancerFromRecipe(recipe)({
+      schema: baseSchema(),
+      formData: { image: '/images/pictogram.svg' },
+    });
+    expect(out.properties.image.hydraRuleWarning).toBeUndefined();
+  });
+
+  test('a rule can carry both: refuse one thing while advising another', () => {
+    const out = createSchemaEnhancerFromRecipe({
+      fieldRules: {
+        image: [
+          { when: { image: { regex: '\\.png$' } }, error: 'Must be an SVG.' },
+          { when: { image: { isSet: true } }, warning: 'Check it is on the grid.' },
+        ],
+      },
+    })({ schema: baseSchema(), formData: { image: '/images/photo.png' } });
+    // First matching rule wins in a switch — the error, here.
+    expect(out.properties.image.hydraRuleError).toBe('Must be an SVG.');
+  });
+});

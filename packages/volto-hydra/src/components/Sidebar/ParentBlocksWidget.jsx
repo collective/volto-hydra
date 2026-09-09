@@ -460,8 +460,29 @@ const ParentBlockSection = ({
           that isn't rendered has nothing to lock. */}
       {!BlockEdit && schema && !isReadonly && !pathInfo?.isTemplateInstance && (() => {
         const formSchema = schema;
+        // Field rules that SAY something rather than refuse it. A warning is
+        // deliberately not a validator — it must not block the save — so it
+        // has no route through Volto's error machinery and is rendered here,
+        // from the resolved schema, beside the fields it is about.
+        const warnings = Object.entries(formSchema.properties || {})
+          .filter(([, def]) => def?.hydraRuleWarning)
+          .map(([field, def]) => ({
+            field,
+            title: def.title || field,
+            message: def.hydraRuleWarning,
+          }));
         const formContent = (
           <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef, onChangeBlock }}>
+            <>
+            {warnings.length > 0 && (
+              <div className="hydra-field-warnings" role="status">
+                {warnings.map((w) => (
+                  <p key={w.field} className="hydra-field-warning">
+                    <strong>{w.title}:</strong> {w.message}
+                  </p>
+                ))}
+              </div>
+            )}
             <BlockDataForm
               errors={blocksErrors?.[blockId] ? { [blockId]: blocksErrors[blockId] } : {}}
               schema={formSchema}
@@ -482,6 +503,7 @@ const ParentBlockSection = ({
               block={blockId}
               applySchemaEnhancers={true}
             />
+            </>
           </HydraSchemaProvider>
         );
         // Portal to the target element (sidebar-properties for current, parent-sidebar-{id} for parents)

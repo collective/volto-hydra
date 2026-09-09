@@ -880,6 +880,15 @@ export const sharedBlocksConfig = {
                     when: { count: { lt: 0 } },
                     error: 'Max items cannot be negative.',
                 },
+                // …and one that SAYS something instead of refusing it. Asking a
+                // feed for a hundred items is a bad idea, not an impossible
+                // one, so the author hears about it and the save goes through.
+                // No fixture asks for that many, so it is inert until a test
+                // does on purpose.
+                feedUrl: {
+                    when: { count: { gt: 50 } },
+                    warning: 'That many items will make the page slow.',
+                },
             },
         },
     },

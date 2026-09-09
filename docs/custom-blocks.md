@@ -517,9 +517,32 @@ the only shape Volto acts on, so a block-level error would show a banner and let
 the save through. If a constraint genuinely belongs to no single field, list the
 same rule under each field it concerns.
 
-There is no **warning** severity. A rule's `error` blocks the save; advice that
-should not block ("this SVG is not on the 48×48 grid") has nowhere to live in the
-form and belongs on the canvas instead.
+### `warning` — a rule that says something rather than refusing it
+
+Not every constraint should stop a save:
+
+```javascript
+fieldRules: {
+    image: {
+        when: { image: { regex: '\\.png$' } },
+        warning: 'A pictogram should be an SVG drawn to the 48×48 grid.',
+    },
+},
+```
+
+An `error` is **refused** — a registered validator turns it into a form error
+and `Form.onSubmit` will not submit. A `warning` is **said**: it is deliberately
+not a validator, so nothing blocks. The sidebar shows it beside the field, and
+the page saves.
+
+Use a warning when the value may well be right and the author should simply
+know: artwork a little off the 48×48 grid is still the right artwork, and
+refusing to save over it would be hostile. Use an error when the value cannot
+work at all — a raster where the design system inlines an SVG.
+
+Both actions compose with `set`, and both work in a switch (`[rule, rule, …]`),
+where the first matching entry wins — so a rule can refuse one case and merely
+advise on another.
 
 ### `{ field: '...' }` — compare against another field
 
