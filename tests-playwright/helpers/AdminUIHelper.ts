@@ -5775,15 +5775,33 @@ export class AdminUIHelper {
    * @param _objectBrowser - The object browser locator (unused, searches globally)
    * @param folderName - The name of the folder to navigate into (e.g., "Images" or /images/i)
    */
-  async objectBrowserNavigateToFolder(_objectBrowser: Locator, folderName: string | RegExp): Promise<void> {
-    // The browser queries its level when it opens; deciding anything before that
-    // lands — including whether to climb — reads an empty listing as "this level
-    // has nothing" and walks off in the wrong direction.
+  /**
+   * Wait for the object browser to finish fetching a level.
+   *
+   * The listing area shows `.ob-listing-loading` WHILE fetching and
+   * `.object-listing` once the level is in, so a helper that waits for the
+   * listing alone waits for something that is not there yet — and a helper that
+   * waits a fixed beat races it. Wait for the browser's own signal.
+   */
+  async waitForObjectBrowserLevel(timeout = 10000): Promise<void> {
+    const loading = this.page.locator('.ob-listing-loading');
+    await loading
+      .first()
+      .waitFor({ state: 'hidden', timeout })
+      .catch(() => {});
     await this.page
       .locator('.object-listing')
       .first()
-      .waitFor({ state: 'attached', timeout: 5000 })
+      .waitFor({ state: 'attached', timeout })
       .catch(() => {});
+  }
+
+  async objectBrowserNavigateToFolder(_objectBrowser: Locator, folderName: string | RegExp): Promise<void> {
+    // The browser queries its level when it opens; deciding anything before that
+    // lands — including whether to climb — reads an empty listing as "this level
+    // has nothing" and walks off in the wrong direction. The browser says when it
+    // is fetching, so wait for that to clear rather than guessing at a beat.
+    await this.waitForObjectBrowserLevel();
     const folderItem = this.page.locator('.object-listing li').filter({ hasText: folderName });
 
     const found = await folderItem.first().waitFor({ state: 'visible', timeout: 500 })
@@ -5811,13 +5829,9 @@ export class AdminUIHelper {
           if (count < 2) break;
           await breadcrumbSections.nth(count - 2).click();
         }
-        // The listing re-queries on each level; wait for it to settle rather
-        // than for a fixed beat.
-        await this.page
-          .locator('.object-listing li')
-          .first()
-          .waitFor({ state: 'visible', timeout: 3000 })
-          .catch(() => {});
+        // The listing re-queries on each level; wait for the browser to say it
+        // has finished rather than for a fixed beat.
+        await this.waitForObjectBrowserLevel(5000);
       }
     }
 
@@ -5829,7 +5843,11 @@ export class AdminUIHelper {
     if (nowFound) {
       // With the shadowed OB, clicking a folder row always navigates (all modes)
       await folderItem.first().click({ timeout: 2000 });
-      await expect(this.page.locator('.object-listing li').first()).toBeVisible({ timeout: 5000 });
+      // Wait for the level the click asked for, not for items in it. The browser
+      // swaps the listing out for its loading state while fetching, so requiring
+      // an item here waits for something that is not on screen yet — and a folder
+      // with no children is a legitimate level, not a failure.
+      await this.waitForObjectBrowserLevel();
     }
   }
 
