@@ -556,6 +556,45 @@ Any operand may name a field instead of a literal:
 The reference goes through the same path grammar as a `when` key, so `../` steps
 work in an operand exactly as they do in a key.
 
+### Reading into a value, and arithmetic
+
+A `when` path may continue INTO the field's value, and an operand may do basic
+arithmetic:
+
+```javascript
+fieldRules: {
+    image: [
+        {
+            when: { 'image_scales.image.0.content-type': { isNot: 'image/svg+xml' } },
+            error: 'A pictogram must be an SVG: it is inlined and takes its colour from the page.',
+        },
+        {
+            when: {
+                'image_scales.image.0.width': {
+                    gt: { field: 'image_scales.image.0.height', times: 1.1 },
+                },
+            },
+            warning: 'A pictogram is drawn square, on a 48×48 grid.',
+        },
+    ],
+},
+```
+
+Some of what a rule needs to ask about is not a field at all. Volto stores an
+image's mime type and dimensions ALONGSIDE the reference, in `image_scales`, so
+"is this an SVG" and "is it square" are answerable from data the block already
+carries — no fetching, no extra state.
+
+- **A sub-path's surface comes from the VALUE**, because no schema describes
+  `image_scales.image.0.width`. This is the one place the rule engine reads a
+  value's shape, and only because a declared type does not exist to consult.
+- **A sub-path that leads nowhere is UNSET**: every comparison is false, and
+  only `isSet`/`isNotSet` answer. A rule must not fire on a block whose image
+  has not been chosen yet.
+- **`times` and `plus`** apply to a field reference, so a comparison can carry a
+  tolerance — "square, within a tenth" rather than exactly equal, which no real
+  measurement is.
+
 Two things to know:
 
 - **Surfaces still apply.** A reference does not smuggle a value past the

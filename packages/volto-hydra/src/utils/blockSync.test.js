@@ -1224,3 +1224,108 @@ describe('fieldRules — warning action', () => {
     expect(out.properties.image.hydraRuleError).toBe('Must be an SVG.');
   });
 });
+
+/**
+ * Reading INTO a value, and doing arithmetic on a reference.
+ *
+ * The pictogram rules need both. "Is this an SVG" and "is it square" are
+ * answerable from data the block already carries — Volto stores an image's mime
+ * type and dimensions in `image_scales`, beside the reference — but only if a
+ * path can reach inside a value, and only if a comparison can carry a tolerance:
+ * no real measurement is exactly equal to another.
+ */
+describe('fieldRules — value sub-paths and arithmetic', () => {
+  const schema = () => ({
+    fieldsets: [{ id: 'default', title: 'Default', fields: ['image'] }],
+    properties: { image: { title: 'Pictogram', type: 'string' } },
+    required: [],
+  });
+
+  const withScales = (contentType, width, height) => ({
+    image: '/images/thing',
+    image_scales: { image: [{ 'content-type': contentType, width, height }] },
+  });
+
+  test('a sub-path reads a mime type out of image_scales', () => {
+    const out = createSchemaEnhancerFromRecipe({
+      fieldRules: {
+        image: {
+          when: {
+            'image_scales.image.0.content-type': { isNot: 'image/svg+xml' },
+          },
+          error: 'A pictogram must be an SVG.',
+        },
+      },
+    })({ schema: schema(), formData: withScales('image/png', 120, 68) });
+    expect(out.properties.image.hydraRuleError).toBe('A pictogram must be an SVG.');
+  });
+
+  test('…and says nothing when the type is right', () => {
+    const out = createSchemaEnhancerFromRecipe({
+      fieldRules: {
+        image: {
+          when: {
+            'image_scales.image.0.content-type': { isNot: 'image/svg+xml' },
+          },
+          error: 'A pictogram must be an SVG.',
+        },
+      },
+    })({ schema: schema(), formData: withScales('image/svg+xml', 48, 48) });
+    expect(out.properties.image.hydraRuleError).toBeUndefined();
+  });
+
+  test('a sub-path into a number compares as a number', () => {
+    // The surface comes from the value here — there is no schema for
+    // `image_scales.image.0.width` — so a numeric operator must work on it.
+    const out = createSchemaEnhancerFromRecipe({
+      fieldRules: {
+        image: {
+          when: { 'image_scales.image.0.width': { lt: 48 } },
+          warning: 'Smaller than the 48×48 grid.',
+        },
+      },
+    })({ schema: schema(), formData: withScales('image/svg+xml', 24, 24) });
+    expect(out.properties.image.hydraRuleWarning).toBe('Smaller than the 48×48 grid.');
+  });
+
+  test('arithmetic gives a comparison its tolerance: not square within a tenth', () => {
+    const recipe = {
+      fieldRules: {
+        image: {
+          when: {
+            'image_scales.image.0.width': {
+              gt: { field: 'image_scales.image.0.height', times: 1.1 },
+            },
+          },
+          warning: 'A pictogram is drawn square, on a 48×48 grid.',
+        },
+      },
+    };
+    const wide = createSchemaEnhancerFromRecipe(recipe)({
+      schema: schema(),
+      formData: withScales('image/svg+xml', 120, 48),
+    });
+    expect(wide.properties.image.hydraRuleWarning).toBe(
+      'A pictogram is drawn square, on a 48×48 grid.',
+    );
+
+    // 50x48 is off-square by 4% — inside the tolerance, so nothing is said.
+    const nearlySquare = createSchemaEnhancerFromRecipe(recipe)({
+      schema: schema(),
+      formData: withScales('image/svg+xml', 50, 48),
+    });
+    expect(nearlySquare.properties.image.hydraRuleWarning).toBeUndefined();
+  });
+
+  test('a sub-path that leads nowhere is unset, not a throw', () => {
+    const out = createSchemaEnhancerFromRecipe({
+      fieldRules: {
+        image: {
+          when: { 'image_scales.image.0.width': { lt: 48 } },
+          warning: 'never mind',
+        },
+      },
+    })({ schema: schema(), formData: { image: '/images/thing' } });
+    expect(out.properties.image.hydraRuleWarning).toBeUndefined();
+  });
+});

@@ -6239,7 +6239,235 @@
         }
       ]
     },
-    "p-115": {
+    "h-115": {
+      "@type": "slate",
+      "plaintext": "Reading into a value, and arithmetic",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Reading into a value, and arithmetic"
+            }
+          ]
+        }
+      ]
+    },
+    "p-116": {
+      "@type": "slate",
+      "plaintext": "A `when` path may continue INTO the field's value, and an operand may do basic arithmetic:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "when"
+                }
+              ]
+            },
+            {
+              "text": " path may continue INTO the field's value, and an operand may do basic arithmetic:"
+            }
+          ]
+        }
+      ]
+    },
+    "ce-117": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-117-javascript-ac3c78",
+          "label": "Javascript",
+          "language": "javascript",
+          "code": "fieldRules: {\n    image: [\n        {\n            when: { 'image_scales.image.0.content-type': { isNot: 'image/svg+xml' } },\n            error: 'A pictogram must be an SVG: it is inlined and takes its colour from the page.',\n        },\n        {\n            when: {\n                'image_scales.image.0.width': {\n                    gt: { field: 'image_scales.image.0.height', times: 1.1 },\n                },\n            },\n            warning: 'A pictogram is drawn square, on a 48×48 grid.',\n        },\n    ],\n},"
+        }
+      ]
+    },
+    "p-118": {
+      "@type": "slate",
+      "plaintext": "Some of what a rule needs to ask about is not a field at all. Volto stores an image's mime type and dimensions ALONGSIDE the reference, in `image_scales`, so \"is this an SVG\" and \"is it square\" are answerable from data the block already carries — no fetching, no extra state.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Some of what a rule needs to ask about is not a field at all. Volto stores an image's mime type and dimensions ALONGSIDE the reference, in "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "image_scales"
+                }
+              ]
+            },
+            {
+              "text": ", so \"is this an SVG\" and \"is it square\" are answerable from data the block already carries — no fetching, no extra state."
+            }
+          ]
+        }
+      ]
+    },
+    "ul-119": {
+      "@type": "slate",
+      "plaintext": "A sub-path's surface comes from the VALUE, because no schema describes",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "A sub-path's surface comes from the VALUE"
+                    }
+                  ]
+                },
+                {
+                  "text": ", because no schema describes"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-120": {
+      "@type": "slate",
+      "plaintext": "`image_scales.image.0.width`. This is the one place the rule engine reads a   value's shape, and only because a declared type does not exist to consult.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "image_scales.image.0.width"
+                }
+              ]
+            },
+            {
+              "text": ". This is the one place the rule engine reads a   value's shape, and only because a declared type does not exist to consult."
+            }
+          ]
+        }
+      ]
+    },
+    "ul-121": {
+      "@type": "slate",
+      "plaintext": "A sub-path that leads nowhere is UNSET: every comparison is false, and",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "A sub-path that leads nowhere is UNSET"
+                    }
+                  ]
+                },
+                {
+                  "text": ": every comparison is false, and"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-122": {
+      "@type": "slate",
+      "plaintext": "only `isSet`/`isNotSet` answer. A rule must not fire on a block whose image   has not been chosen yet.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "only "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "isSet"
+                }
+              ]
+            },
+            {
+              "text": "/"
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "isNotSet"
+                }
+              ]
+            },
+            {
+              "text": " answer. A rule must not fire on a block whose image   has not been chosen yet."
+            }
+          ]
+        }
+      ]
+    },
+    "ul-123": {
+      "@type": "slate",
+      "plaintext": "times and plus apply to a field reference, so a comparison can carry a",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`times` and `plus`"
+                    }
+                  ]
+                },
+                {
+                  "text": " apply to a field reference, so a comparison can carry a"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-124": {
+      "@type": "slate",
+      "plaintext": "tolerance — \"square, within a tenth\" rather than exactly equal, which no real   measurement is.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "tolerance — \"square, within a tenth\" rather than exactly equal, which no real   measurement is."
+            }
+          ]
+        }
+      ]
+    },
+    "p-125": {
       "@type": "slate",
       "plaintext": "Two things to know:",
       "value": [
@@ -6253,7 +6481,7 @@
         }
       ]
     },
-    "ul-116": {
+    "ul-126": {
       "@type": "slate",
       "plaintext": "Surfaces still apply. A reference does not smuggle a value past the",
       "value": [
@@ -6280,7 +6508,7 @@
         }
       ]
     },
-    "p-117": {
+    "p-127": {
       "@type": "slate",
       "plaintext": "operator table — `lt` on a `string` surface throws whether the operand is a   literal or a field. Comparing two date strings is therefore not expressible;   that needs a date surface, which is a separate question from where the operand   comes from.",
       "value": [
@@ -6316,7 +6544,7 @@
         }
       ]
     },
-    "ul-118": {
+    "ul-128": {
       "@type": "slate",
       "plaintext": "An empty reference makes the condition false. If the named field holds",
       "value": [
@@ -6343,7 +6571,7 @@
         }
       ]
     },
-    "p-119": {
+    "p-129": {
       "@type": "slate",
       "plaintext": "nothing there is no value to compare against, and reading that as \"no   constraint\" would fire the rule on every form where the other field has not   been filled in yet.",
       "value": [
@@ -6357,7 +6585,7 @@
         }
       ]
     },
-    "p-120": {
+    "p-130": {
       "@type": "slate",
       "plaintext": "Two extras drive **position-** and **type-**aware rules:",
       "value": [
@@ -6393,7 +6621,7 @@
         }
       ]
     },
-    "ul-121": {
+    "ul-131": {
       "@type": "slate",
       "plaintext": "The virtual field @index reads a block's ordinal position within its parent object_list region (a number surface) — { '@index': { lt: 1 } } means \"first in my region\", and ../@index is the parent block's index. Distinct from a region's count (which counts children). A rule whose set is a block-type NAME (a string) rather than a field definition is a @type rule — it changes the item's type by position, not a field. Declared as typeRule on a typed object_list; see typeRule — position picks a typed item's @type. The retype is applied by CONVERSION (a schema enhancer can't rewrite stored @type), which brings up the confirm described under Drag / paste via conversion.",
       "value": [
@@ -6580,18 +6808,18 @@
         }
       ]
     },
-    "ce-122": {
+    "ce-132": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-122-javascript-524207",
+          "@id": "ce-132-javascript-1eccef",
           "label": "Javascript",
           "language": "javascript",
           "code": "schemaEnhancer: {\n    fieldRules: {\n        // multiselect `elements: ['image','date','tag']` — reveal each option's field\n        date: { when: { elements: { contains: 'date' } }, else: false },\n        media: { when: { elements: { containsAny: ['image', 'video'] } }, else: false },\n        layout: { when: { elements: { containsAll: ['image', 'date'] } }, else: false },\n        // scalar Choice\n        invert: { when: { colour: { oneOf: ['brand-dark', 'black'] } }, else: false },\n        // text: substring / pattern\n        cta: { when: { title: { contains: 'Sale' } }, else: false },\n        year: { when: { title: { regex: { pattern: '\\\\b20\\\\d\\\\d\\\\b', flags: 'i' } } }, else: false },\n    },\n}"
         }
       ]
     },
-    "p-123": {
+    "p-133": {
       "@type": "slate",
       "plaintext": "For a **region** (an `object_list` field, or a single `blocks_layout` region named by its region key), the array surface is its **child block types**, and the numeric operators **count** that region's children — only its own, never a cross-region total:",
       "value": [
@@ -6660,18 +6888,18 @@
         }
       ]
     },
-    "ce-124": {
+    "ce-134": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-124-javascript-eb71c3",
+          "@id": "ce-134-javascript-88c8c6",
           "label": "Javascript",
           "language": "javascript",
           "code": "schemaEnhancer: {\n    fieldRules: {\n        // reveal a caption field only when the `body` region has an image block\n        caption: { when: { body: { contains: 'image' } }, else: false },\n        // offer \"columns layout\" only once the `columns` region has ≥2 blocks\n        columnsLayout: { when: { columns: { gte: 2 } }, else: false },\n        // \"carousel options\" only when the `slides` object_list has >1 item\n        carouselOptions: { when: { slides: { gt: 1 } }, else: false },\n    },\n}"
         }
       ]
     },
-    "p-125": {
+    "p-135": {
       "@type": "slate",
       "plaintext": "To condition on a block's **position** rather than a field value, use the virtual field **`@index`** — a block's ordinal index within its parent `object_list` region (a `number` surface). It composes with the block-step grammar, so `../@index` is the parent block's index. Unlike the region's numeric ops (which *count* children), `@index` is *where this block sits*:",
       "value": [
@@ -6773,18 +7001,18 @@
         }
       ]
     },
-    "ce-126": {
+    "ce-136": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-126-javascript-dfa3b0",
+          "@id": "ce-136-javascript-57dd3f",
           "label": "Javascript",
           "language": "javascript",
           "code": "schemaEnhancer: {\n    fieldRules: {\n        // a table cell's blocks region: cap at one block when this cell is in the\n        // first row (a header row) — `../@index` is the cell's ROW index\n        blocks: [\n            { when: { '../../headerMode': { oneOf: ['row', 'both'] }, '../@index': { lt: 1 } }, set: { maxLength: 1 } },\n            { when: { '../../headerMode': { oneOf: ['col', 'both'] }, '@index':    { lt: 1 } }, set: { maxLength: 1 } },\n        ],\n    },\n}"
         }
       ]
     },
-    "p-127": {
+    "p-137": {
       "@type": "slate",
       "plaintext": "A block that isn't an `object_list` item yields an unset `@index`, so comparisons are simply false (never an error). `lt: 1` is \"first\"; `lt: 2` is \"first two\", etc.",
       "value": [
@@ -6842,7 +7070,7 @@
         }
       ]
     },
-    "p-128": {
+    "p-138": {
       "@type": "slate",
       "plaintext": "Field paths: `../field` for the parent block's field (and `@index` / `../@index` for position), `/field` for a page metadata field.",
       "value": [
@@ -6900,7 +7128,7 @@
         }
       ]
     },
-    "p-129": {
+    "p-139": {
       "@type": "slate",
       "plaintext": "**Worked examples:** two blocks in the reference carry rules for their own reasons — the [Teaser Block](./examples/teaser.md) has nothing to ask for while it borrows the linked page's wording (`overwrite` off), and the [Image Block](./examples/image-block.md) offers no size for a full-width image, written as a list of rules with a bare `false` as the catch-all.",
       "value": [
@@ -6972,7 +7200,7 @@
         }
       ]
     },
-    "h-130": {
+    "h-140": {
       "@type": "slate",
       "plaintext": "Block Conversion & fieldMappings",
       "value": [
@@ -6986,7 +7214,7 @@
         }
       ]
     },
-    "p-131": {
+    "p-141": {
       "@type": "slate",
       "plaintext": "`fieldMappings` (plural) on a block config defines how fields map between block types (and from linked content). This enables:",
       "value": [
@@ -7008,7 +7236,7 @@
         }
       ]
     },
-    "ul-132": {
+    "ul-142": {
       "@type": "slate",
       "plaintext": "\"Convert to...\" UI action — editors can convert a block to another type (e.g. teaser → image). Listing item types — query results are mapped to item blocks via @default (see Listings). Synchronised container children — a parent controls child type, all children convert together (see Container Blocks › Synchronised Block Types). Drag / paste via conversion — a block can be dropped or pasted into a container that only accepts a convertible type; it's converted on drop (see below). Copy from a linked target — a block pulls fields from the content item its link field points at, with a per-field linked/custom toggle (see @target).",
       "value": [
@@ -7163,7 +7391,7 @@
         }
       ]
     },
-    "p-133": {
+    "p-143": {
       "@type": "slate",
       "plaintext": "Each key in `fieldMappings` is either a **specific block type name**, **`@default`**, or **`@target`**.",
       "value": [
@@ -7221,7 +7449,7 @@
         }
       ]
     },
-    "p-134": {
+    "p-144": {
       "@type": "slate",
       "plaintext": "**Worked example:** [Teaser Block](./examples/teaser.md) — `@default` mappings, so a converted or dragged block keeps its title, description and image.",
       "value": [
@@ -7268,7 +7496,7 @@
         }
       ]
     },
-    "h-135": {
+    "h-145": {
       "@type": "slate",
       "plaintext": "@default — the canonical content shape",
       "value": [
@@ -7290,7 +7518,7 @@
         }
       ]
     },
-    "p-136": {
+    "p-146": {
       "@type": "slate",
       "plaintext": "`@default` is a virtual type representing a linked content item's fields — anything a catalog **search** returns as metadata (`metadata_fields: '_all'`): `@id`, `title`, `description`, `image`, `Subject` (tags), `created`/`effective` dates, and so on. A block with `fieldMappings['@default']` is saying \"I can be populated from a content item.\" The keys are content/metadata field names — not this block's own field names (e.g. `label`, `field`, `required` are not content metadata and are invalid).",
       "value": [
@@ -7455,7 +7683,7 @@
         }
       ]
     },
-    "h-137": {
+    "h-147": {
       "@type": "slate",
       "plaintext": "Explicit type-to-type mappings",
       "value": [
@@ -7469,7 +7697,7 @@
         }
       ]
     },
-    "p-138": {
+    "p-148": {
       "@type": "slate",
       "plaintext": "Use these when blocks share fields that aren't part of the `@default` set — for example, facet types sharing `{ title, field, hidden }` or form field types sharing `{ label, description, required }`.",
       "value": [
@@ -7516,18 +7744,18 @@
         }
       ]
     },
-    "ce-139": {
+    "ce-149": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-139-javascript-b7a3d1",
+          "@id": "ce-149-javascript-8a46be",
           "label": "Javascript",
           "language": "javascript",
           "code": "// Content item types: use @default (canonical fields) + explicit cross-mappings\nteaser: {\n    fieldMappings: {\n        '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },\n        image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },\n    },\n},\nimage: {\n    fieldMappings: {\n        '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },\n        teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },\n    },\n},\n\n// Non-content types: use explicit hub-type mappings (NOT @default).\n// All facet types map through checkboxFacet as a hub:\nselectFacet:  { fieldMappings: { checkboxFacet: { title: 'title', field: 'field', hidden: 'hidden' } } },\ncheckboxFacet: { fieldMappings: { selectFacet: { /* ... */ }, daterangeFacet: { /* ... */ } } },"
         }
       ]
     },
-    "h-140": {
+    "h-150": {
       "@type": "slate",
       "plaintext": "@target — copy from a linked content item",
       "value": [
@@ -7549,7 +7777,7 @@
         }
       ]
     },
-    "p-141": {
+    "p-151": {
       "@type": "slate",
       "plaintext": "`@target` maps a **linked** content item's attributes onto this block's own fields — the generic version of the Volto teaser's \"copy from target\" button. It maps *source content attributes* (`title`, `description`, `image`, …) to *this block's fields*. The item is whichever the block's **link field** points at (the `object_browser mode: 'link'` field — its stored snapshot is the source), so you don't name a URL field separately: \"the url is the link in the mapping\".",
       "value": [
@@ -7659,18 +7887,18 @@
         }
       ]
     },
-    "ce-142": {
+    "ce-152": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-142-javascript-428f06",
+          "@id": "ce-152-javascript-85afbc",
           "label": "Javascript",
           "language": "javascript",
           "code": "button: {\n    // The Label (title) syncs from the linked item's title.\n    fieldMappings: {\n        '@target': {\n            title: 'title',\n            description: 'description',\n            // image: the conversion is derived from the destination field's\n            // widget, so the value is assembled into the shape it expects.\n            image: 'preview_image',\n        },\n    },\n},"
         }
       ]
     },
-    "p-143": {
+    "p-153": {
       "@type": "slate",
       "plaintext": "Declaring `@target` is the **only** opt-in — no per-block enhancer wiring. Each mapped field then shows a small **🔗 pull from linked** toggle in the sidebar (only when a target is selected). Every mapped field is one of two states:",
       "value": [
@@ -7717,7 +7945,7 @@
         }
       ]
     },
-    "ul-144": {
+    "ul-154": {
       "@type": "slate",
       "plaintext": "Linked (default, toggle ticked) — the field pulls from the linked item.",
       "value": [
@@ -7755,7 +7983,7 @@
         }
       ]
     },
-    "p-145": {
+    "p-155": {
       "@type": "slate",
       "plaintext": "Its value is filled from the target's snapshot when the page opens for editing   and re-pulled when you change the link, so it always mirrors the linked content.",
       "value": [
@@ -7769,7 +7997,7 @@
         }
       ]
     },
-    "ul-146": {
+    "ul-156": {
       "@type": "slate",
       "plaintext": "Custom (toggle unticked) — your own value, ignored by the target. A field",
       "value": [
@@ -7796,7 +8024,7 @@
         }
       ]
     },
-    "p-147": {
+    "p-157": {
       "@type": "slate",
       "plaintext": "becomes custom the moment you edit it, or when you untick the toggle;   re-ticking re-pulls the target value. Custom fields are recorded in the block's   `_customFields` array (absence ⇒ linked), so the state persists with the block.",
       "value": [
@@ -7821,7 +8049,7 @@
         }
       ]
     },
-    "h-148": {
+    "h-158": {
       "@type": "slate",
       "plaintext": "Container ⇄ value (region-crossing paths)",
       "value": [
@@ -7835,7 +8063,7 @@
         }
       ]
     },
-    "p-149": {
+    "p-159": {
       "@type": "slate",
       "plaintext": "A `fieldMappings` value is usually a sibling **field name**. It may instead be a **region-crossing path** `<region>/<type|*>/<field>`, which reaches the `<field>` of a container region's children — the one place the path grammar crosses a region boundary. This bridges a **container** block (a region of child blocks) and a **value** block (a scalar field), so a block can convert between the two shapes:",
       "value": [
@@ -7926,18 +8154,18 @@
         }
       ]
     },
-    "ce-150": {
+    "ce-160": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-150-javascript-7d4cd3",
+          "@id": "ce-160-javascript-851653",
           "label": "Javascript",
           "language": "javascript",
           "code": "tableHeaderCell: {                                   // the value form: one slate\n    blockSchema: { properties: { value: { widget: 'slate' } } },\n    // Declared ONCE on the value block; works both directions.\n    fieldMappings: { tableCell: { value: 'blocks/slate/value' } },\n},\ntableCell: {                                         // the container form\n    blockSchema: { properties: {\n        blocks: { widget: 'object_list', typeField: '@type',\n                  allowedBlocks: ['slate', 'image', 'video'] },\n    } },\n},"
         }
       ]
     },
-    "ul-151": {
+    "ul-161": {
       "@type": "slate",
       "plaintext": "container → value (collapse) — gather the region's matching children's",
       "value": [
@@ -7964,7 +8192,7 @@
         }
       ]
     },
-    "p-152": {
+    "p-162": {
       "@type": "slate",
       "plaintext": "`<field>`; slate values are **merged** into one (lossless), not truncated.",
       "value": [
@@ -7997,7 +8225,7 @@
         }
       ]
     },
-    "ul-153": {
+    "ul-163": {
       "@type": "slate",
       "plaintext": "value → container (expand) — wrap the value in one child of <type> in",
       "value": [
@@ -8046,7 +8274,7 @@
         }
       ]
     },
-    "p-154": {
+    "p-164": {
       "@type": "slate",
       "plaintext": "the region.",
       "value": [
@@ -8060,7 +8288,7 @@
         }
       ]
     },
-    "ul-155": {
+    "ul-165": {
       "@type": "slate",
       "plaintext": "<type> selects a child type; * = any child that exposes <field> (siblings",
       "value": [
@@ -8109,7 +8337,7 @@
         }
       ]
     },
-    "p-156": {
+    "p-166": {
       "@type": "slate",
       "plaintext": "without it — an `image` for a `value` path — are skipped). A **concrete** type   (`blocks/slate/value`) makes expand unambiguous, so use it for a two-way bridge;   `*` suits read-only cross-region reads (e.g. a `when` condition).",
       "value": [
@@ -8189,7 +8417,7 @@
         }
       ]
     },
-    "p-157": {
+    "p-167": {
       "@type": "slate",
       "plaintext": "Non-region scalar fields (`key`, `width`, …) carry over unchanged. This is the `convertValueContainer` helper; DnD/paste and the block chooser reuse it via the same `fieldMappings` graph. See `proposals/container-value-conversion.md`.",
       "value": [
@@ -8258,7 +8486,7 @@
         }
       ]
     },
-    "h-158": {
+    "h-168": {
       "@type": "slate",
       "plaintext": "typeRule — position picks a typed item's @type",
       "value": [
@@ -8288,7 +8516,7 @@
         }
       ]
     },
-    "p-159": {
+    "p-169": {
       "@type": "slate",
       "plaintext": "The bridge converts on demand; a **`@type` rule** on a typed `object_list` field decides *when*, by **position**. It is an ordinary `when`-based fieldRule (same grammar — `@index`, `../@index`, `../../<field>`, `oneOf`, `lt`, …) whose `set` is a block-**type name** instead of a field definition:",
       "value": [
@@ -8434,18 +8662,18 @@
         }
       ]
     },
-    "ce-160": {
+    "ce-170": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-160-javascript-851653",
+          "@id": "ce-170-javascript-9c4d9c",
           "label": "Javascript",
           "language": "javascript",
           "code": "cells: {\n    widget: 'object_list', typeField: '@type',\n    allowedBlocks: ['tableCell', 'tableHeaderCell'],\n    typeRule: [\n        // header row OR header column → the value form\n        { when: { '../../headerMode': { oneOf: ['row', 'both'] }, '../@index': { lt: 1 } }, set: 'tableHeaderCell' },\n        { when: { '../../headerMode': { oneOf: ['col', 'both'] }, '@index': { lt: 1 } },     set: 'tableHeaderCell' },\n        { set: 'tableCell' },                                // otherwise the container form\n    ],\n},"
         }
       ]
     },
-    "p-161": {
+    "p-171": {
       "@type": "slate",
       "plaintext": "The rule is evaluated in the same pass that applies field defaults (run on every edit): each typed item's target `@type` is re-resolved, and when it differs from the stored `@type` the item is **converted in place** via the bridge above. So moving a row to/from row 0 flips its cells between `tableHeaderCell` (a slate `value`) and `tableCell` (a `blocks` container), losslessly — no imperative \"re-type the cells\" code. Only meaningful on a **typed** object_list (a `typeField` item has an `@type` to rewrite); it settles in one pass (the target type re-resolves to itself once the item is in place).",
       "value": [
@@ -8569,7 +8797,7 @@
         }
       ]
     },
-    "p-162": {
+    "p-172": {
       "@type": "slate",
       "plaintext": "Each field's value is converted to the shape its destination widget expects (derived from the widget): strings copy across, an image field is assembled from the target's `image_scales` / `image_field`, multi-value fields (e.g. `Subject` → tags) pass through as-is.",
       "value": [
@@ -8616,7 +8844,7 @@
         }
       ]
     },
-    "p-163": {
+    "p-173": {
       "@type": "slate",
       "plaintext": "The pull is **snapshot-based** — there is no separate live fetch. When you pick or type a link, the url widget stores the target's **full** metadata onto the link field (the object browser already fetches every item with `metadata_fields: '_all'`, and the field's `selectedItemAttrs` keeps the whole canonical set), so the block carries its own source data. Every mapped field then pulls straight from that stored snapshot: **on page open** (all blocks fill at once) and again whenever you change the link.",
       "value": [
@@ -8685,7 +8913,7 @@
         }
       ]
     },
-    "p-164": {
+    "p-174": {
       "@type": "slate",
       "plaintext": "Only an **internal** link is a pull source. An external URL has no catalog item to search, so a field linked to one can't pull — the toggle is hidden and the field behaves as a plain editable field. (Unfurling external links via OpenGraph is a future enhancement.)",
       "value": [
@@ -8710,7 +8938,7 @@
         }
       ]
     },
-    "h-165": {
+    "h-175": {
       "@type": "slate",
       "plaintext": "Conversion graph rules",
       "value": [
@@ -8724,7 +8952,7 @@
         }
       ]
     },
-    "ul-166": {
+    "ul-176": {
       "@type": "slate",
       "plaintext": "Explicit fieldMappings[typeName] always creates a conversion edge. @default only creates edges between types that both have valid @default mappings (keys from { @id, title, description, image }). Types with non-canonical @default keys are ignored. Types without fieldMappings never appear in the \"Convert to...\" menu. Transitive conversions use paths through intermediate types (e.g. hero → teaser → image). Unmapped fields are kept in the data so converting back restores them.",
       "value": [
@@ -8838,7 +9066,7 @@
         }
       ]
     },
-    "h-167": {
+    "h-177": {
       "@type": "slate",
       "plaintext": "Drag / paste via conversion",
       "value": [
@@ -8852,7 +9080,7 @@
         }
       ]
     },
-    "p-168": {
+    "p-178": {
       "@type": "slate",
       "plaintext": "The same conversion graph gives drag-and-drop (and paste) more valid destinations: a block can be dropped or pasted into a container whose `allowedBlocks` only admits a type the block can *convert* to.",
       "value": [
@@ -8888,7 +9116,7 @@
         }
       ]
     },
-    "p-169": {
+    "p-179": {
       "@type": "slate",
       "plaintext": "**Every drop/paste is TRIALLED before it commits.** The candidate result is normalised (the same pass that applies field defaults and evaluates [`@type` rules](#typerule--position-picks-a-typed-items-type)), then each block's `@type` is diffed against what was dropped. If **anything** converted — because the dropped block had to convert to fit the container, **or** because a rule re-typed a block by its new position (e.g. a table row moved to row 0 turns its cells into header cells) — a **\"Convert blocks?\"** confirm lists each `from → to` and waits: **Convert** commits the already-converted result, **Cancel** aborts the whole drop. Nothing converted → it commits silently.",
       "value": [
@@ -9001,7 +9229,7 @@
         }
       ]
     },
-    "p-170": {
+    "p-180": {
       "@type": "slate",
       "plaintext": "The chooser popup survives only for the genuinely ambiguous case: a single block reachable to *several* target types, where you pick which one (cancelling leaves it untouched). Zero reachable types rejects the drop; multi-block selections are auto-only (every member must reach exactly one type). On mobile, conversion happens via cut → paste (drag/chevron move stays native-only). External-link and other type restrictions are unaffected; only the container's `allowedBlocks` gate is relaxed to \"allowed or convertible\".",
       "value": [
@@ -9037,7 +9265,7 @@
         }
       ]
     },
-    "h-171": {
+    "h-181": {
       "@type": "slate",
       "plaintext": "Mapping value format",
       "value": [
@@ -9051,7 +9279,7 @@
         }
       ]
     },
-    "p-172": {
+    "p-182": {
       "@type": "slate",
       "plaintext": "A mapping value is either a string (simple field rename) or `{ field, type }` (rename with type conversion):",
       "value": [
@@ -9076,18 +9304,18 @@
         }
       ]
     },
-    "ce-173": {
+    "ce-183": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-173-json-54200b",
+          "@id": "ce-183-json-16e4c3",
           "label": "Json",
           "language": "json",
           "code": "{\n    \"@id\": { \"field\": \"href\", \"type\": \"link\" },\n    \"title\": \"title\",\n    \"description\": \"description\",\n    \"image\": \"preview_image\"\n}"
         }
       ]
     },
-    "p-174": {
+    "p-184": {
       "@type": "slate",
       "plaintext": "When `type` is specified, the value is converted at runtime:",
       "value": [
@@ -9112,7 +9340,7 @@
         }
       ]
     },
-    "tbl-175": {
+    "tbl-185": {
       "@type": "slateTable",
       "table": {
         "fixed": true,
@@ -9123,10 +9351,10 @@
         "striped": false,
         "rows": [
           {
-            "key": "tbl-175-r0",
+            "key": "tbl-185-r0",
             "cells": [
               {
-                "key": "tbl-175-r0c0",
+                "key": "tbl-185-r0c0",
                 "type": "header",
                 "value": [
                   {
@@ -9140,7 +9368,7 @@
                 ]
               },
               {
-                "key": "tbl-175-r0c1",
+                "key": "tbl-185-r0c1",
                 "type": "header",
                 "value": [
                   {
@@ -9156,10 +9384,10 @@
             ]
           },
           {
-            "key": "tbl-175-r1",
+            "key": "tbl-185-r1",
             "cells": [
               {
-                "key": "tbl-175-r1c0",
+                "key": "tbl-185-r1c0",
                 "type": "data",
                 "value": [
                   {
@@ -9178,7 +9406,7 @@
                 ]
               },
               {
-                "key": "tbl-175-r1c1",
+                "key": "tbl-185-r1c1",
                 "type": "data",
                 "value": [
                   {
@@ -9205,10 +9433,10 @@
             ]
           },
           {
-            "key": "tbl-175-r2",
+            "key": "tbl-185-r2",
             "cells": [
               {
-                "key": "tbl-175-r2c0",
+                "key": "tbl-185-r2c0",
                 "type": "data",
                 "value": [
                   {
@@ -9227,7 +9455,7 @@
                 ]
               },
               {
-                "key": "tbl-175-r2c1",
+                "key": "tbl-185-r2c1",
                 "type": "data",
                 "value": [
                   {
@@ -9254,10 +9482,10 @@
             ]
           },
           {
-            "key": "tbl-175-r3",
+            "key": "tbl-185-r3",
             "cells": [
               {
-                "key": "tbl-175-r3c0",
+                "key": "tbl-185-r3c0",
                 "type": "data",
                 "value": [
                   {
@@ -9276,7 +9504,7 @@
                 ]
               },
               {
-                "key": "tbl-175-r3c1",
+                "key": "tbl-185-r3c1",
                 "type": "data",
                 "value": [
                   {
@@ -9303,10 +9531,10 @@
             ]
           },
           {
-            "key": "tbl-175-r4",
+            "key": "tbl-185-r4",
             "cells": [
               {
-                "key": "tbl-175-r4c0",
+                "key": "tbl-185-r4c0",
                 "type": "data",
                 "value": [
                   {
@@ -9325,7 +9553,7 @@
                 ]
               },
               {
-                "key": "tbl-175-r4c1",
+                "key": "tbl-185-r4c1",
                 "type": "data",
                 "value": [
                   {
@@ -9349,10 +9577,10 @@
             ]
           },
           {
-            "key": "tbl-175-r5",
+            "key": "tbl-185-r5",
             "cells": [
               {
-                "key": "tbl-175-r5c0",
+                "key": "tbl-185-r5c0",
                 "type": "data",
                 "value": [
                   {
@@ -9371,7 +9599,7 @@
                 ]
               },
               {
-                "key": "tbl-175-r5c1",
+                "key": "tbl-185-r5c1",
                 "type": "data",
                 "value": [
                   {
@@ -9389,7 +9617,7 @@
         ]
       }
     },
-    "h-176": {
+    "h-186": {
       "@type": "slate",
       "plaintext": "FieldMappingWidget",
       "value": [
@@ -9403,7 +9631,7 @@
         }
       ]
     },
-    "p-177": {
+    "p-187": {
       "@type": "slate",
       "plaintext": "When a parent block has `mappingField` set in its `inheritSchemaFrom` recipe, the admin sidebar shows a widget that lets editors configure field mappings visually:",
       "value": [
@@ -9439,7 +9667,7 @@
         }
       ]
     },
-    "ul-178": {
+    "ul-188": {
       "@type": "slate",
       "plaintext": "Shows the @default source fields (@id, title, description, image) on the left. For each source field, lets the editor pick a field from the selected child type's schema. Auto-detects the conversion type from the target field definition (e.g. object_browser with mode=link → type: \"link\"). Saves the result as fieldMapping (singular) on the block data.",
       "value": [
@@ -9592,7 +9820,7 @@
         }
       ]
     },
-    "p-179": {
+    "p-189": {
       "@type": "slate",
       "plaintext": "The saved `fieldMapping` is read at render time by `expandListingBlocks` — no block registry access needed at render time.",
       "value": [
@@ -9628,7 +9856,7 @@
         }
       ]
     },
-    "h-180": {
+    "h-190": {
       "@type": "slate",
       "plaintext": "HTML Paste Support (TODO)",
       "value": [
@@ -9642,7 +9870,7 @@
         }
       ]
     },
-    "p-181": {
+    "p-191": {
       "@type": "slate",
       "plaintext": "When the editor pastes rich HTML into the page, Hydra will eventually be able to recognise it as a custom block by matching against a CSS selector mapping. The proposed shape:",
       "value": [
@@ -9656,18 +9884,18 @@
         }
       ]
     },
-    "ce-182": {
+    "ce-192": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-182-javascript-237cb7",
+          "@id": "ce-192-javascript-d04dec",
           "label": "Javascript",
           "language": "javascript",
           "code": "video: {\n    fieldMappings: {\n        'css:video': { 'src': 'url', 'caption[@class=\"alt\"]': 'alt' },\n    },\n}"
         }
       ]
     },
-    "p-183": {
+    "p-193": {
       "@type": "slate",
       "plaintext": "The `css:<selector>` key in `fieldMappings` matches a pasted HTML element; the value maps element attributes to block fields. Not yet implemented — open question on whether this should run via `htmlTagsToSlate` (bypassing slate conversion) or be encoded into slate so attributes/classes survive.",
       "value": [
@@ -9832,75 +10060,85 @@
       "p-112",
       "ce-113",
       "p-114",
-      "p-115",
-      "ul-116",
-      "p-117",
-      "ul-118",
-      "p-119",
+      "h-115",
+      "p-116",
+      "ce-117",
+      "p-118",
+      "ul-119",
       "p-120",
       "ul-121",
-      "ce-122",
-      "p-123",
-      "ce-124",
+      "p-122",
+      "ul-123",
+      "p-124",
       "p-125",
-      "ce-126",
+      "ul-126",
       "p-127",
-      "p-128",
+      "ul-128",
       "p-129",
-      "h-130",
-      "p-131",
-      "ul-132",
+      "p-130",
+      "ul-131",
+      "ce-132",
       "p-133",
-      "p-134",
-      "h-135",
-      "p-136",
-      "h-137",
+      "ce-134",
+      "p-135",
+      "ce-136",
+      "p-137",
       "p-138",
-      "ce-139",
+      "p-139",
       "h-140",
       "p-141",
-      "ce-142",
+      "ul-142",
       "p-143",
-      "ul-144",
-      "p-145",
-      "ul-146",
-      "p-147",
-      "h-148",
-      "p-149",
-      "ce-150",
-      "ul-151",
-      "p-152",
-      "ul-153",
-      "p-154",
-      "ul-155",
-      "p-156",
+      "p-144",
+      "h-145",
+      "p-146",
+      "h-147",
+      "p-148",
+      "ce-149",
+      "h-150",
+      "p-151",
+      "ce-152",
+      "p-153",
+      "ul-154",
+      "p-155",
+      "ul-156",
       "p-157",
       "h-158",
       "p-159",
       "ce-160",
-      "p-161",
+      "ul-161",
       "p-162",
-      "p-163",
+      "ul-163",
       "p-164",
-      "h-165",
-      "ul-166",
-      "h-167",
-      "p-168",
+      "ul-165",
+      "p-166",
+      "p-167",
+      "h-168",
       "p-169",
-      "p-170",
-      "h-171",
+      "ce-170",
+      "p-171",
       "p-172",
-      "ce-173",
+      "p-173",
       "p-174",
-      "tbl-175",
-      "h-176",
-      "p-177",
-      "ul-178",
+      "h-175",
+      "ul-176",
+      "h-177",
+      "p-178",
       "p-179",
-      "h-180",
-      "p-181",
-      "ce-182",
-      "p-183"
+      "p-180",
+      "h-181",
+      "p-182",
+      "ce-183",
+      "p-184",
+      "tbl-185",
+      "h-186",
+      "p-187",
+      "ul-188",
+      "p-189",
+      "h-190",
+      "p-191",
+      "ce-192",
+      "p-193"
     ]
   }
 }
