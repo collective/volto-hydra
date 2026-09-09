@@ -7,15 +7,25 @@
  * This pins down whether the typeless seed is a config gap (region needs a
  * defaultBlockType / single allowedBlocks) or a deeper forced-layout bug.
  */
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, vi } from 'vitest';
+
+// blockSync reaches HydraSchemaContext.js — JSX inside a .js file, which esbuild
+// (vitest) can't parse. Nothing here touches the live schema context.
+vi.mock('../context', () => ({
+  getHydraSchemaContext: () => ({}),
+  setHydraSchemaContext: () => () => {},
+  getLiveBlockData: () => undefined,
+}));
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import { getBlockAddability } from '@volto-hydra/helpers';
 import {
   buildBlockPathMap,
-  deleteBlocks,
   ensureEmptyBlockIfEmpty,
   getBlockById,
 } from './blockPath.js';
+// deleteBlocks lives in the EDIT layer (blockSync), not among the storage
+// primitives: it deletes and then settles the structure the delete disturbed.
+import { deleteBlocks } from './blockSync.js';
 import { mergeTemplatesIntoPage } from './mergeTemplates.mjs';
 
 const EMPTY_ANNOUNCEMENT_TEMPLATE = {

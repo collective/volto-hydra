@@ -39,7 +39,8 @@
  */
 import { getInjectedBlocksConfig, getSlateStyleGlobals, getSlateVocabulary } from './injectedVoltoConfig.js';
 import { normalizeSlateFields, undefinedSlateTypes } from '../../../hydra-js/slateStyles.js';
-import { getContainerFieldConfig, getBlockByPath, getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField, convertValueContainer, convertContainerBlock, getContainerRegionDescriptors, insertBlockInContainer, parseRegionPath, expandValueIntoRegion, collapseRegionToValue } from './blockPath.js';
+import { getContainerFieldConfig, getBlockByPath, getBlockTypeSchema, getBlockById, updateBlockById,
+  deleteBlockFromContainer, ensureEmptyBlockIfEmpty, removeReplacedPlaceholder, getChildBlockIds, getChildField, getChildBlockIdsInField, convertValueContainer, convertContainerBlock, getContainerRegionDescriptors, insertBlockInContainer, parseRegionPath, expandValueIntoRegion, collapseRegionToValue } from './blockPath.js';
 import { addableSiblingTypes, buildBlockPathMap } from '../../../hydra-js/buildBlockPathMap.js';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import {
@@ -53,6 +54,8 @@ import {
   getBlockType,
   isSlateFieldType,
   slateNodesText,
+  isBlockReadonly,
+  isBlockPositionLocked,
 } from '@volto-hydra/helpers';
 import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '../context/index.js';
 // Pure validation/default-application logic lives in schemaValidation.js
@@ -3219,4 +3222,136 @@ export function applyMembershipAfterMove(formData, blockPathMap, blockId, option
   // written back, and the stored block keeps its stale source membership.
   if (updatedBlockData === originalBlockData) return formData;
   return updateBlockById(formData, blockPathMap, blockId, updatedBlockData);
+}
+
+/**
+ * Restore the invariants every structural edit owes, in the order they owe them.
+ *
+ * Adding, deleting, moving and dropping are different edits, but afterwards they
+ * all owe the same three things — and the ORDER is the part that kept being got
+ * wrong, in a different way by each caller:
+ *
+ *   1. a block that LANDED somewhere new takes that region's membership;
+ *   2. THEN a placeholder it was dropped onto is removed — after (1), because in
+ *      a forced region the placeholder is the only neighbour carrying the
+ *      template, so removing it first leaves nothing to derive from;
+ *   3. a region a block was taken OUT of is re-seeded if that emptied it, so a
+ *      forced region always keeps a placeholder to select and add into.
+ *
+ * Each caller had implemented the subset it happened to need: delete re-seeded
+ * but only in one of its two paths; the drag re-derived membership, the chooser's
+ * drop didn't; both removed placeholders, in different places relative to (1).
+ * Every one of those was a bug, and every one of them was the same bug.
+ *
+ * @param {Object} formData
+ * @param {Object} blockPathMap - map for `formData`
+ * @param {Object} what - what the edit did
+ * @param {string[]} [what.landed] - blocks that arrived somewhere new
+ * @param {string[]} [what.replacedPlaceholders] - 'empty' blocks that were dropped onto
+ * @param {Object[]} [what.emptiedContainers] - containerConfigs a block came out of
+ * @param {Object} options - blocksConfig, intl, uuidGenerator, templateEditMode,
+ *   metadata, and insertAfterById for the membership recompute
+ * @returns {{formData: Object, blockPathMap: Object}}
+ */
+export function settleBlockStructure(formData, blockPathMap, what, options) {
+  const { landed = [], replacedPlaceholders = [], emptiedContainers = [] } = what;
+  const {
+    blocksConfig,
+    intl,
+    uuidGenerator,
+    templateEditMode = null,
+    metadata,
+    insertAfterById = {},
+  } = options;
+  let out = formData;
+  let map = blockPathMap;
+  const remap = () => {
+    map = buildBlockPathMap(out, blocksConfig, intl);
+  };
+
+  for (const blockId of landed) {
+    const next = applyMembershipAfterMove(out, map, blockId, {
+      blocksConfig,
+      intl,
+      templateEditMode,
+      insertAfter: insertAfterById[blockId],
+    });
+    if (next !== out) {
+      out = next;
+      remap();
+    }
+  }
+
+  for (const placeholderId of replacedPlaceholders) {
+    const next = removeReplacedPlaceholder(out, map, placeholderId, {
+      blocksConfig,
+      intl,
+    });
+    if (next !== out) {
+      out = next;
+      remap();
+    }
+  }
+
+  for (const containerConfig of emptiedContainers) {
+    if (!containerConfig) continue;
+    const next = ensureEmptyBlockIfEmpty(
+      out,
+      containerConfig,
+      map,
+      uuidGenerator,
+      blocksConfig,
+      { intl, metadata, properties: out },
+    );
+    if (next !== out) {
+      out = next;
+      remap();
+    }
+  }
+
+  return { formData: out, blockPathMap: map };
+}
+
+/**
+ * Delete blocks and settle the structure afterwards.
+ *
+ * ONE delete, because there were two: View.jsx's single (DELETE_BLOCK, the
+ * toolbar's Remove) deleted and re-seeded; its multi (DELETE_BLOCKS,
+ * multi-select) looped and never re-seeded, so whether a forced region survived
+ * being emptied depended on how many blocks you had selected. The lock backstop
+ * had drifted the other way — the multi path had it, the single one didn't.
+ *
+ * @returns {{formData, blockPathMap, deleted: string[]}}
+ */
+export function deleteBlocks(formData, blockPathMap, blockIds, options = {}) {
+  const { blocksConfig, intl, templateEditMode = null } = options;
+  let out = formData;
+  let map = blockPathMap;
+  const deleted = [];
+  const emptiedContainers = [];
+  for (const blockId of blockIds) {
+    const blockData = getBlockById(out, map, blockId);
+    // Missing, or locked and not being edited: leave it alone. A backstop — the
+    // iframe filters first (hydra._filterMutableBlockUids).
+    if (
+      !blockData ||
+      isBlockReadonly(blockData, templateEditMode) ||
+      isBlockPositionLocked(blockData, templateEditMode)
+    ) {
+      continue;
+    }
+    const containerConfig = getContainerFieldConfig(
+      blockId,
+      map,
+      out,
+      blocksConfig,
+      intl,
+    );
+    out = deleteBlockFromContainer(out, map, blockId, containerConfig);
+    map = buildBlockPathMap(out, blocksConfig, intl);
+    emptiedContainers.push(containerConfig);
+    deleted.push(blockId);
+  }
+  const settled = settleBlockStructure(out, map, { emptiedContainers }, options);
+  return { ...settled, deleted };
 }

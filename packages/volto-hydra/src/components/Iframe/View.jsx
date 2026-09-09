@@ -259,7 +259,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { deleteBlocks, removeReplacedPlaceholder, buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, getEmptyBlockType, getContainerRegionDescriptors } from '../../utils/blockPath';
+import { removeReplacedPlaceholder, buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, getEmptyBlockType, getContainerRegionDescriptors } from '../../utils/blockPath';
 import { mergeAnchorsIntoContent } from '../../utils/linkableAnchors';
 import { installStyleMenuPreviewCss } from '../../utils/styleMenuPreviewCss';
 import { canContainAll, getBlockAddability, getChildBlockEntries, setBlockType, clearBlockType } from '@volto-hydra/helpers';
@@ -270,6 +270,8 @@ import {
   filterAddableTypesByRule,
   applyBlockDefaultsWithContext,
   applyMembershipAfterMove,
+  settleBlockStructure,
+  deleteBlocks,
   createSchemaEnhancerFromRecipe,
   installVariationFieldEnhancers,
   installChildBlockEnhancers,
@@ -3129,51 +3131,32 @@ const Iframe = (props) => {
           log('MOVE_BLOCKS: moveBlockBetweenContainers returned:', newFormData ? 'formData' : 'null');
 
           if (newFormData) {
-            // Re-derive each moved block's membership from where it LANDED — the
-            // shared applyMembershipAfterMove, so the chooser's ask-first drop
-            // (below) does exactly the same thing rather than nothing.
-            let updatedPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
-            for (const moveBlockId of blocksToMove) {
-              const withMembership = applyMembershipAfterMove(
-                newFormData,
-                updatedPathMap,
-                moveBlockId,
-                {
-                  blocksConfig,
-                  intl,
-                  templateEditMode: templateEditModeRef.current,
-                  insertAfter: blockInsertAfterMap[moveBlockId],
-                },
-              );
-              if (withMembership !== newFormData) {
-                newFormData = withMembership;
-                updatedPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
-                log('MOVE_BLOCKS: membership re-derived for', moveBlockId);
-              }
-            }
-            // If we moved to a different container, ensure source container has at least one block
-            if (sourceParentId !== targetParentId && sourceContainerConfig) {
-              newFormData = ensureEmptyBlockIfEmpty(
-                newFormData,
-                sourceContainerConfig,
-                currentBlockPathMap,
-                uuid,
-                blocksConfig,
-                { intl, metadata, properties: currentFormData },
-              );
-            }
-
-            // Replace path: the dragged block was dropped on an 'empty'
-            // placeholder. Remove the placeholder so the dropped block
-            // takes its position rather than sitting beside it.
-            // Done after the move (and after applyBlockDefaultsWithContext)
-            // so the moved block's neighbour-derived fields settle first.
-            newFormData = removeReplacedPlaceholder(
+            // Everything a move owes afterwards, in the order it owes it:
+            // membership for what landed, THEN the placeholder it landed on,
+            // THEN a re-seed of the region it came out of. settleBlockStructure
+            // fixes that order in one place so the drag path and the chooser's
+            // ask-first drop cannot disagree about it again.
+            const settledMove = settleBlockStructure(
               newFormData,
               buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl),
-              replaceTargetId,
-              { blocksConfig, intl },
+              {
+                landed: blocksToMove,
+                replacedPlaceholders: replaceTargetId ? [replaceTargetId] : [],
+                emptiedContainers:
+                  sourceParentId !== targetParentId && sourceContainerConfig
+                    ? [sourceContainerConfig]
+                    : [],
+              },
+              {
+                blocksConfig,
+                intl,
+                uuidGenerator: uuid,
+                templateEditMode: templateEditModeRef.current,
+                metadata,
+                insertAfterById: blockInsertAfterMap,
+              },
             );
+            newFormData = settledMove.formData;
 
             // Commit + keep the moved block selected. Rebuild the pathMap for the
             // new positions and flushSync so state is committed before the Redux
