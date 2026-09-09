@@ -259,16 +259,17 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { deleteBlocks, buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, getEmptyBlockType, getContainerRegionDescriptors } from '../../utils/blockPath';
+import { deleteBlocks, removeReplacedPlaceholder, buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, getEmptyBlockType, getContainerRegionDescriptors } from '../../utils/blockPath';
 import { mergeAnchorsIntoContent } from '../../utils/linkableAnchors';
 import { installStyleMenuPreviewCss } from '../../utils/styleMenuPreviewCss';
-import { canContainAll, getChildBlockEntries, setBlockType, clearBlockType } from '@volto-hydra/helpers';
+import { canContainAll, getBlockAddability, getChildBlockEntries, setBlockType, clearBlockType } from '@volto-hydra/helpers';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
   applySchemaDefaultsToFormData,
   previewSchemaDefaultConversions,
   filterAddableTypesByRule,
   applyBlockDefaultsWithContext,
+  applyMembershipAfterMove,
   createSchemaEnhancerFromRecipe,
   installVariationFieldEnhancers,
   installChildBlockEnhancers,
@@ -988,6 +989,24 @@ const Iframe = (props) => {
         .filter(Boolean);
 
       if (cloneWithIds.length === 0) return;
+
+      // The same backstop delete and move carry, and paste had none. Hydra's own
+      // answer to "may anything go here" is getBlockAddability, so ask it rather
+      // than trust the iframe-side filter to be the only gate: pasting after
+      // locked template chrome is exactly the injection the lock exists to stop.
+      const afterBlockData = getBlockById(properties, bpm, afterBlockId);
+      if (afterBlockData) {
+        const addability = getBlockAddability(
+          afterBlockId,
+          bpm,
+          afterBlockData,
+          iframeSyncState.templateEditMode,
+        );
+        if (!addability.canInsertAfter && !addability.canReplace) {
+          log('hydra-paste: target refuses inserts (locked template content?)', afterBlockId);
+          return;
+        }
+      }
 
       const containerConfig = getContainerFieldConfig(afterBlockId, bpm, properties, blocksConfig, intl);
       const allowedTypes = containerConfig?.allowedBlocks;
@@ -3110,86 +3129,28 @@ const Iframe = (props) => {
           log('MOVE_BLOCKS: moveBlockBetweenContainers returned:', newFormData ? 'formData' : 'null');
 
           if (newFormData) {
-            // Apply defaults to moved blocks based on their new position
-            // This updates template fields (templateId, templateInstanceId, slotId)
-            // based on neighboring blocks at the new location
+            // Re-derive each moved block's membership from where it LANDED — the
+            // shared applyMembershipAfterMove, so the chooser's ask-first drop
+            // (below) does exactly the same thing rather than nothing.
             let updatedPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
             for (const moveBlockId of blocksToMove) {
-              const originalBlockData = getBlockById(newFormData, updatedPathMap, moveBlockId);
-              if (!originalBlockData) continue;
-
-              // Get container info for the new position
-              const targetContainerConfig = getContainerFieldConfig(moveBlockId, updatedPathMap, newFormData, blocksConfig, intl);
-              if (!targetContainerConfig) continue;
-
-              const { parentId: containerId, region: containerRegion } = targetContainerConfig;
-              const containerPath = containerId === PAGE_BLOCK_UID ? [] : updatedPathMap[containerId]?.path;
-              const container = containerPath ? getBlockByPath(newFormData, containerPath) : newFormData;
-              const fullLayout = container?.blocks_layout?.[containerRegion || 'items'] || [];
-              // Recompute membership from the block's NEIGHBOURS, with the block itself
-              // EXCLUDED. It already sits in the layout at this index, so a naive
-              // getNeighborData(position) would return the block itself and it would offer
-              // its own (stale, source) slot back to itself — keeping membership it should
-              // have shed. Excluding it makes `position` the insertion gap between its real
-              // prev/next neighbours.
-              const position = fullLayout.indexOf(moveBlockId);
-              const layoutItems = fullLayout.filter((id) => id !== moveBlockId);
-
-              // Membership on a move is GATED ON EDIT MODE (see architecture.md »
-              // "Template membership"):
-              //  - normal mode → a moved block takes on the membership of wherever it lands,
-              //    so we strip its source membership and re-derive from the destination
-              //    (a slot, a template-instance container, or NOTHING → plain page content);
-              //  - template edit mode → the author's slotId is EXPLICIT (you rename slots,
-              //    you don't change them by dragging), so a move that stays INSIDE the
-              //    template keeps its slotId. A move OUT of the template still strips (drag
-              //    out exits, even while editing).
-              // Fixed template blocks always keep their identity (their slot/fixed IS the
-              // template). "Inside the template" = a same-instance block sits both before AND
-              // after the landing gap.
-              const instId = originalBlockData.templateInstanceId;
-              const editingThisTemplate =
-                !!instId && (templateEditModeRef.current || []).includes(instId);
-              const inSameInstance = (id) =>
-                id && newFormData.blocks[id]?.templateInstanceId === instId;
-              const insideTemplate =
-                editingThisTemplate &&
-                layoutItems.slice(0, position).some(inSameInstance) &&
-                layoutItems.slice(position).some(inSameInstance);
-
-              let blockData = originalBlockData;
-              if (!originalBlockData.fixed && !insideTemplate) {
-                blockData = { ...blockData };
-                delete blockData.templateId;
-                delete blockData.templateInstanceId;
-                delete blockData.slotId;
-                delete blockData.readOnly;
-              }
-
-              // Apply defaults with context - this derives template fields from neighbors
-              const updatedBlockData = applyBlockDefaultsWithContext(blockData, {
-                containerId,
-                field: containerRegion,
-                position,
-                insertAfter: blockInsertAfterMap[moveBlockId],
-                layoutItems,
-                allBlocks: newFormData.blocks,
-                blockPathMap: updatedPathMap,
-                blocksConfig,
-                intl,
-              });
-
-              // Update block if the recompute changed it from what was STORED. Compare
-              // against originalBlockData, not the (possibly membership-stripped) blockData
-              // copy — otherwise a stripped block whose recompute is a no-op is never
-              // written back, and the stored block keeps its stale source membership.
-              if (updatedBlockData !== originalBlockData) {
-                newFormData = updateBlockById(newFormData, updatedPathMap, moveBlockId, updatedBlockData);
+              const withMembership = applyMembershipAfterMove(
+                newFormData,
+                updatedPathMap,
+                moveBlockId,
+                {
+                  blocksConfig,
+                  intl,
+                  templateEditMode: templateEditModeRef.current,
+                  insertAfter: blockInsertAfterMap[moveBlockId],
+                },
+              );
+              if (withMembership !== newFormData) {
+                newFormData = withMembership;
                 updatedPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
-                log('MOVE_BLOCKS: Applied defaults to moved block:', moveBlockId, 'templateId:', updatedBlockData.templateId, 'slotId:', updatedBlockData.slotId);
+                log('MOVE_BLOCKS: membership re-derived for', moveBlockId);
               }
             }
-
             // If we moved to a different container, ensure source container has at least one block
             if (sourceParentId !== targetParentId && sourceContainerConfig) {
               newFormData = ensureEmptyBlockIfEmpty(
@@ -3207,20 +3168,12 @@ const Iframe = (props) => {
             // takes its position rather than sitting beside it.
             // Done after the move (and after applyBlockDefaultsWithContext)
             // so the moved block's neighbour-derived fields settle first.
-            if (replaceTargetId) {
-              const replacePathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
-              const replaceBlockData = getBlockById(newFormData, replacePathMap, replaceTargetId);
-              if (replaceBlockData?.['@type'] === 'empty') {
-                const replaceContainerConfig = getContainerFieldConfig(
-                  replaceTargetId, replacePathMap, newFormData, blocksConfig, intl,
-                );
-                if (replaceContainerConfig) {
-                  newFormData = deleteBlockFromContainer(
-                    newFormData, replacePathMap, replaceTargetId, replaceContainerConfig,
-                  );
-                }
-              }
-            }
+            newFormData = removeReplacedPlaceholder(
+              newFormData,
+              buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl),
+              replaceTargetId,
+              { blocksConfig, intl },
+            );
 
             // Commit + keep the moved block selected. Rebuild the pathMap for the
             // new positions and flushSync so state is committed before the Redux
@@ -4813,18 +4766,36 @@ const Iframe = (props) => {
               updatedProperties, bpm2, chooser.blockId, pm.targetBlockId, pm.insertAfter,
               srcParent, pm.targetParentId, blocksConfig, intl,
             ) || updatedProperties;
+            // Same membership recompute the drag path does. Without it a block
+            // dropped into a template region through the chooser kept its source
+            // membership (or none) and the region never owned it.
+            //
+            // BEFORE the placeholder is removed, for the reason the drag path
+            // spells out: the placeholder is a neighbour, and on a forced region
+            // it is the only one carrying the template — remove it first and
+            // there is nothing left to derive from.
+            {
+              const mbpm = buildBlockPathMap(updatedProperties, blocksConfig, intl);
+              updatedProperties = applyMembershipAfterMove(
+                updatedProperties,
+                mbpm,
+                chooser.blockId,
+                {
+                  blocksConfig,
+                  intl,
+                  templateEditMode: templateEditModeRef.current,
+                  insertAfter: pm.insertAfter,
+                },
+              );
+            }
             // Dropped onto an empty-container placeholder → remove it so the
             // converted block takes its place (mirrors the MOVE_BLOCKS replace path).
-            if (pm.replaceTargetId) {
-              const rbpm = buildBlockPathMap(updatedProperties, blocksConfig, intl);
-              const rdata = getBlockById(updatedProperties, rbpm, pm.replaceTargetId);
-              if (rdata?.['@type'] === 'empty') {
-                const rcfg = getContainerFieldConfig(pm.replaceTargetId, rbpm, updatedProperties, blocksConfig, intl);
-                if (rcfg) {
-                  updatedProperties = deleteBlockFromContainer(updatedProperties, rbpm, pm.replaceTargetId, rcfg);
-                }
-              }
-            }
+            updatedProperties = removeReplacedPlaceholder(
+              updatedProperties,
+              buildBlockPathMap(updatedProperties, blocksConfig, intl),
+              pm.replaceTargetId,
+              { blocksConfig, intl },
+            );
           }
           // The pick placed the block; run `@type` rules in case its new position
           // re-types it or a sibling. No second confirm — the pick was the ask.

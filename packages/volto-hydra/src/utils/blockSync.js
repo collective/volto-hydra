@@ -39,7 +39,7 @@
  */
 import { getInjectedBlocksConfig, getSlateStyleGlobals, getSlateVocabulary } from './injectedVoltoConfig.js';
 import { normalizeSlateFields, undefinedSlateTypes } from '../../../hydra-js/slateStyles.js';
-import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField, convertValueContainer, convertContainerBlock, getContainerRegionDescriptors, insertBlockInContainer, parseRegionPath, expandValueIntoRegion, collapseRegionToValue } from './blockPath.js';
+import { getContainerFieldConfig, getBlockByPath, getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField, convertValueContainer, convertContainerBlock, getContainerRegionDescriptors, insertBlockInContainer, parseRegionPath, expandValueIntoRegion, collapseRegionToValue } from './blockPath.js';
 import { addableSiblingTypes, buildBlockPathMap } from '../../../hydra-js/buildBlockPathMap.js';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import {
@@ -446,13 +446,26 @@ function getTemplateInfoFromNeighbors(context) {
 
   const slotOffer = (neighbor, fixedSlotField) => {
     if (!neighbor?.templateId) return null;
+    // An 'empty' placeholder offers its OWN slot, fixed or not. A fixed block is
+    // otherwise chrome — its slotId is its identity, not an invitation, which is
+    // why fixed blocks only reach a neighbouring slot through next/prevSlotId.
+    // A placeholder is the opposite: it exists to be filled, and its slot is the
+    // slot being filled. Without this a forced region's seeded empty offered
+    // nothing, so a block added or dropped beside it joined no template and the
+    // author had nothing to lock.
+    const isPlaceholder = neighbor['@type'] === 'empty';
     const slotId =
-      !neighbor.fixed && neighbor.slotId
+      (isPlaceholder || !neighbor.fixed) && neighbor.slotId
         ? neighbor.slotId
         : neighbor.fixed && neighbor[fixedSlotField]
           ? neighbor[fixedSlotField]
           : null;
-    if (!slotId) return null;
+    // A placeholder in a FORCED region has no slot of its own — the region IS
+    // the template, so there is nothing to name. Offer the instance anyway and
+    // let the caller mint a slot (it already prefers an existing slotId, then a
+    // neighbour's, then a fresh one). Requiring a slot here is what left a block
+    // dropped into an emptied announcement belonging to nothing.
+    if (!slotId && !isPlaceholder) return null;
     return {
       templateId: neighbor.templateId,
       templateInstanceId: neighbor.templateInstanceId,
@@ -3103,4 +3116,107 @@ export function syncChildBlockTypes(formData, blockPathMap, blockId, oldBlockDat
   }
 
   return result;
+}
+
+/**
+ * Re-derive a moved block's template membership from where it LANDED.
+ *
+ * One implementation, because there were two moves and only one of them did
+ * this. MOVE_BLOCKS (drag and drop) recomputed membership from the block's new
+ * neighbours; the chooser's ask-first drop (convert + move in one update) moved
+ * the block and never recomputed, so a block dropped into a template region
+ * through that path kept its source membership — or none — and the region it
+ * landed in did not own it.
+ *
+ * Membership on a move is GATED ON EDIT MODE (architecture.md » "Template
+ * membership"):
+ *  - normal mode → the block takes on the membership of wherever it lands, so
+ *    its source membership is stripped and re-derived from the destination (a
+ *    slot, a template-instance container, or NOTHING → plain page content);
+ *  - template edit mode → the author's slotId is EXPLICIT (you rename slots, you
+ *    don't change them by dragging), so a move that stays INSIDE the template
+ *    keeps its slotId. A move OUT still strips — drag out exits, even while
+ *    editing.
+ *
+ * Fixed template blocks always keep their identity: their slot/fixed IS the
+ * template. "Inside the template" means a same-instance block sits both before
+ * AND after the landing gap.
+ *
+ * @param {Object} formData
+ * @param {Object} blockPathMap - map for `formData`
+ * @param {string} blockId - the block that just moved
+ * @param {Object} options
+ * @param {Object} options.blocksConfig
+ * @param {Object} options.intl
+ * @param {Array|null} [options.templateEditMode] - unlocked instance ids
+ * @param {boolean} [options.insertAfter]
+ * @returns {Object} formData (unchanged object identity when nothing changed)
+ */
+export function applyMembershipAfterMove(formData, blockPathMap, blockId, options) {
+  const {
+    blocksConfig,
+    intl,
+    templateEditMode = null,
+    insertAfter,
+  } = options;
+  const originalBlockData = getBlockById(formData, blockPathMap, blockId);
+  if (!originalBlockData) return formData;
+  const targetContainerConfig = getContainerFieldConfig(
+    blockId,
+    blockPathMap,
+    formData,
+    blocksConfig,
+    intl,
+  );
+  if (!targetContainerConfig) return formData;
+
+  const { parentId: containerId, region: containerRegion } = targetContainerConfig;
+  const containerPath =
+    containerId === PAGE_BLOCK_UID ? [] : blockPathMap[containerId]?.path;
+  const container = containerPath
+    ? getBlockByPath(formData, containerPath)
+    : formData;
+  const fullLayout = container?.blocks_layout?.[containerRegion || 'items'] || [];
+  // The block itself is EXCLUDED from the neighbours: it already sits in the
+  // layout at this index, so a naive getNeighborData(position) returns the block
+  // itself and it offers its own (stale, source) slot back to itself — keeping
+  // membership it should have shed. Excluding it makes `position` the insertion
+  // gap between its real prev/next neighbours.
+  const position = fullLayout.indexOf(blockId);
+  const layoutItems = fullLayout.filter((id) => id !== blockId);
+
+  const instId = originalBlockData.templateInstanceId;
+  const editingThisTemplate =
+    !!instId && (templateEditMode || []).includes(instId);
+  const inSameInstance = (id) =>
+    id && formData.blocks?.[id]?.templateInstanceId === instId;
+  const insideTemplate =
+    editingThisTemplate &&
+    layoutItems.slice(0, position).some(inSameInstance) &&
+    layoutItems.slice(position).some(inSameInstance);
+
+  let blockData = originalBlockData;
+  if (!originalBlockData.fixed && !insideTemplate) {
+    blockData = { ...blockData };
+    delete blockData.templateId;
+    delete blockData.templateInstanceId;
+    delete blockData.slotId;
+    delete blockData.readOnly;
+  }
+  const updatedBlockData = applyBlockDefaultsWithContext(blockData, {
+    containerId,
+    field: containerRegion,
+    position,
+    insertAfter,
+    layoutItems,
+    allBlocks: formData.blocks,
+    blockPathMap,
+    blocksConfig,
+    intl,
+  });
+  // Compare against originalBlockData, not the (possibly membership-stripped)
+  // copy — otherwise a stripped block whose recompute is a no-op is never
+  // written back, and the stored block keeps its stale source membership.
+  if (updatedBlockData === originalBlockData) return formData;
+  return updateBlockById(formData, blockPathMap, blockId, updatedBlockData);
 }
