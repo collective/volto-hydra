@@ -75,7 +75,8 @@ test.describe('a block whose body is an iframe', () => {
       .poll(
         () =>
           page.evaluate(
-            () => (window as any).mockParent.lastBlockSelectedMessage?.hasEmbed,
+            (uid) => (window as any).mockParent.blockSelectedByUid?.[uid]?.hasEmbed,
+            BLOCK,
           ),
         { timeout: 5000 },
       )
@@ -95,6 +96,11 @@ test.describe('a block whose body is an iframe', () => {
 });
 
 test.describe('a block whose embed is inside a shadow root', () => {
+  // Built in the page rather than authored as content. A PDF preview is
+  // `<pdfjs-viewer-element>` — a custom element wrapping an iframe in a shadow
+  // root — and no frontend fixture has one. Adding a fake block type for it put
+  // an unregistered @type in shared content, which every OTHER frontend's block
+  // sanity then refused, quite rightly.
   test.beforeEach(async ({ page, helper }) => {
     await page.goto(
       `${URLS.testFrontend}/mock-parent.html?api_path=${encodeURIComponent(
@@ -103,25 +109,50 @@ test.describe('a block whose embed is inside a shadow root', () => {
     );
     await helper
       .getIframe()
-      .locator(`[data-block-uid="${SHADOW_BLOCK}"] test-shadow-embed`)
+      .locator(`[data-block-uid="${BLOCK}"] iframe`)
       .waitFor({ state: 'attached', timeout: 10000 });
+
+    await helper
+      .getIframe()
+      .locator('body')
+      .evaluate((node: HTMLElement, uid: string) => {
+        const doc = node.ownerDocument;
+        if (!doc.defaultView!.customElements.get('test-shadow-embed')) {
+          doc.defaultView!.customElements.define(
+            'test-shadow-embed',
+            class extends (doc.defaultView!.HTMLElement as any) {
+              connectedCallback() {
+                if (this.shadowRoot) return;
+                const root = this.attachShadow({ mode: 'open' });
+                const frame = doc.createElement('iframe');
+                frame.src = 'about:blank';
+                frame.title = 'Embedded document';
+                frame.style.cssText = 'width:100%;height:200px;border:0;display:block';
+                root.appendChild(frame);
+              }
+            } as any,
+          );
+        }
+        const block = doc.createElement('div');
+        block.setAttribute('data-block-uid', uid);
+        block.appendChild(doc.createElement('test-shadow-embed'));
+        node.appendChild(block);
+      }, SHADOW_BLOCK);
+
+    await helper
+      .getIframe()
+      .locator(`[data-block-uid="${SHADOW_BLOCK}"] test-shadow-embed`)
+      .waitFor({ state: 'attached', timeout: 5000 });
   });
 
   test('is selected by clicking it', async ({ helper }) => {
-    // The shadow boundary breaks both halves of the naive approach:
-    //
-    //   document.activeElement            -> the HOST (a custom element), not the iframe
-    //   hostShadowRoot.activeElement      -> the IFRAME
-    //   thatIframe.closest('[data-block-uid]') -> null, closest() does not cross out
-    //
-    // So the embed test has to descend, and the BLOCK has to be resolved from
-    // the host. This is exactly a PDF preview: `<pdfjs-viewer-element>` wrapping
-    // PDF.js in an iframe, which is where it was found.
+    // The shadow boundary is why this needs its own case: document.activeElement
+    // reports the HOST, not the iframe inside it, and the iframe's closest()
+    // cannot reach back out to the block. Focus landing on the host is both the
+    // signal and the only way back to the block.
     await helper.getIframe().locator(`[data-block-uid="${SHADOW_BLOCK}"]`).click();
 
-    await expect
-      .poll(() => selectedUid(helper), { timeout: 5000 })
-      .toBe(SHADOW_BLOCK);
+    await expect.poll(() => selectedUid(helper), { timeout: 5000 }).toBe(SHADOW_BLOCK);
   });
 
   test('reports its embed to the admin, through the shadow root', async ({
@@ -134,7 +165,8 @@ test.describe('a block whose embed is inside a shadow root', () => {
       .poll(
         () =>
           page.evaluate(
-            () => (window as any).mockParent.lastBlockSelectedMessage?.hasEmbed,
+            (uid) => (window as any).mockParent.blockSelectedByUid?.[uid]?.hasEmbed,
+            SHADOW_BLOCK,
           ),
         { timeout: 5000 },
       )

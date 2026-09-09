@@ -20,17 +20,12 @@
     "video-embed-1": {
       "@type": "video",
       "url": "https://www.youtube.com/watch?v=aqz-KE-bpKQ"
-    },
-    "shadow-embed-1": {
-      "@type": "shadowEmbed",
-      "url": "about:blank"
     }
   },
   "blocks_layout": {
     "items": [
       "intro-1",
-      "video-embed-1",
-      "shadow-embed-1"
+      "video-embed-1"
     ]
   }
 }
