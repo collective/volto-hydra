@@ -1964,7 +1964,10 @@ const Iframe = (props) => {
       return null;
     }
 
-    // Ensure new container blocks have at least one child (for gridBlock etc.)
+    // Ensure new container blocks have at least one child (for gridBlock etc.).
+    // NOT settleBlockStructure's job: nothing was taken out of anything here — a
+    // container that has just been created needs a child to be usable, which is
+    // the ADD invariant, not the three an edit owes afterwards.
     const newBlockPathMap = buildBlockPathMap(newFormData, mergedBlocksConfig, intl);
     newFormData = ensureEmptyBlockIfEmpty(
       newFormData,
@@ -2862,6 +2865,11 @@ const Iframe = (props) => {
                         Transforms.mergeNodes(adjEditor, { at: [mergedValue.length] });
                         const combined = JSON.parse(JSON.stringify(adjEditor.children));
                         newFormData = updateBlockById(newFormData, nextBpm, prevBlockId, { ...updatedPrev, [fieldName]: combined });
+                        // The one raw delete left, and deliberately raw: this
+                        // MERGES the next block's content into the previous one
+                        // and drops the empty shell. The region cannot be
+                        // emptied by it — the block that absorbed the content is
+                        // still there — so there is nothing for settle to settle.
                         newFormData = deleteBlockFromContainer(newFormData, nextBpm, nextBlockId,
                           getContainerFieldConfig(nextBlockId, nextBpm, newFormData, config.blocks.blocksConfig, intl));
                       }
@@ -2986,10 +2994,17 @@ const Iframe = (props) => {
           } else if (action === 'deleteRow' && pathInfo?.addMode === 'table') {
             // Delete row: use standard block deletion
             const containerConfig = getContainerFieldConfig(actionBlockId, iframeSyncState.blockPathMap, properties, blocksConfig, intl);
-            let newFormData = deleteBlockFromContainer(properties, iframeSyncState.blockPathMap, actionBlockId, containerConfig);
-            if (newFormData && containerConfig) {
-              // Ensure container has at least one row
-              newFormData = ensureEmptyBlockIfEmpty(newFormData, containerConfig, iframeSyncState.blockPathMap, uuid, blocksConfig, { intl, metadata, properties });
+            // A row delete is a delete: deleteBlocks removes it and settles what
+            // that disturbed (re-seeding the table if it took the last row),
+            // and brings the lock backstop with it — a row of locked template
+            // chrome is not the author's to remove from a page.
+            const { formData: newFormData, deleted: deletedRows } = deleteBlocks(
+              properties,
+              iframeSyncState.blockPathMap,
+              [actionBlockId],
+              { blocksConfig, intl, uuidGenerator: uuid, templateEditMode: iframeSyncState.templateEditMode, metadata },
+            );
+            if (deletedRows.length > 0) {
               onChangeFormData(newFormData);
               // Select the parent table after row deletion
               if (pathInfo.parentId) {
@@ -4749,36 +4764,26 @@ const Iframe = (props) => {
               updatedProperties, bpm2, chooser.blockId, pm.targetBlockId, pm.insertAfter,
               srcParent, pm.targetParentId, blocksConfig, intl,
             ) || updatedProperties;
-            // Same membership recompute the drag path does. Without it a block
-            // dropped into a template region through the chooser kept its source
-            // membership (or none) and the region never owned it.
-            //
-            // BEFORE the placeholder is removed, for the reason the drag path
-            // spells out: the placeholder is a neighbour, and on a forced region
-            // it is the only one carrying the template — remove it first and
-            // there is nothing left to derive from.
-            {
-              const mbpm = buildBlockPathMap(updatedProperties, blocksConfig, intl);
-              updatedProperties = applyMembershipAfterMove(
-                updatedProperties,
-                mbpm,
-                chooser.blockId,
-                {
-                  blocksConfig,
-                  intl,
-                  templateEditMode: templateEditModeRef.current,
-                  insertAfter: pm.insertAfter,
-                },
-              );
-            }
-            // Dropped onto an empty-container placeholder → remove it so the
-            // converted block takes its place (mirrors the MOVE_BLOCKS replace path).
-            updatedProperties = removeReplacedPlaceholder(
+            // The same settle the drag path uses: membership for what landed,
+            // then the placeholder it landed on. Listing them is all this path
+            // does — the order is settleBlockStructure's business.
+            const settledDrop = settleBlockStructure(
               updatedProperties,
               buildBlockPathMap(updatedProperties, blocksConfig, intl),
-              pm.replaceTargetId,
-              { blocksConfig, intl },
+              {
+                landed: [chooser.blockId],
+                replacedPlaceholders: pm.replaceTargetId ? [pm.replaceTargetId] : [],
+              },
+              {
+                blocksConfig,
+                intl,
+                uuidGenerator: uuid,
+                templateEditMode: templateEditModeRef.current,
+                metadata,
+                insertAfterById: { [chooser.blockId]: pm.insertAfter },
+              },
             );
+            updatedProperties = settledDrop.formData;
           }
           // The pick placed the block; run `@type` rules in case its new position
           // re-types it or a sibling. No second confirm — the pick was the ask.
@@ -5562,9 +5567,17 @@ const Iframe = (props) => {
                   const containerConfig = getContainerFieldConfig(rowId, iframeSyncState.blockPathMap, properties, blocksConfig, intl);
                   const rowIndex = rowPathInfo.path[rowPathInfo.path.length - 1];
 
-                  let newFormData = deleteBlockFromContainer(properties, iframeSyncState.blockPathMap, rowId, containerConfig);
-                  if (newFormData && containerConfig) {
-                    newFormData = ensureEmptyBlockIfEmpty(newFormData, containerConfig, iframeSyncState.blockPathMap, uuid, blocksConfig, { intl, metadata, properties });
+                  // A row delete is a delete: deleteBlocks removes it and settles what
+                  // that disturbed (re-seeding the table if it took the last row),
+                  // and brings the lock backstop with it — a row of locked template
+                  // chrome is not the author's to remove from a page.
+                  const { formData: newFormData, deleted: deletedRows } = deleteBlocks(
+                    properties,
+                    iframeSyncState.blockPathMap,
+                    [rowId],
+                    { blocksConfig, intl, uuidGenerator: uuid, templateEditMode: iframeSyncState.templateEditMode, metadata },
+                  );
+                  if (deletedRows.length > 0) {
 
                     // Determine what to select after deletion BEFORE triggering re-render
                     // If called from a cell, select corresponding cell in previous row
@@ -6148,9 +6161,17 @@ const Iframe = (props) => {
             if (rowPathInfo?.addMode === 'table') {
               const containerConfig = getContainerFieldConfig(rowId, iframeSyncState.blockPathMap, properties, blocksConfig, intl);
               const rowIndex = rowPathInfo.path[rowPathInfo.path.length - 1];
-              let newFormData = deleteBlockFromContainer(properties, iframeSyncState.blockPathMap, rowId, containerConfig);
-              if (newFormData && containerConfig) {
-                newFormData = ensureEmptyBlockIfEmpty(newFormData, containerConfig, iframeSyncState.blockPathMap, uuid, blocksConfig, { intl, metadata, properties });
+              // A row delete is a delete: deleteBlocks removes it and settles what
+              // that disturbed (re-seeding the table if it took the last row),
+              // and brings the lock backstop with it — a row of locked template
+              // chrome is not the author's to remove from a page.
+              const { formData: newFormData, deleted: deletedRows } = deleteBlocks(
+                properties,
+                iframeSyncState.blockPathMap,
+                [rowId],
+                { blocksConfig, intl, uuidGenerator: uuid, templateEditMode: iframeSyncState.templateEditMode, metadata },
+              );
+              if (deletedRows.length > 0) {
                 let selectBlockId = rowPathInfo.parentId;
                 if (cellIndex != null && rowIndex > 0) {
                   const newBlockPathMap = buildBlockPathMap(newFormData, blocksConfig, intl);
