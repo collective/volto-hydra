@@ -61,6 +61,7 @@ import {
 import { getQuerystring } from '@plone/volto/actions/querystring/querystring';
 import { compose } from 'redux';
 import config from '@plone/volto/registry';
+import withSaveAsDraft from '@plone/volto/helpers/Utils/withSaveAsDraft';
 import SlotRenderer from '@plone/volto/components/theme/SlotRenderer/SlotRenderer';
 import Iframe from '../../../../../components/Iframe/View';
 import { validateTemplatePlaceholders } from '../../../../../utils/formDataValidation';
@@ -96,6 +97,9 @@ class Form extends Component {
     metadataFieldFocus: PropTypes.string,
     pathname: PropTypes.string,
     onSubmit: PropTypes.func,
+    checkSavedDraft: PropTypes.func,
+    onSaveDraft: PropTypes.func,
+    onCancelDraft: PropTypes.func,
     onCancel: PropTypes.func,
     submitLabel: PropTypes.string,
     resetAfterSubmit: PropTypes.bool,
@@ -129,6 +133,9 @@ class Form extends Component {
   static defaultProps = {
     formData: null,
     onSubmit: null,
+    checkSavedDraft: () => {},
+    onSaveDraft: () => {},
+    onCancelDraft: () => {},
     onCancel: null,
     submitLabel: null,
     resetAfterSubmit: false,
@@ -283,6 +290,16 @@ class Form extends Component {
     let errors = {};
     let activeIndex = 0;
 
+    // The schema usually arrives AFTER mount, and the offer to restore a draft
+    // needs it (it decides which fields the draft covers). Without this, coming
+    // back to a page you left mid-edit silently keeps the server's copy.
+    if (!prevProps.schema && this.props.schema) {
+      this.props.checkSavedDraft(
+        this.state.formData,
+        this.updateFormDataWithSaved,
+      );
+    }
+
     if (!this.props.isFormSelected && prevProps.isFormSelected) {
       this.props.setUIState({
         selected: null,
@@ -403,8 +420,26 @@ class Form extends Component {
    * @method componentDidMount
    * @returns {undefined}
    */
+  /**
+   * Take a draft the author accepted back into the form. Called by
+   * checkSavedDraft when they say yes to the offer.
+   */
+  updateFormDataWithSaved = (savedFormData) => {
+    if (savedFormData) {
+      this.setState({ formData: savedFormData });
+    }
+  };
+
   componentDidMount() {
     this.setState({ isClient: true });
+
+    // Offer back anything autosaved from a previous visit to this page.
+    if (this.props.schema) {
+      this.props.checkSavedDraft(
+        this.state.formData,
+        this.updateFormDataWithSaved,
+      );
+    }
 
     // Pre-fetch querystring indexes so widgets like QueryWidget don't crash
     // when mounted before their own getQuerystring() call completes
@@ -442,6 +477,9 @@ class Form extends Component {
    * @returns {undefined}
    */
   onChangeField(id, value) {
+    // Autosave (debounced inside the HOC). Blocks are drafted too — see the
+    // withSaveAsDraft shadow — so canvas work survives leaving the page.
+    this.props.onSaveDraft(this.state.formData);
     this.setState((prevState) => {
       const { errors, formData } = prevState;
       const newFormData = {
@@ -500,6 +538,9 @@ class Form extends Component {
     if (event) {
       event.preventDefault();
     }
+    // Cancelling means the author does not want this work; the draft must not
+    // outlive that decision and be offered back next time.
+    this.props.onCancelDraft();
     if (this.props.resetOnCancel || this.props.resetAfterSubmit) {
       this.setState({
         formData: this.props.formData,
@@ -686,6 +727,11 @@ class Form extends Component {
     this.setState({
       formData: newFormData,
     });
+    // Autosave the canvas too. This is THE path that matters in hydra: almost
+    // everything an author does happens in the iframe and arrives here, not
+    // through onChangeField, so a draft wired only to the sidebar would save a
+    // title and lose every block.
+    this.props.onSaveDraft(newFormData);
     if (this.props.global) {
       this.props.setFormData(newFormData);
     }
@@ -1081,4 +1127,5 @@ export default compose(
     null,
     { forwardRef: true },
   ),
+  withSaveAsDraft({ forwardRef: true }),
 )(FormIntl);
