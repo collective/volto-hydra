@@ -14,18 +14,22 @@
  * different ways and got either an outline with no toolbar or no selection at
  * all.
  *
- * The fixture uses the VIDEO block with a YouTube url, which the test frontend
- * renders as an iframe — the real shape rather than a hand-made one. Nothing
- * here needs the embed to LOAD: the iframe element swallows the click whether or
- * not YouTube answers, so the test carries no network dependency.
+ * The fixture uses two real blocks rather than hand-made markup: the VIDEO
+ * block, which the test frontend renders as a bare iframe, and the MAPS block,
+ * which it renders through a custom element holding the iframe in a shadow root
+ * (see `defineMapEmbedElement` in the test frontend's renderer, and
+ * docs/examples/maps.md). Nothing here needs an embed to LOAD: the iframe
+ * element swallows the click whether or not the provider answers, so the tests
+ * carry no network dependency.
  */
 import { test, expect } from './fixtures';
 import { URLS } from '../ports';
 
 const PAGE = '/_test_data/iframe-block-page';
 const BLOCK = 'video-embed-1';
-// An embed inside a custom element's SHADOW ROOT — a real PDF preview's shape.
-const SHADOW_BLOCK = 'shadow-embed-1';
+// A MAPS block: the test frontend renders it as an iframe inside a custom
+// element's shadow root, which is a real PDF preview's shape.
+const SHADOW_BLOCK = 'maps-embed-1';
 
 const selectedUid = (helper: any) =>
   helper
@@ -96,11 +100,14 @@ test.describe('a block whose body is an iframe', () => {
 });
 
 test.describe('a block whose embed is inside a shadow root', () => {
-  // Built in the page rather than authored as content. A PDF preview is
-  // `<pdfjs-viewer-element>` — a custom element wrapping an iframe in a shadow
-  // root — and no frontend fixture has one. Adding a fake block type for it put
-  // an unregistered @type in shared content, which every OTHER frontend's block
-  // sanity then refused, quite rightly.
+  // The maps block. The test frontend renders it through `<map-embed>`, a
+  // custom element that builds its iframe in a shadow root — the shape of
+  // `<pdfjs-viewer-element>` and of every consent-gated third-party embed, and
+  // the reason the PDF preview could not be selected on the NSW frontend.
+  //
+  // It is a real, registered block type carrying real content, so every other
+  // frontend's block sanity is happy with the fixture page. An invented @type
+  // was not: shared content is served to all of them.
   test.beforeEach(async ({ page, helper }) => {
     await page.goto(
       `${URLS.testFrontend}/mock-parent.html?api_path=${encodeURIComponent(
@@ -109,40 +116,8 @@ test.describe('a block whose embed is inside a shadow root', () => {
     );
     await helper
       .getIframe()
-      .locator(`[data-block-uid="${BLOCK}"] iframe`)
+      .locator(`[data-block-uid="${SHADOW_BLOCK}"] map-embed`)
       .waitFor({ state: 'attached', timeout: 10000 });
-
-    await helper
-      .getIframe()
-      .locator('body')
-      .evaluate((node: HTMLElement, uid: string) => {
-        const doc = node.ownerDocument;
-        if (!doc.defaultView!.customElements.get('test-shadow-embed')) {
-          doc.defaultView!.customElements.define(
-            'test-shadow-embed',
-            class extends (doc.defaultView!.HTMLElement as any) {
-              connectedCallback() {
-                if (this.shadowRoot) return;
-                const root = this.attachShadow({ mode: 'open' });
-                const frame = doc.createElement('iframe');
-                frame.src = 'about:blank';
-                frame.title = 'Embedded document';
-                frame.style.cssText = 'width:100%;height:200px;border:0;display:block';
-                root.appendChild(frame);
-              }
-            } as any,
-          );
-        }
-        const block = doc.createElement('div');
-        block.setAttribute('data-block-uid', uid);
-        block.appendChild(doc.createElement('test-shadow-embed'));
-        node.appendChild(block);
-      }, SHADOW_BLOCK);
-
-    await helper
-      .getIframe()
-      .locator(`[data-block-uid="${SHADOW_BLOCK}"] test-shadow-embed`)
-      .waitFor({ state: 'attached', timeout: 5000 });
   });
 
   test('is selected by clicking it', async ({ helper }) => {

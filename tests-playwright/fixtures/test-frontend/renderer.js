@@ -1006,8 +1006,47 @@ function renderImageBlock(block) {
 }
 
 /**
- * Render a video block.
- * @param {Object} block - Video block data with url
+ * A map embed that builds its iframe inside a SHADOW ROOT.
+ *
+ * This is how embed components are really written — `<pdfjs-viewer-element>`,
+ * `<lite-youtube>`, the map wrappers that gate a third-party frame behind
+ * cookie consent — so the vendor iframe and its styles stay isolated from the
+ * page. It is a plain custom element: no library, no network, nothing to
+ * install.
+ *
+ * Hydra has to cope with the shape, which is why the test frontend renders maps
+ * this way rather than as a bare iframe (the video block already covers that).
+ * The shadow boundary hides the embed from ordinary traversal: querySelector()
+ * from the block will not find the iframe, the iframe's closest() cannot reach
+ * back out to the block, and document.activeElement reports the HOST element
+ * when focus moves inside. Detecting an embed therefore has to pierce shadow
+ * roots, and the host is the only way back to the block.
+ * @returns {void}
+ */
+function defineMapEmbedElement() {
+    if (customElements.get('map-embed')) return;
+    customElements.define(
+        'map-embed',
+        class extends HTMLElement {
+            connectedCallback() {
+                if (this.shadowRoot) return;
+                const root = this.attachShadow({ mode: 'open' });
+                const frame = document.createElement('iframe');
+                frame.src = this.getAttribute('src') || '';
+                frame.title = this.getAttribute('frame-title') || 'Map';
+                frame.loading = 'lazy';
+                frame.setAttribute('allowfullscreen', '');
+                frame.style.cssText = 'width:100%;height:450px;border:none;display:block';
+                root.appendChild(frame);
+            }
+        },
+    );
+}
+defineMapEmbedElement();
+
+/**
+ * Render a maps block.
+ * @param {Object} block - Maps block data with url
  * @returns {string} HTML string
  */
 function renderMapsBlock(block) {
@@ -1015,8 +1054,7 @@ function renderMapsBlock(block) {
     const title = block.title || 'Map';
     if (url) {
         return `<div class="maps-block">
-            <iframe src="${url}" title="${title}" allowfullscreen loading="lazy"
-                style="width:100%;height:450px;border:none"></iframe>
+            <map-embed src="${url}" frame-title="${title}"></map-embed>
         </div>`;
     }
     return `<div class="maps-block"><p>No map URL set</p></div>`;
