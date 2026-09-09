@@ -21,13 +21,13 @@ test.describe('save as draft', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
+    // Wait on the BLOCK, not on a page-title element: `#page-title` is the mock
+    // frontend's markup, and this feature is admin-side — it has to hold for
+    // whichever frontend is in the iframe. Every frontend renders a block with
+    // its data-block-uid; that is the readiness signal they share.
     const iframe = helper.getIframe();
-    const title = iframe.locator('#page-title');
-    await expect(title).toBeVisible({ timeout: 15000 });
-
-    // Type into a BLOCK on the canvas, and do not save.
     const block = iframe.locator('[data-block-uid="block-1-uuid"]').first();
-    await expect(block).toBeVisible({ timeout: 10000 });
+    await expect(block).toBeVisible({ timeout: 20000 });
     await block.click();
     await page.keyboard.type(' drafted');
 
@@ -49,9 +49,9 @@ test.describe('save as draft', () => {
     // "closed the tab and came back": the editor is built again from scratch,
     // which is when a draft has to be noticed.
     await page.reload();
-    await expect(helper.getIframe().locator('#page-title')).toBeVisible({
-      timeout: 20000,
-    });
+    await expect(
+      helper.getIframe().locator('[data-block-uid="block-1-uuid"]').first(),
+    ).toBeVisible({ timeout: 25000 });
 
     // The editor offers the autosaved work back.
     await expect(
@@ -69,9 +69,8 @@ test.describe('save as draft', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
     const iframe = helper.getIframe();
-    await expect(iframe.locator('#page-title')).toBeVisible({ timeout: 15000 });
-
     const block = iframe.locator('[data-block-uid="block-1-uuid"]').first();
+    await expect(block).toBeVisible({ timeout: 20000 });
     await block.click();
     await page.keyboard.type(' drafted here too');
     await expect
