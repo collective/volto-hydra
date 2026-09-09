@@ -745,8 +745,15 @@ export class PloneAdapter extends BaseAdapter {
           });
         }
 
+        // Categories matter: plone.restapi's own recorded example
+        // (actions_get.resp) puts delete/cut/copy/rename in object_buttons and
+        // view/edit/folderContents/history/local_roles in object. Reading
+        // `delete` from `object` found nothing on a real Plone — it only
+        // worked here because our mock had put it in the wrong category.
         const object = actions.object ?? [];
+        const buttons = actions.object_buttons ?? [];
         const has = (id) => object.some((a) => a.id === id);
+        const hasButton = (id) => buttons.some((a) => a.id === id);
         const transitions = (wf.transitions ?? []).map((t) => ({
           id: t['@id'].split('/').pop(),
           label: t.title,
@@ -759,16 +766,14 @@ export class PloneAdapter extends BaseAdapter {
         //
         // Whether it is possible is already in the actions we just fetched,
         // which is where Volto's own buttons read it from. No extra request.
-        const buttons = actions.object_buttons ?? [];
-        const can = (id) => buttons.some((a) => a.id === id);
-        if (can('iterate_checkout')) {
+        if (hasButton('iterate_checkout')) {
           transitions.push({
             id: 'checkout',
             label: 'Work on a draft copy',
             relocates: true,
           });
         }
-        if (can('iterate_checkin')) {
+        if (hasButton('iterate_checkin')) {
           transitions.push({
             id: 'checkin',
             label: 'Publish the draft',
@@ -787,7 +792,7 @@ export class PloneAdapter extends BaseAdapter {
           effective: {
             canEdit: has('edit'),
             canPublish: transitions.some((t) => t.id === 'publish'),
-            canDelete: has('delete'),
+            canDelete: hasButton('delete'),
             canShare: has('sharing') || has('local_roles'),
             canComment: has('discussion'),
           },

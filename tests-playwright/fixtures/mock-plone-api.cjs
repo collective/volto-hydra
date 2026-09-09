@@ -773,29 +773,33 @@ function buildActionsComponent(cleanPath, baseUrl, sessionId) {
   return {
     '@id': `${fullUrl}/@actions`,
     document_actions: [],
-    // `url`, not `@id` — that is what Plone 6 emits and what Volto reads. See
-    // tests-adapters/fixtures/plone/live_actions_anon.json.
+    // Two sources, and they disagree. plone.restapi's own recorded example
+    // (actions_get.resp) has keys [icon, id, title]; a live Plone 6
+    // (demo.plone.org) has [icon, id, title, url]. The recording predates the
+    // serializer gaining `url`, and Volto reads `url` — Footer.jsx renders
+    // `item.url ? flattenToAppURL(item.url) : addAppURL(item.id)` — so `url`
+    // is what a current Plone emits and what belongs here.
+    //
+    // WHICH entries appear, and in which category, is from actions_get.resp:
+    // delete belongs in object_buttons beside cut/copy/rename, not in object.
     object: [
       { url: fullUrl, icon: '', id: 'view', title: 'View' },
       { url: `${fullUrl}/edit`, icon: '', id: 'edit', title: 'Edit' },
-      { id: 'folderContents', title: 'Contents' },
-      // Real Plone lists these for anyone who may use them; the session here is
-      // a Manager. Their absence made effective.canDelete/canShare false while
-      // the adapter was handing back a sharing form.
-      { url: `${fullUrl}/delete_confirmation`, id: 'delete', title: 'Delete' },
-      { url: `${fullUrl}/@@sharing`, id: 'local_roles', title: 'Sharing' },
+      { id: 'folderContents', icon: '', title: 'Contents' },
+      { id: 'history', icon: '', title: 'History' },
+      { id: 'local_roles', icon: '', title: 'Sharing' },
     ],
-    // Where Volto reads whether a working copy is possible, and now where the
-    // adapter reads it too. iterate_checkin only appears on a copy.
     object_buttons: [
-      // Real Plone lists these for a Manager, and Volto gates its URL-alias
-      // and content-rules entries on exactly these ids. Absent, those entries
-      // hide — which is what happens on a CMS that has neither.
-      { id: 'redirection', title: 'URL Management' },
-      { id: 'contentrules', title: 'Rules' },
+      { id: 'cut', icon: '', title: 'Cut' },
+      { id: 'copy', icon: '', title: 'Copy' },
+      { id: 'delete', icon: '', title: 'Delete' },
+      { id: 'rename', icon: '', title: 'Rename' },
+      // plone.app.iterate's, and the ids Volto gates its working-copy buttons
+      // on. NOT in actions_get.resp, which records a site without it — so this
+      // is the one entry here that is inferred rather than recorded.
       ...(workingCopyOf(cleanPath, sessionId)
-        ? [{ id: 'iterate_checkin', title: 'Check in' }]
-        : [{ id: 'iterate_checkout', title: 'Check out' }]),
+        ? [{ id: 'iterate_checkin', icon: '', title: 'Check in' }]
+        : [{ id: 'iterate_checkout', icon: '', title: 'Check out' }]),
     ],
     portal_tabs: [],
     site_actions: [],
