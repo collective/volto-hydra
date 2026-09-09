@@ -11,7 +11,7 @@
           "type": "p",
           "children": [
             {
-              "text": "Both blocks below render as embeds. The video is a bare iframe; the map puts its iframe inside a custom element's shadow root, the way a PDF preview does."
+              "text": "Both blocks below render as embeds. The video is a bare iframe; the map puts its iframe inside a custom element\u2019s shadow root, the way a PDF preview does. Both point at documents that really load, because an embed that fails to load does not swallow the click and so tests nothing."
             }
           ]
         }
@@ -23,7 +23,7 @@
     },
     "maps-embed-1": {
       "@type": "maps",
-      "url": "https://www.openstreetmap.org/export/embed.html?bbox=151.20%2C-33.87%2C151.22%2C-33.85",
+      "url": "http://localhost:8888/embedded-document.html",
       "title": "Sydney"
     }
   },

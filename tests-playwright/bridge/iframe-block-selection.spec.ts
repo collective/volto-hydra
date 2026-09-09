@@ -22,6 +22,7 @@
  * element swallows the click whether or not the provider answers, so the tests
  * carry no network dependency.
  */
+import type { Page } from '@playwright/test';
 import { test, expect, getFrontendUrl } from './fixtures';
 import { URLS } from '../ports';
 
@@ -36,6 +37,50 @@ import { URLS } from '../ports';
 const parentUrl = (frontend: string, path: string) =>
   `${URLS.testFrontend}/mock-parent.html?frontend=${encodeURIComponent(frontend)}` +
   `&api_path=${encodeURIComponent(`${URLS.mockApi}${path}`)}`;
+
+// A video block's url is a YouTube one, because that is what the frontends
+// render a video embed FROM — the mock renderer and both example frontends
+// rewrite it to youtube.com/embed/<id>. The request is answered here instead of
+// by YouTube: the markup under test is production's, the document that lands in
+// the frame is ours, and the test needs no network.
+const stubYouTube = (page: Page) =>
+  page.route(/youtube\.com\/embed\//, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'text/html',
+      body:
+        '<!doctype html><meta charset="utf-8"><title>Video</title>' +
+        '<style>html,body{margin:0;height:100%}main{height:100%;background:#223;' +
+        'color:#fff;display:grid;place-items:center;font:14px system-ui}</style>' +
+        '<main tabindex="0">A video</main>',
+    }),
+  );
+
+/**
+ * Wait until the embed is REALLY loaded — its document is in the page's frame
+ * tree, not merely an <iframe> element in the DOM.
+ *
+ * This is the difference between testing embed selection and testing nothing.
+ * An embed that never loads does not swallow the click: it falls through to the
+ * page, the ordinary click path selects the block, and the test goes green
+ * without an embed ever being involved. That is exactly what this spec did —
+ * it passed on the test frontend, where the click never entered the frame, and
+ * failed on the nextjs example, where it did.
+ */
+const waitForEmbedLoaded = async (page: Page, urlPart: string, text: string) => {
+  // The frame's own CONTENT, not just its url: a frame that 404s or is refused
+  // still reports the url it tried, so a url check calls a failed embed loaded.
+  await expect
+    .poll(
+      async () => {
+        const frame = page.frames().find((f) => f.url().includes(urlPart));
+        if (!frame) return '';
+        return (await frame.locator('body').textContent().catch(() => '')) || '';
+      },
+      { timeout: 15000 },
+    )
+    .toContain(text);
+};
 
 const PAGE = '/_test_data/iframe-block-page';
 const BLOCK = 'video-embed-1';
@@ -57,6 +102,7 @@ test.describe('a block whose body is an iframe', () => {
   // all render a video block as an iframe, so the shape under test is real in
   // every one of them.
   test.beforeEach(async ({ page, helper }, testInfo) => {
+    await stubYouTube(page);
     await page.goto(
       parentUrl(getFrontendUrl(testInfo.project.name) || URLS.testFrontend, PAGE),
     );
@@ -64,6 +110,7 @@ test.describe('a block whose body is an iframe', () => {
       .getIframe()
       .locator(`[data-block-uid="${BLOCK}"] iframe`)
       .waitFor({ state: 'attached', timeout: 10000 });
+    await waitForEmbedLoaded(page, 'youtube.com/embed/', 'A video');
   });
 
   test('is selected by clicking it', async ({ helper }) => {
@@ -132,6 +179,7 @@ test.describe('a block whose embed is inside a shadow root', () => {
       .getIframe()
       .locator(`[data-block-uid="${SHADOW_BLOCK}"] map-embed`)
       .waitFor({ state: 'attached', timeout: 10000 });
+    await waitForEmbedLoaded(page, 'embedded-document.html', 'An embedded document');
   });
 
   test('is selected by clicking it', async ({ helper }) => {

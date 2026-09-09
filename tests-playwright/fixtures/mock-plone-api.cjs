@@ -1707,6 +1707,29 @@ app.get('/health', (req, res) => {
 });
 
 /**
+ * GET /embedded-document.html
+ *
+ * A document for a block to EMBED. Served from the API's origin, which is a
+ * different origin from the frontend's, so an iframe pointing here is a real
+ * cross-origin embed — the shape a video, a map or a PDF preview has — and it
+ * always loads, with no third party and no network.
+ *
+ * That matters because an embed that fails to load is not the same test: the
+ * click falls through to the page and the block selects by the ordinary path,
+ * which is how a test for embed selection came to pass without ever exercising
+ * an embed. It is focusable so that clicking it moves focus the way a real
+ * embed's document does.
+ */
+app.get('/embedded-document.html', (req, res) => {
+  res.type('html').send(
+    '<!doctype html><meta charset="utf-8"><title>Embedded document</title>' +
+      '<style>html,body{margin:0;height:100%;font:14px system-ui}' +
+      'main{height:100%;display:grid;place-items:center;background:#eef}</style>' +
+      '<main tabindex="0">An embedded document</main>',
+  );
+});
+
+/**
  * Walk every registered content dir and collect unique `subjects` values
  * across all data.json files. Returns the `{ value: { title } }` shape
  * Plone's @querystring endpoint uses for the Subject (Keywords) index.
