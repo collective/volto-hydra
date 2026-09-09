@@ -290,6 +290,26 @@ export class Bridge {
       // fires.
       setTimeout(() => this.selectBlockFromFocusedEmbed(), 0);
     });
+    // …and blur is not enough on its own.
+    //
+    // Whether the window blurs when focus moves into an embed depends on how
+    // the frontend is nested: it fires when the frontend and the admin share an
+    // origin, and does NOT when they differ — which is every real deployment,
+    // and the nextjs example that failed while the same-origin test frontend
+    // passed. In that case focus moves into the embed and the ONLY trace is
+    // document.activeElement quietly becoming the <iframe>. No click (it
+    // belongs to the embed's document), no focus event, no blur.
+    //
+    // So watch the one thing that does change. Reading activeElement is a
+    // property access; at this interval it is nothing next to a render, and it
+    // is the whole reason a video, map or PDF can be selected at all.
+    clearInterval(this._embedFocusWatch);
+    this._embedFocusWatch = setInterval(() => {
+      const focused = document.activeElement;
+      if (focused === this._lastActiveElement) return;
+      this._lastActiveElement = focused;
+      this.selectBlockFromFocusedEmbed();
+    }, 200);
     // Register onEditChange callback BEFORE init() sends INIT message.
     // This eliminates the race where INITIAL_DATA arrives before the callback is set.
     //

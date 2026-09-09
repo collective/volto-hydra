@@ -67,6 +67,20 @@ const stubYouTube = (page: Page) =>
  * it passed on the test frontend, where the click never entered the frame, and
  * failed on the nextjs example, where it did.
  */
+/**
+ * Wait for the admin's OWN initial selection to land before clicking anything.
+ *
+ * The mock parent auto-selects the first block once the page is in. On a slower
+ * frontend that can arrive AFTER a click, which then reads as the click having
+ * failed: the block really was selected, and the auto-selection replaced it a
+ * moment later. Let the page settle on its own choice, then change it.
+ */
+const waitForInitialSelection = async (helper: any) => {
+  await expect
+    .poll(() => selectedUid(helper), { timeout: 15000 })
+    .toBeTruthy();
+};
+
 const waitForEmbedLoaded = async (page: Page, urlPart: string, text: string) => {
   // The frame's own CONTENT, not just its url: a frame that 404s or is refused
   // still reports the url it tried, so a url check calls a failed embed loaded.
@@ -111,6 +125,7 @@ test.describe('a block whose body is an iframe', () => {
       .locator(`[data-block-uid="${BLOCK}"] iframe`)
       .waitFor({ state: 'attached', timeout: 10000 });
     await waitForEmbedLoaded(page, 'youtube.com/embed/', 'A video');
+    await waitForInitialSelection(helper);
   });
 
   test('is selected by clicking it', async ({ helper }) => {
@@ -180,6 +195,7 @@ test.describe('a block whose embed is inside a shadow root', () => {
       .locator(`[data-block-uid="${SHADOW_BLOCK}"] map-embed`)
       .waitFor({ state: 'attached', timeout: 10000 });
     await waitForEmbedLoaded(page, 'embedded-document.html', 'An embedded document');
+    await waitForInitialSelection(helper);
   });
 
   test('is selected by clicking it', async ({ helper }) => {
