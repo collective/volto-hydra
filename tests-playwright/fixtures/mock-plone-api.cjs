@@ -2052,8 +2052,17 @@ app.get('/@site', (req, res) => {
     // (server.jsx -> toBackendLang(initialLang)). Volto 18 used
     // `config.settings.defaultLanguage` instead — the source moved from
     // frontend config to backend response, so the mock has to provide it.
-    'plone.default_language': 'en',
-    'plone.available_languages': ['en'],
+    'plone.default_language': process.env.MOCK_SITE_DEFAULT_LANGUAGE || 'en',
+    // Defaults to a single-language site (['en']); set MOCK_SITE_LANGUAGES
+    // (comma-separated, e.g. "en,ar,vi,it") to report a multilingual site — the
+    // Google Translate selector only renders when the site advertises 2+
+    // languages. Env-driven so this stays configurable WITHOUT editing this
+    // (submodule) file per run; guarded by our repo's translate specs so a
+    // submodule resync that drops it is caught.
+    'plone.available_languages': (process.env.MOCK_SITE_LANGUAGES || 'en')
+      .split(',')
+      .map((lang) => lang.trim())
+      .filter(Boolean),
   });
 });
 
