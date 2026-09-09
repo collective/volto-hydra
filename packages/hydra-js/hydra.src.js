@@ -8278,7 +8278,20 @@ export class Bridge {
     // the host is the thing focus lands on.
     if (document.hidden) return; // a tab or app switch, not a click into an embed
     const focused = document.activeElement;
-    const blockElement = focused?.closest?.('[data-block-uid]');
+    // Only when focus went INTO something that holds a nested browsing context.
+    // The window also blurs when the author clicks the admin around the iframe,
+    // and activeElement is then still whatever they last focused in a block —
+    // acting on that re-selects it and overrides what the admin just did.
+    //
+    // Asked as a property, not a tag list: an <iframe>, <embed> or <object> has
+    // a contentWindow, and a custom element that wraps one (the PDF preview is
+    // `<pdfjs-viewer-element>`) has a shadow root. Focus lands on the host in
+    // both cases, which is what we want — closest() cannot cross out of a
+    // shadow root, so the block is only reachable from the host.
+    const holdsNestedContext =
+      !!focused && ('contentWindow' in focused || !!focused.shadowRoot);
+    if (!holdsNestedContext) return;
+    const blockElement = focused.closest?.('[data-block-uid]');
     const blockUid = blockElement?.getAttribute('data-block-uid');
     if (!blockUid || blockUid === this.selectedBlockUid) return;
     log('selectBlockFromFocusedEmbed: focus left the page inside', blockUid);
