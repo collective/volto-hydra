@@ -10,6 +10,7 @@ import {
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import {
   isBlockReadonly,
+  isBlockPositionLocked,
   getChildBlockEntries,
   setChildBlockEntries,
   getBlockType,
@@ -2055,6 +2056,14 @@ export function resolveRegionConstraints(
       blockConfig?.defaultBlockType ??
       (inherited ? pageDefaults.defaultBlockType ?? null : null),
     maxLength: fieldDef?.maxLength ?? blockConfig?.maxLength ?? null,
+    // A FORCED region's layout is a constraint like the rest, and dropping it
+    // here quietly unmade the region. ensureEmptyBlockIfEmpty stamps a seeded
+    // placeholder with the template membership it reads off
+    // `containerConfig.allowedLayouts`; a config resolved through here carried
+    // none, so a region re-seeded after a delete came back as ordinary page
+    // content. The author then filled it and had nothing to lock — the
+    // placeholder they filled was no longer the template's.
+    allowedLayouts: fieldDef?.allowedLayouts ?? blockConfig?.allowedLayouts ?? null,
   };
 }
 
@@ -2939,4 +2948,74 @@ export function getCommonAncestor(blockPathMap, blockUids) {
     }
   }
   return common;
+}
+
+/**
+ * Delete blocks, and re-seed any region they emptied.
+ *
+ * ONE implementation, because there were two and they had drifted. View.jsx's
+ * single delete (DELETE_BLOCK, the toolbar's Remove) deleted and then called
+ * ensureEmptyBlockIfEmpty; its multi delete (DELETE_BLOCKS / hydra-delete-blocks,
+ * multi-select) looped deleteBlockFromContainer and never re-seeded. So emptying
+ * a FORCED region — a site announcement, a site footer, whose whole content is
+ * its template — left no placeholder at all if you did it with more than one
+ * block selected: nothing to select, nothing to add into, and the region
+ * unusable until reload. The lock backstop had drifted the other way: the multi
+ * path filtered locked blocks, the single path didn't.
+ *
+ * Both behaviours belong to "delete a block", so both live here and neither
+ * caller can lose one again. Callers differ only in what they select afterwards.
+ *
+ * @param {Object} formData
+ * @param {Object} blockPathMap - map for `formData` (rebuilt internally per id)
+ * @param {string[]} blockIds - ids to delete, in any order
+ * @param {Object} options
+ * @param {Object} options.blocksConfig
+ * @param {Object} options.intl
+ * @param {Function} options.uuidGenerator - for the re-seeded placeholder
+ * @param {Array|null} [options.templateEditMode] - unlocked instance ids; a
+ *   locked block is skipped (a backstop — the iframe filters first)
+ * @param {Object} [options.metadata]
+ * @returns {{formData: Object, blockPathMap: Object, deleted: string[]}}
+ */
+export function deleteBlocks(formData, blockPathMap, blockIds, options = {}) {
+  const {
+    blocksConfig,
+    intl,
+    uuidGenerator,
+    templateEditMode = null,
+    metadata,
+  } = options;
+  let out = formData;
+  let map = blockPathMap;
+  const deleted = [];
+  for (const blockId of blockIds) {
+    const blockData = getBlockById(out, map, blockId);
+    // Missing, or locked and not being edited: leave it alone.
+    if (
+      !blockData ||
+      isBlockReadonly(blockData, templateEditMode) ||
+      isBlockPositionLocked(blockData, templateEditMode)
+    ) {
+      continue;
+    }
+    const containerConfig = getContainerFieldConfig(
+      blockId,
+      map,
+      out,
+      blocksConfig,
+      intl,
+    );
+    out = deleteBlockFromContainer(out, map, blockId, containerConfig);
+    // The region may now be empty — a forced one has to keep a placeholder, and
+    // that placeholder carries the template membership the lock control needs.
+    out = ensureEmptyBlockIfEmpty(out, containerConfig, map, uuidGenerator, blocksConfig, {
+      intl,
+      metadata,
+      properties: out,
+    });
+    map = buildBlockPathMap(out, blocksConfig, intl);
+    deleted.push(blockId);
+  }
+  return { formData: out, blockPathMap: map, deleted };
 }

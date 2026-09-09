@@ -259,7 +259,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, getEmptyBlockType, getContainerRegionDescriptors } from '../../utils/blockPath';
+import { deleteBlocks, buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, getEmptyBlockType, getContainerRegionDescriptors } from '../../utils/blockPath';
 import { mergeAnchorsIntoContent } from '../../utils/linkableAnchors';
 import { installStyleMenuPreviewCss } from '../../utils/styleMenuPreviewCss';
 import { canContainAll, getChildBlockEntries, setBlockType, clearBlockType } from '@volto-hydra/helpers';
@@ -946,24 +946,24 @@ const Iframe = (props) => {
 
     const handleDelete = (e) => {
       const { blockIds } = e.detail;
-      // Backstop: even if a caller slipped locked UIDs past the iframe-side
-      // filter (hydra._filterMutableBlockUids), guard here before we mutate.
-      const templateMode = iframeSyncState.templateEditMode;
-      const safeIds = blockIds.filter((uid) => {
-        const block = getBlockById(properties, bpm, uid);
-        if (!block) return false;
-        return !isBlockReadonly(block, templateMode)
-            && !isBlockPositionLocked(block, templateMode);
-      });
-      log('hydra-delete-blocks:', safeIds.length, '/', blockIds.length, 'blocks (after lock filter)');
-      if (safeIds.length === 0) return;
-      let newFormData = { ...properties };
-      let currentBpm = bpm;
-      for (const uid of safeIds) {
-        const containerConfig = getContainerFieldConfig(uid, currentBpm, newFormData, blocksConfig, intl);
-        newFormData = deleteBlockFromContainer(newFormData, currentBpm, uid, containerConfig);
-        currentBpm = buildBlockPathMap(newFormData, blocksConfig, intl);
-      }
+      // deleteBlocks carries BOTH halves this handler and onDeleteBlock had
+      // drifted apart on: the lock backstop (in case a caller slipped locked
+      // uids past hydra._filterMutableBlockUids) and the re-seed that stops a
+      // forced region being emptied into nothing.
+      const { formData: newFormData, deleted } = deleteBlocks(
+        properties,
+        bpm,
+        blockIds,
+        {
+          blocksConfig,
+          intl,
+          uuidGenerator: uuid,
+          templateEditMode: iframeSyncState.templateEditMode,
+          metadata,
+        },
+      );
+      log('hydra-delete-blocks:', deleted.length, '/', blockIds.length, 'blocks (after lock filter)');
+      if (deleted.length === 0) return;
       onChangeFormData(newFormData);
       onSelectBlock(null);
       setBlockUI(null);
@@ -2118,22 +2118,21 @@ const Iframe = (props) => {
       id, containerConfig, iframeSyncState.blockPathMap, properties,
     );
 
-    // Unified deletion - works for both page and container
-    let newFormData = deleteBlockFromContainer(
+    // The SAME delete the multi path uses — one block is a list of one. It
+    // deletes, then re-seeds a region it emptied: a forced region keeps a
+    // placeholder, and that placeholder carries the template membership the lock
+    // control needs.
+    const { formData: newFormData } = deleteBlocks(
       properties,
       iframeSyncState.blockPathMap,
-      id,
-      containerConfig,
-    );
-
-    // Ensure container has at least one block (empty block if now empty)
-    newFormData = ensureEmptyBlockIfEmpty(
-      newFormData,
-      containerConfig,
-      iframeSyncState.blockPathMap,
-      uuid,
-      blocksConfig,
-      { intl, metadata, properties },
+      [id],
+      {
+        blocksConfig,
+        intl,
+        uuidGenerator: uuid,
+        templateEditMode: iframeSyncState.templateEditMode,
+        metadata,
+      },
     );
 
     // Rebuild blockPathMap to reflect the deleted block

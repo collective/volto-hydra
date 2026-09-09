@@ -12,6 +12,7 @@ import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import { getBlockAddability } from '@volto-hydra/helpers';
 import {
   buildBlockPathMap,
+  deleteBlocks,
   ensureEmptyBlockIfEmpty,
   getBlockById,
 } from './blockPath.js';
@@ -302,6 +303,34 @@ describe('forced empty layout is empty but LOCKED until the template is unlocked
     expect(instanceOf(buildBlockPathMap(reseeded, cfg, intl), newId)).toBe(
       seed.templateInstanceId,
     );
+  });
+
+  // There were two deletes — View.jsx's single (the toolbar's Remove) re-seeded,
+  // its multi (hydra-delete-blocks, multi-select) didn't — so whether a forced
+  // region survived being emptied depended on how many blocks you had selected
+  // when you emptied it. One implementation now, and this pins the behaviour for
+  // both shapes it is called in.
+  test.each([
+    ['one block at a time', (id) => [id]],
+    ['several at once', (id) => [id, 'a']],
+  ])('deleting %s re-seeds the forced region it empties', async (_label, ids) => {
+    const { seeded, id, seed } = await seedForcedEmpty();
+    const map = buildBlockPathMap(seeded, cfg, intl);
+    // A COUNTER, not a constant: emptying two regions seeds two placeholders,
+    // and one id for both would have the second overwrite the first.
+    let n = 0;
+    const { formData: after } = deleteBlocks(seeded, map, ids(id), {
+      blocksConfig: cfg,
+      intl,
+      uuidGenerator: () => `re-seed-${(n += 1)}`,
+      templateEditMode: [seed.templateInstanceId],
+    });
+    const region = after.blocks_layout.announcement;
+    expect(region.length, 'the forced region was emptied into nothing').toBe(1);
+    expect(
+      after.blocks[region[0]]?.templateInstanceId,
+      'the re-seeded placeholder is not the template\'s — nothing to lock',
+    ).toBe(seed.templateInstanceId);
   });
 
   test('locked outside template-edit-mode, replaceable once the template is unlocked', async () => {
