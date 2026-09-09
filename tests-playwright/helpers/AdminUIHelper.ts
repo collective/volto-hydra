@@ -5776,6 +5776,14 @@ export class AdminUIHelper {
    * @param folderName - The name of the folder to navigate into (e.g., "Images" or /images/i)
    */
   async objectBrowserNavigateToFolder(_objectBrowser: Locator, folderName: string | RegExp): Promise<void> {
+    // The browser queries its level when it opens; deciding anything before that
+    // lands — including whether to climb — reads an empty listing as "this level
+    // has nothing" and walks off in the wrong direction.
+    await this.page
+      .locator('.object-listing')
+      .first()
+      .waitFor({ state: 'attached', timeout: 5000 })
+      .catch(() => {});
     const folderItem = this.page.locator('.object-listing li').filter({ hasText: folderName });
 
     const found = await folderItem.first().waitFor({ state: 'visible', timeout: 500 })
@@ -5783,12 +5791,33 @@ export class AdminUIHelper {
       .catch(() => false);
 
     if (!found) {
-      // Navigate up one level via breadcrumbs
+      // Climb until the folder shows up. The browser opens in the CURRENT page's
+      // folder, which is often a leaf with no children at all — a doc page, say —
+      // so the target usually lives one or more levels UP rather than in view.
+      //
+      // Two affordances, because the browser has had both: the Back button in
+      // its header (what it renders today) and breadcrumb sections. Try Back
+      // first and fall back, rather than assuming either.
+      const back = this.page.locator(
+        '.object-browser button[aria-label="Back"], button[aria-label="Back"]',
+      );
       const breadcrumbSections = this.page.locator('.object-browser .breadcrumbs .section');
-      const count = await breadcrumbSections.count();
-      if (count >= 2) {
-        await breadcrumbSections.nth(count - 2).click();
-        await this.page.waitForTimeout(1000);
+      for (let level = 0; level < 5; level += 1) {
+        if (await folderItem.first().isVisible().catch(() => false)) break;
+        if (await back.first().isVisible().catch(() => false)) {
+          await back.first().click();
+        } else {
+          const count = await breadcrumbSections.count();
+          if (count < 2) break;
+          await breadcrumbSections.nth(count - 2).click();
+        }
+        // The listing re-queries on each level; wait for it to settle rather
+        // than for a fixed beat.
+        await this.page
+          .locator('.object-listing li')
+          .first()
+          .waitFor({ state: 'visible', timeout: 3000 })
+          .catch(() => {});
       }
     }
 

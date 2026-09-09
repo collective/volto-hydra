@@ -853,6 +853,19 @@ class ObjectBrowserBody extends Component {
                     </div>
                   )}
                 </Segment>
+              ) : this.props.searchSubrequests[
+                  `${this.props.block}-${this.props.mode}`
+                ]?.loading ? (
+                // Say that a level is being fetched. Without this an empty
+                // listing and a listing still on its way look identical: the
+                // browser opens on a leaf page, shows nothing, and the author
+                // cannot tell whether the folder is empty or the request is
+                // still out — so they wait, or click Back on a level that was
+                // about to fill. The flag is already in props; it was just
+                // never rendered.
+                <Segment className="ob-listing-loading">
+                  <FormattedMessage id="Loading" defaultMessage="Loading" />
+                </Segment>
               ) : (
               <ObjectBrowserNav
                 currentSearchResults={
