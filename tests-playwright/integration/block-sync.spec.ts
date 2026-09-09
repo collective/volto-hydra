@@ -1615,24 +1615,16 @@ test.describe('fieldRules - a rule that refuses a value', () => {
    * The same machinery, with Volto's OWN validators rather than a hydra rule.
    *
    * Every standard validator is covered as a unit in validateBlocks.test.js;
-   * these two prove the wiring an author actually meets: a block whose schema
-   * requires a value it hasn't got, and a bad value NESTED inside a container —
-   * which core's validation, walking `blocks_layout.items`, would never open.
+   * these prove the wiring an author actually meets: a bad value NESTED inside
+   * a container — which core's validation, walking `blocks_layout.items`, would
+   * never open — and a string over its schema's maxLength.
+   *
+   * `required` is covered as a unit, not here: block sanity forbids a fixture
+   * holding a required-but-empty field ("the editor won't let a block save
+   * without it, so this content can't be authored"), which is the rule this
+   * change now enforces. Testing it in the browser needs the state made at
+   * RUNTIME — an author emptying the field and pressing save — not stored.
    */
-  test('a block missing a required value does not save', async ({ page }) => {
-    const helper = new AdminUIHelper(page);
-    await helper.login();
-    await helper.navigateToEdit('/required-missing-page');
-    await expect(
-      helper.getIframe().locator('[data-block-uid="intro-1"]'),
-    ).toBeVisible({ timeout: 15000 });
-
-    await page.locator('#toolbar-save, button:has-text("Save")').first().click();
-
-    await expect(page.getByRole('alert').first()).toBeVisible({ timeout: 10000 });
-    await expect(page).toHaveURL(/\/edit(\?|$)/);
-  });
-
   test('a string longer than its schema allows does not save', async ({ page }) => {
     // maxLength — a standard Volto validator, on a plain string field of a
     // fixture block. Every slide in the fixtures has a short kicker, so the
