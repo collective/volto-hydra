@@ -45,10 +45,51 @@ test.describe('save as draft', () => {
       )
       .toBe(true);
 
-    // Leave without saving, then come back.
-    await helper.navigateToEdit('/test-page');
+    // Leave without saving, then come back — a reload is the honest version of
+    // "closed the tab and came back": the editor is built again from scratch,
+    // which is when a draft has to be noticed.
+    await page.reload();
+    await expect(helper.getIframe().locator('#page-title')).toBeVisible({
+      timeout: 20000,
+    });
 
     // The editor offers the autosaved work back.
+    await expect(
+      page.getByText(/Autosaved content found|autosaved content/i).first(),
+    ).toBeVisible({ timeout: 15000 });
+  });
+
+  test('a draft is offered when you navigate back to the page in the editor', async ({
+    page,
+  }) => {
+    // The other way back: not a reload, but moving between pages inside the
+    // editor, where the Form is never rebuilt. Without a check on that
+    // transition a draft is only ever noticed on a cold load.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    const iframe = helper.getIframe();
+    await expect(iframe.locator('#page-title')).toBeVisible({ timeout: 15000 });
+
+    const block = iframe.locator('[data-block-uid="block-1-uuid"]').first();
+    await block.click();
+    await page.keyboard.type(' drafted here too');
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() =>
+            Object.keys(window.localStorage).some((k) =>
+              (window.localStorage.getItem(k) || '').includes('drafted here too'),
+            ),
+          ),
+        { timeout: 15000 },
+      )
+      .toBe(true);
+
+    // Away to another page, then back — no reload.
+    await helper.navigateToEdit('/example-listings-page');
+    await helper.navigateToEdit('/test-page');
+
     await expect(
       page.getByText(/Autosaved content found|autosaved content/i).first(),
     ).toBeVisible({ timeout: 15000 });

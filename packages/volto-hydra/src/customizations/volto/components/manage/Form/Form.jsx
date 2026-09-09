@@ -336,7 +336,16 @@ class Form extends Component {
 
     // Hydra: Reset formData when navigating to a different page
     if (this.props?.location?.pathname !== prevProps?.location?.pathname) {
-      this.setState({ formData: this.props.formData });
+      this.setState({ formData: this.props.formData }, () => {
+        // Arriving at a different page is the other moment a draft can exist
+        // for it. The mount check only fires when the Form is created; hydra
+        // navigates between pages inside the editor without remounting it, so
+        // without this you are only ever offered a draft on a cold load.
+        this.props.checkSavedDraft(
+          this.state.formData,
+          this.updateFormDataWithSaved,
+        );
+      });
     }
 
     if (!isEqual(prevProps.schema, this.props.schema)) {
