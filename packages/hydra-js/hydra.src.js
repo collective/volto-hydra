@@ -273,7 +273,43 @@ export class Bridge {
     // manager regardless of OS-level window focus.
     this._iframeFocused = document.hasFocus();
     window.addEventListener('focus', () => { this._iframeFocused = true; });
-    window.addEventListener('blur', () => { this._iframeFocused = false; });
+    window.addEventListener('blur', () => {
+      this._iframeFocused = false;
+      // A click INTO a nested browsing context — a video, a map, a PDF preview —
+      // never reaches our click listener: the event belongs to the embed's own
+      // document, and does not bubble or capture across the boundary. So the
+      // block could not be selected by clicking the thing itself; only by
+      // finding some margin of it that wasn't the embed.
+      //
+      // One thing does cross: focus moves to the <iframe> ELEMENT in THIS
+      // document, and blur fires here. Select from that, and let the click go
+      // where it was going. The embed stays interactive — no shield, no
+      // pointer-events games, nothing to click twice.
+      //
+      // Deferred a tick because activeElement is not yet the iframe when blur
+      // fires.
+      setTimeout(() => this.selectBlockFromFocusedEmbed(), 0);
+    });
+    // …and blur is not enough on its own.
+    //
+    // Whether the window blurs when focus moves into an embed depends on how
+    // the frontend is nested: it fires when the frontend and the admin share an
+    // origin, and does NOT when they differ — which is every real deployment,
+    // and the nextjs example that failed while the same-origin test frontend
+    // passed. In that case focus moves into the embed and the ONLY trace is
+    // document.activeElement quietly becoming the <iframe>. No click (it
+    // belongs to the embed's document), no focus event, no blur.
+    //
+    // So watch the one thing that does change. Reading activeElement is a
+    // property access; at this interval it is nothing next to a render, and it
+    // is the whole reason a video, map or PDF can be selected at all.
+    clearInterval(this._embedFocusWatch);
+    this._embedFocusWatch = setInterval(() => {
+      const focused = document.activeElement;
+      if (focused === this._lastActiveElement) return;
+      this._lastActiveElement = focused;
+      this.selectBlockFromFocusedEmbed();
+    }, 200);
     // Register onEditChange callback BEFORE init() sends INIT message.
     // This eliminates the race where INITIAL_DATA arrives before the callback is set.
     //
@@ -3621,6 +3657,14 @@ export class Bridge {
       // the author clicks to edit. Sent separately so chrome can avoid it
       // without the outline swallowing the whole tab strip.
       standInRect: this.getStandInRect(blockUid),
+      // Does this block's content live in a nested browsing context — a video,
+      // a map, a PDF preview? The bridge is the only side that can see it, and
+      // the admin needs it for the toolbar: fading is right for an ordinary
+      // block (the toolbar sits over content the author is reading, and their
+      // mouse keeps it alive), but an embed swallows the mouse. Fade there and
+      // the controls vanish seconds into the interaction with nothing to bring
+      // them back.
+      hasEmbed: this.blockHasEmbed(blockUid),
       rect: {
         top: rect.top,
         left: rect.left,
@@ -4283,6 +4327,9 @@ export class Bridge {
           // the focus event between mousedown and click must not call selectBlock
           // because restoreContentEditableOnFields would change the DOM and
           // shift event.target before the click event fires.
+          // When the author last pressed a key, so a focus change can be told
+          // apart from one the frontend made on its own (see the focus listener).
+          document.addEventListener('keydown', () => { this._lastKeyDownAt = Date.now(); }, true);
           document.addEventListener('mousedown', () => { this._mouseButtonDown = true; }, true);
           document.addEventListener('mouseup', () => { this._mouseButtonDown = false; }, true);
           document.addEventListener('focus', (e) => {
@@ -4320,6 +4367,21 @@ export class Bridge {
               if (this._mouseButtonDown) {
                 return;
               }
+              // Only a focus the AUTHOR moved may move the selection. Tab is
+              // theirs; a focus the frontend moves is not — a container
+              // refocusing itself after re-rendering, a tab strip restoring
+              // focus to its active tab, a carousel after a slide change.
+              //
+              // Acting on those steals the selection: adding a block into a doc
+              // page's Example tab left the TAB selected, so the sidebar offered
+              // the container's settings instead of the block just added, and
+              // there was no way to configure it. Same argument the block-mode
+              // branch above already makes; just as true here.
+              //
+              // Not "is the target editable": Tab legitimately lands on a
+              // button or a link in another block, and selection should follow
+              // there too (block-navigation.spec.ts pins exactly that).
+              if (Date.now() - (this._lastKeyDownAt || 0) > 300) return;
               // Focus moved to a different block (e.g., via Tab) — select it
               log('Focus moved to different block:', blockUid, 'from:', this.selectedBlockUid);
               // Cancel any pending initial-selection — user navigated away
@@ -8191,6 +8253,71 @@ export class Bridge {
    *   null      → block mode (no contenteditable, no field focus)
    *   'value'   → focus specific field
    */
+  /**
+   * Select the block an embed belongs to, when focus has moved into the embed.
+   *
+   * The companion to blockClickHandler for content we cannot receive clicks
+   * from: <iframe>, <embed>, <object>. The click itself is not ours to see and
+   * not ours to interfere with — the author is playing a video or scrolling a
+   * PDF, and that must keep working — so selection is inferred from focus
+   * instead.
+   *
+   * Block mode deliberately (fieldToFocus: null): pulling focus into a text
+   * field would take it straight back out of the embed the author just clicked.
+   */
+  /**
+   * Does any element of this block hold a nested browsing context?
+   *
+   * <iframe>, <embed> and <object> all swallow the mouse: their events belong
+   * to their own document and never reach us. Used for the BLOCK_SELECTED
+   * payload, and it is the same test selectBlockFromFocusedEmbed relies on.
+   */
+  blockHasEmbed(blockUid) {
+    const holdsEmbed = (root) => {
+      if (!root?.querySelector) return false;
+      if (root.querySelector('iframe, embed, object')) return true;
+      // querySelector does not pierce shadow DOM, and the PDF viewer keeps its
+      // iframe in one — so ask each custom element that has a shadow root.
+      for (const el of root.querySelectorAll('*')) {
+        if (el.shadowRoot && holdsEmbed(el.shadowRoot)) return true;
+      }
+      return false;
+    };
+    for (const element of this.getAllBlockElements(blockUid)) {
+      if (holdsEmbed(element)) return true;
+    }
+    return false;
+  }
+
+  selectBlockFromFocusedEmbed() {
+    // Window blur means focus left this browsing context, which is what a click
+    // into an embed does. Whatever took the focus is still an element of THIS
+    // document — the <iframe> itself, or the custom element that wraps one — so
+    // asking which block it sits in is the whole test. No tag list, and no
+    // shadow-root walking: closest() cannot cross a shadow boundary anyway, and
+    // the host is the thing focus lands on.
+    if (document.hidden) return; // a tab or app switch, not a click into an embed
+    const focused = document.activeElement;
+    // Only when focus went INTO something that holds a nested browsing context.
+    // The window also blurs when the author clicks the admin around the iframe,
+    // and activeElement is then still whatever they last focused in a block —
+    // acting on that re-selects it and overrides what the admin just did.
+    //
+    // Asked as a property, not a tag list: an <iframe>, <embed> or <object> has
+    // a contentWindow, and a custom element that wraps one (the PDF preview is
+    // `<pdfjs-viewer-element>`) has a shadow root. Focus lands on the host in
+    // both cases, which is what we want — closest() cannot cross out of a
+    // shadow root, so the block is only reachable from the host.
+    const holdsNestedContext =
+      !!focused && ('contentWindow' in focused || !!focused.shadowRoot);
+    if (!holdsNestedContext) return;
+    const blockElement = focused.closest?.('[data-block-uid]');
+    const blockUid = blockElement?.getAttribute('data-block-uid');
+    if (!blockUid || blockUid === this.selectedBlockUid) return;
+    log('selectBlockFromFocusedEmbed: focus left the page inside', blockUid);
+    this.selectBlock(blockElement, { fieldToFocus: null });
+  }
+
   selectBlock(blockElementOrUid, options = {}) {
     // Back-compat: old callers pass a string as second arg (caller name for logging)
     const opts = typeof options === 'string' ? {} : options;

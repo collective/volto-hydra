@@ -259,7 +259,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, getEmptyBlockType, getContainerRegionDescriptors } from '../../utils/blockPath';
+import { removeReplacedPlaceholder, buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, getEmptyBlockType, getContainerRegionDescriptors } from '../../utils/blockPath';
 import { mergeAnchorsIntoContent } from '../../utils/linkableAnchors';
 import { installStyleMenuPreviewCss } from '../../utils/styleMenuPreviewCss';
 import { canContainAll, getChildBlockEntries, setBlockType, clearBlockType } from '@volto-hydra/helpers';
@@ -269,6 +269,10 @@ import {
   previewSchemaDefaultConversions,
   filterAddableTypesByRule,
   applyBlockDefaultsWithContext,
+  applyMembershipAfterMove,
+  settleBlockStructure,
+  deleteBlocks,
+  canInsertBesideBlock,
   createSchemaEnhancerFromRecipe,
   installVariationFieldEnhancers,
   installChildBlockEnhancers,
@@ -946,24 +950,24 @@ const Iframe = (props) => {
 
     const handleDelete = (e) => {
       const { blockIds } = e.detail;
-      // Backstop: even if a caller slipped locked UIDs past the iframe-side
-      // filter (hydra._filterMutableBlockUids), guard here before we mutate.
-      const templateMode = iframeSyncState.templateEditMode;
-      const safeIds = blockIds.filter((uid) => {
-        const block = getBlockById(properties, bpm, uid);
-        if (!block) return false;
-        return !isBlockReadonly(block, templateMode)
-            && !isBlockPositionLocked(block, templateMode);
-      });
-      log('hydra-delete-blocks:', safeIds.length, '/', blockIds.length, 'blocks (after lock filter)');
-      if (safeIds.length === 0) return;
-      let newFormData = { ...properties };
-      let currentBpm = bpm;
-      for (const uid of safeIds) {
-        const containerConfig = getContainerFieldConfig(uid, currentBpm, newFormData, blocksConfig, intl);
-        newFormData = deleteBlockFromContainer(newFormData, currentBpm, uid, containerConfig);
-        currentBpm = buildBlockPathMap(newFormData, blocksConfig, intl);
-      }
+      // deleteBlocks carries BOTH halves this handler and onDeleteBlock had
+      // drifted apart on: the lock backstop (in case a caller slipped locked
+      // uids past hydra._filterMutableBlockUids) and the re-seed that stops a
+      // forced region being emptied into nothing.
+      const { formData: newFormData, deleted } = deleteBlocks(
+        properties,
+        bpm,
+        blockIds,
+        {
+          blocksConfig,
+          intl,
+          uuidGenerator: uuid,
+          templateEditMode: iframeSyncState.templateEditMode,
+          metadata,
+        },
+      );
+      log('hydra-delete-blocks:', deleted.length, '/', blockIds.length, 'blocks (after lock filter)');
+      if (deleted.length === 0) return;
       onChangeFormData(newFormData);
       onSelectBlock(null);
       setBlockUI(null);
@@ -988,6 +992,22 @@ const Iframe = (props) => {
         .filter(Boolean);
 
       if (cloneWithIds.length === 0) return;
+
+      // The same backstop delete and move carry, and paste had none: pasting
+      // after locked template chrome is exactly the injection the lock exists to
+      // stop. The decision is canInsertBesideBlock, in the edit layer with the
+      // rest of them, so it can be tested without driving this handler.
+      if (
+        !canInsertBesideBlock(
+          afterBlockId,
+          bpm,
+          getBlockById(properties, bpm, afterBlockId),
+          iframeSyncState.templateEditMode,
+        )
+      ) {
+        log('hydra-paste: target refuses inserts (locked template content?)', afterBlockId);
+        return;
+      }
 
       const containerConfig = getContainerFieldConfig(afterBlockId, bpm, properties, blocksConfig, intl);
       const allowedTypes = containerConfig?.allowedBlocks;
@@ -1943,7 +1963,10 @@ const Iframe = (props) => {
       return null;
     }
 
-    // Ensure new container blocks have at least one child (for gridBlock etc.)
+    // Ensure new container blocks have at least one child (for gridBlock etc.).
+    // NOT settleBlockStructure's job: nothing was taken out of anything here — a
+    // container that has just been created needs a child to be usable, which is
+    // the ADD invariant, not the three an edit owes afterwards.
     const newBlockPathMap = buildBlockPathMap(newFormData, mergedBlocksConfig, intl);
     newFormData = ensureEmptyBlockIfEmpty(
       newFormData,
@@ -2118,22 +2141,21 @@ const Iframe = (props) => {
       id, containerConfig, iframeSyncState.blockPathMap, properties,
     );
 
-    // Unified deletion - works for both page and container
-    let newFormData = deleteBlockFromContainer(
+    // The SAME delete the multi path uses — one block is a list of one. It
+    // deletes, then re-seeds a region it emptied: a forced region keeps a
+    // placeholder, and that placeholder carries the template membership the lock
+    // control needs.
+    const { formData: newFormData } = deleteBlocks(
       properties,
       iframeSyncState.blockPathMap,
-      id,
-      containerConfig,
-    );
-
-    // Ensure container has at least one block (empty block if now empty)
-    newFormData = ensureEmptyBlockIfEmpty(
-      newFormData,
-      containerConfig,
-      iframeSyncState.blockPathMap,
-      uuid,
-      blocksConfig,
-      { intl, metadata, properties },
+      [id],
+      {
+        blocksConfig,
+        intl,
+        uuidGenerator: uuid,
+        templateEditMode: iframeSyncState.templateEditMode,
+        metadata,
+      },
     );
 
     // Rebuild blockPathMap to reflect the deleted block
@@ -2842,6 +2864,11 @@ const Iframe = (props) => {
                         Transforms.mergeNodes(adjEditor, { at: [mergedValue.length] });
                         const combined = JSON.parse(JSON.stringify(adjEditor.children));
                         newFormData = updateBlockById(newFormData, nextBpm, prevBlockId, { ...updatedPrev, [fieldName]: combined });
+                        // The one raw delete left, and deliberately raw: this
+                        // MERGES the next block's content into the previous one
+                        // and drops the empty shell. The region cannot be
+                        // emptied by it — the block that absorbed the content is
+                        // still there — so there is nothing for settle to settle.
                         newFormData = deleteBlockFromContainer(newFormData, nextBpm, nextBlockId,
                           getContainerFieldConfig(nextBlockId, nextBpm, newFormData, config.blocks.blocksConfig, intl));
                       }
@@ -2966,10 +2993,17 @@ const Iframe = (props) => {
           } else if (action === 'deleteRow' && pathInfo?.addMode === 'table') {
             // Delete row: use standard block deletion
             const containerConfig = getContainerFieldConfig(actionBlockId, iframeSyncState.blockPathMap, properties, blocksConfig, intl);
-            let newFormData = deleteBlockFromContainer(properties, iframeSyncState.blockPathMap, actionBlockId, containerConfig);
-            if (newFormData && containerConfig) {
-              // Ensure container has at least one row
-              newFormData = ensureEmptyBlockIfEmpty(newFormData, containerConfig, iframeSyncState.blockPathMap, uuid, blocksConfig, { intl, metadata, properties });
+            // A row delete is a delete: deleteBlocks removes it and settles what
+            // that disturbed (re-seeding the table if it took the last row),
+            // and brings the lock backstop with it — a row of locked template
+            // chrome is not the author's to remove from a page.
+            const { formData: newFormData, deleted: deletedRows } = deleteBlocks(
+              properties,
+              iframeSyncState.blockPathMap,
+              [actionBlockId],
+              { blocksConfig, intl, uuidGenerator: uuid, templateEditMode: iframeSyncState.templateEditMode, metadata },
+            );
+            if (deletedRows.length > 0) {
               onChangeFormData(newFormData);
               // Select the parent table after row deletion
               if (pathInfo.parentId) {
@@ -3111,117 +3145,32 @@ const Iframe = (props) => {
           log('MOVE_BLOCKS: moveBlockBetweenContainers returned:', newFormData ? 'formData' : 'null');
 
           if (newFormData) {
-            // Apply defaults to moved blocks based on their new position
-            // This updates template fields (templateId, templateInstanceId, slotId)
-            // based on neighboring blocks at the new location
-            let updatedPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
-            for (const moveBlockId of blocksToMove) {
-              const originalBlockData = getBlockById(newFormData, updatedPathMap, moveBlockId);
-              if (!originalBlockData) continue;
-
-              // Get container info for the new position
-              const targetContainerConfig = getContainerFieldConfig(moveBlockId, updatedPathMap, newFormData, blocksConfig, intl);
-              if (!targetContainerConfig) continue;
-
-              const { parentId: containerId, region: containerRegion } = targetContainerConfig;
-              const containerPath = containerId === PAGE_BLOCK_UID ? [] : updatedPathMap[containerId]?.path;
-              const container = containerPath ? getBlockByPath(newFormData, containerPath) : newFormData;
-              const fullLayout = container?.blocks_layout?.[containerRegion || 'items'] || [];
-              // Recompute membership from the block's NEIGHBOURS, with the block itself
-              // EXCLUDED. It already sits in the layout at this index, so a naive
-              // getNeighborData(position) would return the block itself and it would offer
-              // its own (stale, source) slot back to itself — keeping membership it should
-              // have shed. Excluding it makes `position` the insertion gap between its real
-              // prev/next neighbours.
-              const position = fullLayout.indexOf(moveBlockId);
-              const layoutItems = fullLayout.filter((id) => id !== moveBlockId);
-
-              // Membership on a move is GATED ON EDIT MODE (see architecture.md »
-              // "Template membership"):
-              //  - normal mode → a moved block takes on the membership of wherever it lands,
-              //    so we strip its source membership and re-derive from the destination
-              //    (a slot, a template-instance container, or NOTHING → plain page content);
-              //  - template edit mode → the author's slotId is EXPLICIT (you rename slots,
-              //    you don't change them by dragging), so a move that stays INSIDE the
-              //    template keeps its slotId. A move OUT of the template still strips (drag
-              //    out exits, even while editing).
-              // Fixed template blocks always keep their identity (their slot/fixed IS the
-              // template). "Inside the template" = a same-instance block sits both before AND
-              // after the landing gap.
-              const instId = originalBlockData.templateInstanceId;
-              const editingThisTemplate =
-                !!instId && (templateEditModeRef.current || []).includes(instId);
-              const inSameInstance = (id) =>
-                id && newFormData.blocks[id]?.templateInstanceId === instId;
-              const insideTemplate =
-                editingThisTemplate &&
-                layoutItems.slice(0, position).some(inSameInstance) &&
-                layoutItems.slice(position).some(inSameInstance);
-
-              let blockData = originalBlockData;
-              if (!originalBlockData.fixed && !insideTemplate) {
-                blockData = { ...blockData };
-                delete blockData.templateId;
-                delete blockData.templateInstanceId;
-                delete blockData.slotId;
-                delete blockData.readOnly;
-              }
-
-              // Apply defaults with context - this derives template fields from neighbors
-              const updatedBlockData = applyBlockDefaultsWithContext(blockData, {
-                containerId,
-                field: containerRegion,
-                position,
-                insertAfter: blockInsertAfterMap[moveBlockId],
-                layoutItems,
-                allBlocks: newFormData.blocks,
-                blockPathMap: updatedPathMap,
+            // Everything a move owes afterwards, in the order it owes it:
+            // membership for what landed, THEN the placeholder it landed on,
+            // THEN a re-seed of the region it came out of. settleBlockStructure
+            // fixes that order in one place so the drag path and the chooser's
+            // ask-first drop cannot disagree about it again.
+            const settledMove = settleBlockStructure(
+              newFormData,
+              buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl),
+              {
+                landed: blocksToMove,
+                replacedPlaceholders: replaceTargetId ? [replaceTargetId] : [],
+                emptiedContainers:
+                  sourceParentId !== targetParentId && sourceContainerConfig
+                    ? [sourceContainerConfig]
+                    : [],
+              },
+              {
                 blocksConfig,
                 intl,
-              });
-
-              // Update block if the recompute changed it from what was STORED. Compare
-              // against originalBlockData, not the (possibly membership-stripped) blockData
-              // copy — otherwise a stripped block whose recompute is a no-op is never
-              // written back, and the stored block keeps its stale source membership.
-              if (updatedBlockData !== originalBlockData) {
-                newFormData = updateBlockById(newFormData, updatedPathMap, moveBlockId, updatedBlockData);
-                updatedPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
-                log('MOVE_BLOCKS: Applied defaults to moved block:', moveBlockId, 'templateId:', updatedBlockData.templateId, 'slotId:', updatedBlockData.slotId);
-              }
-            }
-
-            // If we moved to a different container, ensure source container has at least one block
-            if (sourceParentId !== targetParentId && sourceContainerConfig) {
-              newFormData = ensureEmptyBlockIfEmpty(
-                newFormData,
-                sourceContainerConfig,
-                currentBlockPathMap,
-                uuid,
-                blocksConfig,
-                { intl, metadata, properties: currentFormData },
-              );
-            }
-
-            // Replace path: the dragged block was dropped on an 'empty'
-            // placeholder. Remove the placeholder so the dropped block
-            // takes its position rather than sitting beside it.
-            // Done after the move (and after applyBlockDefaultsWithContext)
-            // so the moved block's neighbour-derived fields settle first.
-            if (replaceTargetId) {
-              const replacePathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
-              const replaceBlockData = getBlockById(newFormData, replacePathMap, replaceTargetId);
-              if (replaceBlockData?.['@type'] === 'empty') {
-                const replaceContainerConfig = getContainerFieldConfig(
-                  replaceTargetId, replacePathMap, newFormData, blocksConfig, intl,
-                );
-                if (replaceContainerConfig) {
-                  newFormData = deleteBlockFromContainer(
-                    newFormData, replacePathMap, replaceTargetId, replaceContainerConfig,
-                  );
-                }
-              }
-            }
+                uuidGenerator: uuid,
+                templateEditMode: templateEditModeRef.current,
+                metadata,
+                insertAfterById: blockInsertAfterMap,
+              },
+            );
+            newFormData = settledMove.formData;
 
             // Commit + keep the moved block selected. Rebuild the pathMap for the
             // new positions and flushSync so state is committed before the Redux
@@ -3419,6 +3368,11 @@ const Iframe = (props) => {
               // Where a stand-in for this block sits (a tab's label on its trigger), so
               // chrome can be placed clear of a field the author needs to click.
               standInRect: event.data.standInRect,
+              // The block's content lives in a nested browsing context (video,
+              // map, PDF preview). Its mouse events are the embed's, not ours,
+              // so the toolbar must not fade waiting for activity that cannot
+              // arrive — see SyncedSlateToolbar.
+              hasEmbed: event.data.hasEmbed,
               focusedFieldName: event.data.focusedFieldName, // Track which editable field is focused
               focusedFieldRect: event.data.focusedFieldRect, // Rect of focused field for underline positioning
               focusedLinkableField: event.data.focusedLinkableField, // Track which linkable field is focused
@@ -4814,18 +4768,26 @@ const Iframe = (props) => {
               updatedProperties, bpm2, chooser.blockId, pm.targetBlockId, pm.insertAfter,
               srcParent, pm.targetParentId, blocksConfig, intl,
             ) || updatedProperties;
-            // Dropped onto an empty-container placeholder → remove it so the
-            // converted block takes its place (mirrors the MOVE_BLOCKS replace path).
-            if (pm.replaceTargetId) {
-              const rbpm = buildBlockPathMap(updatedProperties, blocksConfig, intl);
-              const rdata = getBlockById(updatedProperties, rbpm, pm.replaceTargetId);
-              if (rdata?.['@type'] === 'empty') {
-                const rcfg = getContainerFieldConfig(pm.replaceTargetId, rbpm, updatedProperties, blocksConfig, intl);
-                if (rcfg) {
-                  updatedProperties = deleteBlockFromContainer(updatedProperties, rbpm, pm.replaceTargetId, rcfg);
-                }
-              }
-            }
+            // The same settle the drag path uses: membership for what landed,
+            // then the placeholder it landed on. Listing them is all this path
+            // does — the order is settleBlockStructure's business.
+            const settledDrop = settleBlockStructure(
+              updatedProperties,
+              buildBlockPathMap(updatedProperties, blocksConfig, intl),
+              {
+                landed: [chooser.blockId],
+                replacedPlaceholders: pm.replaceTargetId ? [pm.replaceTargetId] : [],
+              },
+              {
+                blocksConfig,
+                intl,
+                uuidGenerator: uuid,
+                templateEditMode: templateEditModeRef.current,
+                metadata,
+                insertAfterById: { [chooser.blockId]: pm.insertAfter },
+              },
+            );
+            updatedProperties = settledDrop.formData;
           }
           // The pick placed the block; run `@type` rules in case its new position
           // re-types it or a sibling. No second confirm — the pick was the ask.
@@ -5491,6 +5453,7 @@ const Iframe = (props) => {
             currentSelection={iframeSyncState.selection}
             _selectionSource={iframeSyncState._selectionSource}
             mouseActivityCounter={mouseActivityCounter}
+            blockHasEmbed={!!blockUI?.hasEmbed}
             completedFlushRequestId={iframeSyncState.completedFlushRequestId}
             transformAction={iframeSyncState.transformAction}
             onTransformApplied={() => setIframeSyncState(prev => ({ ...prev, transformAction: null }))}
@@ -5609,9 +5572,17 @@ const Iframe = (props) => {
                   const containerConfig = getContainerFieldConfig(rowId, iframeSyncState.blockPathMap, properties, blocksConfig, intl);
                   const rowIndex = rowPathInfo.path[rowPathInfo.path.length - 1];
 
-                  let newFormData = deleteBlockFromContainer(properties, iframeSyncState.blockPathMap, rowId, containerConfig);
-                  if (newFormData && containerConfig) {
-                    newFormData = ensureEmptyBlockIfEmpty(newFormData, containerConfig, iframeSyncState.blockPathMap, uuid, blocksConfig, { intl, metadata, properties });
+                  // A row delete is a delete: deleteBlocks removes it and settles what
+                  // that disturbed (re-seeding the table if it took the last row),
+                  // and brings the lock backstop with it — a row of locked template
+                  // chrome is not the author's to remove from a page.
+                  const { formData: newFormData, deleted: deletedRows } = deleteBlocks(
+                    properties,
+                    iframeSyncState.blockPathMap,
+                    [rowId],
+                    { blocksConfig, intl, uuidGenerator: uuid, templateEditMode: iframeSyncState.templateEditMode, metadata },
+                  );
+                  if (deletedRows.length > 0) {
 
                     // Determine what to select after deletion BEFORE triggering re-render
                     // If called from a cell, select corresponding cell in previous row
@@ -6195,9 +6166,17 @@ const Iframe = (props) => {
             if (rowPathInfo?.addMode === 'table') {
               const containerConfig = getContainerFieldConfig(rowId, iframeSyncState.blockPathMap, properties, blocksConfig, intl);
               const rowIndex = rowPathInfo.path[rowPathInfo.path.length - 1];
-              let newFormData = deleteBlockFromContainer(properties, iframeSyncState.blockPathMap, rowId, containerConfig);
-              if (newFormData && containerConfig) {
-                newFormData = ensureEmptyBlockIfEmpty(newFormData, containerConfig, iframeSyncState.blockPathMap, uuid, blocksConfig, { intl, metadata, properties });
+              // A row delete is a delete: deleteBlocks removes it and settles what
+              // that disturbed (re-seeding the table if it took the last row),
+              // and brings the lock backstop with it — a row of locked template
+              // chrome is not the author's to remove from a page.
+              const { formData: newFormData, deleted: deletedRows } = deleteBlocks(
+                properties,
+                iframeSyncState.blockPathMap,
+                [rowId],
+                { blocksConfig, intl, uuidGenerator: uuid, templateEditMode: iframeSyncState.templateEditMode, metadata },
+              );
+              if (deletedRows.length > 0) {
                 let selectBlockId = rowPathInfo.parentId;
                 if (cellIndex != null && rowIndex > 0) {
                   const newBlockPathMap = buildBlockPathMap(newFormData, blocksConfig, intl);

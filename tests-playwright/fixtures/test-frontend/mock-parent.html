@@ -963,6 +963,16 @@
         case 'BLOCK_SELECTED': {
           // Track the last selected block for test assertions
           window.mockParent.lastSelectedBlockUid = message.blockUid;
+          // The whole message, so a test can assert what the bridge reports
+          // about the block (e.g. hasEmbed) and not just which one it is.
+          window.mockParent.lastBlockSelectedMessage = message;
+          // ...and keyed by block, because BLOCK_SELECTED also arrives from the
+          // scroll handler for whatever is in view: a test asking about the
+          // block it just clicked would otherwise read a later message about a
+          // different one.
+          window.mockParent.blockSelectedByUid =
+            window.mockParent.blockSelectedByUid || {};
+          window.mockParent.blockSelectedByUid[message.blockUid] = message;
           // Position the block UI overlays based on rect from iframe
           const { rect, blockUid } = message;
           if (rect) {
