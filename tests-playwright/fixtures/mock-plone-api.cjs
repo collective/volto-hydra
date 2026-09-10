@@ -4243,6 +4243,24 @@ app.patch('*', (req, res) => {
   // Reload content from disk to pick up changes during development
   const content = getContent(cleanPath, sessionId);
 
+  // Changing the SHORT NAME renames the object, as Plone does: `id` is a real
+  // field (plone.shortname), and a PATCH that changes it moves the content to a
+  // new path — the old URL stops resolving and the new one starts. Storing the
+  // new id on the old path would leave the page answering at a URL that no
+  // longer matches its own id, and the menu would keep linking to the old one.
+  if (content && req.body?.id && req.body.id !== content.id) {
+    const parent = cleanPath.split('/').slice(0, -1).join('/') || '';
+    const renamedPath = `${parent}/${req.body.id}`;
+    const renamed = { ...content, ...req.body, id: req.body.id };
+    setSessionContent(sessionId, renamedPath, renamed);
+    if (!sessionDeletions[sessionId]) sessionDeletions[sessionId] = new Set();
+    sessionDeletions[sessionId].add(cleanPath);
+    if (renamed.UID) uidToPathMap[renamed.UID] = renamedPath;
+    return res.json(
+      enrichContent(renamed, renamedPath, `http://localhost:${PORT}`, parseExpand(req), sessionId),
+    );
+  }
+
   // Reordering a folder's children is a PATCH on the CONTAINER carrying
   // `ordering`, not a call to any @order endpoint — that is what Volto's
   // contents view sends (actions/content: `data: { ordering: { obj_id, delta,
