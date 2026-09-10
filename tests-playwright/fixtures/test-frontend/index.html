@@ -137,6 +137,39 @@
     <script src="/renderer.js"></script>
     <script type="module">
         import { initBridge, getAccessToken } from '/hydra.js';
+        // The frontend owns the adapter: it is what answers the admin's
+        // BACKEND_REQUESTs, on the frontend's origin with the frontend's
+        // credentials. Without one, an admin running with
+        // useBridgeBackend=true gets NO_ADAPTER for every call.
+        import { PloneAdapter } from '/plone-adapter.js';
+        import { WordPressAdapter } from '/wordpress-adapter.js';
+        import { DrupalAdapter } from '/drupal-adapter.js';
+
+        // Which CMS this frontend talks to, chosen per test run. The whole
+        // point of the inversion is that the ADMIN does not know or care —
+        // it is the frontend that owns the adapter, so switching CMS is a
+        // frontend concern and nothing in Volto changes.
+        function buildAdapter() {
+            const params = new URLSearchParams(window.location.search);
+            const which = params.get('adapter') || 'plone';
+            const cmsBaseUrl = params.get('cms') || window._apiOrigin;
+            switch (which) {
+                case 'wordpress':
+                    return new WordPressAdapter({ cmsBaseUrl });
+                case 'drupal':
+                    return new DrupalAdapter({
+                        cmsBaseUrl,
+                        credentials: { username: 'admin', password: 'admin' },
+                    });
+                case 'plone':
+                    return new PloneAdapter({
+                        cmsBaseUrl,
+                        getAuthToken: () => getAccessToken(),
+                    });
+                default:
+                    throw new Error(`Unknown adapter '${which}'`);
+            }
+        }
         import { expandListingBlocks, ploneFetchItems, relatedItemsFetcher, searchShortcutsFetcher, rssFetcher, expandTemplates, expandTemplatesSync, contentPath } from '/helpers.js';
         import { sharedBlocksConfig } from '/shared-block-schemas.js';
         import { coreBlocksConfig } from '/core-block-schemas.js';
@@ -181,6 +214,13 @@
         }
 
         // API origin — the mock Plone API always runs on port 8888
+        // NOTE: this fixture renders Inka's own (Plone) content, so its own
+        // fetching stays on the Plone mock even during a Drupal or WordPress
+        // journey. Pointing it at the run's CMS breaks its bootstrap — the
+        // Plone-shaped /++api++ requests fail, the adapter never announces and
+        // the admin gets nothing. Making the fixture CMS-agnostic is its own
+        // piece of work; until then the journey's guard scopes itself to the
+        // ADMIN's requests, which are the ones that must never reach Plone.
         window._apiOrigin = 'http://localhost:8888';
 
         // Make search criteria available globally for form handlers
@@ -332,8 +372,16 @@
                 // the per-page allowedLayouts config that other tests rely
                 // on stays in effect. Same idea as the footer's
                 // forceFooterLayout flag, just keyed off URL depth.
+                // /news is the journey's fixture root on Drupal and WordPress.
+                // Excluded for the same reason as /_test_data: a forced layout
+                // injects fixed, read-only blocks into the page, and the
+                // journey's add-a-block step then selects and diffs against
+                // template blocks rather than its own. Forced layouts are
+                // covered by the context-navigation-forced-folder tests; the
+                // journey is testing create, link, image and move.
                 const contextNavLayoutForced =
                     !contentPath.startsWith('/_test_data/')
+                    && !contentPath.startsWith('/news/')
                     && contentPath.split('/').filter(Boolean).length >= 2
                         ? ['/templates/context-navigation-layout']
                         : null;
@@ -453,7 +501,16 @@
                     // Return promise from async render so hydra.js can wait for DOM updates
                     window._formDataCount = 0;
 
+                    // NO adapter here. This is the PREVIEW: it renders, and it
+                    // navigates as the editor moves around. Serving CMS calls
+                    // from a window whose lifetime is driven by what is being
+                    // looked at is what orphaned in-flight requests when it was
+                    // replaced mid-edit. The adapter lives in the proxy frame
+                    // (hydra-proxy.html), which never navigates.
                     window.bridge = initBridge({
+                        cmsBaseUrl:
+                            new URLSearchParams(window.location.search).get('cms') ||
+                            window._apiOrigin,
                         page: {
                             schema: {
                                 // Blocks fields: each is a key in the shared blocks_layout dict.

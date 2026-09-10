@@ -3,9 +3,17 @@ import * as path from 'path';
 import { PORTS, URLS } from './tests-playwright/ports';
 
 // Check which extra servers we need based on --project arg
-const projectArgIndex = process.argv.indexOf('--project');
-const projectArg = process.argv.find(arg => arg.startsWith('--project='))?.split('=')[1]
-  || (projectArgIndex !== -1 ? process.argv[projectArgIndex + 1] : undefined);
+// EVERY --project on the command line, not just the first. Playwright accepts
+// the flag repeatedly, and reading one value meant a run naming several targets
+// started only the first one's backing servers — the others then failed with
+// "Failed to fetch" against a CMS that was never booted, which reads like an
+// adapter bug rather than a missing server.
+const projectArgs: string[] = [];
+process.argv.forEach((arg, i) => {
+  if (arg.startsWith('--project=')) projectArgs.push(arg.slice('--project='.length));
+  else if (arg === '--project' && process.argv[i + 1]) projectArgs.push(process.argv[i + 1]);
+});
+const projectArg = projectArgs.length ? projectArgs.join(',') : undefined;
 const needsNuxt = !projectArg || projectArg.includes('nuxt');
 const needsReact = !projectArg || projectArg.includes('react');
 const needsSvelte = !projectArg || projectArg.includes('svelte');
@@ -18,6 +26,22 @@ const needsAstro = projectArg?.includes('astro');
 // Example frontends — opt-in only (not started unless explicitly requested)
 const needsNextjs = projectArg?.includes('nextjs');
 const needsF7 = projectArg?.includes('f7');
+// The journey runs the same spec against each CMS; only the requested one is
+// started, because booting all three costs minutes for no benefit.
+const needsDrupal = projectArg?.includes('journey-drupal');
+const needsWordPress = projectArg?.includes('journey-wordpress');
+const needsJourney = projectArgs.some((p) => p.startsWith('journey'));
+// The bridge-mock project runs the admin with the backend inversion on. It is
+// an env var rather than a test fixture because the Api helper is constructed
+// by Volto's start-client before any test code runs.
+//
+// NOTE: the Volto webServer entries below use reuseExistingServer, so a server
+// already running WITHOUT this flag will be reused as-is. Run bridge-mock
+// against a freshly started server, or the transparency proof is vacuous.
+const useBridgeBackend =
+  projectArg?.includes('bridge') || projectArg?.includes('journey')
+    ? 'true'
+    : 'false';
 
 /**
  * Playwright Test configuration for Volto Hydra tests.
@@ -42,8 +66,26 @@ export default defineConfig({
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
 
-  /* Opt out of parallel tests on CI */
-  workers: process.env.CI ? undefined : undefined,
+  /* One worker when WordPress is involved.
+   *
+   * WordPress here is PHP-WASM: a single-threaded server answering about one
+   * request a second. The suite is fullyParallel, so a whole journey directory
+   * puts nine specs on it at once and they starve each other — every spec in
+   * the WordPress suite failed on timeouts while each one passed on its own.
+   * Nothing was wrong with them; there was simply one server and nine callers.
+   *
+   * And one worker for the journey suites generally, whatever the CMS.
+   *
+   * These specs share ONE backend and walk a real editorial tree — creating,
+   * moving, checking out and transitioning documents in it. Run in parallel
+   * they are not independent tests of the same world, they are concurrent
+   * writers to it: a listing assertion in one spec fails because another spec
+   * moved something mid-request, which reads as a flake and is not one. That
+   * stayed hidden only while no spec mutated shared content; the working-copy
+   * round trip is the first that does.
+   *
+   * The non-journey suites hold no shared state and keep the default. */
+  workers: needsWordPress || needsJourney ? 1 : undefined,
 
   /* Reporter to use */
   reporter: [['html', { open: 'never' }]],
@@ -242,6 +284,89 @@ export default defineConfig({
         /multifield.*\.spec\.ts/, // Skip multifield tests (hero block not in Nuxt)
       ],
     },
+    // The end-to-end journey, one spec run against each CMS. The adapter is
+    // selected by the FRONTEND via ?adapter=, so the admin is identical in
+    // all three — which is the claim under test.
+    {
+      name: 'journey-plone',
+      testDir: 'tests-playwright/journey',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        storageState: 'tests-playwright/fixtures/storage-journey-plone.json',
+      },
+    },
+    {
+      // Plone against the CANONICAL seed, so focused specs get the same
+      // fixtures as WordPress and Drupal. journey-plone (above) keeps running
+      // against the repo's docs content.
+      name: 'journey-plone-seeded',
+      testDir: 'tests-playwright/journey',
+      testIgnore: /auth\.setup\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        storageState: 'tests-playwright/fixtures/storage-journey-plone-seeded.json',
+      },
+    },
+    {
+      name: 'journey-drupal',
+      testDir: 'tests-playwright/journey',
+      // Drupal's mock seeds the canonical set (/news, /about); the Plone mock
+      // serves its own test tree under /_test_data. Different fixtures, same
+      // journey.
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        storageState: 'tests-playwright/fixtures/storage-journey-drupal.json',
+      },
+    },
+    {
+      // Signs in once and saves the session; every WordPress spec depends on
+      // it. Without this each spec paid ~50s for the login round trip.
+      name: 'journey-wordpress-setup',
+      testDir: 'tests-playwright/journey',
+      testMatch: /auth\.setup\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        storageState: 'tests-playwright/fixtures/storage-journey-wordpress.json',
+      },
+    },
+    {
+      name: 'journey-wordpress',
+      testDir: 'tests-playwright/journey',
+      testIgnore: /auth\.setup\.ts/,
+      dependencies: ['journey-wordpress-setup'],
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        // The saved session, including the proxy origin's stored credential.
+        storageState: 'tests-playwright/fixtures/storage-authed-wordpress.json',
+      },
+    },
+
+    // Same specs as admin-mock, but with the backend inversion switched on:
+    // every CMS call travels admin -> bridge -> iframe adapter instead of
+    // being fetched directly. A pass count identical to admin-mock is the
+    // evidence that the bridge is a faithful shim; any divergence is a real
+    // defect in the inversion, not a test to adjust.
+    {
+      name: 'bridge-mock',
+      testDir: 'tests-playwright/integration',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+      },
+      testIgnore: [
+        /nuxt-.*\.spec\.ts/,
+      ],
+    },
     // Nuxt-specific tests (nuxt-*.spec.ts) - set their own iframe_url cookie
     {
       name: 'nuxt-specific',
@@ -378,6 +503,7 @@ export default defineConfig({
               URLS.vueDoc, URLS.nextjs, URLS.f7, URLS.astroDoc,
             ].join(','),
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
+            RAZZLE_USE_BRIDGE_BACKEND: useBridgeBackend,
           },
         }
       : {
@@ -404,10 +530,70 @@ export default defineConfig({
               URLS.vueDoc, URLS.nextjs, URLS.f7, URLS.astroDoc,
             ].join(','),
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
+            RAZZLE_USE_BRIDGE_BACKEND: useBridgeBackend,
             // Prevent parcel from trying to access TTY (fixes segfault in background process)
             CI: process.env.CI || 'true',
           },
         },
+    // Mock Drupal JSON:API — only for journey-drupal.
+    ...(needsDrupal ? [{
+      name: 'Mock Drupal',
+      command: `node tests-adapters/fixtures/mock-drupal-api.cjs`,
+      url: `http://127.0.0.1:${PORTS.mockDrupal}/health`,
+      timeout: 30 * 1000,
+      reuseExistingServer: true,
+      cwd: process.cwd(),
+      stdout: 'pipe' as const,
+      stderr: 'pipe' as const,
+      env: { PORT: String(PORTS.mockDrupal) },
+    }] : []),
+    // A second Plone mock serving the canonical seed. Same binary as the docs
+    // mock, different CONTENT_MOUNTS — nothing is created at runtime.
+    ...(projectArg?.includes('journey-plone-seeded')
+      ? [{
+          name: 'Seeded Plone API',
+          command: `PORT=${PORTS.plonSeeded} CONTENT_MOUNTS='/:tests-adapters/fixtures/content' node ${path.join(__dirname, 'tests-playwright/fixtures/mock-api-server.cjs')}`,
+          url: `${URLS.plonSeeded}/health`,
+          timeout: 30 * 1000,
+          reuseExistingServer: true,
+          cwd: process.cwd(),
+        }]
+      : []),
+    // WordPress Playground — real WordPress on PHP-WASM; slow to boot, so it
+    // is only started when the WordPress journey is actually requested.
+    ...(needsWordPress ? [{
+      name: 'WordPress Playground',
+      // The JOURNEY blueprint, and no --login.
+      //
+      // --login makes WordPress answer a cookie-less client with a 302 to the
+      // same URL so it can retry carrying an auto-login cookie, which anything
+      // without a cookie jar follows forever. The journey blueprint resolves
+      // the user server-side instead, because the adapter's cross-site calls
+      // from the iframe cannot carry WordPress cookies at all.
+      command: `pnpm dlx @wp-playground/cli@3.1.51 server --port ${PORTS.wordpress} --blueprint tests-adapters/fixtures/wp-blueprint-journey.json`,
+      // PINNED, not @latest: dlx fetches into the pnpm store, so @latest
+      // quietly adds another copy of WordPress-on-WASM every time upstream
+      // publishes. The design doc names this version; keeping them equal also
+      // means the suite is not silently retested against a new WordPress.
+      //
+      // A CORE STATIC ASSET, not `/`.
+      //
+      // WordPress answers `/` with a 302 to itself here, and Playwright's
+      // readiness check follows redirects waiting for a 2xx — so it looped
+      // until the 300s timeout and the WordPress journey never ran at all,
+      // which is why it had never once been seen to pass. The contract suite
+      // never hit this because its own check uses redirect:'manual' and
+      // accepts anything under 500.
+      //
+      // wp-embed.min.js is served by WordPress itself, so a 200 means the
+      // install is up and not merely that the port is open.
+      url: `http://127.0.0.1:${PORTS.wordpress}/wp-includes/js/wp-embed.min.js`,
+      timeout: 300 * 1000,
+      reuseExistingServer: true,
+      cwd: process.cwd(),
+      stdout: 'pipe' as const,
+      stderr: 'pipe' as const,
+    }] : []),
     // Nuxt frontend for testing Nuxt-specific scenarios (only started when running nuxt tests)
     ...(needsNuxt ? [{
       name: 'Nuxt Frontend (Test)',

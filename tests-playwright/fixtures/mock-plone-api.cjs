@@ -109,6 +109,37 @@ if (process.env.SKIP_CONTENT_VALIDATION !== 'true') {
 // Format: { sessionId: { '/path': content, ... } }
 const sessionContent = {};
 
+// Bytes of images uploaded within a session, so @@images can serve back what
+// was just POSTed. Without this the mock accepts an upload and then 404s every
+// scale URL it advertised. Format: { 'sessionId:/path:field': {buffer, mime} }
+const sessionBlobs = {};
+
+// Paths deleted within a session. Disk content can't actually be removed (it
+// is shared by every session and reloaded by the watcher), so a DELETE records
+// a tombstone here and getContent treats the path as gone for that session
+// only. Format: { sessionId: Set<'/path'> }
+const sessionDeletions = {};
+
+// Explicit child ordering per container, set by @order. Absent means "use the
+// natural order", which is what every existing test relies on.
+const sessionOrder = {};
+
+/**
+ * @move and @copy accept either one source or a list — the contents view lets
+ * an editor select several rows and paste them together, so Volto always sends
+ * whatever was selected. Each entry may be an absolute URL or a plain path.
+ */
+function normaliseSources(raw) {
+  const list = Array.isArray(raw) ? raw : [raw];
+  return list.filter(Boolean).map((entry) => {
+    const value = typeof entry === 'string' ? entry : entry?.['@id'];
+    if (typeof value !== 'string') return null;
+    return /^https?:\/\//.test(value)
+      ? new URL(value).pathname.replace('/++api++', '') || '/'
+      : value;
+  }).filter(Boolean);
+}
+
 // Map URL paths to source directories (for loading content from disk)
 const contentDirMap = {};
 
@@ -244,10 +275,32 @@ if (process.env.DEBUG) {
  * @param {Object} req - Express request object
  * @returns {boolean} True if authenticated
  */
+/**
+ * A token the mock always rejects, so tests can reproduce a mid-session expiry
+ * without tearing the server down. Nothing else issues this value.
+ */
+const REVOKED_TOKEN = 'EXPIRED_TOKEN';
+
+function isRevoked(req) {
+  const authHeader = req.headers.authorization;
+  return authHeader === `Bearer ${REVOKED_TOKEN}`;
+}
+
 function isAuthenticated(req) {
   const authHeader = req.headers.authorization;
-  return authHeader && authHeader.startsWith('Bearer ');
+  return authHeader && authHeader.startsWith('Bearer ') && !isRevoked(req);
 }
+
+// Reject a revoked session before any route sees the request, exactly as a
+// CMS with an expired cookie would.
+app.use((req, res, next) => {
+  if (isRevoked(req)) {
+    return res.status(401).json({
+      error: { type: 'Unauthorized', message: 'Session expired' },
+    });
+  }
+  next();
+});
 
 /**
  * Filter actions based on authentication status
@@ -674,12 +727,12 @@ function getNavigationItems(basePath = '/', depth = 1, baseUrlIn) {
  * Merges items from all content mounts so test content (/_test_data/*)
  * appears alongside docs content in the navigation.
  */
-function getRootNavigationItems() {
+function getRootNavigationItems(sessionId) {
   // Top-level items each pre-populated with their immediate children, so
   // the dropdown menu shows the next level on hover. depth=2 means "two
   // levels of items in total" — top + their direct children — which is
   // what the previous (depth-1-with-implicit-child-recursion) code produced.
-  return getNavigationItems('/', 2);
+  return getNavigationItems('/', 2, undefined, sessionId);
 }
 
 // ── Per-component builders ────────────────────────────────────────────────
@@ -715,38 +768,153 @@ function buildBreadcrumbsComponent(cleanPath, baseUrl) {
   };
 }
 
-function buildActionsComponent(cleanPath, baseUrl) {
+function buildActionsComponent(cleanPath, baseUrl, sessionId) {
   const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
   return {
     '@id': `${fullUrl}/@actions`,
     document_actions: [],
+    // Two sources, and they disagree. plone.restapi's own recorded example
+    // (actions_get.resp) has keys [icon, id, title]; a live Plone 6
+    // (demo.plone.org) has [icon, id, title, url]. The recording predates the
+    // serializer gaining `url`, and Volto reads `url` — Footer.jsx renders
+    // `item.url ? flattenToAppURL(item.url) : addAppURL(item.id)` — so `url`
+    // is what a current Plone emits and what belongs here.
+    //
+    // WHICH entries appear, and in which category, is from actions_get.resp:
+    // delete belongs in object_buttons beside cut/copy/rename, not in object.
     object: [
-      { '@id': fullUrl, icon: '', id: 'view', title: 'View' },
-      { '@id': `${fullUrl}/edit`, icon: '', id: 'edit', title: 'Edit' },
-      { id: 'folderContents', title: 'Contents' },
+      { url: fullUrl, icon: '', id: 'view', title: 'View' },
+      { url: `${fullUrl}/edit`, icon: '', id: 'edit', title: 'Edit' },
+      { id: 'folderContents', icon: '', title: 'Contents' },
+      { id: 'history', icon: '', title: 'History' },
+      { id: 'local_roles', icon: '', title: 'Sharing' },
     ],
-    object_buttons: [],
+    object_buttons: [
+      { id: 'cut', icon: '', title: 'Cut' },
+      { id: 'copy', icon: '', title: 'Copy' },
+      { id: 'delete', icon: '', title: 'Delete' },
+      { id: 'rename', icon: '', title: 'Rename' },
+      // plone.app.iterate's, and the ids Volto gates its working-copy buttons
+      // on. NOT in actions_get.resp, which records a site without it — so this
+      // is the one entry here that is inferred rather than recorded.
+      ...(workingCopyOf(cleanPath, sessionId)
+        ? [{ id: 'iterate_checkin', icon: '', title: 'Check in' }]
+        : [{ id: 'iterate_checkout', icon: '', title: 'Check out' }]),
+    ],
     portal_tabs: [],
     site_actions: [],
     user: [],
   };
 }
 
-function buildNavigationComponent(cleanPath, baseUrl) {
+function buildNavigationComponent(cleanPath, baseUrl, sessionId) {
   const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
   return {
     '@id': `${fullUrl}/@navigation`,
     // Always rooted at site root — top-level items with nested children
-    items: getRootNavigationItems(),
+    items: getRootNavigationItems(sessionId),
   };
 }
 
-function buildWorkflowComponent(cleanPath, baseUrl) {
+/**
+ * Plone's simple_publication_workflow.
+ *
+ * Shape comes from tests-adapters/fixtures/plone/workflow_get.resp — a real
+ * recorded response. Note what is NOT in it: a transition names no destination
+ * state, only an @id and a title. Behaviour (which transition leads where) is
+ * simulated here because the workflow definition is not over REST at all.
+ */
+const SPW = {
+  private: [
+    { id: 'publish', title: 'Publish', to: 'published' },
+    { id: 'submit', title: 'Submit for publication', to: 'pending' },
+  ],
+  pending: [
+    { id: 'publish', title: 'Publish', to: 'published' },
+    { id: 'reject', title: 'Reject', to: 'private' },
+    { id: 'retract', title: 'Retract', to: 'private' },
+  ],
+  published: [{ id: 'retract', title: 'Retract', to: 'private' }],
+};
+
+const STATE_TITLES = {
+  private: 'Private',
+  pending: 'Pending review',
+  published: 'Published',
+};
+
+function buildWorkflowComponent(cleanPath, baseUrl, sessionId) {
   const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
+  const content = getContent(cleanPath, sessionId);
+  const state = content?.review_state || 'published';
   return {
     '@id': `${fullUrl}/@workflow`,
-    history: [],
-    transitions: [],
+    history: [
+      {
+        action: null,
+        actor: 'admin',
+        comments: '',
+        review_state: state,
+        time: '1995-07-31T17:30:00+00:00',
+        title: STATE_TITLES[state] ?? state,
+      },
+    ],
+    state: { id: state, title: STATE_TITLES[state] ?? state },
+    // Deliberately {@id, title} only. An adapter that wants a destination
+    // state has to get it somewhere else — which is the finding.
+    transitions: (SPW[state] ?? []).map((t) => ({
+      '@id': `${fullUrl}/@workflow/${t.id}`,
+      title: t.title,
+    })),
+  };
+}
+
+/**
+ * Local roles. Shape from tests-adapters/fixtures/plone/sharing_folder_get.resp.
+ *
+ * Entry-major, with a {Role: bool} map per principal — the grid. Transposing
+ * that into one field per role is the ADAPTER's job, in both directions.
+ */
+const AVAILABLE_ROLES = [
+  { id: 'Contributor', title: 'Can add' },
+  { id: 'Editor', title: 'Can edit' },
+  { id: 'Reader', title: 'Can view' },
+  { id: 'Reviewer', title: 'Can review' },
+];
+
+const sessionSharing = {};
+
+/**
+ * Working copies. Shapes from tests-adapters/fixtures/plone/workingcopy_*.
+ * A checkout lives at a DIFFERENT path, which is the whole reason the
+ * transition has to say where the editing session should go.
+ */
+const sessionWorkingCopies = {};
+
+function workingCopyOf(cleanPath, sessionId) {
+  return sessionWorkingCopies[sessionId]?.[cleanPath] ?? null;
+}
+
+function noRoles() {
+  return Object.fromEntries(AVAILABLE_ROLES.map((r) => [r.id, false]));
+}
+
+function getSharing(cleanPath, sessionId) {
+  const stored = sessionSharing[sessionId]?.[cleanPath];
+  if (stored) return stored;
+  return {
+    available_roles: AVAILABLE_ROLES,
+    entries: [
+      {
+        disabled: false,
+        id: 'AuthenticatedUsers',
+        login: null,
+        roles: noRoles(),
+        title: 'Logged-in users',
+        type: 'group',
+      },
+    ],
+    inherit: true,
   };
 }
 
@@ -774,6 +942,9 @@ function buildTypesComponent() {
 function generateComponents(urlPath, baseUrl) {
   const cleanPath = urlPath.replace(/\/$/, '') || '/';
   return {
+    // No session here: generateComponents builds the expander bundle, which
+    // has no request context. The adapter reads @actions directly, and that
+    // route IS session-aware, so a working copy still reports iterate_checkin.
     actions: buildActionsComponent(cleanPath, baseUrl),
     breadcrumbs: buildBreadcrumbsComponent(cleanPath, baseUrl),
     navigation: buildNavigationComponent(cleanPath, baseUrl),
@@ -1335,6 +1506,11 @@ setupContentWatchers();
  * @param {string} sessionId - Session ID for session-specific uploads
  */
 function getContent(urlPath, sessionId, expandList = []) {
+  // A path deleted in this session is gone for this session, even if disk
+  // content still backs it.
+  if (sessionId && sessionDeletions[sessionId]?.has(urlPath)) {
+    return null;
+  }
   // Check session-specific storage first (for content created in this session).
   if (sessionId && sessionContent[sessionId]) {
     const store = sessionContent[sessionId];
@@ -1382,7 +1558,7 @@ app.post('/@login-renew', (req, res) => {
   res.json({
     token: generateAuthToken('admin'),
     user: {
-      '@id': 'http://localhost:8888/@users/admin',
+      '@id': `http://localhost:${PORT}/@users/admin`,
       id: 'admin',
       fullname: 'Admin User',
       email: 'admin@example.com',
@@ -1408,7 +1584,7 @@ app.post('/@login', (req, res) => {
     const response = {
       token,
       user: {
-        '@id': `http://localhost:8888/@users/${login}`,
+        '@id': `http://localhost:${PORT}/@users/${login}`,
         id: login,
         fullname: 'Admin User',
         email: 'admin@example.com',
@@ -1446,6 +1622,154 @@ app.post('/@logout', (req, res) => {
   }
   // Return 204 No Content on successful logout (Plone behavior)
   res.status(204).send();
+});
+
+/**
+ * POST /:target/@move — relocate content into this container.
+ *
+ * plone.restapi posts to the TARGET folder with the source in the body. The
+ * mock keeps disk content immutable and shared, so a move is recorded as a
+ * session relocation: the subtree reads from its new path and 404s at the old
+ * one, for the calling session only.
+ */
+app.post('*/@move', (req, res) => {
+  const targetPath = req.path.replace('/@move', '') || '/';
+  const sessionId = getSessionId(req);
+  const sources = normaliseSources(req.body?.source);
+  if (sources.length === 0) {
+    return res.status(400).json({
+      error: { type: 'BadRequest', message: '@move requires a source' },
+    });
+  }
+
+  const results = [];
+  for (const sourcePath of sources) {
+  const source = getContent(sourcePath, sessionId);
+  if (!source) {
+    return res.status(404).json({
+      error: { type: 'NotFound', message: `No such resource: ${sourcePath}` },
+    });
+  }
+  if (targetPath === sourcePath || targetPath.startsWith(`${sourcePath}/`)) {
+    return res.status(400).json({
+      error: {
+        type: 'BadRequest',
+        message: 'Cannot move a document inside itself',
+      },
+    });
+  }
+
+  const id = sourcePath.split('/').filter(Boolean).pop();
+  const destPath = `${targetPath === '/' ? '' : targetPath}/${id}`;
+
+  // Relocate the whole subtree: every descendant path moves with its parent,
+  // exactly as a real move does. Anything else silently orphans children.
+  const everyPath = new Set([
+    ...Object.keys(contentDirMap),
+    ...Object.keys(sessionContent[sessionId] || {}),
+  ]);
+  for (const p of everyPath) {
+    if (p !== sourcePath && !p.startsWith(`${sourcePath}/`)) continue;
+    const moved = getContent(p, sessionId);
+    if (!moved) continue;
+    const suffix = p.slice(sourcePath.length);
+    const raw = JSON.parse(JSON.stringify(moved));
+    delete raw['@components'];
+    setSessionContent(sessionId, `${destPath}${suffix}`, raw);
+    if (!sessionDeletions[sessionId]) sessionDeletions[sessionId] = new Set();
+    sessionDeletions[sessionId].add(p);
+    if (raw.UID) uidToPathMap[raw.UID] = `${destPath}${suffix}`;
+  }
+
+  results.push({ source: sourcePath, target: destPath });
+  }
+
+  return res.json(results);
+});
+
+/**
+ * POST /:parent/@order — reorder a child within its container.
+ */
+/**
+ * POST /:target/@copy — duplicate content into this container.
+ *
+ * Same shape as @move, but the source stays put and the copy gets a fresh UID
+ * so it is a genuinely distinct document rather than a second path onto one.
+ */
+app.post('*/@copy', (req, res) => {
+  const targetPath = req.path.replace('/@copy', '') || '/';
+  const sessionId = getSessionId(req);
+  const sources = normaliseSources(req.body?.source);
+  if (sources.length === 0) {
+    return res.status(400).json({
+      error: { type: 'BadRequest', message: '@copy requires a source' },
+    });
+  }
+  const sourcePath = sources[0];
+  const source = getContent(sourcePath, sessionId);
+  if (!source) {
+    return res.status(404).json({
+      error: { type: 'NotFound', message: `No such resource: ${sourcePath}` },
+    });
+  }
+  const id = sourcePath.split('/').filter(Boolean).pop();
+  const destPath = `${targetPath === '/' ? '' : targetPath}/${id}`;
+  const raw = JSON.parse(JSON.stringify(source));
+  delete raw['@components'];
+  raw.UID = `${raw.UID || id}-copy-${Object.keys(sessionContent[sessionId] || {}).length}`;
+  setSessionContent(sessionId, destPath, raw);
+  uidToPathMap[raw.UID] = destPath;
+  return res.json([{ source: sourcePath, target: destPath }]);
+});
+
+app.post('*/@order', (req, res) => {
+  const parentPath = req.path.replace('/@order', '') || '/';
+  const sessionId = getSessionId(req);
+  const { obj_id: objId, delta } = req.body || {};
+  if (!objId) {
+    return res.status(400).json({
+      error: { type: 'BadRequest', message: '@order requires obj_id' },
+    });
+  }
+  if (!sessionOrder[sessionId]) sessionOrder[sessionId] = {};
+  const current = sessionOrder[sessionId][parentPath] || [];
+  const without = current.filter((entry) => entry !== objId);
+  const index = delta === 'top' ? 0 : Math.max(0, without.length);
+  without.splice(index, 0, objId);
+  sessionOrder[sessionId][parentPath] = without;
+  return res.status(204).send();
+});
+
+/**
+ * DELETE /:path (content removal)
+ *
+ * Drops session-created content outright and tombstones disk-backed content
+ * so it reads as gone for the calling session. Plone answers 204 with no body.
+ */
+app.delete('/*', (req, res, next) => {
+  // Special endpoints (e.g. */@lock) have their own handlers.
+  if (req.path.startsWith('/@') || req.path.includes('/@')) {
+    return next();
+  }
+
+  const sessionId = getSessionId(req);
+  const urlPath = req.path.replace(/\/$/, '') || '/';
+
+  if (getContent(urlPath, sessionId) === null) {
+    return res.status(404).json({
+      error: { type: 'NotFound', message: `No such resource: ${urlPath}` },
+    });
+  }
+
+  if (sessionContent[sessionId]) {
+    delete sessionContent[sessionId][urlPath];
+  }
+  if (!sessionDeletions[sessionId]) {
+    sessionDeletions[sessionId] = new Set();
+  }
+  sessionDeletions[sessionId].add(urlPath);
+
+  return res.status(204).send();
 });
 
 /**
@@ -1493,7 +1817,7 @@ app.post('/*', (req, res, next) => {
 
     // Create the image content
     const imageContent = {
-      '@id': `http://localhost:8888${imagePath}`,
+      '@id': `http://localhost:${PORT}${imagePath}`,
       '@type': 'Image',
       'UID': `uid-${imageId}`,
       'id': imageId,
@@ -1501,18 +1825,18 @@ app.post('/*', (req, res, next) => {
       'description': body.description || '',
       'image': {
         'content-type': body.image?.['content-type'] || 'image/png',
-        'download': `http://localhost:8888${imagePath}/@@images/image`,
+        'download': `http://localhost:${PORT}${imagePath}/@@images/image`,
         'filename': body.image?.filename || 'image.png',
         'height': height,
         'width': width,
         'scales': {
           'preview': {
-            'download': `http://localhost:8888${imagePath}/@@images/image/preview`,
+            'download': `http://localhost:${PORT}${imagePath}/@@images/image/preview`,
             'height': 400,
             'width': 400,
           },
           'large': {
-            'download': `http://localhost:8888${imagePath}/@@images/image/large`,
+            'download': `http://localhost:${PORT}${imagePath}/@@images/image/large`,
             'height': 800,
             'width': 800,
           },
@@ -1542,6 +1866,15 @@ app.post('/*', (req, res, next) => {
     const sessionId = getSessionId(req);
     setSessionContent(sessionId, imagePath, imageContent);
 
+    // Keep the bytes so @@images can serve back the scale URLs this response
+    // advertises. Session-scoped, like the content itself.
+    if (body.image?.data) {
+      sessionBlobs[`${sessionId}:${imagePath}:image`] = {
+        buffer: Buffer.from(body.image.data, body.image.encoding || 'base64'),
+        mime: body.image['content-type'] || 'image/png',
+      };
+    }
+
     if (process.env.DEBUG) {
       console.log(`Created Image: ${imagePath}${sessionId ? ` (session: ${sessionId})` : ''}`);
     }
@@ -1561,7 +1894,7 @@ app.post('/*', (req, res, next) => {
         .replace(/^-+|-+$/g, '');
     const filePath = `${parentPath === '/' ? '' : parentPath}/${fileId}`.replace(/\/+/g, '/');
     const fileContent = {
-      '@id': `http://localhost:8888${filePath}`,
+      '@id': `http://localhost:${PORT}${filePath}`,
       '@type': 'File',
       'UID': `uid-${fileId}`,
       'id': fileId,
@@ -1569,7 +1902,7 @@ app.post('/*', (req, res, next) => {
       'description': body.description || '',
       'file': {
         'content-type': body.file?.['content-type'] || 'application/octet-stream',
-        'download': `http://localhost:8888${filePath}/@@download/file`,
+        'download': `http://localhost:${PORT}${filePath}/@@download/file`,
         'filename': body.file?.filename || rawName,
         'size': body.file?.data?.length || 0,
       },
@@ -1695,7 +2028,7 @@ function collectSubjectValues() {
  */
 app.get('*/@querystring', (req, res) => {
   res.json({
-    '@id': 'http://localhost:8888/@querystring',
+    '@id': `http://localhost:${PORT}/@querystring`,
     'indexes': {
       'portal_type': {
         'title': 'Type',
@@ -1981,7 +2314,7 @@ app.get('*/@querystring', (req, res) => {
  */
 app.get('/@site', (req, res) => {
   res.json({
-    '@id': 'http://localhost:8888',
+    '@id': `http://localhost:${PORT}`,
     'plone.site_title': 'Plone Site',
     'plone.site_logo': null,
     // Volto 19 reads `plone.default_language` from this response as the
@@ -2000,7 +2333,132 @@ app.get('/@site', (req, res) => {
  */
 app.get(/.*\/@workflow$/, (req, res) => {
   const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@workflow$/, '') || '/').replace(/\/+$/, '') || '/';
-  res.json(buildWorkflowComponent(cleanPath, `http://localhost:${PORT}`));
+  res.json(buildWorkflowComponent(cleanPath, `http://localhost:${PORT}`, getSessionId(req)));
+});
+
+/**
+ * POST /:path/@workflow/:transition
+ *
+ * The body Plone accepts here is real, not invented — see
+ * tests-adapters/fixtures/plone/workflow_post_with_body.req: comment,
+ * effective, expires, include_children.
+ */
+app.post(/.*\/@workflow\/[^/]+$/, (req, res) => {
+  const raw = req.path.replace('/++api++', '');
+  const transitionId = raw.split('/').pop();
+  const cleanPath = (raw.replace(/\/?@workflow\/[^/]+$/, '') || '/').replace(/\/+$/, '') || '/';
+  const sessionId = getSessionId(req);
+
+  const content = getContent(cleanPath, sessionId);
+  if (!content) return res.status(404).json({ error: { type: 'NotFound' } });
+
+  const from = content.review_state || 'published';
+  const move = (SPW[from] ?? []).find((t) => t.id === transitionId);
+  if (!move) {
+    return res.status(400).json({
+      error: { type: 'BadRequest', message: `Invalid transition '${transitionId}' from '${from}'` },
+    });
+  }
+
+  const patch = { review_state: move.to };
+  for (const field of ['effective', 'expires']) {
+    if (req.body?.[field]) patch[field] = req.body[field];
+  }
+  setSessionContent(sessionId, cleanPath, { ...content, ...patch });
+
+  res.json({
+    action: transitionId,
+    actor: 'admin',
+    comments: req.body?.comment ?? '',
+    review_state: move.to,
+    title: STATE_TITLES[move.to] ?? move.to,
+  });
+});
+
+app.post(/.*\/@workingcopy$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@workingcopy$/, '') || '/').replace(/\/+$/, '') || '/';
+  const sessionId = getSessionId(req);
+  const content = getContent(cleanPath, sessionId);
+  if (!content) return res.status(404).json({ error: { type: 'NotFound' } });
+
+  const segments = cleanPath.split('/');
+  const id = segments.pop();
+  const copyPath = [...segments, `copy_of_${id}`].join('/') || '/';
+
+  setSessionContent(sessionId, copyPath, { ...content, id: `copy_of_${id}` });
+  if (!sessionWorkingCopies[sessionId]) sessionWorkingCopies[sessionId] = {};
+  sessionWorkingCopies[sessionId][copyPath] = cleanPath;
+
+  res.status(201).json({ '@id': `http://localhost:${PORT}${copyPath}` });
+});
+
+app.get(/.*\/@workingcopy$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@workingcopy$/, '') || '/').replace(/\/+$/, '') || '/';
+  const baseline = workingCopyOf(cleanPath, getSessionId(req));
+  res.json({
+    working_copy: null,
+    working_copy_of: baseline ? { '@id': `http://localhost:${PORT}${baseline}` } : null,
+  });
+});
+
+function endWorkingCopy(req, res) {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@workingcopy$/, '') || '/').replace(/\/+$/, '') || '/';
+  const sessionId = getSessionId(req);
+  const baseline = workingCopyOf(cleanPath, sessionId);
+  if (!baseline) {
+    return res.status(400).json({
+      error: { type: 'BadRequest', message: 'Not a working copy' },
+    });
+  }
+  delete sessionWorkingCopies[sessionId][cleanPath];
+
+  // The copy stops existing. Applying it merges it into the baseline and
+  // discarding it throws it away — either way there is no document left at
+  // this path, and leaving one behind put a stray `copy_of_*` in every listing
+  // for the rest of the session.
+  if (sessionContent[sessionId]) delete sessionContent[sessionId][cleanPath];
+  if (!sessionDeletions[sessionId]) sessionDeletions[sessionId] = new Set();
+  sessionDeletions[sessionId].add(cleanPath);
+
+  res.json({
+    working_copy_of: { '@id': `http://localhost:${PORT}${baseline}` },
+  });
+}
+
+app.patch(/.*\/@workingcopy$/, endWorkingCopy);
+app.delete(/.*\/@workingcopy$/, endWorkingCopy);
+
+app.get(/.*\/@sharing$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@sharing$/, '') || '/').replace(/\/+$/, '') || '/';
+  res.json(getSharing(cleanPath, getSessionId(req)));
+});
+
+app.post(/.*\/@sharing$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@sharing$/, '') || '/').replace(/\/+$/, '') || '/';
+  const sessionId = getSessionId(req);
+  const current = getSharing(cleanPath, sessionId);
+
+  const byId = new Map(current.entries.map((e) => [e.id, e]));
+  for (const incoming of req.body?.entries ?? []) {
+    const existing = byId.get(incoming.id);
+    byId.set(incoming.id, {
+      disabled: false,
+      login: null,
+      title: incoming.id,
+      type: incoming.type ?? 'user',
+      ...existing,
+      id: incoming.id,
+      roles: { ...noRoles(), ...(existing?.roles ?? {}), ...incoming.roles },
+    });
+  }
+
+  if (!sessionSharing[sessionId]) sessionSharing[sessionId] = {};
+  sessionSharing[sessionId][cleanPath] = {
+    available_roles: AVAILABLE_ROLES,
+    entries: [...byId.values()],
+    inherit: req.body?.inherit ?? current.inherit,
+  };
+  res.status(204).end();
 });
 
 /**
@@ -2010,7 +2468,7 @@ app.get(/.*\/@workflow$/, (req, res) => {
 app.get('/@users/:userid', (req, res) => {
   const { userid } = req.params;
   res.json({
-    '@id': `http://localhost:8888/@users/${userid}`,
+    '@id': `http://localhost:${PORT}/@users/${userid}`,
     id: userid,
     fullname: 'Admin User',
     email: 'admin@example.com',
@@ -2083,8 +2541,32 @@ function getTypeSchema(typeName) {
   return schema;
 }
 
+/**
+ * True when this mock knows the type at all: either it ships a schema file or
+ * it is one of the addable types. Real Plone 404s on an unknown type rather
+ * than inventing a schema, and adapters have to be able to tell the
+ * difference, so the fallback in getTypeSchema must not apply to made-up
+ * names.
+ */
+function isKnownType(typeName) {
+  const schemaPath = path.join(
+    __dirname,
+    'api',
+    `schema-${typeName.toLowerCase()}.json`,
+  );
+  if (fs.existsSync(schemaPath)) return true;
+  return listAddableTypes().some(
+    (t) => t['@id'].split('/').pop() === typeName,
+  );
+}
+
 app.get('/@types/:typeName', (req, res) => {
   const { typeName } = req.params;
+  if (!isKnownType(typeName)) {
+    return res.status(404).json({
+      error: { type: 'NotFound', message: `No such content type: ${typeName}` },
+    });
+  }
   res.json(getTypeSchema(typeName));
 });
 
@@ -2095,7 +2577,60 @@ app.get('/@types/:typeName', (req, res) => {
 const VOCAB_ITEMS = {
   'plone.app.vocabularies.Keywords': ['news', 'plone', 'events'],
 };
+
+// Optional generated vocabularies, declared by a seed file and switched on
+// with VOCAB_SPEC. Used by the adapter contract suite, which needs a
+// vocabulary large enough that fetch-everything-and-filter-in-memory shows up
+// as a latency failure. Off unless the env var is set, so nothing else here
+// changes behaviour.
+const GENERATED_VOCABS = {};
+if (process.env.VOCAB_SPEC) {
+  const specPath = path.resolve(process.cwd(), process.env.VOCAB_SPEC);
+  const spec = JSON.parse(fs.readFileSync(specPath, 'utf-8')).vocabularies || {};
+  const prefix = process.env.VOCAB_PREFIX || '';
+  for (const [name, def] of Object.entries(spec)) {
+    GENERATED_VOCABS[`${prefix}${name}`] = Array.from(
+      { length: def.generate },
+      (_, i) => ({
+        token: `${def.tokenPrefix}${i}`,
+        title: `${def.titlePrefix}${i}`,
+      }),
+    );
+  }
+  console.log(
+    `Generated vocabularies: ${Object.entries(GENERATED_VOCABS)
+      .map(([k, v]) => `${k} (${v.length})`)
+      .join(', ')}`,
+  );
+}
+
 app.get('/@vocabularies/:vocab', (req, res) => {
+  const generated = GENERATED_VOCABS[req.params.vocab];
+  if (generated) {
+    // Real Plone filters and batches server-side; so must this, or the
+    // contract suite's type-ahead latency assertion is meaningless.
+    const title = req.query.title;
+    const filtered = title
+      ? generated.filter((i) => i.title.includes(title))
+      : generated;
+    const size = req.query.b_size ? parseInt(req.query.b_size, 10) : 25;
+    const start = req.query.b_start ? parseInt(req.query.b_start, 10) : 0;
+    return res.json({
+      '@id': `http://localhost:${PORT}/@vocabularies/${req.params.vocab}`,
+      items: filtered.slice(start, start + size),
+      items_total: filtered.length,
+    });
+  }
+
+  if (!VOCAB_ITEMS[req.params.vocab]) {
+    return res.status(404).json({
+      error: {
+        type: 'NotFound',
+        message: `No such vocabulary: ${req.params.vocab}`,
+      },
+    });
+  }
+
   const values = VOCAB_ITEMS[req.params.vocab] || [];
   res.json({
     '@id': `http://localhost:${PORT}/@vocabularies/${req.params.vocab}`,
@@ -2172,7 +2707,7 @@ app.get('*/@breadcrumbs', (req, res) => {
  */
 app.get(/.*\/@actions$/, (req, res) => {
   const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@actions$/, '') || '/').replace(/\/+$/, '') || '/';
-  res.json(buildActionsComponent(cleanPath, `http://localhost:${PORT}`));
+  res.json(buildActionsComponent(cleanPath, `http://localhost:${PORT}`, getSessionId(req)));
 });
 
 /**
@@ -2193,11 +2728,11 @@ app.get(/.*\/@navigation$/, (req, res) => {
     const rootPath = rootPathParam || '/';
     res.json({
       '@id': `${baseUrl}${cleanPath}/@navigation`,
-      items: getNavigationItems(rootPath, depth, baseUrl),
+      items: getNavigationItems(rootPath, depth, baseUrl, getSessionId(req)),
     });
     return;
   }
-  res.json(buildNavigationComponent(cleanPath, baseUrl));
+  res.json(buildNavigationComponent(cleanPath, baseUrl, getSessionId(req)));
 });
 
 app.get(/.*\/@navroot$/, (req, res) => {
@@ -2402,6 +2937,18 @@ app.post('*/@querystring-search', (req, res) => {
       if (value) {
         allItems = allItems.filter((item) => matchSearchableText(value, item));
       }
+    } else if (index === 'Title' && operation.includes('string.contains')) {
+      // The Title index is its own catalog index, distinct from SearchableText.
+      // Without this branch a Title criterion matched nothing in the chain and
+      // was dropped, so the endpoint returned the whole collection and any
+      // test asserting "the filter found something" passed without filtering.
+      if (value) {
+        allItems = allItems.filter((item) =>
+          String(item.title ?? '')
+            .toLowerCase()
+            .includes(String(value).toLowerCase()),
+        );
+      }
     } else if (index === 'exclude_from_nav' && operation.includes('boolean')) {
       // Nav listings filter out items marked exclude_from_nav: true.
       // Mirrors Plone's plone.app.querystring.operation.boolean.{isFalse,isTrue}.
@@ -2413,6 +2960,14 @@ app.post('*/@querystring-search', (req, res) => {
       // Note: `review_state` and `Subject` selection.{any,all,none} are
       // handled generically above via `selectionFields` (which already
       // maps both indices), so we don't need explicit branches here.
+    } else {
+      // Never drop a criterion quietly. An ignored filter returns the whole
+      // collection, which looks exactly like a filter that matched everything
+      // — the failure mode that hid the missing Title branch above.
+      console.warn(
+        `[MOCK-API] @querystring-search: unhandled criterion '${index}' ` +
+          `with operation '${operation}' — returning unfiltered results`,
+      );
     }
   }
 
@@ -2499,6 +3054,25 @@ app.post('*/@querystring-search', (req, res) => {
  */
 app.get('*/@search', (req, res) => {
   const searchPath = req.path.replace('/@search', '');
+
+  // UID lookup — the index behind resolveuid. Real Plone's catalog answers
+  // this and reflects unsaved-elsewhere edits made in the same session, so it
+  // must read through getContent (session first) rather than straight off
+  // disk, or a renamed document keeps reporting its old title.
+  if (req.query.UID) {
+    const uidPath = uidToPathMap[req.query.UID];
+    const found = uidPath
+      ? getContent(uidPath, getSessionId(req))
+      : null;
+    return res.json({
+      '@id': `http://localhost:${PORT}${searchPath}/@search`,
+      items: found
+        ? [formatSearchItem(found, `http://localhost:${PORT}`)]
+        : [],
+      items_total: found ? 1 : 0,
+    });
+  }
+
   const pathDepth = req.query['path.depth'];
   const pathQuery = req.query['path.query'];
   const searchableText = req.query['SearchableText'];
@@ -2536,8 +3110,13 @@ app.get('*/@search', (req, res) => {
     const normalizedSearch = (searchPath === '' || searchPath === '/') ? '/' : searchPath;
     const searchDepth = normalizedSearch === '/' ? 0 : normalizedSearch.split('/').filter(Boolean).length;
 
-    // Get direct children from contentDirMap (items at searchDepth + 1)
-    items = Object.keys(contentDirMap)
+    // Direct children, from disk AND from anything this session created or
+    // moved here. Enumerating contentDirMap alone would miss a page that was
+    // just pasted in and would keep listing one that was cut away, which is
+    // precisely what the contents view is for.
+    const sessionPaths = Object.keys(sessionContent[getSessionId(req)] || {});
+    const candidates = new Set([...Object.keys(contentDirMap), ...sessionPaths]);
+    items = [...candidates]
       .filter((itemPath) => {
         if (itemPath === '/') return false;
         if (itemPath === normalizedSearch) return false;
@@ -2547,11 +3126,23 @@ app.get('*/@search', (req, res) => {
         const itemParts = itemPath.split('/').filter(Boolean);
         return itemParts.length === searchDepth + 1;
       })
-      .map((itemPath) => loadContentFromDisk(itemPath))
+      .map((itemPath) => getContent(itemPath, getSessionId(req)))
       // A dir with no parseable data.json (e.g. `templates/`) loads as null —
       // skip it, don't crash formatSearchItem (same guard as the no-depth branch).
       .filter((content) => content != null)
       .map((content) => formatSearchItem(content, baseUrl));
+
+    // Honour an explicit ordering set via @order for this container. Items not
+    // named in it keep their natural position after the ones that are.
+    const explicit = sessionOrder[getSessionId(req)]?.[normalizedSearch];
+    if (explicit) {
+      const rank = (item) => {
+        const id = new URL(item['@id']).pathname.split('/').filter(Boolean).pop();
+        const at = explicit.indexOf(id);
+        return at === -1 ? explicit.length : at;
+      };
+      items.sort((a, b) => rank(a) - rank(b));
+    }
 
     // For root searches, also include non-root mount points as virtual folders
     // so the object browser can navigate into them (e.g., _test_data)
@@ -2608,9 +3199,34 @@ app.get('*/@search', (req, res) => {
       .map((content) => formatSearchItem(content, baseUrl));
   }
 
+  // GET @search honours sort_on / sort_order, as the catalog does.
+  //
+  // It did not, so anything ordering a listing through this endpoint — the
+  // contents view's "Rearrange by", above all — came back in whatever order
+  // the items were assembled. Ascending and descending were byte-identical,
+  // which is indistinguishable from a sort the ADMIN failed to send, and hid
+  // the question of whether the admin sends it at all.
+  //
+  // getObjPositionInParent is the folder's own order, which is how the items
+  // already arrive; every other index sorts on the metadata field of that
+  // name, and sort_order: descending reverses the whole result, as in the
+  // querystring-search handler above.
+  const sortOn = req.query.sort_on;
+  if (sortOn && sortOn !== 'getObjPositionInParent') {
+    items = [...items].sort((a, b) => {
+      const x = a[sortOn] ?? '';
+      const y = b[sortOn] ?? '';
+      if (typeof x === 'number' && typeof y === 'number') return x - y;
+      return String(x) < String(y) ? -1 : String(x) > String(y) ? 1 : 0;
+    });
+  }
+  if (req.query.sort_order === 'descending' || req.query.sort_order === 'reverse') {
+    items = [...items].reverse();
+  }
+
   const searchUrl = searchPath === '' || searchPath === '/'
-    ? 'http://localhost:8888/@search'
-    : `http://localhost:8888${searchPath}/@search`;
+    ? `http://localhost:${PORT}/@search`
+    : `http://localhost:${PORT}${searchPath}/@search`;
 
   res.json({
     '@id': searchUrl,
@@ -2688,7 +3304,7 @@ app.get('*/@contents', (req, res) => {
   }
 
   res.json({
-    '@id': `http://localhost:8888${contentPath}/@contents`,
+    '@id': `http://localhost:${PORT}${contentPath}/@contents`,
     'items': items,
     'items_total': items.length,
   });
@@ -2794,6 +3410,14 @@ app.get('*/@@images/*', (req, res) => {
       || 'application/octet-stream');
     res.sendFile(file);
     return;
+  }
+
+  // Bytes uploaded in this session take precedence: they have no directory on
+  // disk, so contentDirMap will never find them.
+  const blob = sessionBlobs[`${getSessionId(req)}:${contentPath}:${fieldName}`];
+  if (blob) {
+    res.set('Content-Type', blob.mime);
+    return res.send(blob.buffer);
   }
 
   // Try to serve actual image file from content directory

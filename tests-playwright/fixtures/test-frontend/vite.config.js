@@ -30,6 +30,9 @@ export default defineConfig({
     alias: {
       '/hydra.js': path.resolve(__dirname, '../../../packages/hydra-js/hydra.src.js'),
       '/helpers.js': path.resolve(__dirname, '../../../packages/helpers/index.js'),
+      '/plone-adapter.js': path.resolve(__dirname, '../../../packages/hydra-adapters-plone/index.js'),
+      '/wordpress-adapter.js': path.resolve(__dirname, '../../../packages/hydra-adapters-wordpress/index.js'),
+      '/drupal-adapter.js': path.resolve(__dirname, '../../../packages/hydra-adapters-drupal/index.js'),
       '/build-block-path-map.js': path.resolve(__dirname, '../../../packages/hydra-js/buildBlockPathMap.js'),
       '/shared-block-schemas.js': path.resolve(__dirname, '../shared-block-schemas.js'),
       '/core-block-schemas.js': path.resolve(__dirname, '../core-block-schemas.js'),

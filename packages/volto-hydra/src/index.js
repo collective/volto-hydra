@@ -1,3 +1,6 @@
+// Publishes window.__hydraBridgeRpc at module load — before any route can
+// dispatch, which is earlier than any component effect could manage.
+import './bridge/client';
 import { defineMessages } from 'react-intl';
 import filterSVG from '@plone/volto/icons/filter.svg';
 
@@ -36,6 +39,8 @@ import frontendPreviewUrl, { viewportPreset } from './reducers';
 import FrontendSwitcherPlug from './components/Toolbar/FrontendSwitcherPlug';
 import SidebarToggleToolbarPlug from './components/Toolbar/SidebarToggleToolbarPlug';
 import FrontendSwitcherPanel from './components/Toolbar/FrontendSwitcherPanel';
+import NativeActionsPlug from './components/Toolbar/NativeActionsPlug';
+import NativeActionsPanel from './components/Toolbar/NativeActionsPanel';
 import MobileSubmenuClose from './components/Toolbar/MobileSubmenuClose';
 import { getIframeUrlCookieName } from './utils/cookieNames';
 import getSavedURLs, { getURlsFromEnv } from './utils/getSavedURLs';
@@ -76,6 +81,50 @@ import { applyBlockDefaults } from '@plone/volto/helpers';
 import { setInjectedVoltoConfig } from './utils/injectedVoltoConfig';
 
 const applyConfig = (config) => {
+  // Route every CMS call over the bridge to the frontend's adapter instead of
+  // fetching directly from the admin. Off unless explicitly enabled: with it
+  // off the customized Api helper falls through to stock superagent, so the
+  // whole inversion is inert.
+  config.settings.useBridgeBackend =
+    process.env.RAZZLE_USE_BRIDGE_BACKEND === 'true';
+
+  if (config.settings.useBridgeBackend) {
+    // Expanders are decided from the adapter's CAPABILITIES, not statically
+    // here: at config time no adapter has announced itself yet, and baking in
+    // a default that never gets revisited is exactly how every request once
+    // ended up on the passthrough regardless of which CMS was connected.
+    //
+    // Off until the frontend says it can expand natively — see
+    // bridge/expanders.js for why that gate exists and what it measured.
+    config.settings.apiExpanders = [];
+
+    // Guarantee the server can resolve a UI language without asking a CMS.
+    //
+    // server.jsx picks the render language from
+    //   cookie || state.site.data['plone.default_language'] || accept-language
+    // and in a bridge session the middle term is always absent — site info is
+    // a CMS read the server cannot make. A request that also carries no
+    // Accept-Language (health checks, curl, monitors) therefore left the
+    // language undefined, and toReactIntlLang() called .includes() on it. That
+    // throw lands in server.jsx's .catch(errorHandler), so the response was an
+    // ERROR PAGE with an error status rather than the admin.
+    //
+    // Naming the language the admin is built with is not a fallback for CMS
+    // data: it is a UI preference the CMS never owned in the first place.
+    const language =
+      config.settings.supportedLanguages?.[0] ?? 'en';
+    const ensureLanguage = (req, res, next) => {
+      if (!req.headers['accept-language']) {
+        req.headers['accept-language'] = language;
+      }
+      next();
+    };
+    config.settings.expressMiddleware = [
+      ...(config.settings.expressMiddleware ?? []),
+      ensureLanguage,
+    ];
+  }
+
   // Inject the Volto-config-derived values the pure block-path / schema utils
   // need, so those modules carry NO static `@plone/volto/registry` import and can
   // be loaded (bare Node) by block-sanity's offline discovery. Lazy getters so a
@@ -163,12 +212,19 @@ const applyConfig = (config) => {
       component: FrontendSwitcherPanel,
       wrapper: null,
     },
+    // Screens the CMS answers for itself. The button hides when no adapter
+    // declared any, so a CMS happy with Volto's own screens adds nothing.
+    nativeActions: {
+      component: NativeActionsPanel,
+      wrapper: null,
+    },
   };
 
   // Register the toolbar plug as appExtras so Plug mounts in the App tree
   config.settings.appExtras = [
     ...(config.settings.appExtras || []),
     { match: '/', component: FrontendSwitcherPlug },
+    { match: '/', component: NativeActionsPlug },
     { match: '/', component: SidebarToggleToolbarPlug },
     { match: '/', component: MobileSubmenuClose },
   ];
@@ -260,7 +316,21 @@ const applyConfig = (config) => {
           ...(blockTab?.fieldsets?.slice(1) || []),
         ],
         properties: {
-          value: { title: 'Body', widget: 'slate', placeholder },
+          // Default lives HERE, on the field, not only in the initialValue
+          // hook above. initialValue is called by _applyBlockInitialValue,
+          // which only the add-block flow runs; every other way a slate block
+          // comes into being — ensureEmptyBlockIfEmpty seeding an empty
+          // container, initialBlocks for a new page, a template slot — goes
+          // through applyBlockDefaults, which reads schema defaults. Without
+          // this a slate block could exist with no value, and the frontend
+          // would render its empty-state placeholder with no addressable slate
+          // node, which disables selection sync for the block.
+          value: {
+            title: 'Body',
+            widget: 'slate',
+            placeholder,
+            default: config.settings.slate.defaultValue(),
+          },
           ...(blockTab?.properties || {}),
         },
         required: blockTab?.required || [],
@@ -791,15 +861,29 @@ const applyConfig = (config) => {
   // Initial call to set the blocks based on the initial state
   updateAllowedBlocks();
 
-  // Initial block for Document content type
+  // What a new document starts with.
+  //
+  // Keyed by CONTENT TYPE, and every key here used to be a Plone type name, so
+  // a new document on any other CMS started with no blocks at all — both
+  // WordPress and Drupal report their page type as 'page'. The admin is meant
+  // to be CMS-agnostic, so the same starting blocks are registered for the
+  // page types the other adapters report.
+  //
+  // Still a gap: this is a list of known type names rather than a default for
+  // any type, so a CMS whose page type is called something else is back to
+  // starting empty. Fixing that properly means a fallback in Volto's
+  // initialBlocks lookup, which is core behaviour rather than config.
+  const INITIAL_BLOCKS = [
+    { '@type': 'title' },
+    {
+      '@type': 'slate',
+      value: [{ type: 'p', children: [{ text: '' }] }],
+    },
+  ];
   config.blocks.initialBlocks = {
-    Document: [
-      { '@type': 'title' },
-      {
-        '@type': 'slate',
-        value: [{ type: 'p', children: [{ text: '' }] }],
-      },
-    ],
+    Document: INITIAL_BLOCKS,
+    page: INITIAL_BLOCKS,
+    post: INITIAL_BLOCKS,
   };
 
   // Generic block actions registry

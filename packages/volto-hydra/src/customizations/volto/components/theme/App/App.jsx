@@ -3,6 +3,7 @@
  * @module components/theme/App/App
  */
 
+import AdapterHost from '../../../../../bridge/AdapterHost';
 import React, { Component } from 'react';
 import jwtDecode from 'jwt-decode';
 import PropTypes from 'prop-types';
@@ -129,6 +130,10 @@ export class App extends Component {
 
     return (
       <PluggablesProvider>
+        {/* HYDRA: hosts the frontend's adapter on EVERY route. Editing routes
+            without an iframe — the contents view above all — would otherwise
+            have no adapter and no way to reach the CMS. */}
+        <AdapterHost />
         {language && (
           <Helmet>
             <html lang={language} />
@@ -261,6 +266,20 @@ export const fetchContent = async ({ store, location }) => {
   return content;
 };
 
+
+/**
+ * Where the route's initial data can actually be fetched.
+ *
+ * Volto loads content, breadcrumbs and navigation on the server only, and the
+ * client inherits them through the serialised store. A bridge-backed admin has
+ * no server-side CMS to load them from — the adapter lives in an iframe that
+ * does not exist until the browser renders one — so the same fetches have to
+ * happen client-side instead. Without this the toolbar never sees a folder to
+ * add into, because nothing ever fetched it.
+ */
+const loadsInThisEnvironment = () =>
+  __SERVER__ || config.settings.useBridgeBackend;
+
 export function connectAppComponent(AppComponent) {
   return compose(
     asyncConnect([
@@ -269,7 +288,7 @@ export function connectAppComponent(AppComponent) {
         promise: ({ location, store: { dispatch } }) => {
           // Do not trigger the breadcrumbs action if the expander is present
           if (
-            __SERVER__ &&
+            loadsInThisEnvironment() &&
             !hasApiExpander('breadcrumbs', getBaseUrl(location.pathname))
           ) {
             return dispatch(getBreadcrumbs(getBaseUrl(location.pathname)));
@@ -279,14 +298,14 @@ export function connectAppComponent(AppComponent) {
       {
         key: 'content',
         promise: ({ location, store }) =>
-          __SERVER__ && fetchContent({ store, location }),
+          loadsInThisEnvironment() && fetchContent({ store, location }),
       },
       {
         key: 'navigation',
         promise: ({ location, store: { dispatch } }) => {
           // Do not trigger the navigation action if the expander is present
           if (
-            __SERVER__ &&
+            loadsInThisEnvironment() &&
             !hasApiExpander('navigation', getBaseUrl(location.pathname))
           ) {
             return dispatch(
