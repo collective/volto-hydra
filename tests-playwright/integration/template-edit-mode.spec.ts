@@ -196,7 +196,14 @@ test.describe('Template Creation', () => {
     // Make Template auto-selects the instance and enters edit mode, so the Short
     // name field is editable. Set a custom short name.
     await expect(page.locator('.edit-template-toggle')).toHaveAttribute('aria-pressed', 'true', { timeout: 5000 });
-    const shortName = page.locator('.field').filter({ hasText: 'Short name' }).locator('input');
+    // Scoped to the template instance's own sidebar section. The content type
+    // declares `id`, titled "Short name" too, and the page pane renders it in
+    // the same sidebar at the same time — an unscoped `.field` matched both and
+    // strict mode refused the pair.
+    const shortName = page
+      .locator('.parent-block-settings .field')
+      .filter({ hasText: 'Short name' })
+      .locator('input');
     await expect(shortName).toBeEnabled({ timeout: 5000 });
     await shortName.fill('my-new-layout');
 
