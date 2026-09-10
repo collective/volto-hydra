@@ -172,6 +172,7 @@ const getFilteredBlockSchema = (blockType, intl, blockPathMap, blockId, blockDat
 // React/Volto component tree. Imported at the top of this file.
 
 const ParentBlockSection = ({
+  blocksErrors = {},
   blockId,
   blockType,
   blockData,
@@ -459,9 +460,31 @@ const ParentBlockSection = ({
           that isn't rendered has nothing to lock. */}
       {!BlockEdit && schema && !isReadonly && !pathInfo?.isTemplateInstance && (() => {
         const formSchema = schema;
+        // Field rules that SAY something rather than refuse it. A warning is
+        // deliberately not a validator — it must not block the save — so it
+        // has no route through Volto's error machinery and is rendered here,
+        // from the resolved schema, beside the fields it is about.
+        const warnings = Object.entries(formSchema.properties || {})
+          .filter(([, def]) => def?.hydraRuleWarning)
+          .map(([field, def]) => ({
+            field,
+            title: def.title || field,
+            message: def.hydraRuleWarning,
+          }));
         const formContent = (
           <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef, onChangeBlock }}>
+            <>
+            {warnings.length > 0 && (
+              <div className="hydra-field-warnings" role="status">
+                {warnings.map((w) => (
+                  <p key={w.field} className="hydra-field-warning">
+                    <strong>{w.title}:</strong> {w.message}
+                  </p>
+                ))}
+              </div>
+            )}
             <BlockDataForm
+              errors={blocksErrors?.[blockId] ? { [blockId]: blocksErrors[blockId] } : {}}
               schema={formSchema}
               onChangeField={(fieldId, value) => {
                 // Belt and braces: the widgets are disabled, and a change that
@@ -480,6 +503,7 @@ const ParentBlockSection = ({
               block={blockId}
               applySchemaEnhancers={true}
             />
+            </>
           </HydraSchemaProvider>
         );
         // Portal to the target element (sidebar-properties for current, parent-sidebar-{id} for parents)
@@ -625,6 +649,11 @@ const ParentBlockSection = ({
 const ParentBlocksWidget = ({
   selectedBlock,
   multiSelected = [],
+  // blockId → { field: [messages] }, from the last refused save. Volto's
+  // InlineForm takes `errors` keyed the same way and marks the field, so the
+  // author sees WHICH field is wrong where they would fix it — the toast only
+  // names the block.
+  blocksErrors = {},
   formData,
   blockPathMap,
   onSelectBlock,
@@ -823,6 +852,7 @@ const ParentBlocksWidget = ({
             return (
               <ParentBlockSection
                 key={parentId}
+                blocksErrors={blocksErrors}
                 blockId={parentId}
                 blockType={parentType}
                 blockData={parentData}
@@ -849,6 +879,7 @@ const ParentBlocksWidget = ({
           {/* Current block form (ChildBlocksWidget renders inside its schema fields) */}
           <ParentBlockSection
             key={selectedBlock}
+            blocksErrors={blocksErrors}
             blockId={selectedBlock}
             blockType={currentBlockType}
             blockData={currentBlockData}

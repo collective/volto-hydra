@@ -122,6 +122,37 @@ if (process.env.SKIP_CONTENT_VALIDATION !== 'true') {
 // Format: { sessionId: { '/path': content, ... } }
 const sessionContent = {};
 
+// Bytes of images uploaded within a session, so @@images can serve back what
+// was just POSTed. Without this the mock accepts an upload and then 404s every
+// scale URL it advertised. Format: { 'sessionId:/path:field': {buffer, mime} }
+const sessionBlobs = {};
+
+// Paths deleted within a session. Disk content can't actually be removed (it
+// is shared by every session and reloaded by the watcher), so a DELETE records
+// a tombstone here and getContent treats the path as gone for that session
+// only. Format: { sessionId: Set<'/path'> }
+const sessionDeletions = {};
+
+// Explicit child ordering per container, set by @order. Absent means "use the
+// natural order", which is what every existing test relies on.
+const sessionOrder = {};
+
+/**
+ * @move and @copy accept either one source or a list — the contents view lets
+ * an editor select several rows and paste them together, so Volto always sends
+ * whatever was selected. Each entry may be an absolute URL or a plain path.
+ */
+function normaliseSources(raw) {
+  const list = Array.isArray(raw) ? raw : [raw];
+  return list.filter(Boolean).map((entry) => {
+    const value = typeof entry === 'string' ? entry : entry?.['@id'];
+    if (typeof value !== 'string') return null;
+    return /^https?:\/\//.test(value)
+      ? new URL(value).pathname.replace('/++api++', '') || '/'
+      : value;
+  }).filter(Boolean);
+}
+
 // Map URL paths to source directories (for loading content from disk)
 const contentDirMap = {};
 
@@ -168,13 +199,51 @@ function setSessionContent(sessionId, urlPath, content) {
  * Generate a fresh JWT token with 24-hour expiration from now.
  * Called on each login/renew to ensure token is always valid.
  */
+let tokenCounter = 0;
+
+/**
+ * Mint a session token.
+ *
+ * The `jti` is not decoration: every mutation in this mock is scoped to the
+ * caller's token (see getSessionId), and the payload used to be `{sub, exp}`
+ * with `exp` at SECOND granularity — so two logins in the same second produced
+ * a byte-identical token and silently shared one session. Two tests that each
+ * moved the same page then interfered with each other, passing or failing on
+ * where the second boundary happened to fall.
+ */
 function generateAuthToken(username = 'admin') {
   const header = Buffer.from(JSON.stringify({"alg":"HS256","typ":"JWT"})).toString('base64').replace(/=/g, '');
+  tokenCounter += 1;
   const payload = Buffer.from(JSON.stringify({
     "sub": username,
-    "exp": Math.floor(Date.now()/1000) + 86400  // 24 hours from NOW
+    "exp": Math.floor(Date.now()/1000) + 86400,  // 24 hours from NOW
+    "jti": `${Date.now()}-${tokenCounter}`
   })).toString('base64').replace(/=/g, '');
   return `${header}.${payload}.fake-signature`;
+}
+
+/**
+ * Carry a session across a token change.
+ *
+ * Real Plone's @login-renew answers with a fresh JWT, so the mock does too —
+ * but every store here is keyed on the token, and without this a renewal would
+ * strand each edit in the session the caller just stopped using. The admin
+ * renews on a timer, so that would look like edits vanishing at random.
+ */
+function migrateSession(fromToken, toToken) {
+  if (!fromToken || fromToken === toToken) return;
+  const from = `token:${fromToken}`;
+  const to = `token:${toToken}`;
+  for (const store of [
+    sessionContent,
+    sessionBlobs,
+    sessionDeletions,
+    sessionOrder,
+    sessionSharing,
+    sessionWorkingCopies,
+  ]) {
+    if (store[from] !== undefined) store[to] = store[from];
+  }
 }
 
 // Middleware
@@ -244,10 +313,32 @@ if (process.env.DEBUG) {
  * @param {Object} req - Express request object
  * @returns {boolean} True if authenticated
  */
+/**
+ * A token the mock always rejects, so tests can reproduce a mid-session expiry
+ * without tearing the server down. Nothing else issues this value.
+ */
+const REVOKED_TOKEN = 'EXPIRED_TOKEN';
+
+function isRevoked(req) {
+  const authHeader = req.headers.authorization;
+  return authHeader === `Bearer ${REVOKED_TOKEN}`;
+}
+
 function isAuthenticated(req) {
   const authHeader = req.headers.authorization;
-  return authHeader && authHeader.startsWith('Bearer ');
+  return authHeader && authHeader.startsWith('Bearer ') && !isRevoked(req);
 }
+
+// Reject a revoked session before any route sees the request, exactly as a
+// CMS with an expired cookie would.
+app.use((req, res, next) => {
+  if (isRevoked(req)) {
+    return res.status(401).json({
+      error: { type: 'Unauthorized', message: 'Session expired' },
+    });
+  }
+  next();
+});
 
 /**
  * Filter actions based on authentication status
@@ -573,12 +664,12 @@ function parseExpand(req) {
   return String(raw).split(',').map((s) => s.trim()).filter(Boolean);
 }
 
-function loadContentFromDisk(urlPath, expandList = []) {
+function loadContentFromDisk(urlPath, expandList = [], sessionId) {
   const baseUrl = `http://localhost:${PORT}`;
   const content = loadRawContentFromDisk(urlPath);
   if (!content) return null;
 
-  return enrichContent(content, urlPath, baseUrl, expandList);
+  return enrichContent(content, urlPath, baseUrl, expandList, sessionId);
 }
 
 /**
@@ -586,10 +677,24 @@ function loadContentFromDisk(urlPath, expandList = []) {
  * remainingDepth controls how much of the subtree to include: 0 means no
  * children, 1 means direct children only, etc.
  */
-function formatNavItem(rawContent, urlPath, baseUrl, remainingDepth) {
+/**
+ * The content a @components builder is allowed to read: session first, then
+ * disk, and RAW either way.
+ *
+ * `getContent` is the enriching reader — it attaches @components — so calling it
+ * from inside a component builder is a cycle waiting for the right mount. The
+ * session store wins here for the same reason it wins there: a page renamed or
+ * hidden in this session is renamed or hidden in the menu.
+ */
+function rawContentForComponents(urlPath, sessionId) {
+  const inSession = sessionId ? sessionContent[sessionId]?.[urlPath] : undefined;
+  return inSession || loadRawContentFromDisk(urlPath);
+}
+
+function formatNavItem(rawContent, urlPath, baseUrl, remainingDepth, sessionId) {
   const hasPreviewImage = !!(rawContent.preview_image || rawContent['@type'] === 'Image');
   const children = (remainingDepth > 0 && rawContent.is_folderish !== false)
-    ? getNavigationItems(urlPath, remainingDepth, baseUrl)
+    ? getNavigationItems(urlPath, remainingDepth, baseUrl, sessionId)
     : [];
   return {
     '@id': `${baseUrl}${urlPath}`,
@@ -612,15 +717,41 @@ function formatNavItem(rawContent, urlPath, baseUrl, remainingDepth) {
  * @param {string} basePath - The base path to get navigation for (e.g., '/' or '/pretagov')
  * @param {number} depth - How many levels deep to include (default 1)
  */
-function getNavigationItems(basePath = '/', depth = 1, baseUrlIn) {
+/*
+ * The menu follows the SESSION, not just the disk.
+ *
+ * This took a sessionId at both call sites — `getRootNavigationItems` and the
+ * /@navigation route — and did not declare a fourth parameter, so JavaScript
+ * dropped it and every item came off disk regardless. The plumbing read as
+ * though the menu were session-aware while nothing about it was, which is the
+ * hardest kind of wrong to see: a title renamed and SAVED in an editing session
+ * still came back as its old self, and the only symptom was a demo of "the
+ * pages ARE the menu" where the menu never changed.
+ *
+ * Session content wins where there is any, exactly as the content routes do.
+ * That covers a retitle (the label IS the title), an exclude_from_nav tick, and
+ * a page created or moved in the session — all three of which the menu is
+ * supposed to follow.
+ */
+function getNavigationItems(basePath = '/', depth = 1, baseUrlIn, sessionId) {
   const baseUrl = baseUrlIn || `http://localhost:${PORT}`;
   const normalizedBase = basePath.replace(/\/$/, '') || '/';
   const baseDepth = normalizedBase === '/' ? 0 : normalizedBase.split('/').filter(p => p).length;
 
-  const items = Object.keys(contentDirMap)
+  // Disk AND the session. A page created, moved or pasted in this session exists
+  // only in the session store, so enumerating contentDirMap alone leaves it out
+  // of the menu — cut a page into another folder and the menu goes on showing it
+  // where it was, or not at all. The contents view already unions the two for
+  // the same reason; the menu is the same question asked of the same tree. A
+  // path deleted (or cut away) in this session drops out here too, or the menu
+  // keeps offering a page that is no longer there.
+  const sessionPaths = sessionId ? Object.keys(sessionContent[sessionId] || {}) : [];
+  const candidates = [...new Set([...Object.keys(contentDirMap), ...sessionPaths])];
+  const items = candidates
     .filter((itemPath) => {
       if (itemPath === '/') return false;
       if (itemPath === normalizedBase) return false; // Exclude the base itself
+      if (sessionId && sessionDeletions[sessionId]?.has(itemPath)) return false;
 
       // Check if item is under the base path
       if (normalizedBase !== '/' && !itemPath.startsWith(normalizedBase + '/')) {
@@ -633,13 +764,30 @@ function getNavigationItems(basePath = '/', depth = 1, baseUrlIn) {
       return itemParts.length === baseDepth + 1;
     })
     .map((itemPath) => {
-      const rawContent = loadRawContentFromDisk(itemPath);
+      const rawContent = rawContentForComponents(itemPath, sessionId);
       if (!rawContent) return null;
       if (rawContent.exclude_from_nav) return null;
       if (rawContent['@type'] === 'Image' || rawContent['@type'] === 'File') return null;
-      return formatNavItem(rawContent, itemPath, baseUrl, depth - 1);
+      return formatNavItem(rawContent, itemPath, baseUrl, depth - 1, sessionId);
     })
     .filter(Boolean);
+
+  // An explicit ordering set via @order in THIS session wins over the one on
+  // disk. The contents view already honours it; the menu has to as well, or
+  // reordering pages there reorders the listing and leaves the menu alone —
+  // and the menu IS the content tree, which is the whole point of the gesture.
+  // Items the ordering does not name keep their natural position after the ones
+  // it does, exactly as the contents view treats them.
+  const explicit = sessionId && sessionOrder[sessionId]?.[normalizedBase];
+  if (explicit) {
+    const rank = (item) => {
+      const id = String(item['@id'] || '').split('/').filter(Boolean).pop();
+      const at = explicit.indexOf(id);
+      return at === -1 ? explicit.length : at;
+    };
+    items.sort((a, b) => rank(a) - rank(b));
+    return items;
+  }
 
   // Sort by __metadata__.json ordering (UID→position), preserving
   // contentDirMap key order (filesystem alphabetical) as fallback.
@@ -660,12 +808,12 @@ function getNavigationItems(basePath = '/', depth = 1, baseUrlIn) {
  * Merges items from all content mounts so test content (/_test_data/*)
  * appears alongside docs content in the navigation.
  */
-function getRootNavigationItems() {
+function getRootNavigationItems(sessionId) {
   // Top-level items each pre-populated with their immediate children, so
   // the dropdown menu shows the next level on hover. depth=2 means "two
   // levels of items in total" — top + their direct children — which is
   // what the previous (depth-1-with-implicit-child-recursion) code produced.
-  return getNavigationItems('/', 2);
+  return getNavigationItems('/', 2, undefined, sessionId);
 }
 
 // ── Per-component builders ────────────────────────────────────────────────
@@ -701,33 +849,51 @@ function buildBreadcrumbsComponent(cleanPath, baseUrl) {
   };
 }
 
-function buildActionsComponent(cleanPath, baseUrl) {
+function buildActionsComponent(cleanPath, baseUrl, sessionId) {
   const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
   return {
     '@id': `${fullUrl}/@actions`,
     document_actions: [],
+    // Two sources, and they disagree. plone.restapi's own recorded example
+    // (actions_get.resp) has keys [icon, id, title]; a live Plone 6
+    // (demo.plone.org) has [icon, id, title, url]. The recording predates the
+    // serializer gaining `url`, and Volto reads `url` — Footer.jsx renders
+    // `item.url ? flattenToAppURL(item.url) : addAppURL(item.id)` — so `url`
+    // is what a current Plone emits and what belongs here.
+    //
+    // WHICH entries appear, and in which category, is from actions_get.resp:
+    // delete belongs in object_buttons beside cut/copy/rename, not in object.
     object: [
-      { '@id': fullUrl, icon: '', id: 'view', title: 'View' },
-      { '@id': `${fullUrl}/edit`, icon: '', id: 'edit', title: 'Edit' },
-      { id: 'folderContents', title: 'Contents' },
-      // The admin's More menu builds its Sharing entry from this action —
-      // pair of the @sharing endpoint below.
-      { '@id': `${fullUrl}/sharing`, icon: '', id: 'local_roles', title: 'Sharing' },
-      { '@id': `${fullUrl}/history`, icon: '', id: 'history', title: 'History' },
+      { url: fullUrl, icon: '', id: 'view', title: 'View' },
+      { url: `${fullUrl}/edit`, icon: '', id: 'edit', title: 'Edit' },
+      { id: 'folderContents', icon: '', title: 'Contents' },
+      { id: 'history', icon: '', title: 'History' },
+      { id: 'local_roles', icon: '', title: 'Sharing' },
     ],
-    object_buttons: [],
+    object_buttons: [
+      { id: 'cut', icon: '', title: 'Cut' },
+      { id: 'copy', icon: '', title: 'Copy' },
+      { id: 'delete', icon: '', title: 'Delete' },
+      { id: 'rename', icon: '', title: 'Rename' },
+      // plone.app.iterate's, and the ids Volto gates its working-copy buttons
+      // on. NOT in actions_get.resp, which records a site without it — so this
+      // is the one entry here that is inferred rather than recorded.
+      ...(workingCopyOf(cleanPath, sessionId)
+        ? [{ id: 'iterate_checkin', icon: '', title: 'Check in' }]
+        : [{ id: 'iterate_checkout', icon: '', title: 'Check out' }]),
+    ],
     portal_tabs: [],
     site_actions: [],
     user: [],
   };
 }
 
-function buildNavigationComponent(cleanPath, baseUrl) {
+function buildNavigationComponent(cleanPath, baseUrl, sessionId) {
   const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
   return {
     '@id': `${fullUrl}/@navigation`,
     // Always rooted at site root — top-level items with nested children
-    items: getRootNavigationItems(),
+    items: getRootNavigationItems(sessionId),
   };
 }
 
@@ -783,60 +949,114 @@ function synthesizeVersion(cleanPath, content, version, total) {
   return old;
 }
 
-// In-memory workflow state per path — the docs demo clips walk a real
-// publish/retract cycle, so transitions must ACT (and history must grow),
-// while staying ephemeral like everything else the mock holds.
-const workflowState = new Map();
-
-const WORKFLOW = {
-  private: {
-    title: 'Private',
-    transitions: [{ '@id': 'publish', title: 'Publish', to: 'published' },
-                  { '@id': 'submit', title: 'Submit for publication', to: 'pending' }],
-  },
-  pending: {
-    title: 'Pending review',
-    transitions: [{ '@id': 'publish', title: 'Publish', to: 'published' },
-                  { '@id': 'reject', title: 'Send back', to: 'private' }],
-  },
-  published: {
-    title: 'Published',
-    transitions: [{ '@id': 'retract', title: 'Retract', to: 'private' }],
-  },
+/**
+ * Plone's simple_publication_workflow.
+ *
+ * Shape comes from plone.restapi's recorded workflow_get response — see
+ * checking-against-plone.md. Note what is NOT in it: a transition names no destination
+ * state, only an @id and a title. Behaviour (which transition leads where) is
+ * simulated here because the workflow definition is not over REST at all.
+ */
+const SPW = {
+  private: [
+    { id: 'publish', title: 'Publish', to: 'published' },
+    { id: 'submit', title: 'Submit for publication', to: 'pending' },
+  ],
+  pending: [
+    { id: 'publish', title: 'Publish', to: 'published' },
+    { id: 'reject', title: 'Reject', to: 'private' },
+    { id: 'retract', title: 'Retract', to: 'private' },
+  ],
+  published: [{ id: 'retract', title: 'Retract', to: 'private' }],
 };
 
-function buildWorkflowComponent(cleanPath, baseUrl) {
+const STATE_TITLES = {
+  private: 'Private',
+  pending: 'Pending review',
+  published: 'Published',
+};
+
+function buildWorkflowComponent(cleanPath, baseUrl, sessionId) {
   const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
-  const entry = workflowState.get(cleanPath) || { state: 'published', history: [] };
-  const def = WORKFLOW[entry.state];
+  // RAW, never getContent. getContent enriches, and enrichment builds
+  // @components — including this one. For a mount with no site root on disk
+  // that closes a loop: getContent('/') generates a root, generating it builds
+  // its components, and this builder asks getContent('/') again. Every request
+  // for that root died with "Maximum call stack size exceeded", and a Next
+  // frontend fetches the root for its chrome, so every page did.
+  const content = rawContentForComponents(cleanPath, sessionId);
+  const state = content?.review_state || 'published';
   return {
     '@id': `${fullUrl}/@workflow`,
-    history: entry.history,
-    state: { id: entry.state, title: def.title },
-    transitions: def.transitions.map((t) => ({
-      '@id': `${fullUrl}/@workflow/${t['@id']}`,
+    history: [
+      {
+        action: null,
+        actor: 'admin',
+        comments: '',
+        review_state: state,
+        time: '1995-07-31T17:30:00+00:00',
+        title: STATE_TITLES[state] ?? state,
+      },
+    ],
+    state: { id: state, title: STATE_TITLES[state] ?? state },
+    // Deliberately {@id, title} only. An adapter that wants a destination
+    // state has to get it somewhere else — which is the finding.
+    transitions: (SPW[state] ?? []).map((t) => ({
+      '@id': `${fullUrl}/@workflow/${t.id}`,
       title: t.title,
     })),
   };
 }
 
-function applyWorkflowTransition(cleanPath, transitionId) {
-  const entry = workflowState.get(cleanPath) || { state: 'published', history: [] };
-  const def = WORKFLOW[entry.state];
-  const transition = def.transitions.find((t) => t['@id'] === transitionId);
-  if (!transition) return null;
-  const record = {
-    action: transitionId,
-    actor: 'admin',
-    comments: '',
-    review_state: transition.to,
-    time: new Date().toISOString(),
-    title: WORKFLOW[transition.to].title,
+/**
+ * Local roles. Shape from plone.restapi's recorded sharing_folder_get —
+ * see checking-against-plone.md.
+ *
+ * Entry-major, with a {Role: bool} map per principal — the grid. Transposing
+ * that into one field per role is the ADAPTER's job, in both directions.
+ */
+const AVAILABLE_ROLES = [
+  { id: 'Contributor', title: 'Can add' },
+  { id: 'Editor', title: 'Can edit' },
+  { id: 'Reader', title: 'Can view' },
+  { id: 'Reviewer', title: 'Can review' },
+];
+
+const sessionSharing = {};
+
+/**
+ * Working copies. Shapes from plone.restapi's recorded workingcopy_* —
+ * see checking-against-plone.md.
+ * A checkout lives at a DIFFERENT path, which is the whole reason the
+ * transition has to say where the editing session should go.
+ */
+const sessionWorkingCopies = {};
+
+function workingCopyOf(cleanPath, sessionId) {
+  return sessionWorkingCopies[sessionId]?.[cleanPath] ?? null;
+}
+
+function noRoles() {
+  return Object.fromEntries(AVAILABLE_ROLES.map((r) => [r.id, false]));
+}
+
+function getSharing(cleanPath, sessionId) {
+  const stored = sessionSharing[sessionId]?.[cleanPath];
+  if (stored) return stored;
+  return {
+    available_roles: AVAILABLE_ROLES,
+    entries: [
+      {
+        disabled: false,
+        id: 'AuthenticatedUsers',
+        login: null,
+        roles: noRoles(),
+        title: 'Logged-in users',
+        type: 'group',
+      },
+    ],
+    inherit: true,
   };
-  entry.state = transition.to;
-  entry.history = [...entry.history, record];
-  workflowState.set(cleanPath, entry);
-  return record;
 }
 
 function buildNavrootComponent(cleanPath, baseUrl) {
@@ -869,12 +1089,22 @@ function buildTypesComponent() {
  * expand-aware caller (enrichContent) decides which entries are included
  * vs left as @id stubs.
  */
-function generateComponents(urlPath, baseUrl) {
+function generateComponents(urlPath, baseUrl, sessionId) {
   const cleanPath = urlPath.replace(/\/$/, '') || '/';
   return {
+    // @actions has no session here on purpose: the adapter reads @actions
+    // directly, and that route IS session-aware, so a working copy still
+    // reports iterate_checkin.
     actions: buildActionsComponent(cleanPath, baseUrl),
     breadcrumbs: buildBreadcrumbsComponent(cleanPath, baseUrl),
-    navigation: buildNavigationComponent(cleanPath, baseUrl),
+    // navigation DOES need it. A frontend reads the menu from `?expand=
+    // navigation` on the page it is rendering, not from the /@navigation
+    // route — so leaving the session out here means the menu is the one on
+    // disk no matter what the editing session has done to it. The route was
+    // made session-aware and this path was not, which is the same bug one
+    // layer up: the two paths this file exists to keep identical drifted
+    // again, and only the one nothing reads was fixed.
+    navigation: buildNavigationComponent(cleanPath, baseUrl, sessionId),
     navroot: buildNavrootComponent(cleanPath, baseUrl),
     types: buildTypesComponent(),
     workflow: buildWorkflowComponent(cleanPath, baseUrl),
@@ -1136,9 +1366,9 @@ function stubComponents(fullUrl) {
  * Replace stubs for the named components with their fully-expanded bodies.
  * `expandList` is parsed from ?expand= on the incoming request.
  */
-function expandComponents(stubs, expandList, urlPath, baseUrl) {
+function expandComponents(stubs, expandList, urlPath, baseUrl, sessionId) {
   if (!expandList || expandList.length === 0) return stubs;
-  const expanded = generateComponents(urlPath, baseUrl);
+  const expanded = generateComponents(urlPath, baseUrl, sessionId);
   const out = { ...stubs };
   for (const name of expandList) {
     if (expanded[name] !== undefined) out[name] = expanded[name];
@@ -1146,7 +1376,7 @@ function expandComponents(stubs, expandList, urlPath, baseUrl) {
   return out;
 }
 
-function enrichContent(content, urlPath, baseUrl, expandList = []) {
+function enrichContent(content, urlPath, baseUrl, expandList = [], sessionId) {
   // Always use urlPath for @id (includes mount prefix), normalize trailing slash
   const cleanPath = urlPath.replace(/\/$/, '') || '/';
   const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
@@ -1188,7 +1418,7 @@ function enrichContent(content, urlPath, baseUrl, expandList = []) {
     'parent': parent,
     'items': childItems,
     'items_total': childItems.length,
-    '@components': expandComponents(stubComponents(fullUrl), expandList, urlPath, baseUrl),
+    '@components': expandComponents(stubComponents(fullUrl), expandList, urlPath, baseUrl, sessionId),
     // Permissions - granted by default, but a fixture may set `_mockPermissions` to model
     // an unauthorized case (e.g. a templates folder the user can't add to, or a template
     // document the user can't modify). This mirrors Plone's per-object permission flags.
@@ -1375,6 +1605,11 @@ setupContentWatchers();
  * @param {string} sessionId - Session ID for session-specific uploads
  */
 function getContent(urlPath, sessionId, expandList = []) {
+  // A path deleted in this session is gone for this session, even if disk
+  // content still backs it.
+  if (sessionId && sessionDeletions[sessionId]?.has(urlPath)) {
+    return null;
+  }
   // Check session-specific storage first (for content created in this session).
   if (sessionId && sessionContent[sessionId]) {
     const store = sessionContent[sessionId];
@@ -1393,12 +1628,14 @@ function getContent(urlPath, sessionId, expandList = []) {
       // unconditionally so the read-time @components reflect the current
       // request's ?expand= choices, like Plone does.
       const baseUrl = `http://localhost:${PORT}`;
-      return enrichContent(stored, urlPath, baseUrl, expandList);
+      return enrichContent(stored, urlPath, baseUrl, expandList, sessionId);
     }
   }
 
-  // Try disk first (distribution content may have a site root)
-  const diskContent = loadContentFromDisk(urlPath, expandList);
+  // Try disk first (distribution content may have a site root). The SESSION
+  // still goes with it: the page may be untouched while a sibling was renamed
+  // or hidden, and the menu on this page has to show that.
+  const diskContent = loadContentFromDisk(urlPath, expandList, sessionId);
   if (diskContent) return diskContent;
 
   // Fall back to generated site root
@@ -1418,9 +1655,12 @@ app.post('/@login-renew', (req, res) => {
     console.log('Token renewal requested');
   }
 
-  // Generate fresh token with new expiration
+  // Fresh token, same session. See migrateSession.
+  const previous = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const renewed = generateAuthToken('admin');
+  migrateSession(previous, renewed);
   res.json({
-    token: generateAuthToken('admin'),
+    token: renewed,
     user: {
       '@id': `${API_ORIGIN}/@users/admin`,
       id: 'admin',
@@ -1486,6 +1726,154 @@ app.post('/@logout', (req, res) => {
   }
   // Return 204 No Content on successful logout (Plone behavior)
   res.status(204).send();
+});
+
+/**
+ * POST /:target/@move — relocate content into this container.
+ *
+ * plone.restapi posts to the TARGET folder with the source in the body. The
+ * mock keeps disk content immutable and shared, so a move is recorded as a
+ * session relocation: the subtree reads from its new path and 404s at the old
+ * one, for the calling session only.
+ */
+app.post('*/@move', (req, res) => {
+  const targetPath = req.path.replace('/@move', '') || '/';
+  const sessionId = getSessionId(req);
+  const sources = normaliseSources(req.body?.source);
+  if (sources.length === 0) {
+    return res.status(400).json({
+      error: { type: 'BadRequest', message: '@move requires a source' },
+    });
+  }
+
+  const results = [];
+  for (const sourcePath of sources) {
+  const source = getContent(sourcePath, sessionId);
+  if (!source) {
+    return res.status(404).json({
+      error: { type: 'NotFound', message: `No such resource: ${sourcePath}` },
+    });
+  }
+  if (targetPath === sourcePath || targetPath.startsWith(`${sourcePath}/`)) {
+    return res.status(400).json({
+      error: {
+        type: 'BadRequest',
+        message: 'Cannot move a document inside itself',
+      },
+    });
+  }
+
+  const id = sourcePath.split('/').filter(Boolean).pop();
+  const destPath = `${targetPath === '/' ? '' : targetPath}/${id}`;
+
+  // Relocate the whole subtree: every descendant path moves with its parent,
+  // exactly as a real move does. Anything else silently orphans children.
+  const everyPath = new Set([
+    ...Object.keys(contentDirMap),
+    ...Object.keys(sessionContent[sessionId] || {}),
+  ]);
+  for (const p of everyPath) {
+    if (p !== sourcePath && !p.startsWith(`${sourcePath}/`)) continue;
+    const moved = getContent(p, sessionId);
+    if (!moved) continue;
+    const suffix = p.slice(sourcePath.length);
+    const raw = JSON.parse(JSON.stringify(moved));
+    delete raw['@components'];
+    setSessionContent(sessionId, `${destPath}${suffix}`, raw);
+    if (!sessionDeletions[sessionId]) sessionDeletions[sessionId] = new Set();
+    sessionDeletions[sessionId].add(p);
+    if (raw.UID) uidToPathMap[raw.UID] = `${destPath}${suffix}`;
+  }
+
+  results.push({ source: sourcePath, target: destPath });
+  }
+
+  return res.json(results);
+});
+
+/**
+ * POST /:parent/@order — reorder a child within its container.
+ */
+/**
+ * POST /:target/@copy — duplicate content into this container.
+ *
+ * Same shape as @move, but the source stays put and the copy gets a fresh UID
+ * so it is a genuinely distinct document rather than a second path onto one.
+ */
+app.post('*/@copy', (req, res) => {
+  const targetPath = req.path.replace('/@copy', '') || '/';
+  const sessionId = getSessionId(req);
+  const sources = normaliseSources(req.body?.source);
+  if (sources.length === 0) {
+    return res.status(400).json({
+      error: { type: 'BadRequest', message: '@copy requires a source' },
+    });
+  }
+  const sourcePath = sources[0];
+  const source = getContent(sourcePath, sessionId);
+  if (!source) {
+    return res.status(404).json({
+      error: { type: 'NotFound', message: `No such resource: ${sourcePath}` },
+    });
+  }
+  const id = sourcePath.split('/').filter(Boolean).pop();
+  const destPath = `${targetPath === '/' ? '' : targetPath}/${id}`;
+  const raw = JSON.parse(JSON.stringify(source));
+  delete raw['@components'];
+  raw.UID = `${raw.UID || id}-copy-${Object.keys(sessionContent[sessionId] || {}).length}`;
+  setSessionContent(sessionId, destPath, raw);
+  uidToPathMap[raw.UID] = destPath;
+  return res.json([{ source: sourcePath, target: destPath }]);
+});
+
+app.post('*/@order', (req, res) => {
+  const parentPath = req.path.replace('/@order', '') || '/';
+  const sessionId = getSessionId(req);
+  const { obj_id: objId, delta } = req.body || {};
+  if (!objId) {
+    return res.status(400).json({
+      error: { type: 'BadRequest', message: '@order requires obj_id' },
+    });
+  }
+  if (!sessionOrder[sessionId]) sessionOrder[sessionId] = {};
+  const current = sessionOrder[sessionId][parentPath] || [];
+  const without = current.filter((entry) => entry !== objId);
+  const index = delta === 'top' ? 0 : Math.max(0, without.length);
+  without.splice(index, 0, objId);
+  sessionOrder[sessionId][parentPath] = without;
+  return res.status(204).send();
+});
+
+/**
+ * DELETE /:path (content removal)
+ *
+ * Drops session-created content outright and tombstones disk-backed content
+ * so it reads as gone for the calling session. Plone answers 204 with no body.
+ */
+app.delete('/*', (req, res, next) => {
+  // Special endpoints (e.g. */@lock) have their own handlers.
+  if (req.path.startsWith('/@') || req.path.includes('/@')) {
+    return next();
+  }
+
+  const sessionId = getSessionId(req);
+  const urlPath = req.path.replace(/\/$/, '') || '/';
+
+  if (getContent(urlPath, sessionId) === null) {
+    return res.status(404).json({
+      error: { type: 'NotFound', message: `No such resource: ${urlPath}` },
+    });
+  }
+
+  if (sessionContent[sessionId]) {
+    delete sessionContent[sessionId][urlPath];
+  }
+  if (!sessionDeletions[sessionId]) {
+    sessionDeletions[sessionId] = new Set();
+  }
+  sessionDeletions[sessionId].add(urlPath);
+
+  return res.status(204).send();
 });
 
 /**
@@ -1581,6 +1969,15 @@ app.post('/*', (req, res, next) => {
     // Store in session-specific storage (or global if no session)
     const sessionId = getSessionId(req);
     setSessionContent(sessionId, imagePath, imageContent);
+
+    // Keep the bytes so @@images can serve back the scale URLs this response
+    // advertises. Session-scoped, like the content itself.
+    if (body.image?.data) {
+      sessionBlobs[`${sessionId}:${imagePath}:image`] = {
+        buffer: Buffer.from(body.image.data, body.image.encoding || 'base64'),
+        mime: body.image['content-type'] || 'image/png',
+      };
+    }
 
     if (process.env.DEBUG) {
       console.log(`Created Image: ${imagePath}${sessionId ? ` (session: ${sessionId})` : ''}`);
@@ -2072,46 +2469,84 @@ app.get('/@site', (req, res) => {
  */
 app.get(/.*\/@workflow$/, (req, res) => {
   const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@workflow$/, '') || '/').replace(/\/+$/, '') || '/';
-  res.json(buildWorkflowComponent(cleanPath, `http://localhost:${PORT}`));
+  res.json(buildWorkflowComponent(cleanPath, `http://localhost:${PORT}`, getSessionId(req)));
 });
 
 /**
- * POST /@workflow/:transition — apply a transition (publish/retract/…), as
- * Plone does. The docs demo clips drive the admin's state menu through this.
+ * POST /:path/@workflow/:transition
+ *
+ * The body Plone accepts here is real, not invented — see
+ * plone.restapi's recorded workflow_post_with_body request: comment,
+ * effective, expires, include_children.
  */
 app.post(/.*\/@workflow\/[^/]+$/, (req, res) => {
-  const match = req.path.match(/^(.*)\/@workflow\/([^/]+)$/);
-  const cleanPath = (match[1].replace('/++api++', '') || '/').replace(/\/+$/, '') || '/';
-  const record = applyWorkflowTransition(cleanPath, match[2]);
-  if (!record) return res.status(400).json({ error: 'invalid transition' });
+  const raw = req.path.replace('/++api++', '');
+  const transitionId = raw.split('/').pop();
+  const cleanPath = (raw.replace(/\/?@workflow\/[^/]+$/, '') || '/').replace(/\/+$/, '') || '/';
+  const sessionId = getSessionId(req);
+
+  const content = getContent(cleanPath, sessionId);
+  if (!content) return res.status(404).json({ error: { type: 'NotFound' } });
+
+  const from = content.review_state || 'published';
+  const move = (SPW[from] ?? []).find((t) => t.id === transitionId);
+  if (!move) {
+    return res.status(400).json({
+      error: { type: 'BadRequest', message: `Invalid transition '${transitionId}' from '${from}'` },
+    });
+  }
+
+  const record = {
+    action: transitionId,
+    actor: 'admin',
+    comments: req.body?.comment ?? '',
+    review_state: move.to,
+    time: new Date().toISOString(),
+    title: STATE_TITLES[move.to] ?? move.to,
+  };
+
+  const patch = {
+    review_state: move.to,
+    // Plone keeps the trail on the object; @history reads it back from there.
+    workflow_history: [...(content.workflow_history ?? []), record],
+  };
+  for (const field of ['effective', 'expires']) {
+    if (req.body?.[field]) patch[field] = req.body[field];
+  }
+  setSessionContent(sessionId, cleanPath, { ...content, ...patch });
+
   res.json(record);
 });
 
 /**
- * GET /@history — the version + workflow trail the admin's History view lists;
- * grows as @workflow transitions apply.
+ * GET /@history/:version — a content SNAPSHOT: what the page held before edit
+ * N+1 (or current for the newest). The compare view renders these in frontend
+ * iframes.
  */
 app.get(/.*\/@history\/\d+$/, (req, res) => {
-  // A content SNAPSHOT: what the page held before edit N+1 (or current for the
-  // newest). The compare view renders these in frontend iframes.
   const match = req.path.match(/^(.*)\/@history\/(\d+)$/);
   const cleanPath = (match[1].replace('/++api++', '') || '/').replace(/\/+$/, '') || '/';
   const version = Number(match[2]);
   const versions = contentVersions.get(cleanPath) || [];
   const snapshot = versions.find((v) => v.version === version);
   if (snapshot) return res.json(snapshot.content);
-  const sessionId = getSessionId(req);
-  const current = getContent(cleanPath, sessionId);
-  if (!current) return res.status(404).json({ error: 'no such version' });
+  const current = getContent(cleanPath, getSessionId(req));
+  if (!current) return res.status(404).json({ error: { type: 'NotFound' } });
   if (versions.length === 0 && version < SYNTH_VERSIONS) {
     return res.json(synthesizeVersion(cleanPath, current, version, SYNTH_VERSIONS));
   }
   res.json(current);
 });
 
+/**
+ * GET /@history — the version + workflow trail the admin's History view lists.
+ * The workflow half comes off the content's own workflow_history, which is
+ * where a transition wrote it, so the trail grows as the demo publishes and
+ * retracts.
+ */
 app.get(/.*\/@history$/, (req, res) => {
   const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@history$/, '') || '/').replace(/\/+$/, '') || '/';
-  const entry = workflowState.get(cleanPath) || { state: 'published', history: [] };
+  const content = getContent(cleanPath, getSessionId(req));
   let versions = contentVersions.get(cleanPath) || [];
   if (versions.length === 0) {
     versions = Array.from({ length: SYNTH_VERSIONS }, (_, n) => ({
@@ -2129,7 +2564,7 @@ app.get(/.*\/@history$/, (req, res) => {
     type: 'versioning',
     version: v.version,
   }));
-  const workflow = entry.history.map((h, n) => ({
+  const workflow = (content?.workflow_history ?? []).map((h, n) => ({
     '@id': `http://localhost:${PORT}${cleanPath}/@history/${n + 1}`,
     action: h.action,
     actor: { '@id': null, fullname: 'Admin User', id: 'admin', username: 'admin' },
@@ -2143,35 +2578,89 @@ app.get(/.*\/@history$/, (req, res) => {
   res.json([...versioning, ...workflow].sort((a, b) => (a.time < b.time ? 1 : -1)));
 });
 
-/**
- * GET /@sharing — the per-principal role matrix the admin's Sharing view
- * renders; POST accepts changes (held in memory only).
- */
-const sharingOverrides = new Map();
-app.get(/.*\/@sharing$/, (req, res) => {
-  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@sharing$/, '') || '/').replace(/\/+$/, '') || '/';
-  const stored = sharingOverrides.get(cleanPath);
-  res.json(stored || {
-    available_roles: [
-      { id: 'Contributor', title: 'Can add' },
-      { id: 'Editor', title: 'Can edit' },
-      { id: 'Reader', title: 'Can view' },
-      { id: 'Reviewer', title: 'Can review' },
-    ],
-    entries: [
-      { id: 'AuthenticatedUsers', title: 'Logged-in users', type: 'group',
-        roles: { Contributor: false, Editor: false, Reader: false, Reviewer: false } },
-      { id: 'reviewers', title: 'Reviewers', type: 'group',
-        roles: { Contributor: false, Editor: false, Reader: false, Reviewer: 'global' } },
-    ],
-    inherit: true,
+app.post(/.*\/@workingcopy$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@workingcopy$/, '') || '/').replace(/\/+$/, '') || '/';
+  const sessionId = getSessionId(req);
+  const content = getContent(cleanPath, sessionId);
+  if (!content) return res.status(404).json({ error: { type: 'NotFound' } });
+
+  const segments = cleanPath.split('/');
+  const id = segments.pop();
+  const copyPath = [...segments, `copy_of_${id}`].join('/') || '/';
+
+  setSessionContent(sessionId, copyPath, { ...content, id: `copy_of_${id}` });
+  if (!sessionWorkingCopies[sessionId]) sessionWorkingCopies[sessionId] = {};
+  sessionWorkingCopies[sessionId][copyPath] = cleanPath;
+
+  res.status(201).json({ '@id': `http://localhost:${PORT}${copyPath}` });
+});
+
+app.get(/.*\/@workingcopy$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@workingcopy$/, '') || '/').replace(/\/+$/, '') || '/';
+  const baseline = workingCopyOf(cleanPath, getSessionId(req));
+  res.json({
+    working_copy: null,
+    working_copy_of: baseline ? { '@id': `http://localhost:${PORT}${baseline}` } : null,
   });
 });
+
+function endWorkingCopy(req, res) {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@workingcopy$/, '') || '/').replace(/\/+$/, '') || '/';
+  const sessionId = getSessionId(req);
+  const baseline = workingCopyOf(cleanPath, sessionId);
+  if (!baseline) {
+    return res.status(400).json({
+      error: { type: 'BadRequest', message: 'Not a working copy' },
+    });
+  }
+  delete sessionWorkingCopies[sessionId][cleanPath];
+
+  // The copy stops existing. Applying it merges it into the baseline and
+  // discarding it throws it away — either way there is no document left at
+  // this path, and leaving one behind put a stray `copy_of_*` in every listing
+  // for the rest of the session.
+  if (sessionContent[sessionId]) delete sessionContent[sessionId][cleanPath];
+  if (!sessionDeletions[sessionId]) sessionDeletions[sessionId] = new Set();
+  sessionDeletions[sessionId].add(cleanPath);
+
+  res.json({
+    working_copy_of: { '@id': `http://localhost:${PORT}${baseline}` },
+  });
+}
+
+app.patch(/.*\/@workingcopy$/, endWorkingCopy);
+app.delete(/.*\/@workingcopy$/, endWorkingCopy);
+
+app.get(/.*\/@sharing$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@sharing$/, '') || '/').replace(/\/+$/, '') || '/';
+  res.json(getSharing(cleanPath, getSessionId(req)));
+});
+
 app.post(/.*\/@sharing$/, (req, res) => {
   const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@sharing$/, '') || '/').replace(/\/+$/, '') || '/';
-  const current = sharingOverrides.get(cleanPath);
-  // merge entries' role changes into the stored matrix (enough for the demo)
-  sharingOverrides.set(cleanPath, { ...(current || {}), ...req.body });
+  const sessionId = getSessionId(req);
+  const current = getSharing(cleanPath, sessionId);
+
+  const byId = new Map(current.entries.map((e) => [e.id, e]));
+  for (const incoming of req.body?.entries ?? []) {
+    const existing = byId.get(incoming.id);
+    byId.set(incoming.id, {
+      disabled: false,
+      login: null,
+      title: incoming.id,
+      type: incoming.type ?? 'user',
+      ...existing,
+      id: incoming.id,
+      roles: { ...noRoles(), ...(existing?.roles ?? {}), ...incoming.roles },
+    });
+  }
+
+  if (!sessionSharing[sessionId]) sessionSharing[sessionId] = {};
+  sessionSharing[sessionId][cleanPath] = {
+    available_roles: AVAILABLE_ROLES,
+    entries: [...byId.values()],
+    inherit: req.body?.inherit ?? current.inherit,
+  };
   res.status(204).end();
 });
 
@@ -2243,7 +2732,18 @@ function getTypeSchema(typeName) {
     };
   }
 
-  // Merge base schema fields (only add fields not already defined)
+  // Merge base schema fields (only add fields not already defined).
+  //
+  // schema-base.json is the DEXTERITY BEHAVIOURS every content type carries —
+  // dates, short name, exclude-from-navigation. The site root carries none of
+  // them: it is not a dexterity type. A schema file says so with
+  // `mergeBase: false`, and without that opt-out the site root's settings form
+  // offers an author a publication date and a way to hide the site from its own
+  // menu.
+  if (schema.mergeBase === false) {
+    delete schema.mergeBase;
+    return schema;
+  }
   schema.properties = { ...base.properties, ...schema.properties };
   const existingFieldsetIds = new Set((schema.fieldsets || []).map((f) => f.id));
   for (const fs_ of base.fieldsets || []) {
@@ -2255,8 +2755,32 @@ function getTypeSchema(typeName) {
   return schema;
 }
 
+/**
+ * True when this mock knows the type at all: either it ships a schema file or
+ * it is one of the addable types. Real Plone 404s on an unknown type rather
+ * than inventing a schema, and adapters have to be able to tell the
+ * difference, so the fallback in getTypeSchema must not apply to made-up
+ * names.
+ */
+function isKnownType(typeName) {
+  const schemaPath = path.join(
+    __dirname,
+    'api',
+    `schema-${typeName.toLowerCase()}.json`,
+  );
+  if (fs.existsSync(schemaPath)) return true;
+  return listAddableTypes().some(
+    (t) => t['@id'].split('/').pop() === typeName,
+  );
+}
+
 app.get('/@types/:typeName', (req, res) => {
   const { typeName } = req.params;
+  if (!isKnownType(typeName)) {
+    return res.status(404).json({
+      error: { type: 'NotFound', message: `No such content type: ${typeName}` },
+    });
+  }
   res.json(getTypeSchema(typeName));
 });
 
@@ -2281,6 +2805,33 @@ const VOCAB_ITEMS = {
   // all" are the same assertion.
   'plone.app.vocabularies.ReallyUserFriendlyTypes': ['Document', 'News Item'],
 };
+
+// Optional generated vocabularies, declared by a seed file and switched on
+// with VOCAB_SPEC. Used by the adapter contract suite, which needs a
+// vocabulary large enough that fetch-everything-and-filter-in-memory shows up
+// as a latency failure. Off unless the env var is set, so nothing else here
+// changes behaviour.
+const GENERATED_VOCABS = {};
+if (process.env.VOCAB_SPEC) {
+  const specPath = path.resolve(process.cwd(), process.env.VOCAB_SPEC);
+  const spec = JSON.parse(fs.readFileSync(specPath, 'utf-8')).vocabularies || {};
+  const prefix = process.env.VOCAB_PREFIX || '';
+  for (const [name, def] of Object.entries(spec)) {
+    GENERATED_VOCABS[`${prefix}${name}`] = Array.from(
+      { length: def.generate },
+      (_, i) => ({
+        token: `${def.tokenPrefix}${i}`,
+        title: `${def.titlePrefix}${i}`,
+      }),
+    );
+  }
+  console.log(
+    `Generated vocabularies: ${Object.entries(GENERATED_VOCABS)
+      .map(([k, v]) => `${k} (${v.length})`)
+      .join(', ')}`,
+  );
+}
+
 /**
  * GET /@vocabularies — the LISTING: every vocabulary this site has, the shape
  * plone.restapi answers with (`@id` + `title`, no token). A field that picks
@@ -2288,7 +2839,7 @@ const VOCAB_ITEMS = {
  */
 app.get('/@vocabularies', (req, res) => {
   res.json(
-    Object.keys(VOCAB_ITEMS).map((name) => ({
+    [...Object.keys(VOCAB_ITEMS), ...Object.keys(GENERATED_VOCABS)].map((name) => ({
       '@id': `http://localhost:${PORT}/@vocabularies/${name}`,
       title: name,
     })),
@@ -2296,6 +2847,34 @@ app.get('/@vocabularies', (req, res) => {
 });
 
 app.get('/@vocabularies/:vocab', (req, res) => {
+  const generated = GENERATED_VOCABS[req.params.vocab];
+  if (generated) {
+    // Real Plone filters and batches server-side; so must this, or the
+    // contract suite's type-ahead latency assertion is meaningless.
+    // `?title=` is a case-insensitive substring filter in plone.restapi's
+    // serializer — what a type-ahead sends so the server does the narrowing.
+    const title = req.query.title;
+    const filtered = title
+      ? generated.filter((i) => i.title.toLowerCase().includes(String(title).toLowerCase()))
+      : generated;
+    const size = req.query.b_size ? parseInt(req.query.b_size, 10) : 25;
+    const start = req.query.b_start ? parseInt(req.query.b_start, 10) : 0;
+    return res.json({
+      '@id': `http://localhost:${PORT}/@vocabularies/${req.params.vocab}`,
+      items: filtered.slice(start, start + size),
+      items_total: filtered.length,
+    });
+  }
+
+  if (!VOCAB_ITEMS[req.params.vocab]) {
+    return res.status(404).json({
+      error: {
+        type: 'NotFound',
+        message: `No such vocabulary: ${req.params.vocab}`,
+      },
+    });
+  }
+
   const all = VOCAB_ITEMS[req.params.vocab] || [];
   // `?title=` is a case-insensitive substring filter in plone.restapi's
   // serializer — what a type-ahead sends so the server does the narrowing.
@@ -2378,7 +2957,7 @@ app.get('*/@breadcrumbs', (req, res) => {
  */
 app.get(/.*\/@actions$/, (req, res) => {
   const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@actions$/, '') || '/').replace(/\/+$/, '') || '/';
-  res.json(buildActionsComponent(cleanPath, `http://localhost:${PORT}`));
+  res.json(buildActionsComponent(cleanPath, `http://localhost:${PORT}`, getSessionId(req)));
 });
 
 /**
@@ -2399,11 +2978,11 @@ app.get(/.*\/@navigation$/, (req, res) => {
     const rootPath = rootPathParam || '/';
     res.json({
       '@id': `${baseUrl}${cleanPath}/@navigation`,
-      items: getNavigationItems(rootPath, depth, baseUrl),
+      items: getNavigationItems(rootPath, depth, baseUrl, getSessionId(req)),
     });
     return;
   }
-  res.json(buildNavigationComponent(cleanPath, baseUrl));
+  res.json(buildNavigationComponent(cleanPath, baseUrl, getSessionId(req)));
 });
 
 app.get(/.*\/@navroot$/, (req, res) => {
@@ -2615,6 +3194,18 @@ app.post('*/@querystring-search', (req, res) => {
       if (value) {
         allItems = allItems.filter((item) => matchSearchableText(value, item));
       }
+    } else if (index === 'Title' && operation.includes('string.contains')) {
+      // The Title index is its own catalog index, distinct from SearchableText.
+      // Without this branch a Title criterion matched nothing in the chain and
+      // was dropped, so the endpoint returned the whole collection and any
+      // test asserting "the filter found something" passed without filtering.
+      if (value) {
+        allItems = allItems.filter((item) =>
+          String(item.title ?? '')
+            .toLowerCase()
+            .includes(String(value).toLowerCase()),
+        );
+      }
     } else if (index === 'exclude_from_nav' && operation.includes('boolean')) {
       // Nav listings filter out items marked exclude_from_nav: true.
       // Mirrors Plone's plone.app.querystring.operation.boolean.{isFalse,isTrue}.
@@ -2626,6 +3217,14 @@ app.post('*/@querystring-search', (req, res) => {
       // Note: `review_state` and `Subject` selection.{any,all,none} are
       // handled generically above via `selectionFields` (which already
       // maps both indices), so we don't need explicit branches here.
+    } else {
+      // Never drop a criterion quietly. An ignored filter returns the whole
+      // collection, which looks exactly like a filter that matched everything
+      // — the failure mode that hid the missing Title branch above.
+      console.warn(
+        `[MOCK-API] @querystring-search: unhandled criterion '${index}' ` +
+          `with operation '${operation}' — returning unfiltered results`,
+      );
     }
   }
 
@@ -2712,6 +3311,25 @@ app.post('*/@querystring-search', (req, res) => {
  */
 app.get('*/@search', (req, res) => {
   const searchPath = req.path.replace('/@search', '');
+
+  // UID lookup — the index behind resolveuid. Real Plone's catalog answers
+  // this and reflects unsaved-elsewhere edits made in the same session, so it
+  // must read through getContent (session first) rather than straight off
+  // disk, or a renamed document keeps reporting its old title.
+  if (req.query.UID) {
+    const uidPath = uidToPathMap[req.query.UID];
+    const found = uidPath
+      ? getContent(uidPath, getSessionId(req))
+      : null;
+    return res.json({
+      '@id': `http://localhost:${PORT}${searchPath}/@search`,
+      items: found
+        ? [formatSearchItem(found, `http://localhost:${PORT}`)]
+        : [],
+      items_total: found ? 1 : 0,
+    });
+  }
+
   const pathDepth = req.query['path.depth'];
   const pathQuery = req.query['path.query'];
   const searchableText = req.query['SearchableText'];
@@ -2754,7 +3372,8 @@ app.get('*/@search', (req, res) => {
     }
   }
   // Handle path.query with path.depth=0 (exact match for specific content)
-  else if (pathQuery && pathDepth === '0') {
+  else
+  if (pathQuery && pathDepth === '0') {
     const content = loadContentFromDisk(pathQuery);
     if (content) {
       items = [formatSearchItem(content, baseUrl)];
@@ -2767,8 +3386,13 @@ app.get('*/@search', (req, res) => {
     const normalizedSearch = (searchPath === '' || searchPath === '/') ? '/' : searchPath;
     const searchDepth = normalizedSearch === '/' ? 0 : normalizedSearch.split('/').filter(Boolean).length;
 
-    // Get direct children from contentDirMap (items at searchDepth + 1)
-    items = Object.keys(contentDirMap)
+    // Direct children, from disk AND from anything this session created or
+    // moved here. Enumerating contentDirMap alone would miss a page that was
+    // just pasted in and would keep listing one that was cut away, which is
+    // precisely what the contents view is for.
+    const sessionPaths = Object.keys(sessionContent[getSessionId(req)] || {});
+    const candidates = new Set([...Object.keys(contentDirMap), ...sessionPaths]);
+    items = [...candidates]
       .filter((itemPath) => {
         if (itemPath === '/') return false;
         if (itemPath === normalizedSearch) return false;
@@ -2778,11 +3402,23 @@ app.get('*/@search', (req, res) => {
         const itemParts = itemPath.split('/').filter(Boolean);
         return itemParts.length === searchDepth + 1;
       })
-      .map((itemPath) => loadContentFromDisk(itemPath))
+      .map((itemPath) => getContent(itemPath, getSessionId(req)))
       // A dir with no parseable data.json (e.g. `templates/`) loads as null —
       // skip it, don't crash formatSearchItem (same guard as the no-depth branch).
       .filter((content) => content != null)
       .map((content) => formatSearchItem(content, baseUrl));
+
+    // Honour an explicit ordering set via @order for this container. Items not
+    // named in it keep their natural position after the ones that are.
+    const explicit = sessionOrder[getSessionId(req)]?.[normalizedSearch];
+    if (explicit) {
+      const rank = (item) => {
+        const id = new URL(item['@id']).pathname.split('/').filter(Boolean).pop();
+        const at = explicit.indexOf(id);
+        return at === -1 ? explicit.length : at;
+      };
+      items.sort((a, b) => rank(a) - rank(b));
+    }
 
     // For root searches, also include non-root mount points as virtual folders
     // so the object browser can navigate into them (e.g., _test_data)
@@ -2837,6 +3473,31 @@ app.get('*/@search', (req, res) => {
       .map((itemPath) => loadContentFromDisk(itemPath))
       .filter((content) => content != null)  // skip dirs with no parseable data.json
       .map((content) => formatSearchItem(content, baseUrl));
+  }
+
+  // GET @search honours sort_on / sort_order, as the catalog does.
+  //
+  // It did not, so anything ordering a listing through this endpoint — the
+  // contents view's "Rearrange by", above all — came back in whatever order
+  // the items were assembled. Ascending and descending were byte-identical,
+  // which is indistinguishable from a sort the ADMIN failed to send, and hid
+  // the question of whether the admin sends it at all.
+  //
+  // getObjPositionInParent is the folder's own order, which is how the items
+  // already arrive; every other index sorts on the metadata field of that
+  // name, and sort_order: descending reverses the whole result, as in the
+  // querystring-search handler above.
+  const sortOn = req.query.sort_on;
+  if (sortOn && sortOn !== 'getObjPositionInParent') {
+    items = [...items].sort((a, b) => {
+      const x = a[sortOn] ?? '';
+      const y = b[sortOn] ?? '';
+      if (typeof x === 'number' && typeof y === 'number') return x - y;
+      return String(x) < String(y) ? -1 : String(x) > String(y) ? 1 : 0;
+    });
+  }
+  if (req.query.sort_order === 'descending' || req.query.sort_order === 'reverse') {
+    items = [...items].reverse();
   }
 
   const searchUrl = searchPath === '' || searchPath === '/'
@@ -3334,6 +3995,14 @@ app.get('*/@@images/*', (req, res) => {
   const fieldName = rawField.replace(/-\d+.*$/, '');
   const scale = pathMatch && pathMatch[3] ? pathMatch[3] : 'preview';
 
+  // Bytes uploaded in this session take precedence: they have no directory on
+  // disk, so contentDirMap will never find them.
+  const blob = sessionBlobs[`${getSessionId(req)}:${contentPath}:${fieldName}`];
+  if (blob) {
+    res.set('Content-Type', blob.mime);
+    return res.send(blob.buffer);
+  }
+
   // Try to serve actual image file from content directory
   // Use contentDirMap to find actual directory for nested paths
   // If not found, rescan in case content was added after startup
@@ -3612,6 +4281,60 @@ app.patch('*', (req, res) => {
 
   // Reload content from disk to pick up changes during development
   const content = getContent(cleanPath, sessionId);
+
+  // Changing the SHORT NAME renames the object, as Plone does: `id` is a real
+  // field (plone.shortname), and a PATCH that changes it moves the content to a
+  // new path — the old URL stops resolving and the new one starts. Storing the
+  // new id on the old path would leave the page answering at a URL that no
+  // longer matches its own id, and the menu would keep linking to the old one.
+  if (content && req.body?.id && req.body.id !== content.id) {
+    const parent = cleanPath.split('/').slice(0, -1).join('/') || '';
+    const renamedPath = `${parent}/${req.body.id}`;
+    const renamed = { ...content, ...req.body, id: req.body.id };
+    setSessionContent(sessionId, renamedPath, renamed);
+    if (!sessionDeletions[sessionId]) sessionDeletions[sessionId] = new Set();
+    sessionDeletions[sessionId].add(cleanPath);
+    if (renamed.UID) uidToPathMap[renamed.UID] = renamedPath;
+    return res.json(
+      enrichContent(renamed, renamedPath, `http://localhost:${PORT}`, parseExpand(req), sessionId),
+    );
+  }
+
+  // Reordering a folder's children is a PATCH on the CONTAINER carrying
+  // `ordering`, not a call to any @order endpoint — that is what Volto's
+  // contents view sends (actions/content: `data: { ordering: { obj_id, delta,
+  // subset_ids } }`) and what plone.restapi accepts. The mock had an @order
+  // route instead, which nothing calls, so dragging a row reordered the table
+  // in the browser and told the backend nothing: reload and the old order was
+  // back, and the site menu — which the order IS — never moved.
+  if (content && req.body?.ordering?.obj_id) {
+    const { obj_id: objId, delta, subset_ids: subsetIds } = req.body.ordering;
+    const naturalIds = getFolderChildItems(cleanPath, `http://localhost:${PORT}`)
+      .map((item) => String(item['@id'] || '').split('/').filter(Boolean).pop())
+      .filter(Boolean);
+    const current = sessionOrder[sessionId]?.[cleanPath] || naturalIds;
+    // A subset reorders only among the rows it names, leaving the rest put —
+    // the contents view sends one when a filter is on.
+    const scope = Array.isArray(subsetIds) && subsetIds.length ? subsetIds : current;
+    const from = scope.indexOf(objId);
+    if (from !== -1) {
+      const moved = [...scope];
+      moved.splice(from, 1);
+      const to =
+        delta === 'top'
+          ? 0
+          : delta === 'bottom'
+            ? moved.length
+            : Math.max(0, Math.min(moved.length, from + Number(delta)));
+      moved.splice(to, 0, objId);
+      const next =
+        scope === current
+          ? moved
+          : current.map((id) => (subsetIds.includes(id) ? moved.shift() : id));
+      if (!sessionOrder[sessionId]) sessionOrder[sessionId] = {};
+      sessionOrder[sessionId][cleanPath] = next;
+    }
+  }
 
   if (content) {
     // Version snapshot: the state BEFORE this edit becomes version N (like

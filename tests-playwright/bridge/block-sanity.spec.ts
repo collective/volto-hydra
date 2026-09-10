@@ -31,6 +31,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { requireEnvironment } from '../helpers/preconditions';
+import { validateTemplatePlaceholders } from '../../packages/volto-hydra/src/utils/formDataValidation';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 interface DiscoveredBlock {
   blockType: string;
@@ -523,4 +524,79 @@ test.describe('Block sanity (auto-discovered)', () => {
         missing.join('\n'),
     ).toEqual([]);
   });
+});
+
+/**
+ * Template slot structure, checked on the RENDERED page.
+ *
+ * The rule — two different slot groups may not meet without a fixed block
+ * between them — applies to the EXPANDED tree, not to what is stored. A page
+ * stores its slot content flat and expansion places each block into the
+ * template region its slotId names, so `related` and `example` look adjacent on
+ * disk while landing in different tabs, and a template's own fixed chrome is not
+ * in the stored page at all. Reading the stored layout and applying the rule to
+ * it gives a wrong answer — twice over, in both directions: it invents
+ * violations that expansion resolves, and it misses the one real collision
+ * behind them.
+ *
+ * So this asks the page after the merge has happened. The bridge holds the
+ * expanded formData, and hydra's own validateTemplatePlaceholders is a pure
+ * function over it — the same one Form.jsx calls at save time. Neither the
+ * merge nor the rule is reimplemented here, which is the point: a second copy
+ * of either is a second thing to be wrong.
+ *
+ * Why this belongs here rather than in the CLI content validator: the CLI never
+ * renders, so it cannot see an expanded tree without growing its own expander.
+ *
+ * The cost is bounded. A region needs two DISTINCT slot ids to violate the rule,
+ * so a template with no open slots (site-footer, site-announcement — all fixed
+ * chrome) or a single one (every content-layout-*) can never trip it. Only pages
+ * carrying a multi-slot template have anything to check.
+ */
+test.describe('Template slots', () => {
+  const pagesWithTemplates = [
+    ...new Set(discoveredBlocks.map((b) => b.pagePath).filter(Boolean)),
+  ].sort();
+
+  for (const pagePath of pagesWithTemplates) {
+    test(`${pagePath} obeys the template slot rules`, async ({ page, helper }, testInfo) => {
+      const frontendUrl = process.env.FRONTEND_URL || getFrontendUrl(testInfo.project.name);
+      const frontend = frontendUrl ? `&frontend=${encodeURIComponent(frontendUrl)}` : '';
+      const apiOrigin = process.env.DISCOVER_BLOCKS_API || URLS.mockApi;
+      const mockParentUrl = process.env.MOCK_PARENT_URL || `${URLS.testFrontend}/mock-parent.html`;
+      await page.goto(
+        `${mockParentUrl}?api_path=${encodeURIComponent(`${apiOrigin}${pagePath}`)}${frontend}`,
+      );
+      await helper.waitForIframeReady();
+      await helper.waitForBridgeConnected();
+
+      // The expanded tree, exactly as the editor would validate it.
+      // page.frames(), not getIframe(): the latter is a FrameLocator, which
+      // finds elements but cannot evaluate — the bridge is a window global, not
+      // a DOM node.
+      const frame = page.frames().find((f) => f !== page.mainFrame())!;
+      const formData = await frame.evaluate(
+        () => (window as any).__hydraBridge?.formData ?? null,
+      );
+      expect(formData, `${pagePath}: the bridge published no formData`).toBeTruthy();
+
+      // A page with no template instance has nothing to check — pass quietly
+      // rather than skip, so the count of pages checked stays honest.
+      const { valid, blocksErrors } = validateTemplatePlaceholders(formData);
+      const detail = Object.entries(blocksErrors)
+        .map(([blockId, err]: [string, any]) => {
+          const layout = err?._layout ?? {};
+          return `  ${blockId}: ${layout.title ?? 'error'} — ${layout.message ?? ''}`;
+        })
+        .join('\n');
+      expect(
+        valid,
+        `${pagePath} cannot be saved in the editor: its template slots collide.\n${detail}\n\n` +
+          'Two different slot groups meeting with no fixed block between them is an\n' +
+          'insertion gap nothing can resolve — both neighbours offer a slot and\n' +
+          'position cannot say which one a new block joins. Separate them with a\n' +
+          "fixed block, or put one inside a fixed container of its own.",
+      ).toBe(true);
+    });
+  }
 });

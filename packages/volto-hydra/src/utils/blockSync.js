@@ -2052,6 +2052,30 @@ function createFieldRulesEnhancer(rulesConfig) {
  * Returns: false (hide), object (field definition), or undefined (no change).
  * @private
  */
+/**
+ * What a MATCHED rule yields: its `set` definition, carrying any `error` or
+ * `warning` it also declares.
+ *
+ * An ERROR is refused — a registered validator turns `hydraRuleError` into a
+ * form error, so the save does not go through. A WARNING is said, not refused:
+ * it is deliberately NOT a validator, because advice ("this SVG is not drawn to
+ * the 48×48 grid") must not block a save over artwork that may be a little off
+ * and still be the right artwork. The sidebar renders it; nothing blocks.
+ *
+ * Shared by both rule forms — a single `{ when, … }` and an entry in a switch —
+ * so `error` and `warning` mean the same thing wherever they are written.
+ * @private
+ */
+function matchedRuleResult(rule) {
+  const set = 'set' in rule ? rule.set : undefined;
+  if (!('error' in rule || 'warning' in rule) || set === false) return set;
+  return {
+    ...(set && typeof set === 'object' ? set : {}),
+    ...('error' in rule ? { hydraRuleError: rule.error } : {}),
+    ...('warning' in rule ? { hydraRuleWarning: rule.warning } : {}),
+  };
+}
+
 function evaluateFieldRule(rule, formData, args) {
   // false → always hide
   if (rule === false) return false;
@@ -2062,18 +2086,27 @@ function evaluateFieldRule(rule, formData, args) {
       // Bare false acts as a catch-all "hide" (matches with no condition)
       if (r === false) return false;
       if (!r.when || evaluateWhenCondition(r.when, formData, args)) {
-        if ('set' in r) return r.set;
-        return undefined; // matched but no set → keep current
+        if ('set' in r || 'error' in r || 'warning' in r) {
+          return matchedRuleResult(r);
+        }
+        return undefined; // matched but says nothing → keep current
       }
     }
     return undefined; // no match → keep current
   }
 
-  // Object with 'when' or 'set' → single rule
-  if (rule && typeof rule === 'object' && ('when' in rule || 'set' in rule)) {
+  // Object with 'when', 'set', 'error' or 'warning' → single rule
+  if (
+    rule &&
+    typeof rule === 'object' &&
+    ('when' in rule || 'set' in rule || 'error' in rule || 'warning' in rule)
+  ) {
     if (!rule.when || evaluateWhenCondition(rule.when, formData, args)) {
       // Condition met (or no condition)
-      return 'set' in rule ? rule.set : undefined;
+      // Keyed on the field, which is why a rule spanning two fields is written
+      // on the field that should show the message rather than needing a
+      // block-level address of its own.
+      return matchedRuleResult(rule);
     }
     // Condition not met → use else (default: undefined = keep current)
     return 'else' in rule ? rule.else : undefined;
@@ -2120,7 +2153,7 @@ function resolveWhenField(fieldPath, formData, args) {
   const blockPathMap = args?.blockPathMap || hydraContext?.blockPathMap;
   const curBlockId =
     args?.blockId ?? hydraContext?.currentBlockId ?? PAGE_BLOCK_UID;
-  const { blockId: targetBlockId, fieldName } = resolveBlockFieldPath(
+  let { blockId: targetBlockId, fieldName } = resolveBlockFieldPath(
     fieldPath,
     curBlockId,
     blockPathMap,
@@ -2170,6 +2203,11 @@ function resolveWhenField(fieldPath, formData, args) {
     });
   }
 
+  // `a.b.0.c` addresses field `a` and then walks into its value. A field's own
+  // name never contains a dot, so the split is unambiguous.
+  const [headField, ...valuePath] = fieldName.split('.');
+  if (valuePath.length > 0) fieldName = headField;
+
   const def = schema ? getFieldDef(schema, fieldName) : undefined;
 
   // REGION → array of child block TYPES. object_list via widget, blocks_layout via
@@ -2189,6 +2227,43 @@ function resolveWhenField(fieldPath, formData, args) {
   }
 
   const raw = block ? getFieldValue(block, fieldName) : undefined;
+
+  // A path INTO the field's value, e.g. `image_scales.image.0.content-type`.
+  //
+  // Some of what a rule needs to ask about is not a field at all. Volto stores
+  // an image's mime type and dimensions ALONGSIDE the reference, in
+  // `image_scales`, so "is this an SVG" and "is it square" are answerable from
+  // data the block already carries — but only if a path can reach inside a
+  // value instead of stopping at the field.
+  //
+  // The surface comes from the VALUE here, not from a schema: there is no field
+  // definition for `image_scales.image.0.width`, so nothing else can say
+  // whether it is a number. That is the one place this rule engine sniffs a
+  // value, and it is because a declared type does not exist to consult.
+  if (valuePath.length > 0) {
+    let value = raw;
+    for (const step of valuePath) {
+      if (value == null) break;
+      value = Array.isArray(value) ? value[Number(step)] : value[step];
+    }
+    // Nothing there. A declared field would still know its type from the
+    // schema; a sub-path has nothing to ask, so it gets its own surface rather
+    // than being guessed at as a string — which would make a numeric operator
+    // throw on content that simply has no image yet.
+    if (value === undefined || value === null) {
+      return { kind: 'unset', value: undefined, fieldPath };
+    }
+    const kind =
+      typeof value === 'number'
+        ? 'number'
+        : typeof value === 'boolean'
+          ? 'boolean'
+          : Array.isArray(value)
+            ? 'array'
+            : 'string';
+    return { kind, value, fieldPath };
+  }
+
   const typeStr = def ? getFieldTypeString(def) : undefined;
   const type = def?.type;
 
@@ -2223,9 +2298,60 @@ function evaluateWhenCondition(when, formData, args) {
       expected && typeof expected === 'object' && !Array.isArray(expected)
         ? expected
         : { is: expected };
-    if (!evaluateOperators(surface, operators)) return false;
+    const resolved = resolveOperands(operators, formData, args);
+    // A reference to a field that holds nothing cannot be compared against, and
+    // must not read as "no constraint" — that would silently make the condition
+    // TRUE and fire the rule on every form where the other field is not filled
+    // in yet.
+    if (resolved === UNCOMPARABLE) return false;
+    if (!evaluateOperators(surface, resolved)) return false;
   }
   return true;
+}
+
+/**
+ * Resolve `{ field: <path> }` operands to the value that field holds.
+ *
+ * Every operand was a literal, so a rule could only ever compare a field to a
+ * constant — `{ endDate: { lt: '2026-01-01' } }`. Comparing one field to
+ * ANOTHER is the ordinary case for a cross-field check (an end date before its
+ * start date, a maximum below its minimum), and there was no way to say it.
+ *
+ * The reference goes through the same path grammar as a `when` key, so `../`
+ * steps and value sub-paths work in an operand exactly as they do in a key. A
+ * reference to a field holding NOTHING returns UNCOMPARABLE and the whole
+ * condition is false — there is nothing to compare against, and treating that
+ * as "no constraint" would fire the rule on every form where the other field is
+ * not filled in yet.
+ * @private
+ */
+const UNCOMPARABLE = Symbol('uncomparable');
+
+function resolveOperands(operators, formData, args) {
+  let resolved;
+  for (const [op, operand] of Object.entries(operators)) {
+    if (
+      operand &&
+      typeof operand === 'object' &&
+      !Array.isArray(operand) &&
+      typeof operand.field === 'string'
+    ) {
+      let value = resolveWhenField(operand.field, formData, args).value;
+      if (value === undefined || value === null) return UNCOMPARABLE;
+      // Basic arithmetic on the reference, so a comparison can carry a
+      // tolerance: "square, within a tenth" is `width` against
+      // `{ field: 'height', times: 1.1 }`. Without it a cross-field comparison
+      // can only ever be exact, which no real measurement is.
+      if (typeof operand.times === 'number' || typeof operand.plus === 'number') {
+        if (typeof value !== 'number') return UNCOMPARABLE;
+        if (typeof operand.times === 'number') value *= operand.times;
+        if (typeof operand.plus === 'number') value += operand.plus;
+      }
+      resolved = resolved || { ...operators };
+      resolved[op] = value;
+    }
+  }
+  return resolved || operators;
 }
 
 /** Throw when an operator is used on a field surface it can't act on. @private */
@@ -2302,6 +2428,15 @@ function toRegExp(op, operand) {
  */
 function evaluateOperators(surface, operators) {
   const { kind, value } = surface;
+
+  // An unset sub-path answers only the presence questions. Every comparison is
+  // false: there is nothing to compare, and a rule must not fire on a block
+  // whose image simply has not been chosen yet.
+  if (kind === 'unset') {
+    if ('isNotSet' in operators) return operators.isNotSet === true;
+    if ('isSet' in operators) return operators.isSet === false;
+    return false;
+  }
   const {
     is,
     isNot,

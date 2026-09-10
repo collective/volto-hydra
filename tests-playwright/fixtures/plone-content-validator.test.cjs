@@ -885,6 +885,30 @@ describe('plone-content-validator checkIntegrity()', () => {
     assert.equal(r.stats.layoutBroken, 0);
   });
 
+  it('reports a block id listed TWICE in one blocks_layout', () => {
+    // A duplicate is not dangling — both entries resolve — so the dangling
+    // check waves it through, and the page renders that block twice while
+    // whichever block the second entry was MEANT to be renders not at all.
+    // Real case: a template gained a new slot, the id generator restarted its
+    // counter and minted an id an earlier run had already given to another
+    // slot, and six case studies shipped their date stamp twice and their lead
+    // row never.
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/page-a', '@type': 'Document', id: 'page-a', UID: 'pageauid1234567',
+        parent: { '@id': '/' },
+        blocks: { a: { '@type': 'slate' }, b: { '@type': 'slate' } },
+        blocks_layout: { items: ['a', 'b', 'a'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.ok(
+      r.errors.some((e) => e.includes('lists block a twice')),
+      r.errors.join('\n'),
+    );
+  });
+
   it('resolves valid resolveuid refs', () => {
     // UID must be hex ≥ 10 chars to match the /resolveuid/[a-f0-9]{10,}/ regex
     const uid = 'abcdef1234567890';
