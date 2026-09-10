@@ -3673,7 +3673,30 @@ const Iframe = (props) => {
           // Without the split, EVERY property was coerced into a region: a
           // frontend that described its own title got a phantom blocks region
           // and no say over the wording the author sees.
-          const contentTypeProperties = schema?.properties || {};
+          // No fallback. `{}` here is not "a content type with no fields", it
+          // is "the content type has not loaded", and the two are
+          // indistinguishable downstream: `_page` gets registered with the
+          // page's regions and none of its own fields, the path map is built
+          // from that, and the bridge quietly decides `title` is not
+          // text-editable. Clicking the page title still SELECTS it — the
+          // toolbar appears, selection does not go through the schema — so
+          // nothing looks wrong while everything the author types is discarded
+          // and the save carries no title at all. That cost a day to find,
+          // through the menu it made look broken.
+          //
+          // Editing needs the content type. If it is not here, say so.
+          if (
+            history.location.pathname.endsWith('/edit') &&
+            !schema?.properties
+          ) {
+            throw new Error(
+              'INIT: the content type schema has not loaded, so the page fields ' +
+                '(title, description) cannot be registered and would silently ' +
+                'stop being editable. This is a load-order fault, not a content ' +
+                'fault — the message handler must re-run once `schema` arrives.',
+            );
+          }
+          const contentTypeProperties = schema?.properties;
           const pageFieldOverrides = {};
           const pageBlocksFieldsDef = {};
           for (const [fieldName, fieldDef] of Object.entries(pageProperties)) {
@@ -3943,6 +3966,16 @@ const Iframe = (props) => {
     onSelectBlock,
     openObjectBrowser,
     properties,
+    // The content type schema. INIT registers `_page` — the page as a virtual
+    // block, the content type's own fields with the frontend's description
+    // layered on top — and builds the block path map from it. Reading
+    // `schema?.properties` out of a stale closure gives `{}`, so `_page` gets
+    // the page's regions and none of its fields: the bridge cannot resolve
+    // `title` to a text-editable type and never makes it editable. Clicking the
+    // page title still SELECTS it (the toolbar appears — selection does not go
+    // through the schema), so it looks like it worked, while what the author
+    // types is discarded and a save carries no title at all.
+    schema,
     selectedBlock,
     token,
   ]);
