@@ -957,6 +957,23 @@ function synthesizeVersion(cleanPath, content, version, total) {
  * state, only an @id and a title. Behaviour (which transition leads where) is
  * simulated here because the workflow definition is not over REST at all.
  */
+/**
+ * Plone keeps the trail per WORKFLOW, in a dict keyed by the workflow's id —
+ * `{simple_publication_workflow: [entry, …]}` — not a bare list. Content
+ * exported from a real site therefore arrives carrying `workflow_history: {}`,
+ * and reading that as a list threw ("is not iterable") the moment anything
+ * published a page, taking @history down with it.
+ */
+const SPW_ID = 'simple_publication_workflow';
+
+/** The trail for OUR workflow, whatever shape the content arrived in. */
+function workflowTrail(content) {
+  const history = content?.workflow_history;
+  if (Array.isArray(history)) return history; // a mock-written list, pre-fix
+  if (history && typeof history === 'object') return history[SPW_ID] ?? [];
+  return [];
+}
+
 const SPW = {
   private: [
     { id: 'publish', title: 'Publish', to: 'published' },
@@ -1045,6 +1062,12 @@ function getSharing(cleanPath, sessionId) {
   if (stored) return stored;
   return {
     available_roles: AVAILABLE_ROLES,
+    // TWO groups, not one. A sharing matrix with a single row cannot show what
+    // the view is for — you cannot see a role being given to one group and not
+    // another — and `Reviewer: 'global'` is the second thing it has to show: a
+    // role held GLOBALLY, which Plone marks with that string rather than `true`
+    // and which the UI renders as an inherited tick you cannot clear here.
+    // Both were in this mock until the rewrite dropped them.
     entries: [
       {
         disabled: false,
@@ -1052,6 +1075,14 @@ function getSharing(cleanPath, sessionId) {
         login: null,
         roles: noRoles(),
         title: 'Logged-in users',
+        type: 'group',
+      },
+      {
+        disabled: false,
+        id: 'reviewers',
+        login: null,
+        roles: { ...noRoles(), Reviewer: 'global' },
+        title: 'Reviewers',
         type: 'group',
       },
     ],
@@ -2507,8 +2538,16 @@ app.post(/.*\/@workflow\/[^/]+$/, (req, res) => {
 
   const patch = {
     review_state: move.to,
-    // Plone keeps the trail on the object; @history reads it back from there.
-    workflow_history: [...(content.workflow_history ?? []), record],
+    // Plone keeps the trail on the object, keyed by workflow id; @history reads
+    // it back from there. Written in Plone's shape so content that round-trips
+    // through the mock stays loadable by a real one.
+    workflow_history: {
+      ...(typeof content.workflow_history === 'object' &&
+      !Array.isArray(content.workflow_history)
+        ? content.workflow_history
+        : {}),
+      [SPW_ID]: [...workflowTrail(content), record],
+    },
   };
   for (const field of ['effective', 'expires']) {
     if (req.body?.[field]) patch[field] = req.body[field];
@@ -2564,7 +2603,7 @@ app.get(/.*\/@history$/, (req, res) => {
     type: 'versioning',
     version: v.version,
   }));
-  const workflow = (content?.workflow_history ?? []).map((h, n) => ({
+  const workflow = workflowTrail(content).map((h, n) => ({
     '@id': `http://localhost:${PORT}${cleanPath}/@history/${n + 1}`,
     action: h.action,
     actor: { '@id': null, fullname: 'Admin User', id: 'admin', username: 'admin' },
