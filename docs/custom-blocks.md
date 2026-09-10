@@ -474,8 +474,9 @@ const bridge = initBridge({
 - `{ when: { fieldName: { gte: 2 } }, set: { ... } }` — conditional definition override
 - `[rule, rule, ...]` — switch: first matching rule wins. A bare `false` in the array is a catch-all hide: `[{ when: A }, { when: B }, false]` shows on A or B, hides otherwise.
 - `'parent.child': false` — hide a field inside a widget's inner schema
+- `{ when: { ... }, error: 'message' }` — mark the field invalid when the condition holds
 
-Condition operators: `is`, `isNot`, `isSet`, `isNotSet`, `oneOf`, `notOneOf`, `contains`, `notContains`, `containsAny`, `notContainsAny`, `containsAll`, `notContainsAll`, `regex`, `notRegex`, `gt`, `gte`, `lt`, `lte`. A bare value (`{ mode: 'advanced' }`) is shorthand for `is`.
+Condition operators: `is`, `isNot`, `isSet`, `isNotSet`, `oneOf`, `notOneOf`, `contains`, `notContains`, `containsAny`, `notContainsAny`, `containsAll`, `notContainsAll`, `regex`, `notRegex`, `gt`, `gte`, `lt`, `lte`. A bare value (`{ mode: 'advanced' }`) is shorthand for `is`. An operand may be a literal or `{ field: '<path>' }` — see [compare against another field](#-field----compare-against-another-field).
 
 Each operator is driven by the field's **declared type**, never the value shape. A field reduces to one of four **surfaces**, and an operator used off its surface raises an error (a mis-authored rule fails loudly rather than silently mismatching):
 
@@ -487,6 +488,124 @@ Each operator is driven by the field's **declared type**, never the value shape.
 | **array** | multiselect (its values), **region** (its child block **types**) | `isSet`, `is`/`isNot` = **set-equality**, `contains`/`notContains` = membership, `containsAny`/`containsAll` (+inverses), `gt`/`gte`/`lt`/`lte` = **count** |
 
 `oneOf` (scalar value ∈ set) and `containsAny` (array shares any with a set) differ only on the field side — `oneOf` is for a single-valued field, `containsAny` for a multiselect; `oneOf` on an array throws (use `containsAny`).
+
+### `error` — a rule that refuses a value
+
+A rule can raise a validation error instead of showing or hiding something:
+
+```javascript
+fieldRules: {
+    maxItems: {
+        when: { maxItems: { isSet: true, lt: { field: 'minItems' } } },
+        error: 'The maximum is below the minimum.',
+    },
+},
+```
+
+The message lands on the field, and everything an author sees is Volto's own: the
+widget goes red, the form shows its error summary, and **the save is blocked**
+(`Form.onSubmit` validates every block against its enhanced schema and refuses
+to submit while any block has errors).
+
+An `error` composes with a `set` in the same rule — the field can be re-titled
+*and* marked — and it is skipped entirely when the rule's `when` does not match,
+so a form that has not been filled in yet is not scolded for it.
+
+**Write a cross-field rule on the field that should show the error.** There is no
+block-level address, and adding one would do less: an error keyed to a field is
+the only shape Volto acts on, so a block-level error would show a banner and let
+the save through. If a constraint genuinely belongs to no single field, list the
+same rule under each field it concerns.
+
+### `warning` — a rule that says something rather than refusing it
+
+Not every constraint should stop a save:
+
+```javascript
+fieldRules: {
+    image: {
+        when: { image: { regex: '\\.png$' } },
+        warning: 'A pictogram should be an SVG drawn to the 48×48 grid.',
+    },
+},
+```
+
+An `error` is **refused** — a registered validator turns it into a form error
+and `Form.onSubmit` will not submit. A `warning` is **said**: it is deliberately
+not a validator, so nothing blocks. The sidebar shows it beside the field, and
+the page saves.
+
+Use a warning when the value may well be right and the author should simply
+know: artwork a little off the 48×48 grid is still the right artwork, and
+refusing to save over it would be hostile. Use an error when the value cannot
+work at all — a raster where the design system inlines an SVG.
+
+Both actions compose with `set`, and both work in a switch (`[rule, rule, …]`),
+where the first matching entry wins — so a rule can refuse one case and merely
+advise on another.
+
+### `{ field: '...' }` — compare against another field
+
+Any operand may name a field instead of a literal:
+
+```javascript
+{ when: { maxItems: { lt: { field: 'minItems' } } } }        // this block
+{ when: { b_size:   { gt: { field: '../pageSize' } } } }     // parent's field
+```
+
+The reference goes through the same path grammar as a `when` key, so `../` steps
+work in an operand exactly as they do in a key.
+
+### Reading into a value, and arithmetic
+
+A `when` path may continue INTO the field's value, and an operand may do basic
+arithmetic:
+
+```javascript
+fieldRules: {
+    image: [
+        {
+            when: { 'image_scales.image.0.content-type': { isNot: 'image/svg+xml' } },
+            error: 'A pictogram must be an SVG: it is inlined and takes its colour from the page.',
+        },
+        {
+            when: {
+                'image_scales.image.0.width': {
+                    gt: { field: 'image_scales.image.0.height', times: 1.1 },
+                },
+            },
+            warning: 'A pictogram is drawn square, on a 48×48 grid.',
+        },
+    ],
+},
+```
+
+Some of what a rule needs to ask about is not a field at all. Volto stores an
+image's mime type and dimensions ALONGSIDE the reference, in `image_scales`, so
+"is this an SVG" and "is it square" are answerable from data the block already
+carries — no fetching, no extra state.
+
+- **A sub-path's surface comes from the VALUE**, because no schema describes
+  `image_scales.image.0.width`. This is the one place the rule engine reads a
+  value's shape, and only because a declared type does not exist to consult.
+- **A sub-path that leads nowhere is UNSET**: every comparison is false, and
+  only `isSet`/`isNotSet` answer. A rule must not fire on a block whose image
+  has not been chosen yet.
+- **`times` and `plus`** apply to a field reference, so a comparison can carry a
+  tolerance — "square, within a tenth" rather than exactly equal, which no real
+  measurement is.
+
+Two things to know:
+
+- **Surfaces still apply.** A reference does not smuggle a value past the
+  operator table — `lt` on a `string` surface throws whether the operand is a
+  literal or a field. Comparing two date strings is therefore not expressible;
+  that needs a date surface, which is a separate question from where the operand
+  comes from.
+- **An empty reference makes the condition false.** If the named field holds
+  nothing there is no value to compare against, and reading that as "no
+  constraint" would fire the rule on every form where the other field has not
+  been filled in yet.
 
 Two extras drive **position-** and **type-**aware rules:
 

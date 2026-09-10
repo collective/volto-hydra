@@ -372,7 +372,11 @@ export const sharedBlocksConfig = {
             title: 'Slide',
             fieldsets: [{ id: 'default', title: 'Default', fields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'href', 'hideButton', 'flagAlign'] }],
             properties: {
-                head_title: { title: 'Kicker', type: 'string' },
+                // A plain string constraint, so a standard Volto validator is
+                // reachable from a fixture. Every slide in the fixtures has a
+                // title of 16 characters or fewer, so the rule is inert until a
+                // test writes a long one on purpose.
+                head_title: { title: 'Kicker', type: 'string', maxLength: 60 },
                 // The slide's own link target, and which side its caption sits
                 // on. Both are stored by the fixtures and read by the example
                 // frontends (nuxt keys its card position off flagAlign), so an
@@ -866,6 +870,26 @@ export const sharedBlocksConfig = {
         },
         schemaEnhancer: {
             inheritSchemaFrom: { typeField: 'variation', mappingField: 'fieldMapping', defaultsField: 'itemDefaults' },
+            // A rule that REFUSES a value, rather than showing or hiding one.
+            // Asking for fewer than no items is the clearest thing this block
+            // can be told that it cannot do, and no fixture asks for it — the
+            // page uses the default 6 — so the rule is inert until a test sets
+            // a negative count on purpose.
+            fieldRules: {
+                count: {
+                    when: { count: { lt: 0 } },
+                    error: 'Max items cannot be negative.',
+                },
+                // …and one that SAYS something instead of refusing it. Asking a
+                // feed for a hundred items is a bad idea, not an impossible
+                // one, so the author hears about it and the save goes through.
+                // No fixture asks for that many, so it is inert until a test
+                // does on purpose.
+                feedUrl: {
+                    when: { count: { gt: 50 } },
+                    warning: 'That many items will make the page slow.',
+                },
+            },
         },
     },
     // Listing item types — restricted child blocks, only usable inside listing containers
