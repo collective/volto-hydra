@@ -79,7 +79,31 @@ import { applyBlockDefaults } from '@plone/volto/helpers';
 import { setInjectedVoltoConfig } from './utils/injectedVoltoConfig';
 import StyleDropdown from './components/Toolbar/StyleDropdown';
 
+// The field types a `hydraRuleError` can land on. Volto looks a validator up by
+// the field's declared type (`field.type || 'string'`), so the rule's error has
+// to be offered for each type a rule might mark — there is no "any type" key.
+const RULE_ERROR_FIELD_TYPES = ['string', 'number', 'integer', 'boolean', 'array', 'object'];
+
+/**
+ * Surface a field rule's `error` as a form error.
+ *
+ * `evaluateFieldRule` puts the message on the field DEFINITION when the rule
+ * matches; this is what turns that into the things an author sees — the widget
+ * red, the form's error summary, and a blocked save — all of which are Volto's
+ * own, keyed on the field. Nothing here decides anything: the rule already did.
+ */
+const hydraRuleErrorValidator = ({ field }) => field?.hydraRuleError || null;
+
 const applyConfig = (config) => {
+  for (const fieldType of RULE_ERROR_FIELD_TYPES) {
+    config.registerUtility({
+      name: `hydraRuleError-${fieldType}`,
+      type: 'validator',
+      dependencies: { fieldType },
+      method: hydraRuleErrorValidator,
+    });
+  }
+
   // Autosave the form to localStorage while editing, and offer it back if the
   // author returns to a page they left mid-edit. Volto ships the feature but
   // OFF (config.experimental.saveAsDraft.enabled = false), so nobody has ever

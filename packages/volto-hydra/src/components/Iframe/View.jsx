@@ -686,6 +686,7 @@ const Iframe = (props) => {
     schema, // Content type schema for page-level field types
     saveTemplatesRef, // Ref that Form.jsx uses to trigger template save
     multiSelected = [], // Array of block UIDs in multi-selection
+    blocksErrors = {}, // blockId → { field: [messages] } from a refused save
     onSetMultiSelected, // Callback to set multi-selection in Redux
   } = props;
 
@@ -6123,6 +6124,7 @@ const Iframe = (props) => {
       <ParentBlocksWidget
         selectedBlock={selectedBlock}
         multiSelected={multiSelected}
+        blocksErrors={blocksErrors}
         formData={properties}
         blockPathMap={iframeSyncState.blockPathMap}
         templatePermissions={templateCacheRef.current}

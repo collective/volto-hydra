@@ -65,6 +65,7 @@ import withSaveAsDraft from '@plone/volto/helpers/Utils/withSaveAsDraft';
 import SlotRenderer from '@plone/volto/components/theme/SlotRenderer/SlotRenderer';
 import Iframe from '../../../../../components/Iframe/View';
 import { validateTemplatePlaceholders } from '../../../../../utils/formDataValidation';
+import { validateBlocksAgainstSchemas } from '../../../../../utils/validateBlocks';
 import './styles.css';
 
 /**
@@ -589,7 +590,28 @@ class Form extends Component {
 
     // Validate template slot contiguity
     const templateValidation = validateTemplatePlaceholders(formData);
-    const blocksErrors = templateValidation.blocksErrors;
+    // …and every block against its own schema. Core's Form does this and this
+    // shadow had lost it, so a block's `required`, `maxLength`, `pattern` — and
+    // a fieldRules `error` — were never enforced on save. Nested, because
+    // hydra's blocks nest and core's top-level walk would miss everything
+    // inside a container.
+    // Validate what will actually be PERSISTED. Empty slot blocks exist for the
+    // canvas and are stripped on the way out (getOnlyFormModifiedValues), so a
+    // block that will not be saved must not be able to refuse the save.
+    const persistedFormData = stripEmptyBlocks(
+      formData,
+      config.blocks.blocksConfig,
+      this.props.intl,
+    );
+    const schemaValidation = validateBlocksAgainstSchemas(persistedFormData, {
+      blocksConfig: config.blocks.blocksConfig,
+      intl: this.props.intl,
+      formatMessage: this.props.intl.formatMessage,
+    });
+    const blocksErrors = {
+      ...schemaValidation.blocksErrors,
+      ...templateValidation.blocksErrors,
+    };
 
     if (keys(errors).length > 0) {
       const activeIndex = FormValidation.showFirstTabWithErrors({
@@ -852,6 +874,10 @@ class Form extends Component {
           </Container>
           <Iframe
             formData={formData}
+            // Per-block validation errors from the last refused save, so the
+            // sidebar can mark the field. The toast names the block; this is
+            // what shows the author WHICH field and why, where they fix it.
+            blocksErrors={this.state.errors?.blocks}
             schema={this.props.schema}
             onChangeFormData={this.onIframeChangeFormData}
             onChangeField={this.onChangeField}
