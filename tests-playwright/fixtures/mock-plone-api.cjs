@@ -724,10 +724,20 @@ function getNavigationItems(basePath = '/', depth = 1, baseUrlIn, sessionId) {
   const normalizedBase = basePath.replace(/\/$/, '') || '/';
   const baseDepth = normalizedBase === '/' ? 0 : normalizedBase.split('/').filter(p => p).length;
 
-  const items = Object.keys(contentDirMap)
+  // Disk AND the session. A page created, moved or pasted in this session exists
+  // only in the session store, so enumerating contentDirMap alone leaves it out
+  // of the menu — cut a page into another folder and the menu goes on showing it
+  // where it was, or not at all. The contents view already unions the two for
+  // the same reason; the menu is the same question asked of the same tree. A
+  // path deleted (or cut away) in this session drops out here too, or the menu
+  // keeps offering a page that is no longer there.
+  const sessionPaths = sessionId ? Object.keys(sessionContent[sessionId] || {}) : [];
+  const candidates = [...new Set([...Object.keys(contentDirMap), ...sessionPaths])];
+  const items = candidates
     .filter((itemPath) => {
       if (itemPath === '/') return false;
       if (itemPath === normalizedBase) return false; // Exclude the base itself
+      if (sessionId && sessionDeletions[sessionId]?.has(itemPath)) return false;
 
       // Check if item is under the base path
       if (normalizedBase !== '/' && !itemPath.startsWith(normalizedBase + '/')) {
@@ -748,6 +758,23 @@ function getNavigationItems(basePath = '/', depth = 1, baseUrlIn, sessionId) {
       return formatNavItem(rawContent, itemPath, baseUrl, depth - 1, sessionId);
     })
     .filter(Boolean);
+
+  // An explicit ordering set via @order in THIS session wins over the one on
+  // disk. The contents view already honours it; the menu has to as well, or
+  // reordering pages there reorders the listing and leaves the menu alone —
+  // and the menu IS the content tree, which is the whole point of the gesture.
+  // Items the ordering does not name keep their natural position after the ones
+  // it does, exactly as the contents view treats them.
+  const explicit = sessionId && sessionOrder[sessionId]?.[normalizedBase];
+  if (explicit) {
+    const rank = (item) => {
+      const id = String(item['@id'] || '').split('/').filter(Boolean).pop();
+      const at = explicit.indexOf(id);
+      return at === -1 ? explicit.length : at;
+    };
+    items.sort((a, b) => rank(a) - rank(b));
+    return items;
+  }
 
   // Sort by __metadata__.json ordering (UID→position), preserving
   // contentDirMap key order (filesystem alphabetical) as fallback.
@@ -4215,6 +4242,42 @@ app.patch('*', (req, res) => {
 
   // Reload content from disk to pick up changes during development
   const content = getContent(cleanPath, sessionId);
+
+  // Reordering a folder's children is a PATCH on the CONTAINER carrying
+  // `ordering`, not a call to any @order endpoint — that is what Volto's
+  // contents view sends (actions/content: `data: { ordering: { obj_id, delta,
+  // subset_ids } }`) and what plone.restapi accepts. The mock had an @order
+  // route instead, which nothing calls, so dragging a row reordered the table
+  // in the browser and told the backend nothing: reload and the old order was
+  // back, and the site menu — which the order IS — never moved.
+  if (content && req.body?.ordering?.obj_id) {
+    const { obj_id: objId, delta, subset_ids: subsetIds } = req.body.ordering;
+    const naturalIds = getFolderChildItems(cleanPath, `http://localhost:${PORT}`)
+      .map((item) => String(item['@id'] || '').split('/').filter(Boolean).pop())
+      .filter(Boolean);
+    const current = sessionOrder[sessionId]?.[cleanPath] || naturalIds;
+    // A subset reorders only among the rows it names, leaving the rest put —
+    // the contents view sends one when a filter is on.
+    const scope = Array.isArray(subsetIds) && subsetIds.length ? subsetIds : current;
+    const from = scope.indexOf(objId);
+    if (from !== -1) {
+      const moved = [...scope];
+      moved.splice(from, 1);
+      const to =
+        delta === 'top'
+          ? 0
+          : delta === 'bottom'
+            ? moved.length
+            : Math.max(0, Math.min(moved.length, from + Number(delta)));
+      moved.splice(to, 0, objId);
+      const next =
+        scope === current
+          ? moved
+          : current.map((id) => (subsetIds.includes(id) ? moved.shift() : id));
+      if (!sessionOrder[sessionId]) sessionOrder[sessionId] = {};
+      sessionOrder[sessionId][cleanPath] = next;
+    }
+  }
 
   if (content) {
     // Version snapshot: the state BEFORE this edit becomes version N (like
