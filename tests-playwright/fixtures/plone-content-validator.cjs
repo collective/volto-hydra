@@ -4,8 +4,13 @@
  * Two entry points:
  *   validate(contentDir) — export shape: _data_files_/_blob_files_ consistency,
  *                          parent/UID/id presence, Image blob paths, ordering
- *   checkIntegrity(contentDir) — graph integrity: resolveuid refs, image refs,
- *                                teaser/button hrefs, parent containers
+ *   checkIntegrity(source) — graph integrity: resolveuid refs, image refs,
+ *                            teaser/button hrefs, parent containers.
+ *                            `source` is a content DIR (full check) or an
+ *                            in-memory [{ rel, data }] array (e.g. pages
+ *                            fetched from a live API) — the disk-only passes
+ *                            (blob files, __metadata__ cross-check) skip for
+ *                            the in-memory form.
  *
  * Both return { errors: string[], warnings: string[], stats: object }.
  * Mirrors the behaviour of pretagov-site/{validate,test}-content.py so the
@@ -16,6 +21,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { UNDECLARED_EXEMPT } = require('../helpers/discover-blocks.cjs');
 
 /**
  * Content ids that break their PARENT, not themselves.
@@ -271,7 +277,9 @@ function validate(contentDir) {
 /**
  * Graph integrity. Mirrors test-content.py.
  */
-function checkIntegrity(contentDir) {
+function checkIntegrity(source) {
+  const onDisk = typeof source === 'string';
+  const contentDir = onDisk ? source : null;
   const errors = [];
   const warnings = [];
   const stats = {
@@ -292,8 +300,9 @@ function checkIntegrity(contentDir) {
   const uidMap = new Map();
   const pathMap = new Map();
   const items = [];
-  for (const { rel, data, dir } of walkData(contentDir)) {
-    items.push({ rel, data, dir });
+  for (const entry of onDisk ? walkData(contentDir) : source) {
+    items.push(entry);
+    const { rel, data } = entry;
     // `id` is required by the Plone importer: a missing id aborts the ENTIRE
     // create-site with `KeyError: 'id'` (plone.exportimport process_id), and an
     // underscore-prefixed id is rejected by Plone OFS. Both silently leave an
@@ -304,7 +313,10 @@ function checkIntegrity(contentDir) {
       data['@type'] === 'Plone Site' ||
       rel === 'plone_site_root' ||
       data['@id'] === '/Plone';
-    if (!isRoot) {
+    // Identity presence is an IMPORT-side concern (a real API always serves
+    // `id`; mocks serving fixture JSON verbatim legitimately may not) — check
+    // it only for on-disk export trees, where a missing id aborts the import.
+    if (!isRoot && onDisk) {
       if (!data.id) {
         errors.push(`  ${rel}: missing id (Plone import aborts with KeyError: 'id')`);
       } else if (/^_/.test(data.id)) {
@@ -332,8 +344,10 @@ function checkIntegrity(contentDir) {
 
   // Pass 2a: resolveuid references
   const resolveuidRe = /(?:\.\.\/)*resolveuid\/([a-f0-9]{10,})/g;
-  for (const { rel, dir } of items) {
-    const text = fs.readFileSync(path.join(dir, 'data.json'), 'utf8');
+  for (const { rel, dir, data } of items) {
+    const text = onDisk
+      ? fs.readFileSync(path.join(dir, 'data.json'), 'utf8')
+      : JSON.stringify(data);
     let m;
     while ((m = resolveuidRe.exec(text)) !== null) {
       const uid = m[1];
@@ -383,8 +397,10 @@ function imageDimensions(file) {
   return null;
 }
 
-  // Pass 2b: Image content items have blob files
+  // Pass 2b: Image content items have blob files (disk only — an API-fed
+  // check has no blob files to stat; scale URLs are the frontend's concern).
   for (const { rel, data } of items) {
+    if (!onDisk) break;
     if (data['@type'] !== 'Image') continue;
     const img = data.image || {};
     const blobPath = img.blob_path || '';
@@ -470,6 +486,13 @@ function imageDimensions(file) {
       // strip ../ prefixes, scale suffixes (@@images/…) and resource views (/++…)
       let base = ref.replace(/^(\.\.\/)+/, '');
       if (!base.startsWith('/')) base = '/' + base;
+      // Drop the #fragment and ?query before looking the path up. Deep-linking
+      // to a heading is legitimate content (RichText emits slugged heading ids
+      // so `page#section` resolves), and without this a good link read as
+      // "path not in content: /services/advise#discovery". The PATH is still
+      // checked — only the part after # is dropped, so a dead page cannot be
+      // smuggled past the gate by appending an anchor.
+      base = base.split('#')[0].split('?')[0];
       base = base.split('/@@')[0].split('/++')[0].replace(/\/+$/, '') || '/';
       return pathMap.has(base) ? null : `path not in content: ${base}`;
     }
@@ -485,7 +508,34 @@ function imageDimensions(file) {
     return `unrecognized reference form: ${ref.slice(0, 60)}`;
   }
 
+  // Slate links live at value[].data.url — inside the block's rich text, not in
+  // one of LINK_FIELDS — so the field scan below never saw them. Only resolveuid
+  // refs were caught, by a raw-text regex over the whole file; a plain-path
+  // slate link pointing nowhere was not checked at all while the gate still
+  // reported "0 broken".
+  function* slateLinkUrls(value) {
+    if (Array.isArray(value)) {
+      for (const node of value) yield* slateLinkUrls(node);
+      return;
+    }
+    if (!value || typeof value !== 'object') return;
+    if (value.type === 'link') {
+      const url = (value.data || {}).url;
+      if (typeof url === 'string' && url !== '') yield url;
+    }
+    yield* slateLinkUrls(value.children);
+  }
+
   function checkBlockRefs(rel, bid, block) {
+    for (const url of slateLinkUrls(block.value)) {
+      const reason = refFailure(url);
+      if (reason) {
+        stats.linksBroken += 1;
+        errors.push(`  ${rel}: block ${bid} (${block['@type']}) slate link: ${reason}`);
+      } else {
+        stats.linksOk += 1;
+      }
+    }
     for (const field of LINK_FIELDS) {
       if (!(field in block)) continue;
       for (const ref of refStrings(block[field])) {
@@ -511,6 +561,88 @@ function imageDimensions(file) {
   for (const { rel, data } of items) {
     for (const [bid, block] of walkBlocks(data.blocks)) {
       checkBlockRefs(rel, bid, block);
+    }
+  }
+
+  // Pass 2c-bis: a TEMPLATE's top-level blocks must carry templateId AND slotId.
+  //
+  // Forced-layout expansion matches a template's blocks onto a page's region by
+  // those two fields. A block missing either is silently skipped — no error is
+  // raised anywhere, the block just never renders. Nothing else catches it: the
+  // schema gate only checks declared fields (neither is one), and block-sanity
+  // only sees blocks that DID render.
+  //
+  // "Is a template" means a page whose own blocks point at ITSELF — that is what
+  // distinguishes a template from a page that merely EMBEDS one. An ordinary
+  // page (e.g. /services/onyx) carries a block with a templateId referencing the
+  // shared contact-CTA template; treating that as "this is a template" flagged
+  // every other block on the page. Inferred from content, not from the path, so
+  // a template stored outside /templates is still checked.
+  for (const { rel, data } of items) {
+    const blocks = data.blocks || {};
+    const top = (data.blocks_layout || {}).items || [];
+    const own = new Set([data.UID && `resolveuid/${data.UID}`, data['@id']].filter(Boolean));
+    const isTemplate = top.some((bid) => blocks[bid] && own.has(blocks[bid].templateId));
+    if (!isTemplate) continue;
+    // EVERY depth, not just the top. fillRegionEntries is the same function for
+    // a nested container's regions as for the page's, and it opens with
+    //     if (!child || !child.templateId) continue; // orphan / missing → drop
+    // so a block buried in a column is dropped on the same rule — and takes its
+    // own children with it, since they are only reachable through it. Measured:
+    // removing `templateId` from one widget nested in a footer column removed
+    // that widget AND its three slates from the merged footer.
+    const walk = (container, prefix) => {
+      // Descend into FIXED containers only. A fixed block is template-owned
+      // structure: the merge re-derives its children from the template, so each
+      // one needs its own tags or it is dropped. A NON-fixed block is a SLOT —
+      // its children are the page's content, carried through as-is and needing
+      // no tags at all. Checked: /templates/contact-cta's `cta-section` is
+      // `fixed: false` and its untagged `cta-btn` survives the merge intact, so
+      // flagging it would be a false alarm on shipping content.
+      if (container.fixed !== true && prefix) return;
+      const kids = container.blocks || {};
+      const order = Object.values(container.blocks_layout || {}).flat();
+      for (const bid of order.length ? order : Object.keys(kids)) {
+        const block = kids[bid];
+        if (!block || typeof block !== 'object') continue;
+        yieldBlock(prefix ? `${prefix} > ${bid}` : bid, block);
+        walk(block, prefix ? `${prefix} > ${bid}` : bid);
+      }
+    };
+    const yieldBlock = (label, block) => {
+      const missing = [];
+      if (!block.templateId) missing.push('templateId');
+      // A non-fixed child is a SLOT, matched to the page's content by slotId
+      // (`else if (child.slotId)`); without one it matches neither branch and is
+      // dropped too. A fixed child needs it to be matched when the page has
+      // overridden it, and the top-level rule has always required it.
+      if (!block.slotId) missing.push('slotId');
+      // `fixed` must be stated, true or false. Omitting it does not mean "not
+      // fixed" — it makes the block a SLOT for the page to fill, so on a page
+      // whose region is empty the block renders as nothing. Requiring the
+      // decision means a template block can no longer disappear because
+      // somebody forgot to say what kind of block it is.
+      if (typeof block.fixed !== 'boolean') {
+        missing.push(block.fixed === undefined
+          ? 'fixed (true = template-controlled, false = a slot the page fills)'
+          : `fixed as a boolean (got ${JSON.stringify(block.fixed)})`);
+      }
+      if (missing.length) {
+        stats.templateBlocksBroken = (stats.templateBlocksBroken || 0) + 1;
+        errors.push(
+          `  ${rel}: template block ${label} (${block['@type']}) is missing ` +
+          `${missing.join(' and ')} — forced-layout expansion skips it silently, ` +
+          `so it will never render`,
+        );
+      } else {
+        stats.templateBlocksOk = (stats.templateBlocksOk || 0) + 1;
+      }
+    };
+    for (const bid of top) {
+      const block = blocks[bid];
+      if (!block || typeof block !== 'object') continue;
+      yieldBlock(bid, block);
+      walk(block, bid);
     }
   }
 
@@ -548,8 +680,8 @@ function imageDimensions(file) {
   // Parent containers (metadata cross-check for completeness). Uses the `@id`
   // hierarchy via pathMap, not the directory path — see validate()'s note: our
   // content is UID-keyed and flat, so a path-derived parent never resolves.
-  const metaPath = path.join(contentDir, '__metadata__.json');
-  if (fs.existsSync(metaPath)) {
+  const metaPath = onDisk ? path.join(contentDir, '__metadata__.json') : null;
+  if (metaPath && fs.existsSync(metaPath)) {
     const meta = readJson(metaPath);
     for (const entry of meta._data_files_ || []) {
       const entryPath = path.join(contentDir, entry);
@@ -567,9 +699,124 @@ function imageDimensions(file) {
   return { errors, warnings, stats };
 }
 
+
+/**
+ * Every block field the schemas do not declare.
+ *
+ * A conversion writes blocks, and the only way to know it wrote them correctly
+ * is to compare what it produced against the schema those blocks are edited by.
+ * Nothing did that outside a browser: block-sanity holds the equivalent check,
+ * but it needs a frontend, a discovery pass and a mock parent, so it only ever
+ * ran over content we commit. A converted export is generated on a server and
+ * never comes local, and there it went unchecked — `contentBlock` held its link
+ * as `url` where the schema says `linkUrl`, so a "View more" link stopped
+ * rendering and no test anywhere had an opinion.
+ *
+ * This asks the same question with nothing but the content and a field map:
+ * `{ blockType: ["field", ...] }`, which the frontend emits from its own
+ * schemas. It runs over a directory or an in-memory array, like checkIntegrity,
+ * so the same call serves a CI corpus and a live site's pages.
+ *
+ * A block type absent from the map is REPORTED, not skipped: an unknown type is
+ * either a block the frontend cannot render or a map gone stale, and both are
+ * worth hearing about.
+ */
+function checkBlockSchemas(source, fieldMap) {
+  // `{ blocks: { type: { fields, defaultsPrefix } }, identityFields: [...] }`.
+  // A bare `{ type: [fields] }` map still works, for a caller that has one.
+  const declaredFields = fieldMap && fieldMap.blocks ? fieldMap.blocks : fieldMap;
+  // Keys a CONTAINER stamps onto its children — an object_list's `idField` /
+  // `typeField`. The table block keys its cells by `key`, and the cell's own
+  // schema has no reason to declare it.
+  const identityFields = new Set(
+    (fieldMap && fieldMap.identityFields) || ['@id', '@type'],
+  );
+  const onDisk = typeof source === 'string';
+  const errors = [];
+  const warnings = [];
+  const stats = { items: 0, blocks: 0, undeclared: 0, unknownTypes: 0 };
+  const unknown = new Set();
+  // One report per (blockType, field): a stray field is a converter bug, and a
+  // converter repeats itself across every page it touched.
+  const strays = new Map();
+
+  const visit = (block, rel) => {
+    if (!block || typeof block !== 'object') return;
+    const type = block['@type'];
+    if (typeof type === 'string') {
+      stats.blocks += 1;
+      const entry = declaredFields[type];
+      // `{ fields, defaultsPrefix }`, or a bare array from an older map.
+      const declared = Array.isArray(entry) ? entry : entry && entry.fields;
+      const defaultsPrefix = Array.isArray(entry) ? null : entry && entry.defaultsPrefix;
+      if (!declared) {
+        if (!unknown.has(type)) {
+          unknown.add(type);
+          stats.unknownTypes += 1;
+          warnings.push(
+            `  ${rel}: block type "${type}" is in the content but not in the ` +
+              `field map — an unrenderable block, or a stale map`,
+          );
+        }
+      } else {
+        for (const field of Object.keys(block)) {
+          // `@`-prefixed keys are the block's identity, and UNDECLARED_EXEMPT is
+          // the same set block-sanity uses: fields that ride on a block without
+          // being schema fields. Template machinery is the big one —
+          // `templateId`, `templateInstanceId`, `slotId`, `fixed`, `readOnly` —
+          // and it is not unchecked, it is checked by the pass that owns it
+          // (a template's blocks must carry templateId AND slotId, above).
+          // Reporting them here would bury the real findings under three lines
+          // for every block on every templated page: 151 of them on content
+          // that has nothing wrong with it.
+          if (field.startsWith('@') || UNDECLARED_EXEMPT.has(field)) continue;
+          // A container's per-item defaults (`itemDefaults_colour`) are not
+          // properties of the container, and which are valid depends on the
+          // item type — resolvable only with the bridge's registry, which is
+          // exactly why discovery exempts the prefix rather than flagging it.
+          if (defaultsPrefix && field.startsWith(defaultsPrefix)) continue;
+          if (identityFields.has(field)) continue;
+          if (declared.includes(field)) continue;
+          const key = `${type}.${field}`;
+          if (!strays.has(key)) strays.set(key, rel);
+        }
+      }
+    }
+    for (const value of Object.values(block)) {
+      if (Array.isArray(value)) value.forEach((v) => visit(v, rel));
+      else if (value && typeof value === 'object') visit(value, rel);
+    }
+  };
+
+  for (const entry of onDisk ? walkData(source) : source) {
+    const { rel, data } = entry;
+    stats.items += 1;
+    visit(data.blocks, rel);
+  }
+
+  for (const [key, rel] of [...strays.entries()].sort()) {
+    stats.undeclared += 1;
+    errors.push(
+      `  ${key} is not declared by the block's schema (e.g. ${rel}) — ` +
+        `the field cannot be edited, and whatever reads it renders nothing`,
+    );
+  }
+  return { errors, warnings, stats };
+}
+
 function formatReport(title, result) {
   const lines = [];
-  if (title === 'validate') {
+  if (title === 'schema') {
+    lines.push(
+      `Content: ${result.stats.items} items, ${result.stats.blocks} blocks`,
+    );
+    lines.push(
+      `Fields:  ${result.stats.undeclared} undeclared` +
+        (result.stats.unknownTypes
+          ? `, ${result.stats.unknownTypes} block type(s) not in the field map`
+          : ''),
+    );
+  } else if (title === 'validate') {
     lines.push(`Content export OK: ${result.stats.dataFiles} data files, ${result.stats.blobFiles} blob files`);
   } else {
     lines.push(`Content: ${result.stats.items} items`);
@@ -596,4 +843,4 @@ function formatReport(title, result) {
   return lines.join('\n');
 }
 
-module.exports = { validate, checkIntegrity, formatReport };
+module.exports = { validate, checkIntegrity, checkBlockSchemas, formatReport };

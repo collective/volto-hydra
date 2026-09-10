@@ -8,7 +8,7 @@
  *   { hero: { blockSchema: { properties: { ... } } }, slider: { ... } }
  */
 import { expect } from '@playwright/test';
-import type { Page, FrameLocator, Locator } from '@playwright/test';
+import type { Page, FrameLocator, Locator, ElementHandle } from '@playwright/test';
 import { AdminUIHelper } from './AdminUIHelper';
 import { recordSlateFieldContainer, recordFieldEditable } from './field-coverage';
 
@@ -99,6 +99,12 @@ export async function checkDataEditTextClicks(
     (a, b) => String(owners[a] ?? '').localeCompare(String(owners[b] ?? '')) || a - b,
   );
   let revealedOwner: string | null = null;
+  // Whether a click in THIS pass has already selected the block. The first
+  // click is what selects it; every later one lands on a block the admin is
+  // still catching up with — see the wait before the click below.
+  let selected = false;
+
+  const admin = new AdminUIHelper(page);
 
   for (const i of order) {
     const el = editTextEls.nth(i);
@@ -111,7 +117,6 @@ export async function checkDataEditTextClicks(
       // transit lands where it used to be, which reads as "element is outside
       // of the viewport" once Playwright has scrolled (a transform cannot be
       // scrolled to).
-      const admin = new AdminUIHelper(page);
       await admin.getStableBlockCount();
       const ownerEl = iframe.locator(`[data-block-uid="${owner}"]`).first();
       if (await ownerEl.count()) {
@@ -167,7 +172,58 @@ export async function checkDataEditTextClicks(
     // previous selection had something to scroll.
     await new AdminUIHelper(page).waitForPositionStable(el).catch(() => {});
 
-    await el.click();
+    // Playwright resolves a <label> to the control it labels, so a label whose
+    // control is DISABLED counts as disabled and `.click()` refuses to act on
+    // it. That is a false negative here: the browser still delivers the click
+    // to the label, and the bridge still promotes the field — a disabled
+    // control means the ANSWER cannot be given, not that the question's text
+    // cannot be edited. (A form field disabled by a rule is exactly this: the
+    // author must still be able to rename it.)
+    //
+    // So the actionability veto is bypassed only for that case; everywhere else
+    // the ordinary checks — visible, stable, receives the event — keep their
+    // value.
+    // The bridge promotes a field to contenteditable ONCE, on the click that
+    // reaches it — there is no retry. A click that lands while the admin is
+    // still settling the previous selection is answered by a re-render
+    // (restoreContentEditableOnFields, whose own comment notes that it "would
+    // change the DOM and shift event.target"), and the promotion is simply
+    // lost: the assertion below then waits out its full timeout for an
+    // attribute that was never coming, and reads as a mystery flake.
+    //
+    // So wait for the admin to agree the block is selected before clicking
+    // again — the same observable state the integration specs wait on (toolbar
+    // visible AND positioned over the block, handles aligned, nothing covering
+    // it). Not on the first click: that click is what selects the block.
+    if (selected) {
+      // isBlockSelectedInIframe, not waitForBlockSelectedInAdmin: the state we
+      // need is "the admin has caught up with the last click" — the toolbar and
+      // outline are up and positioned over this block — and the mock parent the
+      // BRIDGE suite drives renders exactly those. waitForBlockSelectedInAdmin
+      // additionally checks sidebar coverage and drag-handle alignment, which
+      // only the real Volto admin has, so it could never settle there.
+      //
+      // This is a readiness HINT, not an assertion. Some blocks never report
+      // selected here even though their fields promote perfectly well (a
+      // codeExample's <pre> is one: the outline lands, but the positioning
+      // check this helper makes does not agree) — and failing those is a
+      // regression this wait has no business causing. If the state never
+      // arrives we click anyway: the promotion assertion below is the one that
+      // decides the test, and it reports the real problem when it is real.
+      await expect
+        .poll(
+          async () => {
+            const res = await admin.isBlockSelectedInIframe([blockUid]);
+            return typeof res === 'boolean' ? res : !!res?.ok;
+          },
+          { timeout: 5000 },
+        )
+        .toBeTruthy()
+        .catch(() => {});
+    }
+    const actionable = await el.isEnabled().catch(() => true);
+    await el.click(actionable ? {} : { force: true });
+    selected = true;
     // The warning below is asserted ABSENT, so give the bridge its frame to
     // raise one — see nextFrame. (Was a 300ms sleep.)
     await nextFrame(iframe);
@@ -237,20 +293,85 @@ export async function checkDataEditTextClicks(
  * A block that is already visible, or whose container publishes nothing, is
  * left exactly as it was.
  */
+/**
+ * Do everything the EDITOR would do to make a block's fields editable, in the
+ * order an author would, and say whether anything changed.
+ *
+ * The harness had these steps scattered: `revealBlock` for a block hidden
+ * behind an accordion or a tab, a `data-block-selector="uid#field"` press for a
+ * field the design system draws elsewhere, and `unlockTemplate` in the template
+ * specs — so a check that needed a step nobody had wired in reported the block
+ * as uneditable rather than un-revealed. The footer template's cookie banner
+ * failed exactly that way, while the same block on an ordinary page passed:
+ * nothing had unlocked the template, and a locked member carries no annotation
+ * because it genuinely is not editable yet.
+ *
+ * Each step is skipped when it does not apply, so this is safe to call whenever
+ * a field looks absent, and returns false when it did nothing (there is then no
+ * point looking again).
+ */
+export async function makeEditable(
+  block: Locator,
+  blockData?: Record<string, unknown>,
+  iframe?: FrameLocator,
+): Promise<boolean> {
+  const uid = await block.getAttribute('data-block-uid');
+  if (!uid) return false;
+  let acted = false;
+
+  // 1. Hidden behind a container's own control (accordion header, tab, slide).
+  //    revealBlock owns this: it asks the bridge whether the block is really
+  //    visible (an off-screen slide still has client rects), copes with a
+  //    query-gated block that has no element at all, and steps +1/-1 to reach
+  //    one. Re-clicking the selector here would be a worse copy of it.
+  if (iframe && !(await block.isVisible().catch(() => false))) {
+    await revealBlock(iframe, uid);
+    acted = true;
+  }
+
+  // 2. Drawn ELSEWHERE by design system JavaScript (a cookie banner, a dialog).
+  //    The control that opens it names the field it holds.
+  const handles = block.page().locator(`[data-block-selector^="${uid}#"]`);
+  if ((await handles.count()) > 0) {
+    await handles.first().click().catch(() => {});
+    acted = true;
+  }
+
+  // 3. A LOCKED TEMPLATE MEMBER: not editable in place until the template is
+  //    unlocked, which is a gesture the editor offers rather than a missing
+  //    feature.
+  if (blockData?.templateInstanceId && (blockData.fixed || blockData.readOnly)) {
+    try {
+      await new AdminUIHelper(block.page()).unlockTemplate(uid);
+      acted = true;
+    } catch {
+      // No toggle, or already unlocked — report what is actually there.
+    }
+  }
+  return acted;
+}
+
 export async function revealBlock(iframe: FrameLocator, blockUid: string): Promise<void> {
   const block = iframe.locator(`[data-block-uid="${blockUid}"]`).first();
+  // A query-gated block (data-block-selector-input) has NO element until its
+  // question is asked — and locator.evaluate AUTO-WAITS on an absent element,
+  // so probing it directly hung the whole test until the timeout and the
+  // reveal never ran. Count first: count() never waits.
+  const exists = (await block.count()) > 0;
   // Ask the bridge whether it considers the block visible — do not re-derive it.
   // A carousel slide translated out of view still HAS client rects: it is laid
   // out, just at x=-777 while its container starts at x=16. Checking rects
   // concluded "already rendered", skipped the reveal, and left the click landing
   // off-viewport. isElementHidden knows about off-screen translates.
-  const rendered = await block
-    .evaluate((node) => {
-      const bridge = (window as any).__hydraBridge;
-      if (bridge?.isElementHidden) return !bridge.isElementHidden(node);
-      return node.getClientRects().length > 0;
-    })
-    .catch(() => false);
+  const rendered = exists
+    ? await block
+        .evaluate((node) => {
+          const bridge = (window as any).__hydraBridge;
+          if (bridge?.isElementHidden) return !bridge.isElementHidden(node);
+          return node.getClientRects().length > 0;
+        })
+        .catch(() => false)
+    : false;
   if (rendered) return;
 
   // hydra already knows how to do this: tryMakeBlockVisible clicks a direct
@@ -267,7 +388,10 @@ export async function revealBlock(iframe: FrameLocator, blockUid: string): Promi
     .catch(() => false);
   if (!clicked) return;
 
-  await expect(block).toBeVisible({ timeout: 5000 });
+  // A click reveal repaints in a frame; a QUERY reveal navigates (the form
+  // submits, the page reloads, edit mode waits for INITIAL_DATA, then
+  // renders) — give it the reload's worth of time.
+  await expect(block).toBeVisible({ timeout: 15000 });
 
 }
 
@@ -546,27 +670,152 @@ function slateEqualIgnoringIds(a: unknown, b: unknown): boolean {
  * Values are normalised for the leading slash some renderers emit
  * (`data-edit-media="/image"`).
  */
-async function annotationsOn(
-  block: Locator,
-): Promise<Record<string, Set<string>>> {
-  const raw = await block.evaluate((el) => {
+/**
+ * The annotation a schema field is edited through, if any. `image` /
+ * `object_browser` say what kind of picker the field wants; text and textarea
+ * are deliberately absent (an image's `alt` is a sidebar attribute, and a
+ * textarea is not uniformly canvas content).
+ */
+function annotationFor(
+  prop: Record<string, unknown>,
+): { kind: 'text' | 'media' | 'link'; attr: string } | null {
+  const w = prop?.widget;
+  const mode = (prop as { mode?: string })?.mode;
+  if (w === 'image' || (w === 'object_browser' && mode === 'image'))
+    return { kind: 'media', attr: 'data-edit-media' };
+  if (w === 'object_browser' && mode === 'link')
+    return { kind: 'link', attr: 'data-edit-link' };
+  return null;
+}
+
+/** One annotated element: which attribute declares it, which field, and where. */
+interface EditableField {
+  attr: string;
+  field: string;
+  element: ElementHandle<Element>;
+}
+
+/**
+ * Every field of this block that is editable on the canvas, WITH the element it
+ * is edited in — one search, for every kind at once.
+ *
+ * Two things it does that a descendant query cannot:
+ *
+ *   - it asks the BRIDGE for fields drawn where the block ISN'T. A tab's label
+ *     sits on the button that reveals its panel; the wording of a cookie banner
+ *     sits wherever the design system built it. Those elements say which block
+ *     they belong to (`data-block-selector="uid#field"`), and that is as true of
+ *     a link or a picture as it is of text.
+ *   - it returns the ELEMENT, so a caller with a further question about a field
+ *     — the slate round-trip is the only one — asks it of what was found here
+ *     rather than searching again and risking a different answer.
+ */
+async function editableFieldsIn(block: Locator): Promise<EditableField[]> {
+  const collected = await block.evaluateHandle((el) => {
     const attrs = ['data-edit-text', 'data-edit-media', 'data-edit-link'];
+    const bridge = (window as unknown as { __hydraBridge?: any }).__hydraBridge;
     const strip = (v: string | null) => (v || '').replace(/^\//, '');
-    const out: Record<string, string[]> = {};
-    for (const attr of attrs) {
-      const found: string[] = [];
-      if (el.hasAttribute(attr)) found.push(strip(el.getAttribute(attr)));
-      for (const d of Array.from(el.querySelectorAll(`[${attr}]`))) {
-        found.push(strip(d.getAttribute(attr)));
+    const out: Array<{ attr: string; field: string; el: Element }> = [];
+    const add = (node: Element, attr: string, name: string) => {
+      const field = strip(name);
+      if (field && !out.some((o) => o.el === node && o.attr === attr)) {
+        out.push({ attr, field, el: node });
       }
-      out[attr] = found;
+    };
+    for (const attr of attrs) {
+      if (bridge?.collectBlockFields) {
+        // The BRIDGE's own walk, not a second one: every element carrying the
+        // uid (a block can be several), what stands in for the block, minus
+        // what belongs to a nested block or is marked readonly. Asking it is
+        // the point — a check that re-derives "the block's fields" can pass
+        // while the editor disagrees, which is the failure it exists to catch.
+        bridge.collectBlockFields(el, attr, (node: Element, name: string) => add(node, attr, name));
+      } else {
+        // No bridge (a plain-DOM harness): the block's own subtree is all there
+        // is to go on.
+        if (el.hasAttribute(attr)) add(el, attr, el.getAttribute(attr) ?? '');
+        for (const d of Array.from(el.querySelectorAll(`[${attr}]`))) {
+          add(d, attr, d.getAttribute(attr) ?? '');
+        }
+      }
     }
     return out;
   });
-  return Object.fromEntries(
-    Object.entries(raw).map(([attr, values]) => [attr, new Set(values)]),
-  );
+
+  const found: EditableField[] = [];
+  for (const item of (await collected.getProperties()).values()) {
+    const { attr, field } = await item.evaluate(
+      (o: { attr: string; field: string }) => ({ attr: o.attr, field: o.field }),
+    );
+    const element = (await item.getProperty('el')).asElement();
+    if (element) found.push({ attr, field, element });
+  }
+  return found;
 }
+
+/** The found fields as `{ attribute: Set<fieldName> }`, for presence questions. */
+function namesByAttr(found: EditableField[]): Record<string, Set<string>> {
+  const out: Record<string, Set<string>> = {
+    'data-edit-text': new Set(),
+    'data-edit-media': new Set(),
+    'data-edit-link': new Set(),
+  };
+  for (const f of found) out[f.attr]?.add(f.field);
+  return out;
+}
+
+/**
+ * Ask for what is expected but not there, ONCE for the whole block, the way the
+ * editor asks: `revealFieldPlace` — the same call the sidebar makes when an
+ * author's cursor lands in a field, which opens the half that field is edited
+ * in. Any kind of field: a picture or a link can sit in a collapsed panel as
+ * easily as a paragraph.
+ *
+ * It is opt-in at the bridge (nothing happens unless something advertises
+ * `uid#field`), so a block that draws all its fields itself pays one call and
+ * moves on. Then wait for the ask to land — a component that builds its own
+ * markup rebuilds it a beat later — and read again.
+ */
+async function settleAnnotations(
+  block: Locator,
+  found: EditableField[],
+  expected: Array<[string, string]>,
+  settleMs = 3000,
+): Promise<EditableField[]> {
+  const present = namesByAttr(found);
+  const missing = expected.filter(([attr, field]) => !present[attr]?.has(field));
+  if (!missing.length) return found;
+
+  const asked = await block.evaluate(
+    async (el, args) => {
+      const { wanted, settle } = args as { wanted: Array<[string, string]>; settle: number };
+      const bridge = (window as unknown as { __hydraBridge?: any }).__hydraBridge;
+      const uid = el.getAttribute('data-block-uid');
+      // Nothing advertises these fields → nothing to reveal, and nothing that
+      // could arrive later either. Say so rather than spending the block's test
+      // budget waiting (a container multiplies that by every child).
+      const revealed = wanted
+        .map(([, field]) => bridge?.revealFieldPlace?.(uid, field) ?? false)
+        .some(Boolean);
+      if (!revealed) return false;
+
+      const arrived = () =>
+        wanted.every(([attr, field]) => {
+          if (el.querySelector(`[${attr}="${field}"]`)) return true;
+          const onHandles = bridge?.fieldsOnHandlesFor?.(uid, { attr, fieldName: field }) ?? [];
+          return onHandles.length > 0;
+        });
+      for (let waited = 0; !arrived() && waited < settle; waited += 100) {
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      return true;
+    },
+    { wanted: missing, settle: settleMs },
+  ).catch(() => false);
+
+  return asked ? editableFieldsIn(block) : found;
+}
+
 
 /**
  * The fields this block would REVEAL — i.e. the ones that are empty and have an
@@ -583,6 +832,49 @@ async function annotationsOn(
  * own optional-fields spec — it doesn't need re-proving for every block in every
  * example. What this check needs is only the reason an annotation is missing.
  */
+/**
+ * Fields this block says are edited SOMEWHERE ELSE.
+ *
+ * A block does not always own the element its field is rendered into. Design
+ * system JavaScript builds the cookie banner and its dialog into <body>, so the
+ * paragraph carrying `data-edit-text="message"` is a sibling of the whole app,
+ * not a descendant of the block — `editableFieldsIn` looks inside the block and
+ * cannot see it, and the field reads as "uneditable everywhere it appears" when
+ * it is editable exactly where the reader finds it.
+ *
+ * The block says so itself: `data-block-selector="<uid>#<field>"` is the
+ * frontend declaring "this control reaches that field of mine", and it is the
+ * same handle the bridge clicks when the author picks the field in the sidebar.
+ * Trusting the declaration is what keeps the coverage rule about whether the
+ * author can reach a field, rather than about where the markup happens to sit.
+ */
+async function advertisedFieldsOf(block: Locator): Promise<Set<string>> {
+  const uid = await block.getAttribute('data-block-uid');
+  if (!uid) return new Set();
+  // Searched through the block's OWN document, not `block.page()`. The block is
+  // inside the editor's iframe, and `page.locator()` only ever sees the
+  // top-level document — so a page-wide search found nothing at all, however
+  // plainly the handle was there. `ownerDocument` is the frame the block is
+  // actually in.
+  //
+  // Document-wide within that frame, not block-scoped: the handle usually IS
+  // inside the block (the "Show cookie consent" button), but the whole point of
+  // the mechanism is that either end may sit outside it, so neither is assumed.
+  const tokens: string[] = await block.evaluate((el, blockUid) => {
+    const nodes = el.ownerDocument.querySelectorAll(
+      `[data-block-selector*="${blockUid}#"]`,
+    );
+    return Array.from(nodes).flatMap((n) =>
+      (n.getAttribute('data-block-selector') || '').split(/\s+/),
+    );
+  }, uid);
+  const fields = tokens
+    .filter((t) => t.startsWith(`${uid}#`))
+    .map((t) => t.slice(uid.length + 1))
+    .filter(Boolean);
+  return new Set(fields);
+}
+
 async function revealableFieldsOf(block: Locator): Promise<Set<string>> {
   const uid = await block.getAttribute('data-block-uid');
   if (!uid) return new Set();
@@ -614,6 +906,7 @@ export async function checkSlateAnnotations(
   block: Locator,
   blockData: Record<string, unknown> | undefined,
   blockSchema?: { properties?: Record<string, any> },
+  iframe?: FrameLocator,
 ): Promise<void> {
   if (!blockData) return;
 
@@ -655,21 +948,59 @@ export async function checkSlateAnnotations(
   const blockType = (blockData?.['@type'] as string | undefined) ?? '(unknown)';
   const coverageUid = (await block.getAttribute('data-block-uid')) ?? '(no uid)';
 
-  // One read of every annotation on the block (see annotationsOn), then the
+  // ONE search for the block's editable fields (see editableFieldsIn), then the
   // per-field questions are set lookups. Anything absent may simply be an empty
   // optional field, which renders no element until the editor reveals it
   // (#296), so the misses go to a single reveal press below.
-  const present = await annotationsOn(block);
-  const revealable = await revealableFieldsOf(block);
+  // What this block SHOULD be able to edit on the canvas — slate fields plus the
+  // media/link fields their widgets ask for. Gathered before either loop so the
+  // one settle below covers every kind.
+  const annotatedFields: Array<[string, { kind: 'text' | 'media' | 'link'; attr: string }, unknown]> = [];
+  for (const [field, prop] of Object.entries(blockSchema?.properties ?? {})) {
+    const a = annotationFor(prop as Record<string, unknown>);
+    if (a) annotatedFields.push([field, a, prop]);
+  }
+  const expected: Array<[string, string]> = [
+    ...slateFields.map((f) => ['data-edit-text', f] as [string, string]),
+    ...annotatedFields.map(([f, a]) => [a.attr, f] as [string, string]),
+  ];
+
+  const look = async () => {
+    const f = await settleAnnotations(block, await editableFieldsIn(block), expected);
+    return {
+      found: f,
+      present: namesByAttr(f),
+      revealable: await revealableFieldsOf(block),
+      advertised: await advertisedFieldsOf(block),
+    };
+  };
+  let { found, present, revealable, advertised } = await look();
+
+  // Everything the editor would do to make this block's fields editable — see
+  // makeEditable. Anything still missing afterwards is genuinely missing.
+  const missing = () =>
+    slateFields.some(
+      (f) => !present['data-edit-text'].has(f) && !revealable.has(f),
+    );
+  if (missing() && (await makeEditable(block, blockData, iframe))) {
+    ({ found, present, revealable, advertised } = await look());
+  }
 
   for (const field of slateFields) {
     // Accept either a descendant [data-edit-text="<field>"] OR the block
     // element itself carrying the attribute (renderers are free to collapse
     // the block wrapper and the edit-text container onto one element).
     const blockHasAttr = (await block.getAttribute('data-edit-text')) === field;
-    const container = blockHasAttr ? block : block.locator(`[data-edit-text="${field}"]`).first();
+    // From the one search — no second look, and so no chance of a different
+    // answer than the coverage question just got.
+    const foundField = found.find((f) => f.attr === 'data-edit-text' && f.field === field);
     const hasContainer =
-      present['data-edit-text'].has(field) || revealable.has(field);
+      !!foundField || present['data-edit-text'].has(field) || revealable.has(field);
+    const container = foundField
+      ? foundField.element
+      : blockHasAttr
+        ? block
+        : block.locator(`[data-edit-text="${field}"]`).first();
 
     // Record editability rather than failing per-instance: a slate field only
     // needs its edit container in ONE example of a block type. Some fields are
@@ -678,6 +1009,21 @@ export async function checkSlateAnnotations(
     // example. A final aggregate test (slateFieldsNeverEditable) fails only if
     // a field is never editable in ANY example. On a miss, capture which
     // data-edit-text values ARE present for the aggregate's diagnostic.
+    // The block may say the field lives somewhere else. `data-block-selector`
+    // "<uid>#<field>" is the frontend declaring which control reaches it, and
+    // for cookieConsent that is the whole story: design system JavaScript draws
+    // the banner into <body>, and in the editor the block itself renders a
+    // stand-in with no field in it at all. The annotation is real and the author
+    // can reach it; it is simply not a descendant of this element.
+    //
+    // The sibling recording path already accepted that (a field is editable if
+    // present OR revealable OR advertised). This one did not, so a slate field
+    // drawn elsewhere still read as uneditable everywhere — which is exactly
+    // what `cookieConsent.message` kept reporting after the first fix.
+    if (!hasContainer && advertised.has(field)) {
+      recordSlateFieldContainer(blockType, field, true, `[${coverageUid}] advertised`);
+      continue;
+    }
     if (!hasContainer) {
       const context = await block.evaluate((el) => {
         const outer = (el.outerHTML || '').slice(0, 200);
@@ -763,30 +1109,18 @@ export async function checkSlateAnnotations(
   // for them. Displayed plain text is covered by the DOM-gated check above; slate
   // (always canvas rich-text) is recorded by the loop above.
   if (blockSchema?.properties) {
-    const annotationFor = (
-      prop: Record<string, unknown>,
-    ): { kind: 'text' | 'media' | 'link'; attr: string } | null => {
-      const w = prop?.widget;
-      const mode = (prop as { mode?: string })?.mode;
-      if (w === 'image' || (w === 'object_browser' && mode === 'image'))
-        return { kind: 'media', attr: 'data-edit-media' };
-      if (w === 'object_browser' && mode === 'link')
-        return { kind: 'link', attr: 'data-edit-link' };
-      return null;
-    };
-    // Same two passes as the slate loop, off the same single read: gather what
-    // is missing, then put it all to ONE reveal press.
-    const annotatedFields: Array<[string, { kind: 'text' | 'media' | 'link'; attr: string }, unknown]> = [];
-    for (const [field, prop] of Object.entries(blockSchema.properties)) {
-      const a = annotationFor(prop as Record<string, unknown>);
-      if (a) annotatedFields.push([field, a, prop]);
-    }
     for (const [field, a, prop] of annotatedFields) {
       recordFieldEditable(
         a.kind,
         blockType,
         field,
-        present[a.attr].has(field) || revealable.has(field),
+        // Three ways a field is genuinely reachable: its annotation is in the
+        // block; it is an empty optional field with nothing yet to annotate; or
+        // the block advertises a control that reaches it, because the element
+        // itself is drawn outside the block by design system JavaScript.
+        present[a.attr].has(field) ||
+          revealable.has(field) ||
+          advertised.has(field),
         `[${coverageUid}] widget=${(prop as { widget?: string })?.widget}`,
       );
     }
@@ -841,14 +1175,14 @@ export async function verifyPathMapCoverage(
     if (!b?.blockPathMap) return null;
     const pathMap = b.blockPathMap;
 
-    // Dynamic-container block types render interactive `data-block-uid`
-    // children that are intentionally NOT part of the editable pathMap:
-    // `search` (facets widget + results listing) and `listing`/
-    // `contextNavigation` (async-fetched results). Those are a different
-    // editability model, not the static-nested-editable-block class this
-    // guardrail targets — skip them wholesale to stay false-positive-free.
-    const DYNAMIC = new Set(['search', 'listing', 'contextNavigation']);
-    if (DYNAMIC.has(pathMap[parentUid]?.blockType)) return [];
+    // No dynamic-container exemptions. search/listing/contextNavigation used
+    // to be skipped wholesale ("async-fetched results are a different
+    // editability model"), which is how "search wasn't getting sanity
+    // checked" happened — the reveal work (#330) closed the reachability
+    // hole, and the tolerances below already cover what dynamic expansion
+    // legitimately renders: expanded items REUSE their container's uid, and
+    // projected subtrees carry data-block-readonly. Anything else with a uid
+    // must resolve in the pathMap, dynamic container or not.
 
     const found: string[] = [];
     el.querySelectorAll('[data-block-uid]').forEach((child: Element) => {
@@ -904,12 +1238,19 @@ export async function verifyBlockRendering(
   if (isListing) {
     const items = iframe.locator(`[data-block-uid="${blockId}"]`);
     await expect(items.first()).toBeVisible({ timeout: 15000 });
+    // Three consecutive equal reads, not "at least 2 items": the old n >= 2
+    // floor assumed every listing shows several results, so a listing whose
+    // QUERY yields one item (b_size=1 — a doc example showing one look) could
+    // never pass. The streak is the streaming guard now — one read mid-stream
+    // can catch a stale count, three equal reads across the ramping intervals
+    // cannot.
     let prev = -1;
+    let streak = 0;
     await expect.poll(async () => {
       const n = await items.count();
-      const stable = n === prev && n >= 2;
+      streak = n === prev && n >= 1 ? streak + 1 : 0;
       prev = n;
-      return stable;
+      return streak >= 2;
     }, { timeout: 15000, intervals: [200, 400, 800] }).toBe(true);
     await checkEditAnnotations(items.first(), blockData);
     return;
@@ -975,7 +1316,7 @@ export async function verifyBlockRendering(
 
   // Schema-driven slate check — checkSlateAnnotations pulls the schema
   // from the bridge itself (authoritative, schemaEnhancer-resolved).
-  await checkSlateAnnotations(block, blockData);
+  await checkSlateAnnotations(block, blockData, undefined, iframe);
 
   // Schema-INDEPENDENT coverage: every rendered nested block + editable field
   // must be known to the pathMap. Catches incomplete frontend schemas that the
@@ -1015,6 +1356,11 @@ export async function verifyBlockRendering(
     let anyVisible = false;
     for (const { id, data } of subBlocks) {
       const loc = iframe.locator(`[data-block-uid="${id}"]`).first();
+      // A query-gated child has no element until its question is asked —
+      // reveal FIRST (revealBlock knows how to ask), then require attachment.
+      if ((await loc.count()) === 0) {
+        await revealBlock(iframe, id);
+      }
       await expect(loc).toBeAttached({ timeout: 5000 });
       // Content gated behind a reveal control — an accordion header, a tab, a
       // carousel nav — is display:none until revealed. That's by design: the
@@ -1038,7 +1384,7 @@ export async function verifyBlockRendering(
       if (await loc.isVisible()) {
         anyVisible = true;
         await checkEditAnnotations(loc, data);
-        await checkSlateAnnotations(loc, data);
+        await checkSlateAnnotations(loc, data, undefined, iframe);
       }
     }
     if (subBlocks.length > 0) {

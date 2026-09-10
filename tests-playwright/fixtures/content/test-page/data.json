@@ -224,12 +224,6 @@
         "sort_order": "descending"
       }
     },
-    "skiplogic-test": {
-      "@type": "skiplogicTest",
-      "mode": null,
-      "columns": 1,
-      "basicTitle": "Test Title"
-    },
     "footer-block-1": {
       "@type": "slate",
       "value": [
@@ -261,8 +255,7 @@
       "block-8-grid",
       "block-preset-grid",
       "block-9-listing",
-      "block-10-listing-no-mapping",
-      "skiplogic-test"
+      "block-10-listing-no-mapping"
     ],
     "footer": [
       "footer-block-1",

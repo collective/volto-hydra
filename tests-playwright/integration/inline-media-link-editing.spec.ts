@@ -1087,6 +1087,19 @@ test.describe('Teaser starter UI and overwrite', () => {
    * contradicts its own schema, and a teaser is empty only for the moment
    * between adding it and filling it in.
    */
+  /**
+   * Click an empty teaser to select it, near its top-left corner.
+   *
+   * The starter UI overlay is positioned on the block's CENTRE, so on a
+   * frontend whose empty teaser is short — the Nuxt example's is, the mock's
+   * is not — a default centre click lands on the overlay's own link input
+   * instead of the block, and Playwright retries the intercepted click until
+   * the test times out.
+   */
+  async function clickTeaserAwayFromOverlay(teaser: any) {
+    await teaser.click({ position: { x: 8, y: 8 } });
+  }
+
   async function addEmptyTeaser(page: any, helper: AdminUIHelper) {
     const uid = await helper.addBlockOnCanvas('block-1-uuid', 'teaser');
     return helper.getIframe().locator(`[data-block-uid="${uid}"]`);
@@ -1099,7 +1112,7 @@ test.describe('Teaser starter UI and overwrite', () => {
 
     const emptyTeaser = await addEmptyTeaser(page, helper);
     await expect(emptyTeaser).toBeVisible({ timeout: 10000 });
-    await emptyTeaser.click();
+    await clickTeaserAwayFromOverlay(emptyTeaser);
 
     // Wait for block to be selected (outline appears)
     const outline = page.locator('.volto-hydra-block-outline');
@@ -1233,7 +1246,7 @@ test.describe('Teaser starter UI and overwrite', () => {
     await expect(emptyTeaser).toBeVisible({ timeout: 10000 });
     await emptyTeaser.scrollIntoViewIfNeeded();
     await expect(emptyTeaser).toBeInViewport();
-    await emptyTeaser.click();
+    await clickTeaserAwayFromOverlay(emptyTeaser);
 
     // Wait for starter UI to be fully rendered
     const starterOverlay = page.locator('.starter-ui-overlay');

@@ -840,6 +840,58 @@ function buildNavigationComponent(cleanPath, baseUrl, sessionId) {
   };
 }
 
+// Content snapshots per path, grown on PATCH — versions the compare view diffs.
+const contentVersions = new Map();
+
+// How many versions to SYNTHESIZE for a page nobody has edited — so every
+// page's History offers something to compare in demos and dev.
+const SYNTH_VERSIONS = 2;
+
+// Deterministic PRNG (xfnv1a hash -> mulberry32), seeded by path#version:
+// the same synthetic version renders identically every time it is asked for.
+function seededRand(seed) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+  return () => {
+    h = (h + 0x6d2b79f5) | 0;
+    let t = Math.imul(h ^ (h >>> 15), 1 | h);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// A plausible OLDER revision, derived deterministically from current content:
+// content grows over time, so version N drops the trailing blocks the later
+// versions "added"; and one paragraph gets a seeded word-swap so copy visibly
+// changed too. Purely synthetic — a real PATCH snapshot always wins.
+function synthesizeVersion(cleanPath, content, version, total) {
+  const rand = seededRand(`${cleanPath}#${version}`);
+  const old = JSON.parse(JSON.stringify(content));
+  const layout = old.blocks_layout && old.blocks_layout.items;
+  if (Array.isArray(layout) && layout.length > 2) {
+    const drop = Math.min(layout.length - 2, total - version);
+    const dropped = layout.splice(layout.length - drop, drop);
+    for (const uid of dropped) delete old.blocks[uid];
+  }
+  // Swap the two longest words in one seeded slate paragraph — visibly
+  // different copy without looking corrupted.
+  const slates = Object.values(old.blocks || {}).filter(
+    (b) => b && b['@type'] === 'slate' && typeof b.plaintext === 'string' && b.plaintext.split(' ').length > 6,
+  );
+  if (slates.length) {
+    const target = slates[Math.floor(rand() * slates.length)];
+    const words = target.plaintext.split(' ');
+    const byLen = words.map((w, i) => [w.length, i]).sort((a, b) => b[0] - a[0]);
+    const [i, j] = [byLen[0][1], byLen[1][1]];
+    [words[i], words[j]] = [words[j], words[i]];
+    const swapped = words.join(' ');
+    target.plaintext = swapped;
+    target.value = [{ type: 'p', children: [{ text: swapped }] }];
+  }
+  old.modified = new Date(Date.parse('2026-01-01T09:00:00Z') + version * 86400000).toISOString();
+  return old;
+}
+
 /**
  * Plone's simple_publication_workflow.
  *
@@ -1980,6 +2032,29 @@ app.get('/health', (req, res) => {
 });
 
 /**
+ * GET /embedded-document.html
+ *
+ * A document for a block to EMBED. Served from the API's origin, which is a
+ * different origin from the frontend's, so an iframe pointing here is a real
+ * cross-origin embed — the shape a video, a map or a PDF preview has — and it
+ * always loads, with no third party and no network.
+ *
+ * That matters because an embed that fails to load is not the same test: the
+ * click falls through to the page and the block selects by the ordinary path,
+ * which is how a test for embed selection came to pass without ever exercising
+ * an embed. It is focusable so that clicking it moves focus the way a real
+ * embed's document does.
+ */
+app.get('/embedded-document.html', (req, res) => {
+  res.type('html').send(
+    '<!doctype html><meta charset="utf-8"><title>Embedded document</title>' +
+      '<style>html,body{margin:0;height:100%;font:14px system-ui}' +
+      'main{height:100%;display:grid;place-items:center;background:#eef}</style>' +
+      '<main tabindex="0">An embedded document</main>',
+  );
+});
+
+/**
  * Walk every registered content dir and collect unique `subjects` values
  * across all data.json files. Returns the `{ value: { title } }` shape
  * Plone's @querystring endpoint uses for the Subject (Keywords) index.
@@ -2340,19 +2415,86 @@ app.post(/.*\/@workflow\/[^/]+$/, (req, res) => {
     });
   }
 
-  const patch = { review_state: move.to };
+  const record = {
+    action: transitionId,
+    actor: 'admin',
+    comments: req.body?.comment ?? '',
+    review_state: move.to,
+    time: new Date().toISOString(),
+    title: STATE_TITLES[move.to] ?? move.to,
+  };
+
+  const patch = {
+    review_state: move.to,
+    // Plone keeps the trail on the object; @history reads it back from there.
+    workflow_history: [...(content.workflow_history ?? []), record],
+  };
   for (const field of ['effective', 'expires']) {
     if (req.body?.[field]) patch[field] = req.body[field];
   }
   setSessionContent(sessionId, cleanPath, { ...content, ...patch });
 
-  res.json({
-    action: transitionId,
-    actor: 'admin',
-    comments: req.body?.comment ?? '',
-    review_state: move.to,
-    title: STATE_TITLES[move.to] ?? move.to,
-  });
+  res.json(record);
+});
+
+/**
+ * GET /@history/:version — a content SNAPSHOT: what the page held before edit
+ * N+1 (or current for the newest). The compare view renders these in frontend
+ * iframes.
+ */
+app.get(/.*\/@history\/\d+$/, (req, res) => {
+  const match = req.path.match(/^(.*)\/@history\/(\d+)$/);
+  const cleanPath = (match[1].replace('/++api++', '') || '/').replace(/\/+$/, '') || '/';
+  const version = Number(match[2]);
+  const versions = contentVersions.get(cleanPath) || [];
+  const snapshot = versions.find((v) => v.version === version);
+  if (snapshot) return res.json(snapshot.content);
+  const current = getContent(cleanPath, getSessionId(req));
+  if (!current) return res.status(404).json({ error: { type: 'NotFound' } });
+  if (versions.length === 0 && version < SYNTH_VERSIONS) {
+    return res.json(synthesizeVersion(cleanPath, current, version, SYNTH_VERSIONS));
+  }
+  res.json(current);
+});
+
+/**
+ * GET /@history — the version + workflow trail the admin's History view lists.
+ * The workflow half comes off the content's own workflow_history, which is
+ * where a transition wrote it, so the trail grows as the demo publishes and
+ * retracts.
+ */
+app.get(/.*\/@history$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@history$/, '') || '/').replace(/\/+$/, '') || '/';
+  const content = getContent(cleanPath, getSessionId(req));
+  let versions = contentVersions.get(cleanPath) || [];
+  if (versions.length === 0) {
+    versions = Array.from({ length: SYNTH_VERSIONS }, (_, n) => ({
+      version: n,
+      time: new Date(Date.parse('2026-01-01T09:00:00Z') + n * 86400000).toISOString(),
+    }));
+  }
+  const versioning = versions.map((v) => ({
+    '@id': `http://localhost:${PORT}${cleanPath}/@history/${v.version}`,
+    actor: { '@id': null, fullname: 'Admin User', id: 'admin', username: 'admin' },
+    comments: '',
+    may_revert: true,
+    time: v.time,
+    transition_title: 'Edited',
+    type: 'versioning',
+    version: v.version,
+  }));
+  const workflow = (content?.workflow_history ?? []).map((h, n) => ({
+    '@id': `http://localhost:${PORT}${cleanPath}/@history/${n + 1}`,
+    action: h.action,
+    actor: { '@id': null, fullname: 'Admin User', id: 'admin', username: 'admin' },
+    comments: h.comments,
+    review_state: h.review_state,
+    state_title: h.title,
+    time: h.time,
+    transition_title: h.title,
+    type: 'workflow',
+  }));
+  res.json([...versioning, ...workflow].sort((a, b) => (a.time < b.time ? 1 : -1)));
 });
 
 app.post(/.*\/@workingcopy$/, (req, res) => {
@@ -2555,7 +2697,21 @@ app.get('/@types/:typeName', (req, res) => {
  * Shortcuts block reads Keywords (Subject) unique values in site-wide mode.
  */
 const VOCAB_ITEMS = {
-  'plone.app.vocabularies.Keywords': ['news', 'plone', 'events'],
+  // Five, not three, and three of them share a prefix on purpose: a type-ahead
+  // is the one caller that asks this endpoint a real question ("what starts
+  // with `new`?"), and with no two terms alike every answer was the whole list —
+  // which cannot tell a working filter from an ignored one.
+  'plone.app.vocabularies.Keywords': [
+    'news',
+    'newsletter',
+    'newsroom',
+    'plone',
+    'events',
+  ],
+  // A second one, so a picker that lists vocabularies has something to choose
+  // BETWEEN — with one entry, "offers the right list" and "offers any list at
+  // all" are the same assertion.
+  'plone.app.vocabularies.ReallyUserFriendlyTypes': ['Document', 'News Item'],
 };
 
 // Optional generated vocabularies, declared by a seed file and switched on
@@ -2584,14 +2740,30 @@ if (process.env.VOCAB_SPEC) {
   );
 }
 
+/**
+ * GET /@vocabularies — the LISTING: every vocabulary this site has, the shape
+ * plone.restapi answers with (`@id` + `title`, no token). A field that picks
+ * WHICH vocabulary to use reads this.
+ */
+app.get('/@vocabularies', (req, res) => {
+  res.json(
+    [...Object.keys(VOCAB_ITEMS), ...Object.keys(GENERATED_VOCABS)].map((name) => ({
+      '@id': `http://localhost:${PORT}/@vocabularies/${name}`,
+      title: name,
+    })),
+  );
+});
+
 app.get('/@vocabularies/:vocab', (req, res) => {
   const generated = GENERATED_VOCABS[req.params.vocab];
   if (generated) {
     // Real Plone filters and batches server-side; so must this, or the
     // contract suite's type-ahead latency assertion is meaningless.
+    // `?title=` is a case-insensitive substring filter in plone.restapi's
+    // serializer — what a type-ahead sends so the server does the narrowing.
     const title = req.query.title;
     const filtered = title
-      ? generated.filter((i) => i.title.includes(title))
+      ? generated.filter((i) => i.title.toLowerCase().includes(String(title).toLowerCase()))
       : generated;
     const size = req.query.b_size ? parseInt(req.query.b_size, 10) : 25;
     const start = req.query.b_start ? parseInt(req.query.b_start, 10) : 0;
@@ -2611,7 +2783,13 @@ app.get('/@vocabularies/:vocab', (req, res) => {
     });
   }
 
-  const values = VOCAB_ITEMS[req.params.vocab] || [];
+  const all = VOCAB_ITEMS[req.params.vocab] || [];
+  // `?title=` is a case-insensitive substring filter in plone.restapi's
+  // serializer — what a type-ahead sends so the server does the narrowing.
+  const title = String(req.query.title || '').toLowerCase();
+  const values = title
+    ? all.filter((v) => v.toLowerCase().includes(title))
+    : all;
   res.json({
     '@id': `http://localhost:${PORT}/@vocabularies/${req.params.vocab}`,
     items: values.map((v) => ({ token: v, title: v })),
@@ -3063,19 +3241,38 @@ app.get('*/@search', (req, res) => {
   const pathDepth = req.query['path.depth'];
   const pathQuery = req.query['path.query'];
   const searchableText = req.query['SearchableText'];
+  const titleQuery = req.query['Title'];
   const portalType = req.query['portal_type'];
   const baseUrl = `http://localhost:${PORT}`;
 
   let items;
 
-  // Handle SearchableText (used by ObjectBrowser search input). Plone 6.2
-  // (plone.app.querystring 3.0.0) appends a wildcard to each word and ANDs
-  // the parts — matchSearchableText replicates that on title/description/id.
-  if (searchableText) {
+  // Text queries: SearchableText (used by ObjectBrowser search input) and/or
+  // the Title INDEX alone (`@search?Title=` — what a title autocomplete asks).
+  // Plone 6.2 (plone.app.querystring 3.0.0) appends a wildcard to each word of
+  // SearchableText and ANDs the parts — matchSearchableText replicates that on
+  // title/description/id. The Title index is ZCTextIndex: whole words, with
+  // optional right-truncation (`sea*`) — replicated on the title only.
+  if (searchableText || titleQuery) {
     items = Object.keys(contentDirMap)
       .filter((itemPath) => itemPath !== '/')
-      .map((itemPath) => formatSearchItem(loadContentFromDisk(itemPath), baseUrl))
-      .filter((item) => matchSearchableText(searchableText, item));
+      .map((itemPath) => formatSearchItem(loadContentFromDisk(itemPath), baseUrl));
+    if (searchableText) {
+      items = items.filter((item) => matchSearchableText(searchableText, item));
+    }
+    if (titleQuery) {
+      const terms = String(titleQuery)
+        .toLowerCase()
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((t) => (t.endsWith('*') ? t.slice(0, -1) : t));
+      items = items.filter((item) => {
+        const words = String(item.title || '')
+          .toLowerCase()
+          .split(/\W+/);
+        return terms.every((t) => words.some((w) => w.startsWith(t)));
+      });
+    }
     // Filter by portal_type if specified
     if (portalType) {
       const types = Array.isArray(portalType) ? portalType : [portalType];
@@ -3994,6 +4191,16 @@ app.patch('*', (req, res) => {
   const content = getContent(cleanPath, sessionId);
 
   if (content) {
+    // Version snapshot: the state BEFORE this edit becomes version N (like
+    // CMFEditions). @history lists these; @history/<n> serves them; the
+    // admin's compare view renders any two side by side.
+    const versions = contentVersions.get(cleanPath) || [];
+    versions.push({
+      version: versions.length,
+      time: new Date().toISOString(),
+      content: JSON.parse(JSON.stringify(content)),
+    });
+    contentVersions.set(cleanPath, versions);
     // Emulate Plone's REST deserializer: only fields backed by a registered
     // dexterity field / behavior survive a save. Unknown top-level fields (e.g.
     // an ad-hoc `footer_blocks`) are silently dropped. This is WHY layout

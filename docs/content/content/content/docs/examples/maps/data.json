@@ -157,7 +157,7 @@
           "@id": "ref-maps-schema-javascript-45f9f0",
           "label": "Schema",
           "language": "javascript",
-          "code": "{\n  \"maps\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"url\": {\n          \"title\": \"Map Embed URL\"\n        },\n        \"title\": {\n          \"title\": \"Title\",\n          \"type\": \"string\"\n        }\n      }\n    }\n  }\n}"
+          "code": "{\n  \"maps\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"url\": {\n          \"title\": \"Map Embed URL\",\n          \"widget\": \"url\"\n        },\n        \"title\": {\n          \"title\": \"Title\",\n          \"type\": \"string\"\n        }\n      }\n    }\n  }\n}"
         }
       ]
     },

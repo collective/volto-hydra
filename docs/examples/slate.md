@@ -4,6 +4,8 @@ Rich text block powered by the Slate editor. Supports paragraphs, headings, list
 
 This is a **built-in** block — no schema registration is needed. It's available by default when you include `'slate'` in your page's `allowedBlocks`.
 
+**Demonstrates:** [Renderer Node-ID Rules](../visual-editing.md#renderer-node-id-rules) — the node ids selection sync depends on.
+
 ## Schema
 
 ```json

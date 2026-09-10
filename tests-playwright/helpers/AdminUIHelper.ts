@@ -72,6 +72,157 @@ export class AdminUIHelper {
         }
       }
     });
+
+    // Global opt-in demo pacing: `DEMO_PACING=1200` enables paced, cursor-visible
+    // gestures across every recorded-demo spec without per-spec wiring. A spec
+    // may still override by assigning `helper.demoPacingMs` directly. Default 0
+    // → functional tests (and hydra's own suite) are completely unaffected.
+    if (process.env.DEMO_PACING) {
+      this.demoPacingMs = Number(process.env.DEMO_PACING) || 0;
+    }
+  }
+
+  /**
+   * Demo pacing step: when demoPacingMs>0 (recorded demos), move the (visible)
+   * cursor to `target` and pause so the action reads on video. No-op in
+   * functional runs (demoPacingMs===0), so nothing else is affected.
+   */
+  private async demoStep(target?: Locator): Promise<void> {
+    if (!this.demoPacingMs) return;
+    if (target) {
+      // Best-effort cursor move — hover auto-scrolls the target into view and is
+      // BOUNDED (timeout + catch). A bare scrollIntoViewIfNeeded is NOT bounded
+      // and hangs forever on a just-opened/animating container (e.g. the card
+      // grid's "Card Defaults" accordion), so it must not be used here.
+      await target.hover({ timeout: 1500 }).catch(() => {});
+    }
+    await this.page.waitForTimeout(this.demoPacingMs);
+  }
+
+  /**
+   * Set a react-select Choice field by CLICK — open the control, then click the
+   * option by its visible label — rather than keyboard filter+Enter. Click-based
+   * so it reads clearly on video AND avoids the `fill`+Enter races (e.g. a
+   * mid-word "Methodpproach"). `field` is the schema field id; defaults to the
+   * sidebar properties form.
+   */
+  async setChoiceField(
+    field: string,
+    optionLabel: string,
+    options: { container?: string; multi?: boolean } = {}
+  ): Promise<void> {
+    const base = options.container ?? '#sidebar-properties';
+    // Close any stray-open react-select menu first — some Choice fields auto-open
+    // their menu on focus (the card grid's colour field does), and its floating
+    // options would intercept the click on THIS field. Blur closes it (NOT
+    // Escape — hydra treats that as step-up/deselect).
+    await this.page.evaluate(() =>
+      (document.activeElement as HTMLElement | null)?.blur?.()
+    );
+    // Some blocks (the card grid) render their fieldset TWICE, so a plain
+    // .first() can grab a HIDDEN copy whose control never becomes clickable
+    // (a 240s hang). Scope everything to the VISIBLE field-wrapper.
+    const fieldWrap = this.page
+      .locator(`${base} .field-wrapper-${field}:visible`)
+      .first();
+    const control = fieldWrap.locator('.react-select__control');
+    // demoStep hovers (bounded); control.click() auto-scrolls into view.
+    await this.demoStep(control);
+    await control.click();
+    // The open menu is a singleton (only one react-select is open at a time) and
+    // is NOT always a DOM descendant of its field-wrapper, so find it at page
+    // level.
+    const menu = this.page.locator('.react-select__menu');
+    // control.click() TOGGLES the menu. If the field started already-open (a
+    // prior focus can leave a react-select open), our click just closed it — so
+    // wait briefly, and if it didn't open, click again to (re)open.
+    try {
+      await menu.waitFor({ state: 'visible', timeout: 1500 });
+    } catch {
+      await control.click();
+      await menu.waitFor({ state: 'visible', timeout: 5000 });
+    }
+    // react-select renders each option as a `.react-select__option` div (no
+    // role="option"). Match the exact label with an anchored regex so e.g.
+    // "Off white" doesn't also match "Off white highlight". Scope to this menu.
+    // Match the option tolerantly: exact first (case-insensitive — some Choice
+    // options render their raw value like "none" not the label "None"), then a
+    // prefix fallback so a short caller label matches a verbose option (e.g.
+    // "Box" → "Box (rounded, bordered)").
+    const escaped = optionLabel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const opts = menu.locator('.react-select__option');
+    let option = opts
+      .filter({ hasText: new RegExp(`^\\s*${escaped}\\s*$`, 'i') })
+      .first();
+    if ((await option.count()) === 0) {
+      option = opts
+        .filter({ hasText: new RegExp(`^\\s*${escaped}\\b`, 'i') })
+        .first();
+    }
+    // Fail loudly with what the open menu actually offers, instead of a mystery
+    // timeout, if the label still isn't present.
+    if ((await option.count()) === 0) {
+      const offered = await opts.allInnerTexts();
+      throw new Error(
+        `setChoiceField('${field}', '${optionLabel}'): not offered by the open menu. Offered: [${offered.join(' | ')}]`
+      );
+    }
+    // Wait for it in the DOM, then let click() auto-scroll it into the menu's
+    // viewport (a long option list can keep an option attached-but-not-visible).
+    await option.waitFor({ state: 'attached', timeout: 5000 });
+    await option.scrollIntoViewIfNeeded().catch(() => {});
+    await this.demoStep(option);
+    await option.click();
+    // A multi-select keeps its menu OPEN after a pick (so you can add more), so
+    // blur to close it (NOT Escape — hydra reads that as step-up/deselect). A
+    // single-select closes on pick.
+    if (options.multi) {
+      await this.page.evaluate(() =>
+        (document.activeElement as HTMLElement | null)?.blur?.()
+      );
+    }
+    await expect(menu).toHaveCount(0, { timeout: 5000 });
+  }
+
+  /**
+   * Set a ButtonsWidget field (size/align/layout, …) by CLICK, matching the
+   * hidden radio's `value`. Paced for demos.
+   */
+  async setButtonsField(
+    field: string,
+    value: string,
+    options: { container?: string } = {}
+  ): Promise<void> {
+    const base = options.container ?? '#sidebar-properties';
+    const btn = this.page
+      .locator(
+        `${base} .field-wrapper-${field} .buttons-widget-option:has(input[value="${value}"])`
+      )
+      .first();
+    await btn.scrollIntoViewIfNeeded();
+    await this.demoStep(btn);
+    await btn.click();
+  }
+
+  /**
+   * Type into an inline-editable canvas field (a [data-edit-text] element or a
+   * contenteditable). Click to place the caret; when `replace`, triple-click to
+   * select the existing text VISIBLY (not Ctrl-A) so the overwrite reads on
+   * video. Typing is slowed in demo mode.
+   */
+  async typeInlineText(
+    target: Locator,
+    text: string,
+    options: { replace?: boolean } = {}
+  ): Promise<void> {
+    await target.scrollIntoViewIfNeeded();
+    await this.demoStep(target);
+    await target.click();
+    if (options.replace) {
+      await target.click({ clickCount: 3 });
+      await this.page.waitForTimeout(this.demoPacingMs ? 200 : 30);
+    }
+    await this.page.keyboard.type(text, { delay: this.demoPacingMs ? 55 : 20 });
   }
 
   /**
@@ -553,6 +704,7 @@ export class AdminUIHelper {
     // Wait for click target to be visible
     await clickTarget.waitFor({ state: 'visible', timeout: 5000 });
 
+    await this.demoStep(clickTarget);
     await clickTarget.click();
 
     if (waitForToolbar) {
@@ -1273,9 +1425,22 @@ export class AdminUIHelper {
 
   /**
    * Get the type of block currently being edited in the sidebar.
+   *
+   * Reads the block-editor's own type class FIRST (`block-editor-<type>`, which
+   * Volto renders for every block), so this answers for any type. The
+   * hand-listed slate/image checks below only ever covered those two, and
+   * returned null for everything else — indistinguishable from "the sidebar is
+   * showing nothing", which is the state a caller usually wants to rule out.
    */
   async getSidebarBlockType(): Promise<string | null> {
     const sidebar = this.page.locator('#sidebar-properties');
+
+    const typed = sidebar.locator('[class*="block-editor-"]').first();
+    if (await typed.isVisible().catch(() => false)) {
+      const cls = (await typed.getAttribute('class')) || '';
+      const match = cls.match(/block-editor-([\w-]+)/);
+      if (match) return match[1];
+    }
 
     // Check for common block type indicators
     const selectors = [
@@ -3308,22 +3473,83 @@ export class AdminUIHelper {
    * Set the value of a text field in the sidebar.
    * Matches Cypress pattern: #sidebar-properties #field-{fieldname}
    */
-  async setSidebarFieldValue(fieldName: string, value: string, options: { container?: string } = {}): Promise<void> {
+  async setSidebarFieldValue(
+    fieldName: string,
+    value: string | boolean,
+    options: { container?: string } = {},
+  ): Promise<void> {
     const container = options.container || '#sidebar-properties';
     const fieldWrapper = this.page.locator(`${container} .field-wrapper-${fieldName}`);
 
+    // A field can be revealed by another field's value (schemaEnhancer
+    // fieldRules: a form question's "Condition" appears only once the question
+    // it depends on has been named). That reveal is a round trip through the
+    // iframe, so wait for a control to exist before judging the field missing —
+    // the alternative is a race that fails whenever the sidebar is a beat
+    // behind.
+    await fieldWrapper
+      .locator('input, textarea, [contenteditable="true"], .react-select__control')
+      .first()
+      .waitFor({ state: 'visible', timeout: 10000 })
+      .catch(() => {
+        // Genuinely absent fields fall through to the explicit throw below,
+        // which says which field and where to look.
+      });
+
+    // A react-select is checked FIRST, and its own branch is below. Its search
+    // box is an `input[type="text"]`, so the text branch below matches it — and
+    // typing into a search box then blurring selects NOTHING. The field keeps
+    // its placeholder, the helper returns as if it had worked, and the value is
+    // silently never set. That is what made a picker look like it stored
+    // nothing.
+    const asSelect = fieldWrapper.locator('.react-select__control');
+    const isSelect = await asSelect.isVisible().catch(() => false);
+
+    // A BOOLEAN field is a checkbox, which fill() cannot drive — it needs
+    // check/uncheck. Callers already pass booleans (the columns clip sets
+    // `gap`), and before this they fell through every branch below and returned
+    // silently, so the field simply never changed.
+    if (typeof value === 'boolean') {
+      const checkbox = fieldWrapper.locator('input[type="checkbox"]').first();
+      await checkbox.waitFor({ state: 'attached', timeout: 5000 });
+      // Click the LABEL, which is what a user clicks: Volto styles the checkbox
+      // by covering the real input, so check()/uncheck() report the input as
+      // visible and then time out because the label intercepts the pointer.
+      // Only click when the state actually needs to change — clicking a checkbox
+      // already in the wanted state would toggle it away.
+      if ((await checkbox.isChecked()) !== value) {
+        const label = fieldWrapper.locator('label').first();
+        if (await label.count()) {
+          await label.click();
+        } else {
+          await checkbox.click({ force: true });
+        }
+      }
+      await expect(checkbox).toBeChecked({ checked: value, timeout: 5000 });
+      return;
+    }
+
+    // A native <select> is not a react-select and not a text input, so it
+    // used to fall through every branch to the throw below.
+    const nativeSelect = fieldWrapper.locator('select').first();
+    if (await nativeSelect.count()) {
+      await nativeSelect.selectOption(value);
+      return;
+    }
+
     // Try text input
     const input = fieldWrapper.locator('input[type="text"], input[type="url"], textarea');
-    if (await input.isVisible()) {
+    if (!isSelect && (await input.isVisible())) {
       await input.fill(value);
       await input.blur(); // Trigger blur to commit the value
       return;
     }
 
-    // Try contenteditable (Slate editors)
+    // Try contenteditable (Slate editors)  — also not a select
+
     // Note: fill() doesn't reliably clear Slate editors, use select-all + type
     const contentEditable = fieldWrapper.locator('[contenteditable="true"]');
-    if (await contentEditable.isVisible()) {
+    if (!isSelect && (await contentEditable.isVisible())) {
       // Get current text to verify selection
       const currentText = await contentEditable.textContent() || '';
 
@@ -3347,6 +3573,97 @@ export class AdminUIHelper {
       await contentEditable.blur(); // Trigger blur to commit the value
       return;
     }
+
+    // A Choice / vocabulary / block picker renders react-select, which has no
+    // fillable input until it is opened. Click the control, type to filter,
+    // then take the option once it is actually listed — waiting on the option
+    // rather than on a timer, so a slow menu fails as a missing option instead
+    // of quietly picking whatever was highlighted.
+    const control = asSelect;
+    if (isSelect) {
+      // No Escape to dismiss another field's open menu: in the admin, Escape
+      // leaves block mode and DESELECTS the block, so the sidebar reverts to
+      // the page form and the field being set disappears. Clicking this
+      // control is enough — react-select closes any other menu on the
+      // outside mousedown that precedes the click.
+      await control.scrollIntoViewIfNeeded();
+      // Clicking a control TOGGLES its menu, so clicking one that is already
+      // open closes it and the wait below never resolves. Open it only if it
+      // is shut.
+      const own = fieldWrapper.locator('.react-select__menu');
+      if (!(await own.isVisible().catch(() => false))) {
+        await control.click();
+      }
+      // Wait for the MENU before reaching for an option: react-select renders it
+      // in a portal, so an option located before the menu exists resolves to
+      // nothing and the click lands on the page. Same sequence as
+      // block-sync.spec.ts, which is the one gesture in this repo known to
+      // commit.
+      // Scoped to THIS field's wrapper, and only after anything already open
+      // has gone. A page-wide `.react-select__menu` can be another field's menu
+      // — still up, or on its way out — and taking an option from it writes the
+      // value to the wrong field while this one keeps its placeholder.
+      const menu = fieldWrapper.locator('.react-select__menu');
+      await menu.waitFor({ state: 'visible', timeout: 10000 });
+      // Match the option case-insensitively, and say what IS on the menu when
+      // nothing matches. `hasText` waits, so an unmatched value used to sit in
+      // `click()` until the test's own timeout — four minutes of a demo
+      // recording spent on a menu that was never going to contain the word.
+      // The caller passes what the AUTHOR sees, since a Choice renders its
+      // title ("Content block"), not its token ("listItem").
+      const wanted = new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const option = menu.locator('.react-select__option').filter({ hasText: wanted });
+      if ((await option.count()) === 0) {
+        const offered = await menu
+          .locator('.react-select__option')
+          .allTextContents();
+        throw new Error(
+          `setSidebarFieldValue("${fieldName}"): the menu has no option matching ` +
+            `"${value}". Offered: [${offered.join(', ')}]`,
+        );
+      }
+      await option.first().click();
+      // Deliberately NO blur afterwards. Blurring the control once the value is
+      // chosen loses it — the field reads back empty a second later, which is
+      // what made a dropdown look impossible to set from a test.
+      // It took, or this throws. A dropdown that silently keeps its old value
+      // is the thing that makes a spec assert against a sidebar it never
+      // changed.
+      // The value CONTAINER, not the value nodes: a multi-select has one node
+      // per chosen entry, and a locator that matches several trips strict mode
+      // — reporting "the menu closed without taking it" for a field that took
+      // it twice over.
+      // Case-INSENSITIVELY: callers pass the stored token (`collapsed`) and the
+      // control shows the choice's title (`Collapsed`). Comparing them as-is
+      // failed on nothing more than the capital, and only quietly worked where
+      // a title happened to contain its own token verbatim ("Always open").
+      await expect(
+        fieldWrapper.locator('.react-select__value-container'),
+        `setSidebarFieldValue("${fieldName}"): the menu closed without taking "${value}"`,
+      ).toContainText(new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), {
+        timeout: 5000,
+      });
+      return;
+    }
+
+    // Nothing matched. Saying so is the whole point: this used to return
+    // silently, so a spec that set a dropdown asserted against a sidebar that
+    // had never been touched, and a demo clip recorded a video of nothing
+    // happening.
+    const available = await this.page
+      .locator(`${container} [class*="field-wrapper-"]`)
+      .evaluateAll((els) =>
+        els
+          .map((e) => (e.className.match(/field-wrapper-([\w-]+)/) || [])[1])
+          .filter(Boolean),
+      );
+    throw new Error(
+      `setSidebarFieldValue("${fieldName}"): no text input, slate editor, ` +
+        `checkbox, select or react-select inside ${container} ` +
+        `.field-wrapper-${fieldName}. Fields present: ` +
+        `[${available.join(', ') || 'none'}]. An empty list means the sidebar ` +
+        `is not showing a block form at all — open it, or select the block first.`,
+    );
   }
 
   /**
@@ -3388,6 +3705,7 @@ export class AdminUIHelper {
 
     // Scroll add button into view - it may be outside viewport if block is at edge
     await addButton.scrollIntoViewIfNeeded();
+    await this.demoStep(addButton);
     await addButton.click({ timeout: 10000 });
   }
 
@@ -3511,6 +3829,7 @@ export class AdminUIHelper {
       await chooser.locator('.accordion > .title').nth(sectionIndex).click();
     }
     await expect(button).toBeVisible({ timeout: 5000 });
+    await this.demoStep(button);
     await button.click();
 
     // After click, wait until no visible chooser remains. Using a fresh
@@ -4728,7 +5047,15 @@ export class AdminUIHelper {
    * (It used to sleep 100ms per turn and, on timeout, RETURN the last count —
    * so a never-settling page silently handed the caller a number.)
    *
-   * @param timeout - Maximum time to wait in milliseconds (default 5000)
+   * TWO PHASES, because "no measurement yet" and "the count keeps changing" are
+   * different faults. One budget for both let a single slow round trip fail the
+   * whole thing: on a saturated machine `getBlockOrder()` outlasted the entire
+   * 5s, so the poll never completed one sample and reported "the page kept
+   * re-rendering" having seen NOTHING (`counts seen: []`) — sending the reader
+   * after a re-render that never happened. Phase 1 waits for a count to come
+   * back at all; phase 2 judges stability with its own budget.
+   *
+   * @param timeout - Budget for EACH phase in milliseconds (default 5000)
    * @returns The stable block count
    */
   async getStableBlockCount(timeout: number = 5000): Promise<number> {
@@ -4747,6 +5074,19 @@ export class AdminUIHelper {
     };
 
     const seen: number[] = [];
+
+    // PHASE 1 — a measurement, any measurement. Until one arrives there is
+    // nothing to call stable or unstable.
+    await expect
+      .poll(async () => safeCount(), {
+        timeout,
+        message:
+          `The iframe never returned a block count within ${timeout}ms — ` +
+          `navigation had not finished, or the machine was too loaded for the ` +
+          `round trip to complete. This is NOT a re-rendering page.`,
+      })
+      .toBeGreaterThanOrEqual(0);
+
     let lastCount = -1;
     let stableChecks = 0;
 
@@ -4771,7 +5111,8 @@ export class AdminUIHelper {
             `Block count never settled within ${timeout}ms — counts seen: ` +
             `[${seen.join(', ')}] (-1 = iframe was navigating). The page kept ` +
             `re-rendering; if you know the count you expect, assert it with ` +
-            `toHaveCount instead of waiting for quiescence.`,
+            `toHaveCount instead of waiting for quiescence. (A count DID come ` +
+            `back — phase 1 passed — so this is genuinely instability.)`,
         },
       )
       .toBeGreaterThanOrEqual(2);
@@ -5434,7 +5775,33 @@ export class AdminUIHelper {
    * @param _objectBrowser - The object browser locator (unused, searches globally)
    * @param folderName - The name of the folder to navigate into (e.g., "Images" or /images/i)
    */
+  /**
+   * Wait for the object browser to finish fetching a level.
+   *
+   * The listing area shows `.ob-listing-loading` WHILE fetching and
+   * `.object-listing` once the level is in, so a helper that waits for the
+   * listing alone waits for something that is not there yet — and a helper that
+   * waits a fixed beat races it. Wait for the browser's own signal.
+   */
+  async waitForObjectBrowserLevel(timeout = 10000): Promise<void> {
+    const loading = this.page.locator('.ob-listing-loading');
+    await loading
+      .first()
+      .waitFor({ state: 'hidden', timeout })
+      .catch(() => {});
+    await this.page
+      .locator('.object-listing')
+      .first()
+      .waitFor({ state: 'attached', timeout })
+      .catch(() => {});
+  }
+
   async objectBrowserNavigateToFolder(_objectBrowser: Locator, folderName: string | RegExp): Promise<void> {
+    // The browser queries its level when it opens; deciding anything before that
+    // lands — including whether to climb — reads an empty listing as "this level
+    // has nothing" and walks off in the wrong direction. The browser says when it
+    // is fetching, so wait for that to clear rather than guessing at a beat.
+    await this.waitForObjectBrowserLevel();
     const folderItem = this.page.locator('.object-listing li').filter({ hasText: folderName });
 
     const found = await folderItem.first().waitFor({ state: 'visible', timeout: 500 })
@@ -5442,12 +5809,29 @@ export class AdminUIHelper {
       .catch(() => false);
 
     if (!found) {
-      // Navigate up one level via breadcrumbs
+      // Climb until the folder shows up. The browser opens in the CURRENT page's
+      // folder, which is often a leaf with no children at all — a doc page, say —
+      // so the target usually lives one or more levels UP rather than in view.
+      //
+      // Two affordances, because the browser has had both: the Back button in
+      // its header (what it renders today) and breadcrumb sections. Try Back
+      // first and fall back, rather than assuming either.
+      const back = this.page.locator(
+        '.object-browser button[aria-label="Back"], button[aria-label="Back"]',
+      );
       const breadcrumbSections = this.page.locator('.object-browser .breadcrumbs .section');
-      const count = await breadcrumbSections.count();
-      if (count >= 2) {
-        await breadcrumbSections.nth(count - 2).click();
-        await this.page.waitForTimeout(1000);
+      for (let level = 0; level < 5; level += 1) {
+        if (await folderItem.first().isVisible().catch(() => false)) break;
+        if (await back.first().isVisible().catch(() => false)) {
+          await back.first().click();
+        } else {
+          const count = await breadcrumbSections.count();
+          if (count < 2) break;
+          await breadcrumbSections.nth(count - 2).click();
+        }
+        // The listing re-queries on each level; wait for the browser to say it
+        // has finished rather than for a fixed beat.
+        await this.waitForObjectBrowserLevel(5000);
       }
     }
 
@@ -5459,7 +5843,11 @@ export class AdminUIHelper {
     if (nowFound) {
       // With the shadowed OB, clicking a folder row always navigates (all modes)
       await folderItem.first().click({ timeout: 2000 });
-      await expect(this.page.locator('.object-listing li').first()).toBeVisible({ timeout: 5000 });
+      // Wait for the level the click asked for, not for items in it. The browser
+      // swaps the listing out for its loading state while fetching, so requiring
+      // an item here waits for something that is not on screen yet — and a folder
+      // with no children is a legitimate level, not a failure.
+      await this.waitForObjectBrowserLevel();
     }
   }
 

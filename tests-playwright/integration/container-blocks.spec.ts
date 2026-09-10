@@ -2820,7 +2820,9 @@ test.describe('Sidebar Child Blocks Reordering', () => {
     const childTexts = await childItems
       .locator('.block-type')
       .allTextContents();
-    expect(childTexts).toEqual(['Teaser', 'Teaser']);
+    // Named by the shared namer (blockDisplayTitle): a child with its own
+    // title reads by it, not by its type.
+    expect(childTexts).toEqual(['Grid Teaser 1', 'Grid Teaser 2']);
   });
 });
 

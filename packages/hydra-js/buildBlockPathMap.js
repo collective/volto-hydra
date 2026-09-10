@@ -20,6 +20,7 @@
 // resolve, so it failed there with ERR_MODULE_NOT_FOUND while passing anywhere
 // the workspace happened to be linked. A relative path needs nothing installed.
 import { getBlockType } from '../helpers/index.js';
+import { foldSlateStyleRules } from './slateStyles.js';
 
 // Same value as PAGE_BLOCK_UID in hydra.js — defined locally to avoid
 // importing from @volto-hydra/hydra-js (which would pull in Volto deps).
@@ -402,7 +403,15 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
   // Get page schema from _page block type (registered at INIT time)
   // This contains the blocks_layout container field (which may declare regions)
   const rootConfig = blocksConfig?.['_page'];
-  const pageSchema = rootConfig?.schema?.({ intl }) || {
+  // `blockSchema || schema`, function or plain object — the same convention
+  // getBlockTypeSchema uses for every other type. Reading only `schema({intl})`
+  // meant a `_page` that came from JSON (the offline gates read blocksConfig out
+  // of a file, where a function cannot survive) silently fell back to the bare
+  // default below, hiding the page's regions from everything outside a browser.
+  const pageSchemaSource = rootConfig?.blockSchema || rootConfig?.schema;
+  const pageSchema = (typeof pageSchemaSource === 'function'
+    ? pageSchemaSource({ intl })
+    : pageSchemaSource) || {
     // Fallback before INIT (e.g. ensureAllContainersHaveBlocks runs the path map
     // before the frontend's _page schema is registered): the default blocks
     // field is named 'items', so its data lives at blocks_layout.items.
@@ -482,8 +491,14 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
    * declaration to get the set that applies to its descendants, thread that into
    * every container processor (so their children's `allowedSiblingTypes` exclude
    * it), and record it on this item's entry for the type picker to reuse.
+   *
+   * `slateRules` is the slate style allow-list inherited from the containing
+   * REGION (#295). Unlike the disallow set it is folded per FIELD, not per item
+   * — each container processor folds its own field def onto what it was handed
+   * before stamping the children — so a region can narrow or widen for its own
+   * subtree. Threaded here so the fold is transitive down the whole tree.
    */
-  function processItem(item, itemId, itemPath, schema, inheritedDisallow = null) {
+  function processItem(item, itemId, itemPath, schema, inheritedDisallow = null, slateRules = null) {
     if (!schema?.properties) return;
 
     const itemType = itemId === PAGE_BLOCK_UID ? '_page' : item?.['@type'];
@@ -503,7 +518,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
       // Descend into the nested schema
       if (fieldDef.widget === 'object' && fieldDef.schema?.properties) {
         if (item[fieldName]) {
-          processItem(item[fieldName], itemId, [...itemPath, fieldName], fieldDef.schema, disallow);
+          processItem(item[fieldName], itemId, [...itemPath, fieldName], fieldDef.schema, disallow, slateRules);
         }
         return;
       }
@@ -511,14 +526,14 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
       // Nested object property (legacy: has properties but no widget/type)
       if (fieldDef.properties && !fieldDef.widget && !fieldDef.type) {
         if (item[fieldName]) {
-          processItem(item[fieldName], itemId, [...itemPath, fieldName], fieldDef, disallow);
+          processItem(item[fieldName], itemId, [...itemPath, fieldName], fieldDef, disallow, slateRules);
         }
         return;
       }
 
       // Container field - process its contents
       if (fieldDef.widget === 'blocks_layout') {
-        processBlocksContainer(item, itemId, itemPath, fieldName, fieldDef, disallow);
+        processBlocksContainer(item, itemId, itemPath, fieldName, fieldDef, disallow, slateRules);
       } else if (fieldDef.widget === 'object_list') {
         // Use dataPath if provided to find data in a different location
         const dataPath = fieldDef.dataPath || [fieldName];
@@ -527,7 +542,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
           fieldData = fieldData?.[key];
         }
         if (fieldData) {
-          processObjectListContainer(item, itemId, itemPath, fieldName, fieldDef, dataPath, disallow);
+          processObjectListContainer(item, itemId, itemPath, fieldName, fieldDef, dataPath, disallow, slateRules);
         }
       }
     });
@@ -542,7 +557,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
       processBlocksContainer(item, itemId, itemPath, 'items', {
         allowedBlocks: blockConfig?.allowedBlocks || null,
         maxLength: blockConfig?.maxLength || null,
-      }, disallow);
+      }, disallow, slateRules);
     }
   }
 
@@ -550,7 +565,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
    * Process a widget: 'blocks_layout' container field.
    * Blocks are in shared parent.blocks dict; layout is parent[fieldName].items.
    */
-  function processBlocksContainer(parent, parentId, parentPath, fieldName, fieldDef, disallow = null) {
+  function processBlocksContainer(parent, parentId, parentPath, fieldName, fieldDef, disallow = null, inheritedSlateRules = null) {
     const blocks = parent.blocks;
     // `fieldName` is a blocks field (a schema field with widget 'blocks_layout');
     // its name is the key under the container's shared `blocks_layout` dict. So
@@ -575,6 +590,11 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
       fieldDef.allowedBlocks ?? parentBlockConfig?.allowedBlocks ?? null;
     const effectiveMaxLength =
       fieldDef.maxLength ?? parentBlockConfig?.maxLength ?? null;
+    // Slate styles this region permits (#295). One object shared by every block
+    // in the region — `foldSlateStyleRules` returns the inherited object by
+    // reference when this field declares nothing, so an undeclaring frontend
+    // pays nothing and the postMessage payload doesn't grow a copy per block.
+    const regionSlateRules = foldSlateStyleRules(inheritedSlateRules, fieldDef);
 
     // First pass: collect fixed status for all blocks to determine insert restrictions
     const blockFixedStatus = {};
@@ -696,6 +716,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
           disallow,
         ),
         allowedTemplates: fieldDef.allowedTemplates || null,
+        ...(regionSlateRules && { slateRules: regionSlateRules }),
         maxSiblings: effectiveMaxLength,
         siblingCount: layout.length, // Total siblings in this container
         emptyRequiredFields: getEmptyRequiredFields(block, blockSchema),
@@ -710,7 +731,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
       // from this block's ancestors (parent + up); processItem folds in the
       // block's own disallowDescendantBlocks for its descendants.
       if (blockSchema) {
-        processItem(block, blockId, blockPath, blockSchema, disallow);
+        processItem(block, blockId, blockPath, blockSchema, disallow, regionSlateRules);
       }
     });
   }
@@ -720,7 +741,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
    * Items are stored as array with configurable ID field.
    * @param {Array} dataPath - Path to actual data location (defaults to [fieldName])
    */
-  function processObjectListContainer(parent, parentId, parentPath, fieldName, fieldDef, dataPath = null, disallow = null) {
+  function processObjectListContainer(parent, parentId, parentPath, fieldName, fieldDef, dataPath = null, disallow = null, inheritedSlateRules = null) {
     // Navigate to actual data location using dataPath
     const effectiveDataPath = dataPath || [fieldName];
     let items = parent;
@@ -739,6 +760,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
       return;
     }
 
+    const regionSlateRules = foldSlateStyleRules(inheritedSlateRules, fieldDef);
     const idField = fieldDef.idField || '@id';
     const itemSchema = fieldDef.schema;
     const typeField = fieldDef.typeField || null; // e.g., '@type' - which attribute stores the item's type
@@ -875,6 +897,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
               disallow,
             )
           : [virtualType],
+        ...(regionSlateRules && { slateRules: regionSlateRules }),
         maxSiblings: fieldDef.maxLength || null,
         siblingCount: itemsArray.length,
         addMode, // Table mode for this container (e.g., rows)
@@ -887,7 +910,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
       // the ancestor disallow set through, like the blocks_layout path.
       const recurseSchema = hasAllowedBlocks ? blockSchema : itemSchema;
       if (recurseSchema) {
-        processItem(item, itemId, itemPath, recurseSchema, disallow);
+        processItem(item, itemId, itemPath, recurseSchema, disallow, regionSlateRules);
       }
     });
   }

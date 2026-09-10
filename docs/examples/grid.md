@@ -4,6 +4,8 @@ A responsive grid that lays out child blocks in equal-width cells. The block use
 
 This is a **built-in** block.
 
+**Demonstrates:** [blocks_layout: a region in the shared dict](../container-blocks.md#blocks_layout-a-region-in-the-shared-dict) — the plain case: one region, `allowedBlocks`, nothing else.
+
 ## Schema
 
 ```json

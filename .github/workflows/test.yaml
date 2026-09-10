@@ -3,6 +3,25 @@ name: Build and test
 on:
   push:
 
+# Every test port, stated. `tests-playwright/ports.ts` has no defaults on
+# purpose — a checkout that fell back to these numbers could take over another
+# checkout's servers without saying so — so CI declares them like any other
+# caller. The values are the historical ones; a runner has the machine to
+# itself, so there is nothing to avoid here.
+env:
+  HYDRA_MOCK_API_PORT: 8888
+  HYDRA_TEST_FRONTEND_PORT: 8889
+  HYDRA_MOCK_PARENT_PORT: 8891
+  HYDRA_VOLTO_SSR_PORT: 3001
+  HYDRA_VOLTO_WEBPACK_PORT: 3002
+  HYDRA_NUXT_PORT: 3003
+  HYDRA_REACT_DOC_PORT: 3004
+  HYDRA_VUE_DOC_PORT: 3005
+  HYDRA_SVELTE_DOC_PORT: 3006
+  HYDRA_NEXTJS_PORT: 3007
+  HYDRA_F7_PORT: 3008
+  HYDRA_ASTRO_DOC_PORT: 3009
+
 jobs:
   # ── Build Volto and upload artifact ──────────────────────────────────────
   build:
@@ -45,6 +64,15 @@ jobs:
         run: pnpm build:deps
       - name: Run volto-hydra addon unit tests (vitest)
         run: pnpm test
+      - name: Check docs are in sync with their sources
+        # The docs are ALSO served as Plone content (docs/content/...), and the
+        # examples pages embed real code files. Neither check ran in CI, which
+        # is how main ended up with a stale content JSON and a page-level link
+        # pointing at a 404. Editing a .md without re-running `node docs/sync.mjs`
+        # now fails here rather than shipping a doc page that doesn't match.
+        run: |
+          pnpm check:docs
+          pnpm sync:docs:check
       - name: Run mock-api unit tests (node:test)
         # Plone 6.2 fidelity coverage (@aliases, SearchableText prefix
         # match, navigation, folder ordering). Was not previously wired

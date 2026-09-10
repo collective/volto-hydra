@@ -41,7 +41,10 @@ test.describe('Tab reveal', () => {
     await helper.navigateToEdit('/code-example-test-page');
 
     const iframe = helper.getIframe();
-    const label = iframe.locator('[data-block-selector="tab-js"] [data-edit-text="label"]');
+    // `~=` — the word-list matcher the attribute is documented with. The button
+    // names its tab twice now (`tab-js tab-js#code`: reveal the tab, and reveal
+    // where its code is edited), and an exact-match locator sees neither.
+    const label = iframe.locator('[data-block-selector~="tab-js"] [data-edit-text="label"]');
     await expect(label).toBeVisible({ timeout: 15000 });
 
     await helper.clickBlockInIframe('tab-js');

@@ -3,6 +3,12 @@
     <RichText v-for="node in block['value']" :key="node" :node="node" />
   </div>
 
+  <div v-else-if="block['@type'] == 'suggest'" :data-block-uid="block_uid" class="suggest">
+    <label :for="block_uid + '-input'" data-edit-text="label">{{ block.label }}</label>
+    <input :id="block_uid + '-input'" name="answer" type="text" :value="block.value"
+      aria-autocomplete="list" autocomplete="off">
+    <ul class="suggest__list" hidden></ul>
+  </div>
   <div v-else-if="block['@type'] == 'introduction'" :data-block-uid="block_uid"
        data-edit-text="value" class="text-xl text-gray-600 leading-relaxed my-6 border-t border-b border-gray-200 py-4">
     <RichText v-for="node in block.value || []" :key="node" :node="node" />
@@ -372,13 +378,27 @@
     <!-- Search controls -->
     <div v-if="block.showSearchInput" class="search-controls mb-4">
       <form class="search-form flex gap-2" @submit.prevent="handleSearchSubmit">
+        <!-- The input says WHAT to type, the button says WHICH block that
+             reveals (data-block-selector-input): the quick-answer region only
+             exists once a question has been asked, so the editor reveals it by
+             asking. -->
         <input type="text" name="SearchableText" placeholder="Search..." :value="currentSearchText"
+          :data-block-selector="quickAnswerUid(block) || null"
+          :data-block-selector-input="quickAnswerUid(block) && block.quickAnswerSample ? block.quickAnswerSample : null"
           class="search-input-field flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
         <button type="submit"
+          :data-block-selector="quickAnswerUid(block) || null"
           class="search-submit-button px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
           Search
         </button>
       </form>
+    </div>
+
+    <!-- Rendered only once a question has been asked (URL-driven, like the
+         search itself). -->
+    <div v-if="quickAnswerUid(block) && block.blocks?.[quickAnswerUid(block)] && currentSearchText"
+      :data-block-uid="quickAnswerUid(block)" class="quick-answer my-4 p-3 bg-blue-50 rounded-lg">
+      <div data-edit-text="answer">{{ block.blocks[quickAnswerUid(block)].answer || '' }}</div>
     </div>
 
     <!-- Facets on top (default or facetsTopSide) -->
@@ -845,6 +865,9 @@
 
   <!-- Code example block: tabbed code with syntax highlighting -->
   <CodeExample v-else-if="block['@type'] == 'codeExample'" :block_uid="block_uid" :block="block" />
+
+  <!-- Cookie consent: a bar, plus two halves built outside the block's element -->
+  <CookieConsent v-else-if="block['@type'] == 'cookieConsent'" :block_uid="block_uid" :block="block" />
 
   <!-- Empty block - placeholder for deleted blocks in containers -->
   <div v-else-if="block['@type'] == 'empty'" :data-block-uid="block_uid" class="empty-block min-h-[60px]">
@@ -1397,6 +1420,10 @@ const getListingTotalResults = (searchBlock) => {
   const listingBlock = searchBlock.blocks?.[listingUid];
   return listingBlock?._paging?.totalItems || listingBlock?.items_total || null;
 };
+
+// The quick-answer region a search block declares (a block that exists only
+// once a question has been asked) — see the reveal attributes in the template.
+const quickAnswerUid = (block) => block?.blocks_layout?.quickAnswer?.[0] || '';
 
 // Get current search text from URL (for preserving in input field)
 const currentSearchText = computed(() => {

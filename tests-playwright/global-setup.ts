@@ -23,7 +23,11 @@ async function fetchBlocksConfig(
   mockParentUrl: string,
   frontendUrl: string,
   apiUrl: string,
-): Promise<{ blocksConfig: Record<string, any>; frontendKeys: string[] }> {
+): Promise<{
+  blocksConfig: Record<string, any>;
+  frontendKeys: string[];
+  styleMenuClasses: string[];
+}> {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();
@@ -34,8 +38,13 @@ async function fetchBlocksConfig(
         const mp = (window as any).mockParent;
         const c = mp?.getBlocksConfig?.();
         const fk = mp?.getFrontendBlockKeys?.() || [];
+        // The styles the frontend says it offers — what makes stored `styleName`
+        // content authorable or not. Only the frontend knows.
+        const sm = mp?.getStyleMenuClasses?.() || [];
         // Wait past mock-parent's own baseline (~10 types) for the frontend's INIT to land
-        return c && Object.keys(c).length > 10 ? { blocksConfig: c, frontendKeys: fk } : null;
+        return c && Object.keys(c).length > 10
+          ? { blocksConfig: c, frontendKeys: fk, styleMenuClasses: sm }
+          : null;
       });
       if (result) return result;
       await new Promise((r) => setTimeout(r, 200));
@@ -45,7 +54,7 @@ async function fetchBlocksConfig(
   } finally {
     await browser.close();
   }
-  return { blocksConfig: {}, frontendKeys: [] };
+  return { blocksConfig: {}, frontendKeys: [], styleMenuClasses: [] };
 }
 
 /** Is a frontend actually serving in this job? */
@@ -109,13 +118,64 @@ function writeStorageStates(): void {
   }
 }
 
+/**
+ * Load a frontend once, in a browser, and wait until it has rendered an
+ * annotated block.
+ *
+ * A dev-server frontend is slow on its FIRST real page load (Vite optimises
+ * dependencies then), and whichever spec happens to run first pays for it:
+ * `waitForIframeReady` gives up at 30s and its retries fire while the same
+ * first compile is still running. On CI that made allowed-layouts fail three
+ * times in a row as tests #1-#6 while all 851 later tests passed — a boot
+ * race wearing the costume of a broken feature.
+ *
+ * This is not a wait-and-hope: it waits for the app's OWN signal (a block
+ * carrying data-block-uid) and throws with the URL if that never arrives,
+ * which is a genuinely broken environment worth failing on.
+ */
+async function warmFrontend(url: string): Promise<void> {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await page
+      .locator('[data-block-uid]')
+      .first()
+      .waitFor({ state: 'attached', timeout: 120000 });
+    console.log(`[SETUP] ✓ ${url} rendered blocks`);
+  } catch (error) {
+    // BEST EFFORT, and deliberately so. This is a warm-up, not an assertion:
+    // the tests remain the judge of whether the app works. A CI job whose
+    // frontend does not serve this particular path (the bridge jobs mount
+    // different content) must not be failed by the warm-up — that turned one
+    // boot race into two red jobs.
+    console.log(
+      `[SETUP] ⚠ could not warm ${url} (${(error as Error).message.split('\n')[0]}) — ` +
+        `the first spec will pay for the first render instead`,
+    );
+  } finally {
+    await browser.close();
+  }
+}
+
 async function globalSetup() {
   // Before anything else: the storageStates have to name the ports THIS run uses.
   writeStorageStates();
 
   // Run block discovery if configured (before health checks — SKIP_VOLTO_CHECK
   // causes early return but discovery still needs to run for bridge tests)
+  // Fixture mounts are authored for their own root: served under /_test_data
+  // (the docs+fixtures job layout) their internal refs legitimately miss the
+  // merged view. Default the integrity exemption here so every harness gets
+  // it; a consuming repo can still override before setup runs.
+  process.env.INTEGRITY_EXEMPT_PREFIXES ??= '/_test_data';
   const discoverApi = process.env.DISCOVER_BLOCKS_API;
+  // The schema fetch loads the FRONTEND in a browser with `api_path` so its
+  // INIT carries blocksConfig — any page does; schemas don't depend on which
+  // content. When discovery reads a REMOTE api (a live converted site), the
+  // browser often can't complete that load (CORS, latency), so the schema
+  // fetch stays on a local api unless the harness says otherwise.
+  const schemaApi = process.env.SCHEMA_FETCH_API || discoverApi;
   if (discoverApi) {
     const maxPages = process.env.DISCOVER_MAX_PAGES
       ? parseInt(process.env.DISCOVER_MAX_PAGES, 10)
@@ -129,12 +189,13 @@ async function globalSetup() {
     // aren't set.
     let blocksConfig: Record<string, any> = {};
     let frontendKeys: string[] = [];
+    let styleMenuClasses: string[] = [];
     if (process.env.MOCK_PARENT_URL && process.env.FRONTEND_URL) {
       console.log(`[SETUP] Fetching blocksConfig via ${process.env.MOCK_PARENT_URL}...`);
-      ({ blocksConfig, frontendKeys } = await fetchBlocksConfig(
+      ({ blocksConfig, frontendKeys, styleMenuClasses } = await fetchBlocksConfig(
         process.env.MOCK_PARENT_URL,
         process.env.FRONTEND_URL,
-        discoverApi,
+        schemaApi,
       ));
       console.log(
         `[SETUP] Got ${Object.keys(blocksConfig).length} block schemas from frontend ` +
@@ -190,12 +251,12 @@ async function globalSetup() {
     for (const [project, url] of targets) {
       if (!(await reachable(url))) continue;
       const { blocksConfig: cfg, frontendKeys: keys } = await fetchBlocksConfig(
-        mockParent, url, discoverApi);
+        mockParent, url, schemaApi);
       if (Object.keys(cfg).length === 0) {
         console.warn(`[SETUP] ${project} (${url}) returned no schemas — skipped`);
         continue;
       }
-      const found = await discoverBlocks(discoverApi, maxPages, cfg, keys);
+      const found = await discoverBlocks(discoverApi, maxPages, cfg, keys, styleMenuClasses);
       for (const b of found) blocks.push({ ...b, frontend: project });
       perFrontend[project] = found.length;
       blocksConfig = cfg;      // last one wins for the legacy single-config uses
@@ -269,6 +330,19 @@ async function globalSetup() {
     const emptyOutPath = path.resolve(__dirname, '../.discovered-empty-regions.json');
     fs.writeFileSync(emptyOutPath, JSON.stringify(emptyRegions, null, 2));
     console.log(`[SETUP] Wrote ${emptyRegions.length} empty-seeding container region(s) to ${emptyOutPath}`);
+  }
+
+  // Same --project logic playwright.config uses to decide which frontends to
+  // start: warm exactly the one the run will drive.
+  const projectArgIndex = process.argv.indexOf('--project');
+  const projectArg =
+    process.argv.find((arg) => arg.startsWith('--project='))?.split('=')[1] ||
+    (projectArgIndex !== -1 ? process.argv[projectArgIndex + 1] : undefined);
+  // Only the ADMIN-driven projects: they are the ones whose helper waits for
+  // the iframe to render a block, so they are the ones that pay for a cold
+  // frontend. The bridge projects drive the frontend directly.
+  if (!projectArg || /admin-nuxt|nuxt-specific/.test(projectArg)) {
+    await warmFrontend(`${URLS.nuxt}/test-page`);
   }
 
   // Bridge-only CI jobs don't run Volto — skip the health check

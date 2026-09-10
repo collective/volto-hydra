@@ -374,7 +374,15 @@ const ParentBlockSection = ({
                 addDirection={pathInfo?.addDirection}
                 convertibleTypes={convertibleTypes}
                 onConvertBlock={handleConvertBlock}
-                isFixed={!!blockData?.fixed}
+                // Same rule as the canvas toolbar: `fixed` withholds removal
+                // from a PAGE, not from the template's own author. Once the
+                // template a block BELONGS to is unlocked, it is removable.
+                // (`isEditingThisTemplate` is about the instance itself, so it
+                // is the wrong question for a member.)
+                isFixed={
+                  !!blockData?.fixed &&
+                  !(templateEditMode || []).includes(blockData?.templateInstanceId)
+                }
                 isReadonly={!!blockData?.readOnly}
                 isInTemplate={!!blockData?.templateId}
                 onMakeTemplate={onBlockAction ? () => onBlockAction('makeTemplate', blockId) : null}
@@ -440,13 +448,26 @@ const ParentBlockSection = ({
         </HydraSchemaProvider>
       )}
 
-      {/* Fallback: If no Edit component but has schema, render BlockDataForm directly */}
+      {/* Fallback: If no Edit component but has schema, render BlockDataForm directly.
+          NOT for a read-only block: that one renders its values as static text
+          through ReadOnlyForm below, and rendering an editable form as well —
+          however thoroughly disabled — means every widget has to honour
+          `isDisabled` for the panel to be trustworthy. Volto's object browser
+          does not: it disables its browse button but still renders a typeable
+          <input> for an empty field, so a locked block had a box an author
+          could type into whose value was then dropped on the way out. A form
+          that isn't rendered has nothing to lock. */}
       {!BlockEdit && schema && !isReadonly && !pathInfo?.isTemplateInstance && (() => {
+        const formSchema = schema;
         const formContent = (
           <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef, onChangeBlock }}>
             <BlockDataForm
-              schema={schema}
+              schema={formSchema}
               onChangeField={(fieldId, value) => {
+                // Belt and braces: the widgets are disabled, and a change that
+                // reaches here anyway (a widget that ignores `isDisabled`) is
+                // not written to a block the page may not edit.
+                if (isReadonly) return;
                 // Use lodash set for nested paths like 'itemDefaults.overwrite'
                 const newBlockData = cloneDeep(blockData);
                 set(newBlockData, fieldId, value);

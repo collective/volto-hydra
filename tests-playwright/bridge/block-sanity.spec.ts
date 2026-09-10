@@ -23,6 +23,7 @@ import { test as base, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 import { verifyBlockRendering } from '../helpers/BlockVerificationHelper';
 import { fieldsNeverEditable } from '../helpers/field-coverage';
+import { measureTextStyles, recordTextStyles, slateStyles, stylesNeverRendered, stylesRenderingAsPlainText, stylesSeenInContent } from '../helpers/text-style-coverage';
 import { axeCheckPage, formatViolations } from '../helpers/axe-sanity';
 import { getFrontendUrl, SANITY_PROJECTS } from './fixtures';
 import { URLS } from '../ports';
@@ -72,8 +73,11 @@ if (fs.existsSync(discoveredPath)) {
 // one fetches an external feed that only resolves against the mock. They're
 // covered by their own integration spec (admin-mock), not this render contract.
 const NON_CONTRACT_BLOCKS = new Set(['relatedItemsListing', 'searchShortcuts', 'rssFeed']);
+const seenShapeTitles = new Map();
 discoveredBlocks = discoveredBlocks.filter(
-  (b) => !b.blockType.startsWith('conv') && !NON_CONTRACT_BLOCKS.has(b.blockType),
+  // a shape-issue discovery entry has no blockType — keep it (its test FAILS
+  // with the issue text; dropping it here would hide a real content problem)
+  (b) => !(b.blockType ?? '').startsWith('conv') && !NON_CONTRACT_BLOCKS.has(b.blockType),
 );
 
 // Block sanity is the cross-cutting render contract. We only enforce it on
@@ -104,6 +108,28 @@ const test = base.extend<{ helper: AdminUIHelper }>({
     await use(helper);
   },
 });
+
+// Schema options that no discovered example sets — filled by the loop below,
+// reported by the coverage aggregate at the end.
+const unexercisedOptions: Array<{ blockType: string; field: string; frontend: string }> = [];
+
+/**
+ * Whether an OPTION with no example is a failure here.
+ *
+ * An option proves itself by being SET in some example, so this half of the
+ * check measures the CONTENT as much as the schema — and a project whose run
+ * sees only part of the content cannot answer it. A component library is
+ * exactly that: its fixtures hold one example per block by convention, while
+ * the options are demonstrated by the SITE that consumes it, whose pages this
+ * run never loads. Every one of those then reads as missing (122, the first
+ * time this ran against one), and the backlog is permanent rather than real.
+ *
+ * So a partial corpus says so — `SANITY_OPTION_EXAMPLES=false` — and the run
+ * that DOES see the whole corpus keeps the check. The canvas half is not
+ * gated: a field carries its edit annotation wherever it renders, so any
+ * example proves it.
+ */
+const CHECK_OPTION_EXAMPLES = process.env.SANITY_OPTION_EXAMPLES !== 'false';
 
 test.describe('Block sanity (auto-discovered)', () => {
   for (const block of discoveredBlocks) {
@@ -175,6 +201,19 @@ test.describe('Block sanity (auto-discovered)', () => {
       });
       continue;
     }
+    // Graph integrity on what the API served (the plone-content-validator run
+    // over fetched pages): broken resolveuid/link refs, blocks_layout entries
+    // pointing at missing blocks, duplicate UIDs. One failing test per page.
+    if (block.integrityIssue) {
+      test(`content integrity on ${block.pagePath}${src}`, ({}, testInfo) => {
+        test.skip(!belongsHere(testInfo.project.name), `discovered via ${block.frontend}`);
+        throw new Error(
+          `Content-graph integrity failures on ${block.pagePath}:\n` +
+            (block.issues || []).map((issue: string) => `  - ${issue}`).join('\n'),
+        );
+      });
+      continue;
+    }
     // Content/schema shape mismatch (e.g. a field declared slate but holding a
     // string) — fails as its own test rather than blocking the suite.
     if (block.shapeIssue || block.slateIssue) {
@@ -183,13 +222,34 @@ test.describe('Block sanity (auto-discovered)', () => {
       // can have per-field shape/slate issues — without them, two entries would
       // collide into a "duplicate test title" error and abort the whole run.
       const where = `${block.pagePath || '?'}${block.field ? `.${block.field}` : ''}`;
-      test(`${block.blockType} block [${block.blockId}] on ${where} has valid ${kind}${src}`, () => {
+      // A block can carry SEVERAL distinct issues of the same kind on the same
+      // page+field — suffix repeats so titles stay unique instead of aborting.
+      const baseTitle = `${block.blockType} block [${block.blockId}] on ${where} has valid ${kind}`;
+      const seen = (seenShapeTitles.get(baseTitle) || 0) + 1;
+      seenShapeTitles.set(baseTitle, seen);
+      const title = seen > 1 ? `${baseTitle} (#${seen})` : baseTitle;
+      test(`${title}${src}`, () => {
         throw new Error(
           `Block "${block.blockType}" [${block.blockId}] on ${block.pagePath}` +
             (block.field ? ` field "${block.field}"` : '') +
             ` has ${kind} that does not match its schema:\n` +
             (block.issues || []).map((m) => `  - ${m}`).join('\n'),
         );
+      });
+      continue;
+    }
+    // A schema OPTION no example sets. Collected for the aggregate below rather
+    // than failed one-by-one: the list is a coverage backlog and only reads as
+    // one. Not a renderable block, so it never reaches the render checks.
+    if (block.unexercisedOption) {
+      // WHICH frontend: discovery runs per registered frontend, and each brings
+      // its own schemas (hydra's test-frontend registers a mock set of its own).
+      // Without the source, a project reads another project's options as its
+      // own backlog — which is exactly what happened the first time this ran.
+      unexercisedOptions.push({
+        blockType: block.blockType,
+        field: block.field,
+        frontend: block.frontend || '(unknown)',
       });
       continue;
     }
@@ -323,6 +383,36 @@ test.describe('Block sanity (auto-discovered)', () => {
         checkEditTextClicks: true,
       });
 
+      // TEXT-STYLE COVERAGE (#295). A style the author can apply has to render,
+      // and has to render DIFFERENTLY from body text — otherwise picking it does
+      // nothing visible and nothing says why. Measured by APPEARANCE, never by
+      // markup: the frontend picks its own tags (this one renders `strong` as a
+      // styled span deliberately), so we locate the style's text, take a
+      // signature of how it actually looks, and compare against body text on the
+      // same page. The aggregates at the end of the file do the judging.
+      for (const [field, value] of Object.entries(block.blockData || {})) {
+        if (!Array.isArray(value)) continue;
+        const wanted = [...slateStyles(value)].map(([style, text]) => ({ style, text }));
+        if (wanted.length === 0) continue;
+        // The FIELD name, not just the block's: a field the design system draws
+        // elsewhere is revealed by the handle that names it
+        // (`data-block-selector="uid#field"`).
+        const measured = await measureTextStyles(
+          iframe.locator(`[data-block-uid="${block.blockId}"]`).first(),
+          wanted,
+          block.blockId,
+          field,
+        );
+
+        recordTextStyles(
+          block.blockType,
+          block.pagePath,
+          value,
+          measured.out,
+          measured.baseline,
+        );
+      }
+
       // Accessibility pass (axe-core) over the WHOLE rendered fixture page —
       // not scoped to this one block — so document-outline rules (heading-order)
       // are judged in context. serious/critical WCAG A/AA violations (incl.
@@ -367,15 +457,70 @@ test.describe('Block sanity (auto-discovered)', () => {
   // (e.g. an image block's sidebar-only `alt`) are excluded — they carry no
   // canvas annotation. This runs last (defined after the per-block loop;
   // block-sanity is serial) so coverage is fully accumulated.
-  test('every canvas-editable field is editable in at least one example', () => {
-    const never = fieldsNeverEditable();
+  // The dual of the content-side style check: that one proves no stored node
+  // breaks its region's rules, this proves every style actually in use has a
+  // working example. A style that renders nothing fails HERE rather than as a
+  // reader wondering where a paragraph went.
+  test('every text style in the content renders in at least one example', () => {
+    const never = stylesNeverRendered();
     expect(
       never,
-      `Canvas-editable fields with NO edit annotation in ANY discovered example ` +
-        `(each is uneditable everywhere it appears):\n` +
+      `Slate styles present in content whose text renders NOWHERE ` +
+        `(an author can apply these and the words disappear):\n` +
         never
-          .map((n) => `  - ${n.blockType}.${n.field} (${n.kind})\n      e.g. ${n.example}`)
+          .map((n) => `  - ${n.style} (in ${n.blockType} on ${n.pagePath})\n      text: ${JSON.stringify(n.text.slice(0, 60))}`)
           .join('\n'),
+    ).toEqual([]);
+  });
+
+  // Rendering is not enough: a style has to look like something. If "Subtitle"
+  // produces text indistinguishable from a paragraph, the author picked it, saw
+  // no change, and has nothing to go on.
+  test('every text style renders differently from body text', () => {
+    const flat = stylesRenderingAsPlainText();
+    expect(
+      flat,
+      `Slate styles that render, but identically to ordinary body text ` +
+        `(choosing them changes nothing an author or reader can see):\n` +
+        flat
+          .map((n) => `  - ${n.style} (in ${n.blockType} on ${n.pagePath})\n      text: ${JSON.stringify(n.text.slice(0, 60))}`)
+          .join('\n'),
+    ).toEqual([]);
+  });
+
+  // Fail closed. With no examples recorded the check above passes while
+  // measuring nothing — the exact shape of a gate that reports success over an
+  // empty set. Any real content has paragraphs.
+  test('text-style coverage actually saw some content', () => {
+    expect(
+      stylesSeenInContent(),
+      'no slate styles were recorded from any discovered block — the coverage ' +
+        'check above would pass vacuously',
+    ).not.toEqual([]);
+  });
+
+  test('every field has an example — canvas-editable and sidebar option alike', () => {
+    const never = fieldsNeverEditable();
+    // Same rule, two surfaces. A canvas field proves itself by carrying its edit
+    // annotation somewhere; a sidebar OPTION has no annotation to carry, so it
+    // proves itself by being SET in some example. Excluded from the canvas rule
+    // for want of an annotation, options were the half of a block nothing
+    // covered: undemonstrated in the docs and unguarded against regression.
+    const missing = [
+      ...never.map(
+        (n) => `  - ${n.blockType}.${n.field} (${n.kind}) — no edit annotation in any example\n      e.g. ${n.example}`,
+      ),
+      ...(CHECK_OPTION_EXAMPLES ? unexercisedOptions : []).map(
+        (o) => `  - [${o.frontend}] ${o.blockType}.${o.field} (option) — no example sets it`,
+      ),
+    ];
+    expect(
+      missing,
+      `Fields with no example anywhere. A canvas field with no edit annotation ` +
+        `is uneditable everywhere it appears; an option no example sets is a ` +
+        `setting nobody can see the effect of, and nothing would catch it ` +
+        `breaking. Add an example, or drop the field:\n` +
+        missing.join('\n'),
     ).toEqual([]);
   });
 });

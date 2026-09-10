@@ -32,6 +32,21 @@ export default function PageClient({ initialData, apiUrl }) {
 
   useEffect(() => {
     initBridge({
+      // A design system's own text styles (#295). Declared here because stored
+      // content carrying `styleName` is validated against EVERY frontend that
+      // serves it: block-sanity asks whether an author could have produced it,
+      // and a style no menu offers fails that — correctly. The shared fixtures
+      // use these, so the example frontends that run block-sanity declare them.
+      voltoConfig: {
+        settings: {
+          slate: {
+            styleMenu: {
+              blockStyles: [{ cssClass: 'lead', label: 'Lead' }],
+              inlineStyles: [{ cssClass: 'dropcap', label: 'Drop cap' }],
+            },
+          },
+        },
+      },
       page: {
         schema: {
           properties: {
@@ -42,7 +57,7 @@ export default function PageClient({ initialData, apiUrl }) {
             // found nothing, and skipped the region: no path map for the page's
             // own blocks and no template merge, so definition blocks never got
             // the instance id that makes them unlockable.
-            items: { title: 'Content', widget: 'blocks_layout', allowedBlocks: ['slate', 'image', 'video', 'teaser', 'title', 'description', 'introduction', 'leadimage', 'dateField', 'hero', 'columns', 'gridBlock', 'accordion', 'slider', 'listing', 'search', 'slateTable', 'heading', 'separator', 'button', 'highlight', 'maps', 'toc', 'form', 'codeExample', 'eventMetadata', 'socialLinks'] },
+            items: { title: 'Content', widget: 'blocks_layout', allowedBlocks: ['slate', 'image', 'video', 'teaser', 'title', 'description', 'introduction', 'leadimage', 'dateField', 'hero', 'columns', 'gridBlock', 'accordion', 'slider', 'listing', 'search', 'slateTable', 'heading', 'separator', 'button', 'highlight', 'maps', 'toc', 'form', 'codeExample', 'eventMetadata', 'socialLinks', 'suggest'] },
           },
         },
       },

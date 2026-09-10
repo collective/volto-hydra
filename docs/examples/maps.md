@@ -12,7 +12,8 @@ This is a **built-in** block.
     "blockSchema": {
       "properties": {
         "url": {
-          "title": "Map Embed URL"
+          "title": "Map Embed URL",
+          "widget": "url"
         },
         "title": {
           "title": "Title",
@@ -129,3 +130,56 @@ const { block } = Astro.props;
   )}
 </div>
 ```
+
+## Embeds behind a custom element (shadow DOM)
+
+The implementations above put the `<iframe>` straight in the block. Production
+embed components often don't: `<pdfjs-viewer-element>`, `<lite-youtube>` and the
+consent-gating map wrappers are custom elements that build the third-party frame
+inside a **shadow root**, so its markup and styles stay isolated from the page.
+
+Hydra supports that shape, and the test frontend renders maps this way on
+purpose so it stays covered
+(`tests-playwright/fixtures/test-frontend/renderer.js`):
+
+```html
+<div class="maps-block">
+  <map-embed src="https://…" frame-title="Sydney"></map-embed>
+</div>
+```
+
+```js
+customElements.define(
+  'map-embed',
+  class extends HTMLElement {
+    connectedCallback() {
+      if (this.shadowRoot) return;
+      const root = this.attachShadow({ mode: 'open' });
+      const frame = document.createElement('iframe');
+      frame.src = this.getAttribute('src') || '';
+      frame.title = this.getAttribute('frame-title') || 'Map';
+      root.appendChild(frame);
+    }
+  },
+);
+```
+
+Two consequences worth knowing when you write a block this way:
+
+- **The frame is not reachable by ordinary traversal.** `querySelector()` from
+  the block element stops at the shadow boundary, and the iframe's `closest()`
+  cannot reach back out to the block. Keep `data-block-uid` on an element
+  *outside* the shadow root — as the markup above does — or hydra has nothing to
+  anchor the block to.
+- **Focus reports the host.** When the author clicks into the embed,
+  `document.activeElement` is the `<map-embed>` host, not the iframe. That is
+  what lets hydra select a block whose body is an embed: a click inside a nested
+  browsing context never reaches the page's document, so the focus change is the
+  only signal. The same detection tells the admin the block holds an embed, so
+  the toolbar does not fade away while the author is using it.
+
+Nothing extra is required of your block: use `mode: 'open'` for the shadow root
+(closed roots are invisible to the page, and hydra cannot see through them
+either) and keep the block's `data-block-uid` on the light-DOM wrapper.
+
+Covered by `tests-playwright/bridge/iframe-block-selection.spec.ts`.
