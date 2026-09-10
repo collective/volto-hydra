@@ -677,10 +677,10 @@ function loadContentFromDisk(urlPath, expandList = []) {
  * remainingDepth controls how much of the subtree to include: 0 means no
  * children, 1 means direct children only, etc.
  */
-function formatNavItem(rawContent, urlPath, baseUrl, remainingDepth) {
+function formatNavItem(rawContent, urlPath, baseUrl, remainingDepth, sessionId) {
   const hasPreviewImage = !!(rawContent.preview_image || rawContent['@type'] === 'Image');
   const children = (remainingDepth > 0 && rawContent.is_folderish !== false)
-    ? getNavigationItems(urlPath, remainingDepth, baseUrl)
+    ? getNavigationItems(urlPath, remainingDepth, baseUrl, sessionId)
     : [];
   return {
     '@id': `${baseUrl}${urlPath}`,
@@ -703,7 +703,23 @@ function formatNavItem(rawContent, urlPath, baseUrl, remainingDepth) {
  * @param {string} basePath - The base path to get navigation for (e.g., '/' or '/pretagov')
  * @param {number} depth - How many levels deep to include (default 1)
  */
-function getNavigationItems(basePath = '/', depth = 1, baseUrlIn) {
+/*
+ * The menu follows the SESSION, not just the disk.
+ *
+ * This took a sessionId at both call sites — `getRootNavigationItems` and the
+ * /@navigation route — and did not declare a fourth parameter, so JavaScript
+ * dropped it and every item came off disk regardless. The plumbing read as
+ * though the menu were session-aware while nothing about it was, which is the
+ * hardest kind of wrong to see: a title renamed and SAVED in an editing session
+ * still came back as its old self, and the only symptom was a demo of "the
+ * pages ARE the menu" where the menu never changed.
+ *
+ * Session content wins where there is any, exactly as the content routes do.
+ * That covers a retitle (the label IS the title), an exclude_from_nav tick, and
+ * a page created or moved in the session — all three of which the menu is
+ * supposed to follow.
+ */
+function getNavigationItems(basePath = '/', depth = 1, baseUrlIn, sessionId) {
   const baseUrl = baseUrlIn || `http://localhost:${PORT}`;
   const normalizedBase = basePath.replace(/\/$/, '') || '/';
   const baseDepth = normalizedBase === '/' ? 0 : normalizedBase.split('/').filter(p => p).length;
@@ -724,11 +740,12 @@ function getNavigationItems(basePath = '/', depth = 1, baseUrlIn) {
       return itemParts.length === baseDepth + 1;
     })
     .map((itemPath) => {
-      const rawContent = loadRawContentFromDisk(itemPath);
+      const rawContent =
+        (sessionId && getContent(itemPath, sessionId)) || loadRawContentFromDisk(itemPath);
       if (!rawContent) return null;
       if (rawContent.exclude_from_nav) return null;
       if (rawContent['@type'] === 'Image' || rawContent['@type'] === 'File') return null;
-      return formatNavItem(rawContent, itemPath, baseUrl, depth - 1);
+      return formatNavItem(rawContent, itemPath, baseUrl, depth - 1, sessionId);
     })
     .filter(Boolean);
 
