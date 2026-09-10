@@ -664,12 +664,12 @@ function parseExpand(req) {
   return String(raw).split(',').map((s) => s.trim()).filter(Boolean);
 }
 
-function loadContentFromDisk(urlPath, expandList = []) {
+function loadContentFromDisk(urlPath, expandList = [], sessionId) {
   const baseUrl = `http://localhost:${PORT}`;
   const content = loadRawContentFromDisk(urlPath);
   if (!content) return null;
 
-  return enrichContent(content, urlPath, baseUrl, expandList);
+  return enrichContent(content, urlPath, baseUrl, expandList, sessionId);
 }
 
 /**
@@ -1043,15 +1043,22 @@ function buildTypesComponent() {
  * expand-aware caller (enrichContent) decides which entries are included
  * vs left as @id stubs.
  */
-function generateComponents(urlPath, baseUrl) {
+function generateComponents(urlPath, baseUrl, sessionId) {
   const cleanPath = urlPath.replace(/\/$/, '') || '/';
   return {
-    // No session here: generateComponents builds the expander bundle, which
-    // has no request context. The adapter reads @actions directly, and that
-    // route IS session-aware, so a working copy still reports iterate_checkin.
+    // @actions has no session here on purpose: the adapter reads @actions
+    // directly, and that route IS session-aware, so a working copy still
+    // reports iterate_checkin.
     actions: buildActionsComponent(cleanPath, baseUrl),
     breadcrumbs: buildBreadcrumbsComponent(cleanPath, baseUrl),
-    navigation: buildNavigationComponent(cleanPath, baseUrl),
+    // navigation DOES need it. A frontend reads the menu from `?expand=
+    // navigation` on the page it is rendering, not from the /@navigation
+    // route — so leaving the session out here means the menu is the one on
+    // disk no matter what the editing session has done to it. The route was
+    // made session-aware and this path was not, which is the same bug one
+    // layer up: the two paths this file exists to keep identical drifted
+    // again, and only the one nothing reads was fixed.
+    navigation: buildNavigationComponent(cleanPath, baseUrl, sessionId),
     navroot: buildNavrootComponent(cleanPath, baseUrl),
     types: buildTypesComponent(),
     workflow: buildWorkflowComponent(cleanPath, baseUrl),
@@ -1313,9 +1320,9 @@ function stubComponents(fullUrl) {
  * Replace stubs for the named components with their fully-expanded bodies.
  * `expandList` is parsed from ?expand= on the incoming request.
  */
-function expandComponents(stubs, expandList, urlPath, baseUrl) {
+function expandComponents(stubs, expandList, urlPath, baseUrl, sessionId) {
   if (!expandList || expandList.length === 0) return stubs;
-  const expanded = generateComponents(urlPath, baseUrl);
+  const expanded = generateComponents(urlPath, baseUrl, sessionId);
   const out = { ...stubs };
   for (const name of expandList) {
     if (expanded[name] !== undefined) out[name] = expanded[name];
@@ -1323,7 +1330,7 @@ function expandComponents(stubs, expandList, urlPath, baseUrl) {
   return out;
 }
 
-function enrichContent(content, urlPath, baseUrl, expandList = []) {
+function enrichContent(content, urlPath, baseUrl, expandList = [], sessionId) {
   // Always use urlPath for @id (includes mount prefix), normalize trailing slash
   const cleanPath = urlPath.replace(/\/$/, '') || '/';
   const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
@@ -1365,7 +1372,7 @@ function enrichContent(content, urlPath, baseUrl, expandList = []) {
     'parent': parent,
     'items': childItems,
     'items_total': childItems.length,
-    '@components': expandComponents(stubComponents(fullUrl), expandList, urlPath, baseUrl),
+    '@components': expandComponents(stubComponents(fullUrl), expandList, urlPath, baseUrl, sessionId),
     // Permissions - granted by default, but a fixture may set `_mockPermissions` to model
     // an unauthorized case (e.g. a templates folder the user can't add to, or a template
     // document the user can't modify). This mirrors Plone's per-object permission flags.
@@ -1575,12 +1582,14 @@ function getContent(urlPath, sessionId, expandList = []) {
       // unconditionally so the read-time @components reflect the current
       // request's ?expand= choices, like Plone does.
       const baseUrl = `http://localhost:${PORT}`;
-      return enrichContent(stored, urlPath, baseUrl, expandList);
+      return enrichContent(stored, urlPath, baseUrl, expandList, sessionId);
     }
   }
 
-  // Try disk first (distribution content may have a site root)
-  const diskContent = loadContentFromDisk(urlPath, expandList);
+  // Try disk first (distribution content may have a site root). The SESSION
+  // still goes with it: the page may be untouched while a sibling was renamed
+  // or hidden, and the menu on this page has to show that.
+  const diskContent = loadContentFromDisk(urlPath, expandList, sessionId);
   if (diskContent) return diskContent;
 
   // Fall back to generated site root
