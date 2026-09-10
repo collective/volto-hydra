@@ -646,6 +646,78 @@ function imageDimensions(file) {
     }
   }
 
+  // Pass 2c-ter: an INSTANCE must agree with its template about what is chrome.
+  //
+  // Pass 2c-bis above checks a TEMPLATE's own blocks. This checks the pages that
+  // instantiate one, which is where the drift actually happens: six /components/*
+  // pages carried their section headings with page-specific uids and no `fixed`
+  // at all, while the twenty-eight that worked used the template's uid and said
+  // `fixed: true`.
+  //
+  // That is not cosmetic. `fixed` is what makes a block CHROME, and chrome is
+  // what separates one slot group from the next. An unfixed heading is read as
+  // an open slot, so it collides with the slot beside it, and the page cannot be
+  // saved in the editor at all — the error names two slot groups and says
+  // nothing about a heading, so there is no way to get from the symptom back to
+  // this cause.
+  //
+  // What this canNOT check is the arrangement itself: whether two slot groups
+  // end up adjacent depends on the merge, and the merge needs a render. That
+  // lives in block-sanity's "Template slots" suite, which reads the expanded
+  // tree from the bridge and calls hydra's own validateTemplatePlaceholders. The
+  // split is deliberate — this pass is the cheap static half (are the tags
+  // present and do they agree with the template), and re-deriving the merge here
+  // would just be a second implementation to be wrong in a second way.
+  {
+    // slotId -> fixed, per template, from the template's own blocks at any depth.
+    const templateChrome = new Map(); // templateRef -> Map(slotId -> fixed)
+    for (const { data } of items) {
+      const blocks = data.blocks || {};
+      const top = (data.blocks_layout || {}).items || [];
+      const own = [data.UID && `resolveuid/${data.UID}`, data['@id']].filter(Boolean);
+      const isTemplate = top.some((bid) => blocks[bid] && own.includes(blocks[bid].templateId));
+      if (!isTemplate) continue;
+      const slots = new Map();
+      const collect = (container) => {
+        for (const [, block] of Object.entries(container.blocks || {})) {
+          if (!block || typeof block !== 'object') continue;
+          if (block.slotId) slots.set(block.slotId, block.fixed === true);
+          collect(block);
+        }
+      };
+      collect(data);
+      for (const ref of own) templateChrome.set(ref, slots);
+    }
+
+    for (const { rel, data } of items) {
+      const top = (data.blocks_layout || {}).items || [];
+      const blocks = data.blocks || {};
+      const own = [data.UID && `resolveuid/${data.UID}`, data['@id']].filter(Boolean);
+      if (top.some((bid) => blocks[bid] && own.includes(blocks[bid].templateId))) continue; // a template, not an instance
+      const check = (container) => {
+        for (const [bid, block] of Object.entries(container.blocks || {})) {
+          if (!block || typeof block !== 'object') continue;
+          const chrome = block.templateId && templateChrome.get(block.templateId);
+          if (chrome && block.slotId && chrome.has(block.slotId)) {
+            const shouldBeFixed = chrome.get(block.slotId);
+            if (shouldBeFixed && block.fixed !== true) {
+              stats.instanceBlocksBroken = (stats.instanceBlocksBroken || 0) + 1;
+              errors.push(
+                `  ${rel}: block ${bid} fills slot "${block.slotId}", which its template ` +
+                `marks fixed — the instance must say fixed: true too, or the heading is ` +
+                `read as an open slot and the page cannot be saved`,
+              );
+            } else {
+              stats.instanceBlocksOk = (stats.instanceBlocksOk || 0) + 1;
+            }
+          }
+          check(block);
+        }
+      };
+      check(data);
+    }
+  }
+
   // Pass 2d: blocks_layout references must resolve to a block in the SAME
   // container. A uid listed in a container's blocks_layout but absent from its
   // `blocks` dict is a dangling reference — exactly what a partial block deletion
