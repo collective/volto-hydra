@@ -4790,6 +4790,112 @@ export class AdminUIHelper {
    * @param targetBlock - The block to drop near
    * @param insertAfter - If true, insert after target. If false, insert before.
    */
+  /**
+   * Reorder a row in the Contents view, by keyboard.
+   *
+   * Volto's Contents table is a dnd-kit sortable with no explicit sensors, so
+   * it uses the defaults — PointerSensor AND KeyboardSensor. Driving it with
+   * mouse.down/move/up does not work: dnd-kit's PointerSensor wants real
+   * pointer events with the coalesced properties Playwright's mouse API does
+   * not produce, so the drag never starts and NO @order request is sent. A demo
+   * clip did exactly that for months: the rows appeared to drag, nothing was
+   * reordered, and the failure surfaced three beats later somewhere else.
+   *
+   * The keyboard path is dnd-kit's own accessibility affordance and is exact:
+   * focus the handle, Space to lift, Arrow to step, Space to drop. One step is
+   * one position, so this says what it means.
+   *
+   * @param rowName - accessible name of the row to move (its path)
+   * @param steps - positions to move; negative moves up
+   */
+  async reorderContentsRow(rowName: string, steps: number): Promise<void> {
+    const row = this.page.getByRole('row', { name: rowName, exact: true });
+    await expect(row).toBeVisible({ timeout: 10000 });
+    await this.reorderContentsRowLocator(row, steps);
+  }
+
+  /** Move the folder's FIRST row, for a test that only needs "something moved". */
+  async reorderFirstContentsRow(steps: number): Promise<void> {
+    await expect
+      .poll(() => this.page.locator('tbody tr').count(), { timeout: 30000 })
+      .toBeGreaterThan(1);
+    await this.reorderContentsRowLocator(this.page.locator('tbody tr').first(), steps);
+  }
+
+  /**
+   * Reorder a row you already have a locator for. Prefer this when the row was
+   * found by content — a row's ACCESSIBLE NAME is not its textContent (the
+   * cells run together, "Document  TitlePublishedNoneNone"), so round-tripping
+   * through getByRole({ name }) does not find it again.
+   */
+  async reorderContentsRowByLocator(row: Locator, steps: number): Promise<void> {
+    await this.reorderContentsRowLocator(row, steps);
+  }
+
+  private async reorderContentsRowLocator(row: Locator, steps: number): Promise<void> {
+    // The handle is the row's FIRST cell — it carries dnd-kit's listeners and
+    // attributes, and is the only thing that starts a drag.
+    const handle = row.locator('td').first().locator('button');
+    await expect(handle).toBeVisible({ timeout: 5000 });
+
+    const rows = this.page.locator('tbody tr');
+    const label = ((await row.textContent()) || '').trim();
+    const positionOf = async () =>
+      (await rows.allTextContents()).map((t) => t.trim()).indexOf(label);
+    const from = await positionOf();
+    const target = rows.nth(Math.max(0, from + steps));
+    await handle.scrollIntoViewIfNeeded();
+    await target.scrollIntoViewIfNeeded();
+
+    const handleBox = await handle.boundingBox();
+    const targetBox = await target.boundingBox();
+    expect(handleBox && targetBox, 'the row and its target must be measurable').toBeTruthy();
+
+    // Volto debounces the order request (Contents' `orderTimeout`), so the drop
+    // returning does not mean the backend has heard it. Watch for the request
+    // itself: a reorder the backend never heard about is not a reorder. It is a
+    // PATCH on the CONTAINER carrying `ordering` — what Volto sends and what
+    // plone.restapi accepts. Nothing in this flow calls an @order endpoint.
+    const ordered = this.page.waitForResponse(
+      (response) => {
+        if (response.request().method() !== 'PATCH') return false;
+        try {
+          return Boolean(JSON.parse(response.request().postData() || '{}').ordering);
+        } catch {
+          return false;
+        }
+      },
+      { timeout: 15000 },
+    );
+
+    await this.page.mouse.move(
+      handleBox!.x + handleBox!.width / 2,
+      handleBox!.y + handleBox!.height / 2,
+    );
+    await this.page.mouse.down();
+    // A small move FIRST, to activate the drag. This is the part that decides
+    // whether any of it works: a pointer sensor starts on movement, and going
+    // straight from `down` to a long move never activates one — the rows appear
+    // to drag, nothing reorders, and no request is sent. Same shape the sidebar
+    // child-block reorder uses.
+    await this.page.mouse.move(
+      handleBox!.x + handleBox!.width / 2,
+      handleBox!.y + handleBox!.height / 2 + 5,
+      { steps: 5 },
+    );
+    // The LIFT has to have happened before the real move means anything. dnd-kit
+    // marks the row it is dragging (ContentsItem: `dragging-row`).
+    await expect(row).toHaveClass(/dragging-row/, { timeout: 5000 });
+    await this.page.mouse.move(
+      targetBox!.x + targetBox!.width / 2,
+      targetBox!.y + targetBox!.height / 2 + (steps > 0 ? 10 : -10),
+      { steps: 10 },
+    );
+    await this.page.mouse.up();
+    await expect(row).not.toHaveClass(/dragging-row/, { timeout: 5000 });
+    await ordered;
+  }
+
   async dragBlockWithMouse(
     _dragHandle: Locator,
     targetBlock: Locator,
