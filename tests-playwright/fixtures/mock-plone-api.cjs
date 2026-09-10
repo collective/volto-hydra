@@ -2723,7 +2723,18 @@ function getTypeSchema(typeName) {
     };
   }
 
-  // Merge base schema fields (only add fields not already defined)
+  // Merge base schema fields (only add fields not already defined).
+  //
+  // schema-base.json is the DEXTERITY BEHAVIOURS every content type carries —
+  // dates, short name, exclude-from-navigation. The site root carries none of
+  // them: it is not a dexterity type. A schema file says so with
+  // `mergeBase: false`, and without that opt-out the site root's settings form
+  // offers an author a publication date and a way to hide the site from its own
+  // menu.
+  if (schema.mergeBase === false) {
+    delete schema.mergeBase;
+    return schema;
+  }
   schema.properties = { ...base.properties, ...schema.properties };
   const existingFieldsetIds = new Set((schema.fieldsets || []).map((f) => f.id));
   for (const fs_ of base.fieldsets || []) {
