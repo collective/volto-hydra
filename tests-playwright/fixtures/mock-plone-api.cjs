@@ -724,10 +724,20 @@ function getNavigationItems(basePath = '/', depth = 1, baseUrlIn, sessionId) {
   const normalizedBase = basePath.replace(/\/$/, '') || '/';
   const baseDepth = normalizedBase === '/' ? 0 : normalizedBase.split('/').filter(p => p).length;
 
-  const items = Object.keys(contentDirMap)
+  // Disk AND the session. A page created, moved or pasted in this session exists
+  // only in the session store, so enumerating contentDirMap alone leaves it out
+  // of the menu — cut a page into another folder and the menu goes on showing it
+  // where it was, or not at all. The contents view already unions the two for
+  // the same reason; the menu is the same question asked of the same tree. A
+  // path deleted (or cut away) in this session drops out here too, or the menu
+  // keeps offering a page that is no longer there.
+  const sessionPaths = sessionId ? Object.keys(sessionContent[sessionId] || {}) : [];
+  const candidates = [...new Set([...Object.keys(contentDirMap), ...sessionPaths])];
+  const items = candidates
     .filter((itemPath) => {
       if (itemPath === '/') return false;
       if (itemPath === normalizedBase) return false; // Exclude the base itself
+      if (sessionId && sessionDeletions[sessionId]?.has(itemPath)) return false;
 
       // Check if item is under the base path
       if (normalizedBase !== '/' && !itemPath.startsWith(normalizedBase + '/')) {

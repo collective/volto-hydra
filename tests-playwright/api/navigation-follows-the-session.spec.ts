@@ -86,4 +86,75 @@ test.describe('navigation follows the session', () => {
     expect(after, 'the excluded page is gone from the menu').not.toContain(first.title);
     expect(after.length, 'only that one page left').toBe(before.length - 1);
   });
+
+  test('a page moved into another folder moves in the menu', async ({ request }) => {
+    const token = `navtest-move-${Date.now()}`;
+    const headers = { Authorization: `Bearer ${token}` };
+
+    // Two top-level folders with children, whatever this content set has.
+    const top = await request.get(`${MOCK_API}/++api++/@navigation`, {
+      headers,
+      params: { 'expand.navigation.depth': 2 },
+    });
+    const items = (await top.json()).items ?? [];
+    const from = items.find((i: any) => (i.items ?? []).length > 0);
+    const to = items.find((i: any) => i !== from);
+    expect(from && to, 'the content set has a folder with children, and somewhere to move to').toBeTruthy();
+
+    const child = from.items[0];
+    const childPath = new URL(child['@id']).pathname;
+    const toPath = new URL(to['@id']).pathname;
+
+    const moved = await request.post(`${MOCK_API}/++api++${toPath}/@move`, {
+      headers,
+      data: { source: `${MOCK_API}${childPath}` },
+    });
+    expect(moved.ok(), 'the move succeeds').toBeTruthy();
+
+    // The menu is the content tree: gone from where it was, present where it is.
+    const after = await request.get(`${MOCK_API}/++api++/@navigation`, {
+      headers,
+      params: { 'expand.navigation.depth': 2 },
+    });
+    const sections = (await after.json()).items ?? [];
+    const titlesUnder = (name: string) =>
+      (sections.find((i: any) => i.title === name)?.items ?? []).map((i: any) => i.title);
+
+    expect(titlesUnder(to.title), 'the page is in the folder it moved to').toContain(child.title);
+    expect(titlesUnder(from.title), 'and no longer in the one it left').not.toContain(child.title);
+  });
+
+  test('reordering a folder reorders its menu section', async ({ request }) => {
+    const token = `navtest-order-${Date.now()}`;
+    const headers = { Authorization: `Bearer ${token}` };
+
+    const top = await request.get(`${MOCK_API}/++api++/@navigation`, {
+      headers,
+      params: { 'expand.navigation.depth': 2 },
+    });
+    const section = ((await top.json()).items ?? []).find(
+      (i: any) => (i.items ?? []).length > 1,
+    );
+    expect(section, 'a section with more than one child').toBeTruthy();
+    const before = section.items.map((i: any) => i.title);
+    const parentPath = new URL(section['@id']).pathname;
+    const firstId = new URL(section.items[0]['@id']).pathname.split('/').filter(Boolean).pop();
+
+    // How Volto reorders: a PATCH on the CONTAINER carrying `ordering`.
+    const patched = await request.patch(`${MOCK_API}/++api++${parentPath}`, {
+      headers,
+      data: { ordering: { obj_id: firstId, delta: 1 } },
+    });
+    expect(patched.status(), 'the reorder saves').toBeLessThan(300);
+
+    const after = await request.get(`${MOCK_API}/++api++/@navigation`, {
+      headers,
+      params: { 'expand.navigation.depth': 2 },
+    });
+    const now = ((await after.json()).items ?? [])
+      .find((i: any) => i.title === section.title)
+      .items.map((i: any) => i.title);
+    expect(now, 'the menu section follows the new order').not.toEqual(before);
+    expect(now.slice().sort(), 'the same pages, only reordered').toEqual(before.slice().sort());
+  });
 });
