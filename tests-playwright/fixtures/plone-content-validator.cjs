@@ -730,8 +730,20 @@ function imageDimensions(file) {
     if (!sub || typeof sub !== 'object' || !bl || typeof bl !== 'object') return;
     for (const [lkey, arr] of Object.entries(bl)) {
       if (!Array.isArray(arr)) continue;
+      // A block id listed twice is not dangling — both entries resolve — but it
+      // is always a bug: the block renders twice, and whatever the second entry
+      // was meant to be renders never. It is what a colliding id generator
+      // leaves behind, so check it here rather than only its dangling cousin.
+      const seen = new Set();
       for (const ref of arr) {
         if (typeof ref !== 'string') continue;
+        if (seen.has(ref)) {
+          stats.layoutBroken += 1;
+          const where = bid ? `block ${bid} ` : 'page ';
+          errors.push(`  ${rel}: ${where}blocks_layout.${lkey} lists block ${ref} twice`);
+          continue;
+        }
+        seen.add(ref);
         if (Object.prototype.hasOwnProperty.call(sub, ref)) {
           stats.layoutOk += 1;
         } else {
