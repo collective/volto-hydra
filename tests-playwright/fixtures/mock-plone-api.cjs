@@ -677,6 +677,20 @@ function loadContentFromDisk(urlPath, expandList = [], sessionId) {
  * remainingDepth controls how much of the subtree to include: 0 means no
  * children, 1 means direct children only, etc.
  */
+/**
+ * The content a @components builder is allowed to read: session first, then
+ * disk, and RAW either way.
+ *
+ * `getContent` is the enriching reader — it attaches @components — so calling it
+ * from inside a component builder is a cycle waiting for the right mount. The
+ * session store wins here for the same reason it wins there: a page renamed or
+ * hidden in this session is renamed or hidden in the menu.
+ */
+function rawContentForComponents(urlPath, sessionId) {
+  const inSession = sessionId ? sessionContent[sessionId]?.[urlPath] : undefined;
+  return inSession || loadRawContentFromDisk(urlPath);
+}
+
 function formatNavItem(rawContent, urlPath, baseUrl, remainingDepth, sessionId) {
   const hasPreviewImage = !!(rawContent.preview_image || rawContent['@type'] === 'Image');
   const children = (remainingDepth > 0 && rawContent.is_folderish !== false)
@@ -750,8 +764,7 @@ function getNavigationItems(basePath = '/', depth = 1, baseUrlIn, sessionId) {
       return itemParts.length === baseDepth + 1;
     })
     .map((itemPath) => {
-      const rawContent =
-        (sessionId && getContent(itemPath, sessionId)) || loadRawContentFromDisk(itemPath);
+      const rawContent = rawContentForComponents(itemPath, sessionId);
       if (!rawContent) return null;
       if (rawContent.exclude_from_nav) return null;
       if (rawContent['@type'] === 'Image' || rawContent['@type'] === 'File') return null;
@@ -965,7 +978,13 @@ const STATE_TITLES = {
 
 function buildWorkflowComponent(cleanPath, baseUrl, sessionId) {
   const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
-  const content = getContent(cleanPath, sessionId);
+  // RAW, never getContent. getContent enriches, and enrichment builds
+  // @components — including this one. For a mount with no site root on disk
+  // that closes a loop: getContent('/') generates a root, generating it builds
+  // its components, and this builder asks getContent('/') again. Every request
+  // for that root died with "Maximum call stack size exceeded", and a Next
+  // frontend fetches the root for its chrome, so every page did.
+  const content = rawContentForComponents(cleanPath, sessionId);
   const state = content?.review_state || 'published';
   return {
     '@id': `${fullUrl}/@workflow`,
@@ -2704,7 +2723,18 @@ function getTypeSchema(typeName) {
     };
   }
 
-  // Merge base schema fields (only add fields not already defined)
+  // Merge base schema fields (only add fields not already defined).
+  //
+  // schema-base.json is the DEXTERITY BEHAVIOURS every content type carries —
+  // dates, short name, exclude-from-navigation. The site root carries none of
+  // them: it is not a dexterity type. A schema file says so with
+  // `mergeBase: false`, and without that opt-out the site root's settings form
+  // offers an author a publication date and a way to hide the site from its own
+  // menu.
+  if (schema.mergeBase === false) {
+    delete schema.mergeBase;
+    return schema;
+  }
   schema.properties = { ...base.properties, ...schema.properties };
   const existingFieldsetIds = new Set((schema.fieldsets || []).map((f) => f.id));
   for (const fs_ of base.fieldsets || []) {
