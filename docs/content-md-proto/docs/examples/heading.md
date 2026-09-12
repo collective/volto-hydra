@@ -60,7 +60,7 @@ blocks-matched: |
 blocks-tagged: |
   <block type="teaser" title="${h/text}" href="${h/link}" description="${p/text}" />
   <block type="gridBlock" headline="${h/text}">
-    <region name="blocks" widget="blocks_layout">
+    <region name="items" widget="blocks_layout">
       <block type="teaser" title="${h/text}" description="${p/text}" />
     </region>
   </block>

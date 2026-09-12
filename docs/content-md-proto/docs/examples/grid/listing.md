@@ -38,7 +38,7 @@ blocks-matched: |
   <block type="title" _="${h1}" />
 blocks-tagged: |
   <block type="gridBlock" headline="${h/text}">
-    <region name="blocks" widget="blocks_layout">
+    <region name="items" widget="blocks_layout">
       <block type="teaser" title="${h/text}" description="${p/text}" />
     </region>
   </block>

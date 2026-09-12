@@ -71,7 +71,7 @@ blocks-tagged: |
     </region>
   </block>
   <block type="gridBlock" headline="${h/text}">
-    <region name="blocks" widget="blocks_layout">
+    <region name="items" widget="blocks_layout">
       <block type="teaser" title="${h/text}" description="${p/text}" />
     </region>
   </block>
@@ -125,9 +125,9 @@ Paragraph text (p, 24/33px) -> Lorem ipsum dolor sit amet, consetetur sadipscing
 
 <block type="button" inneralign="left" title="Button text (button, 18/24px)" />
 
-<block type="gridBlock" data-json='{"blocks":[{"@type":"slate","plaintext":"Text Heading (H2, 30/36px)","value":[{"children":[{"text":"Text Heading (H2, 30/36px)"}],"type":"h2"}]},{"@type":"slate","value":[{"children":[{"text":"For grid blocks, the font of the headlines are variable, depending on the number of cells in the grid."}],"type":"p"}],"plaintext":"For grid blocks, the font of the headlines are variable, depending on the number of cells in the grid."}]}' />
+<block type="gridBlock" data-json='{"items":[{"@type":"slate","plaintext":"Text Heading (H2, 30/36px)","value":[{"children":[{"text":"Text Heading (H2, 30/36px)"}],"type":"h2"}]},{"@type":"slate","value":[{"children":[{"text":"For grid blocks, the font of the headlines are variable, depending on the number of cells in the grid."}],"type":"p"}],"plaintext":"For grid blocks, the font of the headlines are variable, depending on the number of cells in the grid."}]}' />
 
-<block type="gridBlock" data-json='{"blocks":[{"@type":"slate","plaintext":"Text Heading (H3, 24/30px)","value":[{"children":[{"text":"Text Heading (H3, 24/30px)"}],"type":"h2"}]},{"@type":"slate","value":[{"children":[{"text":"Paragraph Text (p, 18/24px)"}],"type":"p"}],"plaintext":"Paragraph Text (p, 18/24px)"},{"@type":"slate","plaintext":"Text Heading (H3, 24/30px)","value":[{"children":[{"text":"Text Heading (H3, 24/30px)"}],"type":"h2"}]},{"@type":"slate","value":[{"children":[{"text":"Paragraph Text (p, 18/24px)"}],"type":"p"}],"plaintext":"Paragraph Text (p, 18/24px)"}]}' />
+<block type="gridBlock" data-json='{"items":[{"@type":"slate","plaintext":"Text Heading (H3, 24/30px)","value":[{"children":[{"text":"Text Heading (H3, 24/30px)"}],"type":"h2"}]},{"@type":"slate","value":[{"children":[{"text":"Paragraph Text (p, 18/24px)"}],"type":"p"}],"plaintext":"Paragraph Text (p, 18/24px)"},{"@type":"slate","plaintext":"Text Heading (H3, 24/30px)","value":[{"children":[{"text":"Text Heading (H3, 24/30px)"}],"type":"h2"}]},{"@type":"slate","value":[{"children":[{"text":"Paragraph Text (p, 18/24px)"}],"type":"p"}],"plaintext":"Paragraph Text (p, 18/24px)"}]}' />
 
 <block type="toc" variation="default" data-json='{"levels":["h2","h3"]}' />
 

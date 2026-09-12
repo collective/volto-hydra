@@ -53,7 +53,7 @@ blocks-matched: |
   </block>
 blocks-tagged: |
   <block type="gridBlock" headline="${h/text}">
-    <region name="blocks" widget="blocks_layout">
+    <region name="items" widget="blocks_layout">
       <block type="teaser" title="${h/text}" description="${p/text}" />
     </region>
   </block>
@@ -84,7 +84,7 @@ Displays a list of content items from a query. The listing block fetches items f
 
 </fields>
 
-<block type="gridBlock" headline="Listing: Grid (Teaser)" data-json='{"blocks":[{"@type":"listing","querystring":{"limit":"6","query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Document"]},{"i":"Subject","o":"plone.app.querystring.operation.selection.none","v":["main folder"]}],"sort_on":"getId","sort_order":"ascending"},"variation":"teaser"}],"styles":{"backgroundColor":"transparent"}}' />
+<block type="gridBlock" headline="Listing: Grid (Teaser)" data-json='{"styles":{"backgroundColor":"transparent"},"items":[{"@type":"listing","querystring":{"limit":"6","query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Document"]},{"i":"Subject","o":"plone.app.querystring.operation.selection.none","v":["main folder"]}],"sort_on":"getId","sort_order":"ascending"},"variation":"teaser"}]}' />
 
 <block type="slider" headline="Listing: Image Slider" data-json='{"autoplayDelay":4000,"autoplayEnabled":false,"autoplayJump":false,"slides":[{"@type":"listing","fieldMapping":{"@id":"href","title":"alt","image":"url"},"querystring":{"query":[{"i":"portal_type","o":"plone.app.querystring.operation.selection.any","v":["Image"]}],"sort_order":"ascending"},"variation":"image"}]}' />
 

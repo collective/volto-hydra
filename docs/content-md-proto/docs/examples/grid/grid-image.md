@@ -59,7 +59,7 @@ blocks-matched: |
   <block type="image" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
 blocks-tagged: |
   <block type="gridBlock" headline="${h/text}">
-    <region name="blocks" widget="blocks_layout">
+    <region name="items" widget="blocks_layout">
       <block type="teaser" title="${h/text}" description="${p/text}" />
     </region>
   </block>
