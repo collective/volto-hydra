@@ -24,6 +24,11 @@ title: Build a frontend
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
+  <block type="callout">
+    <region name="items" widget="blocks_layout">
+      <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
+    </region>
+  </block>
   <block type="codeExample">
     <region name="tabs" widget="object_list">
       <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
@@ -38,6 +43,14 @@ The actual code you write will depend on the framework you choose. You can look 
 - [Nuxt.js](https://github.com/collective/volto-hydra/tree/main/examples/nuxt-blog-starter)
 - [Next.js](https://github.com/collective/volto-hydra/tree/main/examples/hydra-nextjs)
 - [F7-Vue](https://github.com/collective/volto-hydra/tree/main/examples/hydra-vue-f7)
+
+<block type="callout" variation="note">
+
+This guide describes the integration pattern for frameworks with client-side reactivity (React, Vue, Svelte, Solid, Next, Nuxt, etc.) — your component tree consumes `formData` and re-renders, the framework's virtual DOM diff handles the per-block update.
+
+For server-only frameworks without client-side reactivity (Astro, PHP, Django, Rails, Laravel, Symfony, Go templates), use the [server-render pattern](/docs/server-rendered-frontends) instead — one config option on `initBridge` plus one small HTTP endpoint.
+
+</block>
 
 ## What an integrated frontend looks like
 
@@ -111,6 +124,12 @@ Page data ends up shaped like this — one shared `blocks` dict, and a region pe
   }
 }
 ```
+
+<block type="callout" variation="note">
+
+Regions are sub-keys of `blocks_layout` — **not** separate top-level fields — because that is what makes them persist. `blocks_layout` is a registered backend field (a Plone behavior field), so the whole dict, including every region, is saved verbatim. A separate top-level field such as `footer_blocks` would be **silently dropped** by the backend on save, because it isn't a registered field. See [Container blocks](/docs/container-blocks) for the data model in full.
+
+</block>
 
 Then you augment the rendered HTML with `data-` attributes (or `<!-- hydra ... -->` comments) so Inka can find your blocks and editable fields:
 
