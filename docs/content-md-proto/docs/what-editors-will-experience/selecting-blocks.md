@@ -23,6 +23,11 @@ subjects: []
 title: Selecting blocks
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
+  <block type="callout">
+    <region name="items" widget="blocks_layout">
+      <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
+    </region>
+  </block>
   <block type="title" _="${h1}" />
   <block type="image" description="${p?/text}" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
   <block type="image" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
@@ -98,6 +103,12 @@ While multiple blocks are selected:
 - The sidebar shows the count and lists each selected block by type.
 
 ![Two adjacent paragraphs multi-selected — combined bounding box, sidebar shows "2 selected", toolbar shows count badge.](/docs/images/multi-select)
+
+<block type="callout" variation="tip">
+
+Shift+Click in **text mode** doesn't multi-select — that's reserved for normal text-range selection in your browser. Press `Escape` first to enter block mode, then Shift+Click. Ctrl/Cmd+Click works in either mode.
+
+</block>
 
 ## Selecting from the sidebar
 

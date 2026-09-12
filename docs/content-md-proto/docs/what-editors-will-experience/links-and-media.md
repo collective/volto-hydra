@@ -25,6 +25,11 @@ subjects: []
 title: Links and media
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
+  <block type="callout">
+    <region name="items" widget="blocks_layout">
+      <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
+    </region>
+  </block>
   <block type="title" _="${h1}" />
   <block type="image" description="${p?/text}" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
   <block type="image" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
@@ -44,6 +49,12 @@ When the frontend has wired up a link field as inline-editable, clicking the lin
 - **Clear the link.**
 
 ![Link picker on a slate link — URL field with /another-page, browse / clear / open-new-tab / submit icons.](/docs/images/link-picker)
+
+<block type="callout" variation="tip">
+
+The frontend can also mark certain links as **always navigable during edit mode** (paging buttons, facet controls, "next slide" arrows). Those still navigate when you click them, even in edit mode — the picker only opens for editorial links, not UI controls.
+
+</block>
 
 <block type="slate">
 

@@ -148,6 +148,12 @@ Then you augment the rendered HTML with `data-` attributes (or `<!-- hydra ... -
 </div>
 ```
 
+<block type="callout" variation="tip">
+
+You can embed the Inka tags directly if you want: `<p data-edit-text="title">A caption</p>`
+
+</block>
+
 ### Deep-link anchors (fragments)
 
 To let editors link to a spot *inside* a page, mark the element with a real `id` (the `#fragment` the browser scrolls to) **and** a linkable-anchor attribute carrying the label shown in the link picker. The attribute you pick also records the anchor's **level**, so the picker (and consumers like an in-page navigation block) can show a hierarchy:

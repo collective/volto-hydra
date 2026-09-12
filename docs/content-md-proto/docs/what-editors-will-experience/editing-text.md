@@ -24,6 +24,11 @@ subjects: []
 title: Editing text
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
+  <block type="callout">
+    <region name="items" widget="blocks_layout">
+      <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
+    </region>
+  </block>
   <block type="title" _="${h1}" />
   <block type="image" description="${p?/text}" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
   <block type="image" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
@@ -42,6 +47,12 @@ blocks-tagged: |
 # Editing text
 
 Click into any text in the preview that's marked inline-editable and start typing. There are two kinds of text fields: **simple text** (like a title) and **slate** (rich text — the body of a paragraph block, descriptions, etc.).
+
+<block type="callout" variation="note">
+
+Which fields are inline-editable depends on your design system. Some sites mark every visible text field as inline-editable; others only mark the "main" text and route everything else through the sidebar. The toolbar and cursor behaviour below is the same either way — but if a field doesn't enter edit mode on click, that's a design-system choice, not a bug. Use the sidebar.
+
+</block>
 
 ## Simple text
 

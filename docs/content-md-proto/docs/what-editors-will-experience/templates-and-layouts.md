@@ -25,6 +25,11 @@ subjects: []
 title: Templates and layouts
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
+  <block type="callout">
+    <region name="items" widget="blocks_layout">
+      <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
+    </region>
+  </block>
   <block type="title" _="${h1}" />
   <block type="image" description="${p?/text}" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
   <block type="image" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
@@ -40,6 +45,12 @@ Templates let editors reuse a layout consistently across many pages without copy
 - **Page-level layouts** — a full layout the whole page (or a region) is rendered through (e.g. an "article layout" with a fixed header / sidebar / footer). Configured as `allowedLayouts`; appears in the Layout dropdown.
 
 The two share the same merge rules; the difference is just where they're applied.
+
+<block type="callout" variation="note">
+
+Whether your site has any templates or layouts at all is a design-system choice. A site can perfectly well skip them and let editors build pages freely; another might lock most pages into a small set of fixed layouts. The mechanics on this page apply when they're configured.
+
+</block>
 
 ## What you'll see in the editor
 
@@ -87,6 +98,12 @@ You **can't** insert a new block between two adjacent fixed/readonly template bl
 
 If you need to add content there, you may need to switch to a different layout (one whose structure has a slot in that position) or talk to whoever maintains the templates.
 
+<block type="callout" variation="note">
+
+This is how it works when you're **filling** a template — the normal case. When you're **editing the template itself** (unlocked, see below), it's the opposite: dragging a block **keeps** its slot, because you set slots deliberately there. To move a block to a different slot while editing the template, change its **slot name** in the sidebar rather than relying on where you drop it.
+
+</block>
+
 ## Moving content in and out of slots
 
 A block belongs to whichever **slot it currently sits in** — and you change that just by moving it. A block always takes on the slot it *lands* in; it never keeps the slot it came from.
@@ -109,6 +126,12 @@ When `allowedLayouts` is configured for a page (or a region), the sidebar shows 
 \- Content tagged with a slot name is placed into the matching slot in the new layout.    - Content with no slot tag falls into the `"default"` slot if the new layout has one; otherwise into the bottom or top slot, or is dropped.    - Fixed blocks with the same `slotId` get their editable content carried over (text, media); their structural settings come from the new layout.
 
 The point of `slotId` is that two layouts can share the same set of region names — switch between them and your content lands in the right places automatically.
+
+<block type="callout" variation="warning">
+
+Editing a template changes its **definition** — the change will appear on **every page that uses it**. Unlocking asks you to confirm first.
+
+</block>
 
 ## Editing content inside a template
 

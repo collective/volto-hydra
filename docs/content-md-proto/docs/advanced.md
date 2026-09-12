@@ -23,6 +23,11 @@ subjects:
 title: Advanced
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
+  <block type="callout">
+    <region name="items" widget="blocks_layout">
+      <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
+    </region>
+  </block>
   <block type="title" _="${h1}" />
   <block type="separator" _="${hr}" styles={"align":"full"} />
   <block type="codeExample">
@@ -37,6 +42,12 @@ blocks-matched: |
 Advanced topics for optimising your Inka integration: lazy loading the bridge, authentication, and preventing reloads.
 
 <block type="separator" />
+
+<block type="callout" variation="note">
+
+Volto is built as a monolith CMS framework, so ignore the parts of the documentation that apply to its presentation layer — Inka replaces that piece.
+
+</block>
 
 ## Lazy Load the Bridge
 

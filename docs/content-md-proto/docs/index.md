@@ -23,6 +23,11 @@ subjects: []
 title: Volto Hydra Documentation
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
+  <block type="callout">
+    <region name="items" widget="blocks_layout">
+      <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
+    </region>
+  </block>
   <block type="title" _="${h1}" />
 order:
   - architecture
@@ -44,6 +49,12 @@ order:
 # Volto Hydra Documentation
 
 A design-system-first page-builder toolkit. Strike the right balance for your site — make it easy for editors to create engagement while staying compliant.
+
+<block type="callout" variation="warning">
+
+Inka is a [Work in Progress](https://github.com/orgs/collective/projects/3/views/4). It should not be used in production yet.
+
+</block>
 
 ## Why Inka?
 
