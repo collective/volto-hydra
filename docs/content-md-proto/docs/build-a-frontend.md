@@ -30,71 +30,77 @@ blocks-assignments:
   - { uid: p-5 }
   - { uid: ul-6 }
   - { uid: p-7 }
-  - { uid: ce-8 }
-  - { id: ce-8-js-bf605e }
-  - { uid: p-9 }
-  - { uid: ce-10 }
-  - { id: ce-10-js-2e9648 }
-  - { uid: p-11 }
-  - { uid: ce-12 }
-  - { id: ce-12-html-e0187e }
-  - { uid: h-13 }
-  - { uid: p-14 }
-  - { uid: ul-15 }
-  - { uid: ce-16 }
-  - { id: ce-16-html-5cddab }
+  - { uid: p-8 }
+  - { uid: ce-9 }
+  - { id: ce-9-js-912029 }
+  - { uid: p-10 }
+  - { uid: ce-11 }
+  - { id: ce-11-js-c500c8 }
+  - { uid: p-12 }
+  - { uid: ce-13 }
+  - { id: ce-13-html-ef9711 }
+  - { uid: h-14 }
+  - { uid: p-15 }
+  - { uid: ul-16 }
   - { uid: p-17 }
-  - { uid: p-18 }
+  - { uid: ul-18 }
   - { uid: p-19 }
-  - { uid: h-20 }
+  - { uid: ce-20 }
+  - { id: ce-20-html-fe64be }
   - { uid: p-21 }
-  - { uid: bq-22 }
+  - { uid: p-22 }
   - { uid: p-23 }
   - { uid: h-24 }
   - { uid: p-25 }
-  - { uid: h-26 }
+  - { uid: p-26 }
   - { uid: p-27 }
-  - { uid: p-28 }
-  - { uid: h-29 }
-  - { uid: p-30 }
-  - { uid: h-31 }
+  - { uid: h-28 }
+  - { uid: p-29 }
+  - { uid: h-30 }
+  - { uid: p-31 }
   - { uid: p-32 }
-  - { uid: ul-33 }
-  - { uid: h-34 }
-  - { uid: p-35 }
-  - { uid: h-36 }
-  - { uid: ol-37 }
-  - { uid: h-38 }
-  - { uid: ol-39 }
+  - { uid: h-33 }
+  - { uid: p-34 }
+  - { uid: h-35 }
+  - { uid: p-36 }
+  - { uid: ul-37 }
+  - { uid: p-38 }
+  - { uid: h-39 }
   - { uid: p-40 }
   - { uid: h-41 }
-  - { uid: p-42 }
-  - { uid: ol-43 }
-  - { uid: h-44 }
-  - { uid: ul-45 }
+  - { uid: ol-42 }
+  - { uid: h-43 }
+  - { uid: ol-44 }
+  - { uid: p-45 }
   - { uid: h-46 }
-  - { uid: ol-47 }
-  - { uid: h-48 }
+  - { uid: p-47 }
+  - { uid: ol-48 }
   - { uid: p-49 }
   - { uid: h-50 }
-  - { uid: p-51 }
-  - { uid: ul-52 }
-  - { uid: h-53 }
-  - { uid: p-54 }
-  - { uid: ul-55 }
+  - { uid: ul-51 }
+  - { uid: h-52 }
+  - { uid: ol-53 }
+  - { uid: h-54 }
+  - { uid: p-55 }
   - { uid: h-56 }
   - { uid: p-57 }
-  - { uid: h-58 }
-  - { uid: p-59 }
-  - { uid: ol-60 }
-  - { uid: p-61 }
+  - { uid: ul-58 }
+  - { uid: h-59 }
+  - { uid: p-60 }
+  - { uid: ul-61 }
   - { uid: h-62 }
   - { uid: p-63 }
-  - { uid: ol-64 }
-  - { uid: h-65 }
-  - { uid: p-66 }
-  - { uid: ul-67 }
-  - { uid: p-68 }
+  - { uid: h-64 }
+  - { uid: p-65 }
+  - { uid: ol-66 }
+  - { uid: p-67 }
+  - { uid: h-68 }
+  - { uid: p-69 }
+  - { uid: ol-70 }
+  - { uid: h-71 }
+  - { uid: p-72 }
+  - { uid: ul-73 }
+  - { uid: p-74 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -117,16 +123,14 @@ The actual code you write will depend on the framework you choose. You can look 
 
 Before you dive into the steps, here's what your frontend ends up doing.
 
-To make a site editable with Inka you break a page into:
+To make a site editable with Hydra you break a page into:
 
 - **Blocks fields** — one or more named, ordered lists of blocks. Each is a schema property with `widget: 'blocks_layout'`; the field name is a key inside the page's `blocks_layout` dict (the default field is `items`, plus e.g. `header`, `footer`). Every field's blocks live in the page's single shared `blocks` dict; the field only records ordering.
 - **Blocks** — discrete visual elements with a schema and settings that can be moved and edited.
-  - Type, title, icon etc. so the user can pick from a menu.
-  - Fields: string, image, link etc. each with their own sidebar widget.
-    - `slate` is a special field that contains JSON for a paragraph, heading etc.
-    - `blocks` fields let a block hold other blocks.
 
-When the page loads inside Inka's edit iframe, you initialise the bridge and declare your blocks; otherwise you render normally from the API:
+\- Type, title, icon etc. so the user can pick from a menu.   - Fields: string, image, link etc. each with their own sidebar widget.     - `slate` is a special field that contains JSON for a paragraph, heading etc.     - `blocks` fields let a block hold other blocks.
+
+When the page loads inside Hydra's edit iframe, you initialise the bridge and declare your blocks; otherwise you render normally from the API:
 
 ### Js
 
@@ -188,7 +192,7 @@ Page data ends up shaped like this — one shared `blocks` dict, and a region pe
 }
 ```
 
-Then you augment the rendered HTML with `data-` attributes (or `<!-- hydra ... -->` comments) so Inka can find your blocks and editable fields:
+Then you augment the rendered HTML with `data-` attributes (or `<!-- hydra ... -->` comments) so Hydra can find your blocks and editable fields:
 
 ### Html
 
@@ -209,8 +213,13 @@ Then you augment the rendered HTML with `data-` attributes (or `<!-- hydra ... -
 
 To let editors link to a spot *inside* a page, mark the element with a real `id` (the `#fragment` the browser scrolls to) **and** a linkable-anchor attribute carrying the label shown in the link picker. The attribute you pick also records the anchor's **level**, so the picker (and consumers like an in-page navigation block) can show a hierarchy:
 
-- `data-linkable-h1` … `data-linkable-h6="Label"` — a heading anchor **at that level**. Use these on your headings; the suffix is the level.
-- `data-linkable-id="Label"` — a **level-less** anchor (a figure, a defined term, any non-heading target).
+- `data-linkable-h1` … `data-linkable-h6="Label"` — a heading anchor \*\*at that
+
+level\*\*. Use these on your headings; the suffix is the level.
+
+- `data-linkable-id="Label"` — a **level-less** anchor (a figure, a defined term,
+
+any non-heading target).
 
 ### Html
 
@@ -220,17 +229,17 @@ To let editors link to a spot *inside* a page, mark the element with a real `id`
 <figure id="fig-1" data-linkable-id="Figure 1">…</figure>
 ```
 
-Inka harvests these per block on render as `{ id, name, level }` and stores them in the block's data, so the object browser offers them as `path#pricing` link targets — as a nested list reflecting the page's structure. Both attributes must survive into your **published** render for the anchor to resolve at runtime — Inka only reads them in edit mode.
+Hydra harvests these per block on render as `{ id, name, level }` and stores them in the block's data, so the object browser offers them as `path#pricing` link targets — as a nested list reflecting the page's structure. Both attributes must survive into your **published** render for the anchor to resolve at runtime — Hydra only reads them in edit mode.
 
-**Level is optional / automatic.** If you use plain `data-linkable-id` on an element that is *itself* an `h1`–`h6`, Inka infers the level from the tag — so tagging every heading with `data-linkable-id` still yields a hierarchy for free. Precedence is: explicit `data-linkable-h{n}` > the element's heading tag > none (a level-less leaf). Given the flat, document-ordered anchor list, `buildAnchorTree` (in `@volto-hydra/hydra-js`) turns the levels into a nested contents tree; no levels means a flat list.
+**Level is optional / automatic.** If you use plain `data-linkable-id` on an element that is *itself* an `h1`–`h6`, Hydra infers the level from the tag — so tagging every heading with `data-linkable-id` still yields a hierarchy for free. Precedence is: explicit `data-linkable-h{n}` > the element's heading tag > none (a level-less leaf). Given the flat, document-ordered anchor list, `buildAnchorTree` (in `@volto-hydra/hydra-js`) turns the levels into a nested contents tree; no levels means a flat list.
 
-It's your choice which elements are linkable — a common pattern is to tag every heading, deriving its `id` from a slug of the heading text. If you want a heading to be linkable *while it's being edited* (before save), keep its `id`/`data-linkable-id` current as the text changes — e.g. a small `input` listener that re-slugifies the heading. Inka harvests anchors both on render **and** when inline edits flush, merging them into the edit form's `block._linkableAnchors` so a freshly-typed heading becomes linkable on the page being edited without saving first; other pages use their last saved anchors.
+It's your choice which elements are linkable — a common pattern is to tag every heading, deriving its `id` from a slug of the heading text. If you want a heading to be linkable *while it's being edited* (before save), keep its `id`/`data-linkable-id` current as the text changes — e.g. a small `input` listener that re-slugifies the heading. Hydra harvests anchors both on render **and** when inline edits flush, merging them into the edit form's `block._linkableAnchors` so a freshly-typed heading becomes linkable on the page being edited without saving first; other pages use their last saved anchors.
 
 #### Building an in-page navigation
 
 To build something *from* the anchors — an in-page navigation ("On this page") block — **derive the list from the page content you already render**, the same way you stamp the heading `id`s. That works identically published (no bridge, JS off) and while editing: structural edits (adding, removing, reordering heading blocks) re-render your frontend with fresh content, so the nav follows them. There is no bridge callback for this — the anchors ride in the ordinary edit-form data (`block._linkableAnchors`), which is what the object browser's link picker reads; a nav rebuilds itself from content on the next render.
 
-> One consequence: text typed into an *existing* heading updates the nav on the next render (when you blur the block), not on every keystroke — inline text edits don't re-render the frontend until they're flushed. Adding or removing headings updates it immediately.
+\> One consequence: text typed into an *existing* heading updates the nav on the next > render (when you blur the block), not on every keystroke — inline text edits don't > re-render the frontend until they're flushed. Adding or removing headings updates it > immediately.
 
 If your anchors carry levels, pair the derived list with `buildAnchorTree(anchors)` (from `@volto-hydra/hydra-js`) to render a nested contents list; no levels means a flat list.
 
@@ -255,7 +264,8 @@ On page setup, take the path and make a [REST API call to the contents endpoint]
 - You can use `@plone/client` for this
 - In some frameworks (such as Nuxt.js) it's better to use their built-in fetch
 - You can also use the [Plone GraphQL API](https://2022.training.plone.org/gatsby/data.html)
-  - Note: this is just a wrapper on the REST API rather than a server-side implementation, so it's not more efficient than using the REST API directly
+
+\- Note: this is just a wrapper on the REST API rather than a server-side implementation, so it's not more efficient than using the REST API directly
 
 ## 4. Render Page Metadata
 
@@ -263,7 +273,7 @@ In your page template, fill title etc. from the content metadata.
 
 ## 5. Navigation
 
-1. Adjust the contents API call to use [`@expand`](https://6.docs.plone.org/volto/configuration/expanders.html) and return [navigation data](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/navigation.html) in the same call
+1. Adjust the contents API call to use [\`@expand\`](https://6.docs.plone.org/volto/configuration/expanders.html) and return [navigation data](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/navigation.html) in the same call
 2. Create a component for your top-level nav that uses this nav JSON to create a menu
 
 ## 6. Blocks
@@ -274,7 +284,7 @@ In your page template, fill title etc. from the content metadata.
 4. In your page, iterate down the `blocks_layout` list and render a `Block` component for each
 5. Rendering Slate — split into a separate component as it's used in many blocks and is also recursive
 
-Give `Block` an `@type: "empty"` case: a container region with no `defaultBlockType` and more than one `allowedBlocks` seeds an `empty` placeholder for the user to type in place, and any custom container renderer must route its children through `Block` so `empty` is handled rather than rejected. See [Empty Blocks](container-blocks.md#empty-blocks).
+Give `Block` an `@type: "empty"` case: a container region with no `defaultBlockType` and more than one `allowedBlocks` seeds an `empty` placeholder for the user to type in place, and any custom container renderer must route its children through `Block` so `empty` is handled rather than rejected. See [Empty Blocks](/docs/container-blocks#empty-blocks).
 
 ## 7. Helper Functions
 
@@ -282,11 +292,12 @@ Several helper functions get reused in many blocks:
 
 1. **Generating a URL for links** — all REST API URLs are relative to the API URL, so you need to convert these to the right frontend URL
 2. **Generating a URL for an image** — blocks have image data in many formats so a helper function is useful
-   - You may also decide to use your framework or hosting solution for image resizing
+
+\- You may also decide to use your framework or hosting solution for image resizing
 
 ## 8. Listing Blocks
 
-- Use the [Listing Helpers](listings.md) or make your own [REST API call to query items](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/querystring.html)
+- Use the [Listing Helpers](/docs/listings) or make your own [REST API call to query items](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/querystring.html)
 - Create your own pagination scheme (e.g., embed page in URL for static generation)
 - Render the items and pagination
 
@@ -318,15 +329,15 @@ Form-block is a plugin that allows a visual form builder:
 
 ## Deployment patterns
 
-Inka separates your production frontend from the editing experience, which gives you choice in how each is deployed.
+Hydra separates your production frontend from the editing experience, which gives you choice in how each is deployed.
 
 ### SPA / Hybrid — full visual editing
 
 The simplest setup — your frontend handles both production and editing:
 
 1. Deploy your frontend as SPA or Hybrid (SSR + client-side hydration).
-2. Deploy Inka and the Plone API server.
-3. Log in to Inka, go to user preferences, set your frontend URL.
+2. Deploy Hydra and the Plone API server.
+3. Log in to Hydra, go to user preferences, set your frontend URL.
 
 This gives you all visual editing features including inline text editing, drag and drop, and realtime preview.
 
@@ -335,16 +346,16 @@ This gives you all visual editing features including inline text editing, drag a
 Get the speed of static generation while keeping visual editing. Deploy two versions of the same frontend:
 
 1. **Production** — deploy your frontend in SSG or SSR mode (fast, cacheable).
-2. **Editing** — deploy the same frontend in SPA mode to a separate URL (used only inside Inka).
-3. **Inka + Plone** — only needs to run during editing, so scale-to-zero / serverless works.
+2. **Editing** — deploy the same frontend in SPA mode to a separate URL (used only inside Hydra).
+3. **Hydra + Plone** — only needs to run during editing, so scale-to-zero / serverless works.
 4. **SSG rebuild** — for SSG, configure [collective.webhook](https://github.com/collective/collective.webhook) to trigger a rebuild on edit. SSR doesn't need this.
 
 ### Example: the Nuxt.js demo
 
-The default Inka demo uses exactly the SSG / SSR pattern above:
+The default Hydra demo uses exactly the SSG / SSR pattern above:
 
 - **Production** — [SSG on Netlify](https://hydra-nuxt-flowbrite.netlify.app/). All pages statically generated, images optimized, fast globally.
-- **Editing** — same Nuxt codebase deployed as SPA to a different Netlify URL. Only loaded inside Inka's iframe.
-- **Inka + Plone** — deployed to [fly.io](https://hydra.pretagov.com) with scale-to-zero. Cost is free or minimal since it only runs during editing.
+- **Editing** — same Nuxt codebase deployed as SPA to a different Netlify URL. Only loaded inside Hydra's iframe.
+- **Hydra + Plone** — deployed to [fly.io](https://hydra.pretagov.com) with scale-to-zero. Cost is free or minimal since it only runs during editing.
 
 For most frameworks, switching between SSG / SSR and SPA is just a config toggle, so you get the best of both worlds with minimal effort.

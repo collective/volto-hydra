@@ -51,7 +51,6 @@ blocks-assignments:
   - { id: ref-maps-rendering-jsx-7fbc14 }
   - { id: ref-maps-rendering-vue-85ab6d }
   - { id: ref-maps-rendering-svelte-4d9083 }
-  - { id: ref-maps-rendering-astro-6e7b3c }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -129,7 +128,8 @@ blandit praesent luptatum zzril qui.
     "blockSchema": {
       "properties": {
         "url": {
-          "title": "Map Embed URL"
+          "title": "Map Embed URL",
+          "widget": "url"
         },
         "title": {
           "title": "Title",
@@ -175,12 +175,6 @@ blandit praesent luptatum zzril qui.
 
 ```{literalinclude} ../../../examples/examples/svelte/MapsBlock.svelte
 :language: svelte
-```
-
-### Astro
-
-```{literalinclude} ../../../examples/examples/astro/MapsBlock.astro
-:language: astro
 ```
 
 </block>

@@ -44,7 +44,6 @@ blocks-assignments:
   - { id: ref-search-rendering-jsx-dd082e }
   - { id: ref-search-rendering-vue-3c1873 }
   - { id: ref-search-rendering-svelte-7ba7ad }
-  - { id: ref-search-rendering-astro-014919 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -86,8 +85,13 @@ A search interface with faceted filtering. Contains a child listing block for re
   "search": {
     "blockSchema": {
       "properties": {
+        "headline": {
+          "title": "Headline",
+          "type": "string"
+        },
         "facetsTitle": {
-          "title": "Facets Title"
+          "title": "Facets Title",
+          "type": "string"
         },
         "facets": {
           "title": "Facets",
@@ -106,6 +110,22 @@ A search interface with faceted filtering. Contains a child listing block for re
           "allowedBlocks": [
             "listing"
           ]
+        },
+        "sortOn": {
+          "title": "Sort results by",
+          "description": "The index the results come back in. One index; empty means the catalog's own order.",
+          "type": "string",
+          "widget": "querystringSelect",
+          "indexes": "sortable",
+          "emptyLabel": "— no sorting —"
+        },
+        "sortOnOptions": {
+          "title": "Sort-by options offered",
+          "description": "The indexes a visitor may re-sort by, in the order the menu should read.",
+          "type": "array",
+          "widget": "querystringSelect",
+          "indexes": "sortable",
+          "multiple": true
         }
       }
     }
@@ -239,7 +259,12 @@ A search interface with faceted filtering. Contains a child listing block for re
     "listing": [
       "listing-1"
     ]
-  }
+  },
+  "sortOn": "effective",
+  "sortOnOptions": [
+    "effective",
+    "sortable_title"
+  ]
 }
 ```
 
@@ -263,12 +288,6 @@ A search interface with faceted filtering. Contains a child listing block for re
 
 ```{literalinclude} ../../../examples/examples/svelte/SearchBlock.svelte
 :language: svelte
-```
-
-### Astro
-
-```{literalinclude} ../../../examples/examples/astro/SearchBlock.astro
-:language: astro
 ```
 
 </block>

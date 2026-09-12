@@ -4,6 +4,12 @@ Displays a list of content items from a query. The listing block fetches items f
 
 This is a **built-in** block.
 
+**Demonstrates:** the sidebar Volto already provides — `querystring` for the
+query and [`query_sort_on`](../custom-blocks.md#picking-a-catalog-index-querystringselect)
+for "Sort on", both registered widgets a hydra schema can name. Nothing here
+needs a custom picker; the [search block](search.md) shows the one case that
+does.
+
 ## Schema
 
 ```json
@@ -118,7 +124,7 @@ After the query is resolved, each item looks like:
 
 ## Rendering
 
-The listing block fetches items and renders each one based on the `variation`. Inka's `expandListingBlocks` helper handles the fetch and field mapping.
+The listing block fetches items and renders each one based on the `variation`. Hydra's `expandListingBlocks` helper handles the fetch and field mapping.
 
 **Expanded items are read-only.** `expandListingBlocks` marks every item it produces read-only (via `setBlockReadonly`), so the bridge ignores any `data-edit-text` / `data-edit-link` / `data-edit-media` annotations inside them — they're query results, not authored content. Render each item with your **normal** item renderer, annotations and all; do not special-case expanded items and do **not** reach for `data-linkable-allow` to stop their links being flagged (that attribute is for navigation controls like pagers/facets, not read-only content — see [Visual Editing](../visual-editing.md#allowed-navigation-data-linkable-allow)). The same renderer serves the authored item (editable) and the expanded item (read-only) with no branching.
 

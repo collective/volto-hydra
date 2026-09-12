@@ -55,7 +55,6 @@ blocks-assignments:
   - { id: ref-separator-rendering-jsx-470901 }
   - { id: ref-separator-rendering-vue-4281a1 }
   - { id: ref-separator-rendering-svelte-8c1d19 }
-  - { id: ref-separator-rendering-astro-84f1fd }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -200,12 +199,6 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 ```{literalinclude} ../../../examples/examples/svelte/SeparatorBlock.svelte
 :language: svelte
-```
-
-### Astro
-
-```{literalinclude} ../../../examples/examples/astro/SeparatorBlock.astro
-:language: astro
 ```
 
 </block>

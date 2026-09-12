@@ -46,7 +46,6 @@ blocks-assignments:
   - { id: ref-table-rendering-jsx-ee1611 }
   - { id: ref-table-rendering-vue-570ccb }
   - { id: ref-table-rendering-svelte-de27fc }
-  - { id: ref-table-rendering-astro-a34e40 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -164,7 +163,8 @@ A table with rich text (Slate) content in each cell. Supports adding/removing ro
                       "schema": {
                         "properties": {
                           "value": {
-                            "widget": "slate"
+                            "widget": "slate",
+                            "type": "array"
                           }
                         }
                       }
@@ -279,12 +279,6 @@ A table with rich text (Slate) content in each cell. Supports adding/removing ro
 
 ```{literalinclude} ../../../examples/examples/svelte/TableBlock.svelte
 :language: svelte
-```
-
-### Astro
-
-```{literalinclude} ../../../examples/examples/astro/TableBlock.astro
-:language: astro
 ```
 
 </block>

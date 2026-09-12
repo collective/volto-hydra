@@ -4,6 +4,8 @@ A table with rich text (Slate) content in each cell. Supports adding/removing ro
 
 This is a **built-in** block (registered as `slateTable`).
 
+**Demonstrates:** [Table Mode](../container-blocks.md#table-mode) — uniform cells from `addMode` and `idField`.
+
 ## Schema
 
 ```json
@@ -29,7 +31,8 @@ This is a **built-in** block (registered as `slateTable`).
                       "schema": {
                         "properties": {
                           "value": {
-                            "widget": "slate"
+                            "widget": "slate",
+                            "type": "array"
                           }
                         }
                       }

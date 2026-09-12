@@ -4,6 +4,8 @@ A collapsible panel group. Each panel is an `object_list` item with a title and 
 
 This is a **custom** block — register it via `initBridge`.
 
+**Demonstrates:** [object_list: a region stored inline](../container-blocks.md#object_list-a-region-stored-inline) — each panel is an inline item holding its own region of child blocks.
+
 ## Schema
 
 ```json

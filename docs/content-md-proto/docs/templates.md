@@ -40,59 +40,72 @@ blocks-assignments:
   - { uid: p-12 }
   - { uid: ol-13 }
   - { uid: p-14 }
-  - { uid: ul-15 }
+  - { uid: ol-15 }
   - { uid: p-16 }
-  - { uid: h-17 }
+  - { uid: ol-17 }
   - { uid: p-18 }
-  - { uid: tbl-19 }
-  - { uid: p-20 }
-  - { uid: ul-21 }
-  - { uid: p-22 }
-  - { uid: h-23 }
-  - { uid: p-24 }
-  - { uid: ul-25 }
+  - { uid: p-19 }
+  - { uid: ul-20 }
+  - { uid: p-21 }
+  - { uid: ul-22 }
+  - { uid: p-23 }
+  - { uid: ul-24 }
+  - { uid: p-25 }
   - { uid: p-26 }
   - { uid: h-27 }
   - { uid: p-28 }
-  - { uid: ul-29 }
+  - { uid: tbl-29 }
   - { uid: p-30 }
-  - { uid: p-31 }
-  - { uid: ce-32 }
-  - { id: ce-32-javascript-403dc6 }
-  - { uid: p-33 }
-  - { uid: h-34 }
-  - { uid: p-35 }
-  - { uid: ce-36 }
-  - { id: ce-36-javascript-336b9b }
-  - { uid: ul-37 }
-  - { uid: h-38 }
-  - { uid: p-39 }
-  - { uid: ul-40 }
-  - { uid: p-41 }
-  - { uid: ul-42 }
-  - { uid: h-43 }
+  - { uid: ul-31 }
+  - { uid: p-32 }
+  - { uid: h-33 }
+  - { uid: p-34 }
+  - { uid: ul-35 }
+  - { uid: p-36 }
+  - { uid: h-37 }
+  - { uid: p-38 }
+  - { uid: ul-39 }
+  - { uid: p-40 }
+  - { uid: ul-41 }
+  - { uid: p-42 }
+  - { uid: p-43 }
   - { uid: p-44 }
   - { uid: ce-45 }
   - { id: ce-45-javascript-f2cdf9 }
   - { uid: p-46 }
-  - { uid: ul-47 }
-  - { uid: h-48 }
-  - { uid: p-49 }
-  - { uid: ol-50 }
-  - { uid: p-51 }
-  - { uid: ul-52 }
-  - { uid: ce-53 }
-  - { id: ce-53-bash-8d3958 }
-  - { uid: h-54 }
-  - { uid: p-55 }
-  - { uid: p-56 }
-  - { uid: ce-57 }
-  - { id: ce-57-javascript-4b24e8 }
-  - { uid: h-58 }
+  - { uid: h-47 }
+  - { uid: p-48 }
+  - { uid: ce-49 }
+  - { id: ce-49-javascript-801e51 }
+  - { uid: ul-50 }
+  - { uid: h-51 }
+  - { uid: p-52 }
+  - { uid: ul-53 }
+  - { uid: p-54 }
+  - { uid: ul-55 }
+  - { uid: h-56 }
+  - { uid: p-57 }
+  - { uid: ce-58 }
+  - { id: ce-58-javascript-6f7634 }
   - { uid: p-59 }
-  - { uid: ce-60 }
-  - { id: ce-60-javascript-0dbe99 }
-  - { uid: p-61 }
+  - { uid: ul-60 }
+  - { uid: h-61 }
+  - { uid: p-62 }
+  - { uid: ol-63 }
+  - { uid: p-64 }
+  - { uid: ul-65 }
+  - { uid: ce-66 }
+  - { id: ce-66-bash-6e903d }
+  - { uid: h-67 }
+  - { uid: p-68 }
+  - { uid: p-69 }
+  - { uid: ce-70 }
+  - { id: ce-70-javascript-401b70 }
+  - { uid: h-71 }
+  - { uid: p-72 }
+  - { uid: ce-73 }
+  - { id: ce-73-javascript-b37117 }
+  - { uid: p-74 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -158,15 +171,31 @@ The point of a template is that its locked parts are authored **once** and updat
 
 To change a template for every page that uses it:
 
-1. On a page using the template, toggle **template edit mode** (the `editTemplate` control on the block).
-2. Edit the `fixed` / `fixed+readOnly` blocks — in template edit mode these become editable; normally they're locked.
-3. Save. The edits are written **back into the template document**, so every page that uses that template shows the change on its next render.
+1. On a page using the template, toggle **template edit mode** (the `editTemplate`
+
+control on the block).
+
+1. Edit the `fixed` / `fixed+readOnly` blocks — in template edit mode these become
+
+editable; normally they're locked.
+
+1. Save. The edits are written **back into the template document**, so every page that
+
+uses that template shows the change on its next render.
 
 What propagates and what doesn't:
 
-- **`fixed` / `fixed+readOnly` blocks edited in template edit mode** → propagate to all pages using the template (template-controlled).
-- **Slot content** (blocks editors add into a slot) is **per-page** — it lives on the page and is never written back to the template.
-- Editing a `fixed` block's content in *normal* mode overrides it for **that page only**; the template's version stays the default for other pages.
+- **\`fixed\` / \`fixed+readOnly\` blocks edited in template edit mode** → propagate to all
+
+pages using the template (template-controlled).
+
+- **Slot content** (blocks editors add into a slot) is **per-page** — it lives on the page
+
+and is never written back to the template.
+
+- Editing a `fixed` block's content in *normal* mode overrides it for **that page only**;
+
+the template's version stays the default for other pages.
 
 **Reusing a template multiple times:** a page may apply the same template more than once (e.g. two of the same layout or snippet). Each use is a distinct *instance*; the merge gives every instance its own block ids, so they never collide.
 
@@ -178,16 +207,16 @@ The two configurations below look similar but solve different problems. Pick by 
 
 | You want… | Use | How it's applied |
 | --- | --- | --- |
-| A reusable snippet the editor **inserts** where they choose — e.g. a contact CTA reused across many pages | **`allowedTemplates`** | Offered in the BlockChooser's "Templates" group and inserted **as a block** (the block carries `templateId`). |
-| A layout **forced across an entire field/region** — a branded header/footer, or a mandated page structure | **`allowedLayouts`** | Applied across the whole blocks field; the field's content is merged into the layout's slots. The editor can't restructure it. |
-| To let the editor **choose** between a few layouts | **`allowedLayouts`** (several, optionally `null`) | Offered in the Layout dropdown; `null` = "no layout". |
+| A reusable snippet the editor **inserts** where they choose — e.g. a contact CTA reused across many pages | **\`allowedTemplates\`** | Offered in the BlockChooser's "Templates" group and inserted **as a block** (the block carries `templateId`). |
+| A layout **forced across an entire field/region** — a branded header/footer, or a mandated page structure | **\`allowedLayouts\`** | Applied across the whole blocks field; the field's content is merged into the layout's slots. The editor can't restructure it. |
+| To let the editor **choose** between a few layouts | **\`allowedLayouts\`** (several, optionally `null`) | Offered in the Layout dropdown; `null` = "no layout". |
 
 </block>
 
-A **branded header/footer is the canonical `allowedLayouts` case**, *not* `allowedTemplates`: don't make the footer a `templateId` block the editor inserts — force a layout across the footer field. Within that layout, each block declares how locked it is:
+A **branded header/footer is the canonical \`allowedLayouts\` case**, *not* `allowedTemplates`: don't make the footer a `templateId` block the editor inserts — force a layout across the footer field. Within that layout, each block declares how locked it is:
 
-- **`fixed: true, readOnly: true`** — can't be edited or moved (logo, branded chrome).
-- **`fixed: true`** — content-editable but not movable (a required section).
+- **\`fixed: true, readOnly: true\`** — can't be edited or moved (logo, branded chrome).
+- **\`fixed: true\`** — content-editable but not movable (a required section).
 - **slot** (`fixed` unset, with `slotId`) — a region where editors add their own blocks; the `"default"` slot receives leftover content.
 
 For a fully-fixed branded footer, leave the blocks **field empty** (`{items: []}`) and let the layout content item supply everything — then editing the layout updates every page.
@@ -205,12 +234,17 @@ So a branded footer is, end to end: a `columns` block (`slotId`, `fixed`, `readO
 
 A container lays out its children one of two ways, and the merge treats **both the same** — as an ordered region of child blocks:
 
-- **`blocks_layout`** (columns, grid): children live in the block's shared `blocks` map, ordered by a `blocks_layout` region (as above).
-- **`object_list`** (a slider's slides, a table's rows): children are an **inline array** of block objects, each identified by an **id field** (`@id` by default).
+- **\`blocks\_layout\`** (columns, grid): children live in the block's shared `blocks` map,
+
+ordered by a `blocks_layout` region (as above).
+
+- **\`object\_list\`** (a slider's slides, a table's rows): children are an **inline array**
+
+of block objects, each identified by an **id field** (`@id` by default).
 
 Everything else is identical: every object\_list item still needs a `slotId` (plus `templateId` / `fixed` / `readOnly` as appropriate), and a slot item fills from the page's content just like a `blocks_layout` slot.
 
-The merge identifies object\_list items by their **id field**, and it varies per field — a form's `subblocks` key on `field_id`, a slider's `slides` on `@id`, a table's `rows` on `key`. A frontend has no schema, so whenever you expand a template or layout that contains an object\_list container you MUST tell the merge each field's id field via an **`idFieldMap`** (`{ blockType: { field: idField } }`). Without it the merge falls back to `@id` — and for a `field_id`-keyed field that mints a broken id and the item is dropped on the next merge.
+The merge identifies object\_list items by their **id field**, and it varies per field — a form's `subblocks` key on `field_id`, a slider's `slides` on `@id`, a table's `rows` on `key`. A frontend has no schema, so whenever you expand a template or layout that contains an object\_list container you MUST tell the merge each field's id field via an **\`idFieldMap\`** (`{ blockType: { field: idField } }`). Without it the merge falls back to `@id` — and for a `field_id`-keyed field that mints a broken id and the item is dropped on the next merge.
 
 ### Javascript
 
@@ -247,8 +281,8 @@ initBridge({
 });
 ```
 
-- **`allowedTemplates`** — Templates shown in the BlockChooser's "Templates" group, inserted as blocks.
-- **`allowedLayouts`** — Templates shown in the Layout dropdown. They replace/merge the entire container content. A value of `null` allows for a no-template option. If none of those templates are already set as the layout then during editing, the first is applied automatically.
+- **\`allowedTemplates\`** — Templates shown in the BlockChooser's "Templates" group, inserted as blocks.
+- **\`allowedLayouts\`** — Templates shown in the Layout dropdown. They replace/merge the entire container content. A value of `null` allows for a no-template option. If none of those templates are already set as the layout then during editing, the first is applied automatically.
 
 ## Applying Merge Rules
 
@@ -259,12 +293,12 @@ Use `expandTemplates` (async) or `expandTemplatesSync` (sync with pre-fetched te
 
 **Sync vs Async**:
 
-- **`expandTemplatesSync`** — Use when templates are pre-fetched at page load. Better for Vue computed properties since it's synchronous.
-- **`expandTemplates`** — Use when you need to lazy-load templates on demand. Handles on-demand loading of forced layouts not in page data.
+- **\`expandTemplatesSync\`** — Use when templates are pre-fetched at page load. Better for Vue computed properties since it's synchronous.
+- **\`expandTemplates\`** — Use when you need to lazy-load templates on demand. Handles on-demand loading of forced layouts not in page data.
 
 ## Pre-loading with loadTemplates
 
-**`loadTemplates(data, loadTemplate)`** scans page data for `templateId` references and loads them all in parallel. It follows nested references (templates referencing other templates) and has a 5s per-template timeout. It only loads templates actually in the page data — `allowedLayouts` options are loaded on demand when a forced layout is applied.
+**\`loadTemplates(data, loadTemplate)\`** scans page data for `templateId` references and loads them all in parallel. It follows nested references (templates referencing other templates) and has a 5s per-template timeout. It only loads templates actually in the page data — `allowedLayouts` options are loaded on demand when a forced layout is applied.
 
 ### Javascript
 
@@ -301,11 +335,11 @@ for (const item of items) {
 
 Options:
 
-- **`blocks`**: Map of blockId -> block data
-- **`templateState`**: Create a fresh `{}` **once per page render** and share it across **every** `expandTemplatesSync`/`expandTemplates` call — top-level and every nested container / object\_list re-entry. It records the template instances minted this render so a re-entry is recognized as already-expanded content and passed through. **Never reset or recreate it mid-render** (e.g. don't `templateState = {}` again before rendering, and don't pass a fresh `{}` per call): wiping it drops the minted instances, so re-entries re-apply the template instead of passing through — infinite recursion / blank page. Recognition is **data-derived** (by `templateInstanceId`), so it is safe to hand blocks back as a Vue reactive value, a clone, or a `postMessage` copy — no `toRaw` needed. (In Vue/React, provide it once at the page root via provide/inject or context; see `examples/nuxt-blog-starter` and `examples/hydra-nextjs`.)
-- **`templates`**: (sync only) Pre-fetched map of templateId -> template data
-- **`loadTemplate(id)`**: (async only) Function to fetch template content
-- **`allowedLayouts`**: Force a layout when container has no template applied
+- **\`blocks\`**: Map of blockId -> block data
+- **\`templateState\`**: Create a fresh `{}` **once per page render** and share it across **every** `expandTemplatesSync`/`expandTemplates` call — top-level and every nested container / object\_list re-entry. It records the template instances minted this render so a re-entry is recognized as already-expanded content and passed through. **Never reset or recreate it mid-render** (e.g. don't `templateState = {}` again before rendering, and don't pass a fresh `{}` per call): wiping it drops the minted instances, so re-entries re-apply the template instead of passing through — infinite recursion / blank page. Recognition is **data-derived** (by `templateInstanceId`), so it is safe to hand blocks back as a Vue reactive value, a clone, or a `postMessage` copy — no `toRaw` needed. (In Vue/React, provide it once at the page root via provide/inject or context; see `examples/nuxt-blog-starter` and `examples/hydra-nextjs`.)
+- **\`templates\`**: (sync only) Pre-fetched map of templateId -> template data
+- **\`loadTemplate(id)\`**: (async only) Function to fetch template content
+- **\`allowedLayouts\`**: Force a layout when container has no template applied
 
 ## How the Merge Works
 

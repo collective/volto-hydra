@@ -35,7 +35,6 @@ blocks-assignments:
   - { id: ref-form-rendering-jsx-29590c }
   - { id: ref-form-rendering-vue-3f1bde }
   - { id: ref-form-rendering-svelte-f8f39b }
-  - { id: ref-form-rendering-astro-8cd3ec }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -58,7 +57,7 @@ A multi-field form with configurable field types, validation, and email submissi
 
 </block>
 
-<block type="form" default_from="noreply@plone.org" title="A simple form" data-json='{"lastChange":1710238630312,"remove_data_after_days":-1,"send":false,"show_cancel":false,"store":true,"subblocks":[{"field_id":"1709833577467","field_type":"text","id":"1709833577467","label":"Name","required":true},{"field_id":"1709833592544","field_type":"from","id":"1709833592544","label":"Email","required":false,"use_as_bcc":false,"use_as_reply_to":false},{"field_id":"1709833604677","field_type":"textarea","id":"1709833604677","label":"Message","required":false},{"field_id":"1709833616406","field_type":"multiple_choice","id":"1709833616406","input_values":["Red","Green","Blue"],"label":"Select field","required":false}]}' />
+<block type="form" default_from="noreply@plone.org" title="A simple form" default_to="admin@example.com" default_subject="New form submission" captcha="honeypot" data-json='{"lastChange":1710238630312,"remove_data_after_days":-1,"send_email":true,"show_cancel":false,"store":true,"subblocks":[{"field_id":"1709833577467","field_type":"text","id":"1709833577467","label":"Name","required":true},{"field_id":"1709833592544","field_type":"from","id":"1709833592544","label":"Email","required":false,"use_as_bcc":false,"use_as_reply_to":false},{"field_id":"1709833604677","field_type":"textarea","id":"1709833604677","label":"Message","required":false},{"field_id":"1709833616406","field_type":"multiple_choice","id":"1709833616406","input_values":["Red","Green","Blue"],"label":"Select field","required":false}]}' />
 
 <block type="slate" data-json='{"value":[{"children":[{"text":""}],"type":"p"}]}' />
 
@@ -201,6 +200,33 @@ A multi-field form with configurable field types, validation, and email submissi
           "title": "Required",
           "type": "boolean",
           "default": false
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -226,6 +252,33 @@ A multi-field form with configurable field types, validation, and email submissi
           "title": "Required",
           "type": "boolean",
           "default": false
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -251,6 +304,33 @@ A multi-field form with configurable field types, validation, and email submissi
           "title": "Required",
           "type": "boolean",
           "default": false
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -311,7 +391,8 @@ A multi-field form with configurable field types, validation, and email submissi
         "label": "label",
         "description": "description",
         "required": "required"
-      }
+      },
+      "select": {}
     },
     "blockSchema": {
       "properties": {
@@ -320,6 +401,12 @@ A multi-field form with configurable field types, validation, and email submissi
         },
         "description": {
           "title": "Description"
+        },
+        "options_from": {
+          "title": "Options from",
+          "description": "A vocabulary this site keeps. Leave empty to write the options out below.",
+          "type": "string",
+          "widget": "vocabularySelect"
         },
         "input_values": {
           "title": "Possible values",
@@ -330,6 +417,41 @@ A multi-field form with configurable field types, validation, and email submissi
           "title": "Required",
           "type": "boolean",
           "default": false
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "input_values": {
+          "when": {
+            "options_from": {
+              "isNotSet": true
+            }
+          },
+          "else": false
+        },
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -361,6 +483,33 @@ A multi-field form with configurable field types, validation, and email submissi
           "title": "Required",
           "type": "boolean",
           "default": false
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -392,6 +541,33 @@ A multi-field form with configurable field types, validation, and email submissi
           "title": "Required",
           "type": "boolean",
           "default": false
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -417,6 +593,33 @@ A multi-field form with configurable field types, validation, and email submissi
           "title": "Required",
           "type": "boolean",
           "default": false
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -442,6 +645,33 @@ A multi-field form with configurable field types, validation, and email submissi
           "title": "Required",
           "type": "boolean",
           "default": false
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -477,6 +707,33 @@ A multi-field form with configurable field types, validation, and email submissi
           "title": "Required",
           "type": "boolean",
           "default": false
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -496,6 +753,33 @@ A multi-field form with configurable field types, validation, and email submissi
         },
         "description": {
           "title": "Description"
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -517,6 +801,33 @@ A multi-field form with configurable field types, validation, and email submissi
         },
         "value": {
           "title": "Value for field"
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -542,6 +853,33 @@ A multi-field form with configurable field types, validation, and email submissi
           "title": "Required",
           "type": "boolean",
           "default": false
+        },
+        "show_when_field": {
+          "title": "Only show when",
+          "description": "An earlier question in this form. Leave empty to always show this one.",
+          "type": "string",
+          "widget": "blockPicker",
+          "scope": "subblocks",
+          "direction": "before",
+          "valueField": "field_id",
+          "labelField": "label",
+          "emptyLabel": "— always show —"
+        },
+        "show_when_is": {
+          "title": "…answers",
+          "type": "string"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "fieldRules": {
+        "show_when_is": {
+          "when": {
+            "show_when_field": {
+              "isNotSet": true
+            }
+          },
+          "else": false
         }
       }
     }
@@ -585,12 +923,8 @@ A multi-field form with configurable field types, validation, and email submissi
       "field_id": "department",
       "field_type": "select",
       "label": "Department",
-      "input_values": [
-        "Sales",
-        "Support",
-        "General"
-      ],
-      "required": false
+      "required": false,
+      "options_from": "plone.app.vocabularies.Keywords"
     },
     {
       "@id": "field-4",
@@ -598,6 +932,15 @@ A multi-field form with configurable field types, validation, and email submissi
       "field_type": "textarea",
       "label": "Message",
       "required": true
+    },
+    {
+      "@id": "field-5",
+      "field_id": "order_number",
+      "field_type": "text",
+      "label": "Order number",
+      "show_when_field": "department",
+      "show_when_is": "Sales",
+      "required": false
     }
   ]
 }
@@ -623,12 +966,6 @@ A multi-field form with configurable field types, validation, and email submissi
 
 ```{literalinclude} ../../../examples/examples/svelte/FormBlock.svelte
 :language: svelte
-```
-
-### Astro
-
-```{literalinclude} ../../../examples/examples/astro/FormBlock.astro
-:language: astro
 ```
 
 </block>

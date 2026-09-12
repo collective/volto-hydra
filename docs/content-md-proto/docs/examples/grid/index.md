@@ -44,7 +44,6 @@ blocks-assignments:
   - { id: ref-grid-rendering-jsx-f30d80 }
   - { id: ref-grid-rendering-vue-1d61ab }
   - { id: ref-grid-rendering-svelte-8158ec }
-  - { id: ref-grid-rendering-astro-f8f4db }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -145,12 +144,6 @@ A responsive grid that lays out child blocks in equal-width cells. The block use
 
 ```{literalinclude} ../../../../examples/examples/svelte/GridBlock.svelte
 :language: svelte
-```
-
-### Astro
-
-```{literalinclude} ../../../../examples/examples/astro/GridBlock.astro
-:language: astro
 ```
 
 </block>

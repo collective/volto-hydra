@@ -36,88 +36,131 @@ blocks-assignments:
   - { uid: ce-8 }
   - { id: ce-8-javascript-d2f77e }
   - { uid: p-9 }
-  - { uid: bq-10 }
-  - { uid: h-11 }
-  - { uid: p-12 }
+  - { uid: p-10 }
+  - { uid: p-11 }
+  - { uid: h-12 }
   - { uid: p-13 }
-  - { uid: ce-14 }
-  - { id: ce-14-javascript-3ea062 }
-  - { uid: p-15 }
-  - { uid: h-16 }
+  - { uid: p-14 }
+  - { uid: ce-15 }
+  - { id: ce-15-javascript-27c677 }
+  - { uid: p-16 }
   - { uid: p-17 }
-  - { uid: p-18 }
-  - { uid: h-19 }
+  - { uid: h-18 }
+  - { uid: p-19 }
   - { uid: p-20 }
-  - { uid: ce-21 }
-  - { id: ce-21-javascript-83a0dc }
-  - { uid: h-22 }
-  - { uid: p-23 }
-  - { uid: ce-24 }
-  - { id: ce-24-javascript-6781ed }
-  - { uid: p-25 }
-  - { uid: h-26 }
-  - { uid: p-27 }
+  - { uid: h-21 }
+  - { uid: p-22 }
+  - { uid: ce-23 }
+  - { id: ce-23-javascript-ac66cd }
+  - { uid: p-24 }
+  - { uid: h-25 }
+  - { uid: p-26 }
+  - { uid: ce-27 }
+  - { id: ce-27-javascript-8bc3be }
   - { uid: p-28 }
-  - { uid: ce-29 }
-  - { id: ce-29-javascript-dd9f7e }
-  - { uid: p-30 }
-  - { uid: ce-31 }
-  - { id: ce-31-javascript-f90eb4 }
-  - { uid: p-32 }
+  - { uid: p-29 }
+  - { uid: h-30 }
+  - { uid: p-31 }
+  - { uid: h-32 }
   - { uid: p-33 }
-  - { uid: p-34 }
-  - { uid: h-35 }
-  - { uid: p-36 }
-  - { uid: tbl-37 }
-  - { uid: p-38 }
-  - { uid: h-39 }
-  - { uid: p-40 }
-  - { uid: ce-41 }
-  - { id: ce-41-javascript-85a3e1 }
-  - { uid: ul-42 }
-  - { uid: h-43 }
+  - { uid: h-34 }
+  - { uid: p-35 }
+  - { uid: ul-36 }
+  - { uid: p-37 }
+  - { uid: ul-38 }
+  - { uid: p-39 }
+  - { uid: h-40 }
+  - { uid: p-41 }
+  - { uid: ce-42 }
+  - { id: ce-42-javascript-f75197 }
+  - { uid: p-43 }
   - { uid: p-44 }
-  - { uid: ce-45 }
-  - { id: ce-45-javascript-1cff8e }
-  - { uid: h-46 }
-  - { uid: p-47 }
-  - { uid: ul-48 }
-  - { uid: p-49 }
+  - { uid: h-45 }
+  - { uid: p-46 }
+  - { uid: ce-47 }
+  - { id: ce-47-javascript-6c6b84 }
+  - { uid: p-48 }
+  - { uid: h-49 }
   - { uid: p-50 }
-  - { uid: h-51 }
+  - { uid: ce-51 }
+  - { id: ce-51-javascript-cf4319 }
   - { uid: p-52 }
-  - { uid: ce-53 }
-  - { id: ce-53-javascript-f4d972 }
-  - { uid: p-54 }
-  - { uid: ul-55 }
+  - { uid: p-53 }
+  - { uid: h-54 }
+  - { uid: p-55 }
   - { uid: p-56 }
-  - { uid: p-57 }
-  - { uid: h-58 }
-  - { uid: p-59 }
+  - { uid: ce-57 }
+  - { id: ce-57-javascript-c317bb }
+  - { uid: p-58 }
+  - { uid: ce-59 }
+  - { id: ce-59-javascript-c2c5ff }
   - { uid: p-60 }
   - { uid: p-61 }
-  - { uid: ce-62 }
-  - { id: ce-62-javascript-4ebff8 }
-  - { uid: p-63 }
-  - { uid: ul-64 }
-  - { uid: h-65 }
+  - { uid: p-62 }
+  - { uid: h-63 }
+  - { uid: p-64 }
+  - { uid: tbl-65 }
   - { uid: p-66 }
-  - { uid: p-67 }
-  - { uid: ce-68 }
-  - { id: ce-68-javascript-cdad0c }
-  - { uid: p-69 }
-  - { uid: h-70 }
+  - { uid: h-67 }
+  - { uid: p-68 }
+  - { uid: ce-69 }
+  - { id: ce-69-html-a372bd }
+  - { uid: ul-70 }
   - { uid: p-71 }
-  - { uid: ce-72 }
-  - { id: ce-72-javascript-521655 }
+  - { uid: ul-72 }
   - { uid: p-73 }
-  - { uid: ol-74 }
-  - { uid: p-75 }
-  - { uid: ce-76 }
-  - { id: ce-76-javascript-6b52c5 }
+  - { uid: p-74 }
+  - { uid: ul-75 }
+  - { uid: h-76 }
   - { uid: p-77 }
-  - { uid: h-78 }
-  - { uid: ul-79 }
+  - { uid: ce-78 }
+  - { id: ce-78-javascript-d9e54d }
+  - { uid: p-79 }
+  - { uid: h-80 }
+  - { uid: p-81 }
+  - { uid: ul-82 }
+  - { uid: p-83 }
+  - { uid: p-84 }
+  - { uid: h-85 }
+  - { uid: p-86 }
+  - { uid: ce-87 }
+  - { id: ce-87-javascript-45f8b0 }
+  - { uid: p-88 }
+  - { uid: ul-89 }
+  - { uid: p-90 }
+  - { uid: ul-91 }
+  - { uid: p-92 }
+  - { uid: ul-93 }
+  - { uid: p-94 }
+  - { uid: p-95 }
+  - { uid: p-96 }
+  - { uid: h-97 }
+  - { uid: p-98 }
+  - { uid: p-99 }
+  - { uid: p-100 }
+  - { uid: ce-101 }
+  - { id: ce-101-javascript-1e39e3 }
+  - { uid: p-102 }
+  - { uid: ul-103 }
+  - { uid: h-104 }
+  - { uid: p-105 }
+  - { uid: p-106 }
+  - { uid: ce-107 }
+  - { id: ce-107-javascript-49b19e }
+  - { uid: p-108 }
+  - { uid: h-109 }
+  - { uid: p-110 }
+  - { uid: ce-111 }
+  - { id: ce-111-javascript-84c084 }
+  - { uid: p-112 }
+  - { uid: ol-113 }
+  - { uid: p-114 }
+  - { uid: ce-115 }
+  - { id: ce-115-javascript-8ed4cb }
+  - { uid: p-116 }
+  - { uid: h-117 }
+  - { uid: ul-118 }
+  - { uid: p-119 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -145,8 +188,8 @@ A block — or the page itself — is divided into **regions**, and each region 
 
 You declare regions in your `blockSchema` (or the page schema), and **you choose how each region is stored in the JSON**:
 
-- **`blocks_layout`** — the region's *ordering* is a named list inside the parent's shared `blocks_layout` dict, and the blocks themselves live in the parent's shared `blocks` dict. This is the default, and it's what persists through the backend (see [Why these persist](#why-these-persist-and-separate-top-level-fields-dont)).
-- **`object_list`** — the region is stored inline, as an array of objects on the field itself.
+- **\`blocks\_layout\`** — the region's *ordering* is a named list inside the parent's shared `blocks_layout` dict, and the blocks themselves live in the parent's shared `blocks` dict. This is the default, and it's what persists through the backend (see [Why these persist](#why-these-persist-and-separate-top-level-fields-dont)).
+- **\`object\_list\`** — the region is stored inline, as an array of objects on the field itself.
 
 Both look and behave the same in the editor — selecting, dragging, nesting — and blocks can be dragged from one to the other; only the JSON storage differs.
 
@@ -181,7 +224,9 @@ slides: {
 
 A block can declare several `blocks_layout` regions; they all share the one `blocks` dict, and each region gets its own list under `blocks_layout`.
 
-> **The region name is a key inside `blocks_layout` — not a top-level field.** The ordering list lives at `blocks_layout.<region>` (a plain array of ids). A tempting mistake is to store it as a top-level field named after the region:  \<!-- codeExample: json --> ``json // ✅ CORRECT — ordering keyed inside the shared blocks_layout dict { "@type": "slider", "blocks": { … }, "blocks_layout": { "slides": ["slide-1", "slide-2"] } }  // ❌ WRONG — an ad-hoc top-level `slides` field holding { items: [...] } { "@type": "slider", "blocks": { … }, "slides": { "items": ["slide-1", "slide-2"] } } ``  The wrong form may *look* fine in a frontend that reads it back the same way, but `slides` is **not a registered field**, so the backend **silently drops it on save** (see [Why these persist](#why-these-persist-and-separate-top-level-fields-dont)) — and tools that walk the shared dict (the block path map, the sanity checks, the editor's reorder/drag) never see the region, because they look under `blocks_layout`, never at a field named for the region. Renderers must read the ordering from `blocks_layout[<region>]`, not from `<region>.items`.
+\> **The region name is a key inside \`blocks\_layout\` — not a top-level field.** The > ordering list lives at `blocks_layout.<region>` (a plain array of ids). A tempting > mistake is to store it as a top-level field named after the region: > > \<!-- codeExample: json --> > \`\``json > // ✅ CORRECT — ordering keyed inside the shared blocks_layout dict > { "@type": "slider", "blocks": { … }, "blocks_layout": { "slides": ["slide-1", "slide-2"] } } > > // ❌ WRONG — an ad-hoc top-level `slides`  field holding { items: [...] } > { "@type": "slider", "blocks": { … }, "slides": { "items": ["slide-1", "slide-2"] } } >  `\``  > > The wrong form may *look* fine in a frontend that reads it back the same way, but >  `slides`  is **not a registered field**, so the backend **silently drops it on save** > (see [Why these persist](#why-these-persist-and-separate-top-level-fields-dont)) — > and tools that walk the shared dict (the block path map, the sanity checks, the > editor's reorder/drag) never see the region, because they look under >  `blocks\_layout`, never at a field named for the region. Renderers must read the > ordering from `blocks\_layout\[\<region>]`, not from `\<region>.items\`.
+
+**Worked examples:** [Grid Block](/docs/examples/grid) — one region of free children, narrowed by `allowedBlocks`; [Columns Block](/docs/examples/columns) — a `columns` region whose children are themselves regions.
 
 ## Multiple regions
 
@@ -216,11 +261,86 @@ properties: {
 
 Each blocks field has its own `allowedBlocks` / `maxLength`. A declared field appears in the editor even when empty (it gets a seeded empty block so it is editable and a drop target).
 
+**Worked example:** [Search Block](/docs/examples/search) — facets in one region and results in another, on the same block.
+
 ### Why these persist (and separate top-level fields don't)
 
-`blocks_layout` regions live as **keys inside the registered `blocks_layout` dict** rather than as separate top-level fields (the older `header_blocks` / `footer_blocks` style) for one concrete reason: **persistence**.
+`blocks_layout` regions live as **keys inside the registered \`blocks\_layout\` dict** rather than as separate top-level fields (the older `header_blocks` / `footer_blocks` style) for one concrete reason: **persistence**.
 
 The backend deserializer only saves values for **registered fields**. `blocks` and `blocks_layout` are registered behavior fields, so the entire `blocks_layout` dict — every list inside it — is stored verbatim. An ad-hoc top-level field like `footer_blocks` is **not** a registered field, so the backend **silently drops it on save**. (A footer might still appear on the live site if a layout template re-injects it on every load — but that footer is never actually persisted.) Keeping every region inside the registered `blocks_layout` dict makes them all persist for real.
+
+## Restricting slate styles per region
+
+A region can also declare which **slate styles** its text may carry — the same idea as `allowedBlocks`, one level down. Four optional keys, all lists of slate element `type` values:
+
+### Javascript
+
+```javascript
+properties: {
+    items: {
+        widget: 'blocks_layout',
+        allowedBlocks: ['slate', 'image'],
+        allowedStyles: ['p', 'h2', 'h3', 'ul', 'ol', 'li', 'strong', 'em'],
+        disallowedStyles: ['blockquote'],
+        // Leaf marks, for plugins that use Editor.addMark. Rarely needed.
+        allowedMarks: null,
+        disallowedMarks: ['highlight'],
+    },
+}
+```
+
+`allowedStyles` names element types, which covers block-level formats (`p`, `h2`, `ul`, `li`) **and** inline ones — volto-slate models bold and italic as inline *elements* (`strong`, `em`, `del`, `sub`, `sup`, `u`, `code`), so one list matches what the toolbar actually toggles. `link` is structural rather than styling and is never restrictable: dropping it would lose an href.
+
+### A design system's own styles
+
+The style menu's entries are named by their CSS class with a **leading dot** — `.nsw-small`, the shape `getSlateVocabulary` reports them under, so a class called `p` cannot collide with the element type `p`:
+
+### Javascript
+
+```javascript
+properties: {
+    items: { widget: 'blocks_layout', disallowedStyles: ['.nsw-small'] },
+    footer: { widget: 'blocks_layout' },   // still offers it
+}
+```
+
+They need their own key because volto-slate does not retype the node for them: `toggleBlockStyleInSelection` writes `styleName: "nsw-small"` (space separated when several apply), beside a `type` that stays `p`. A disallowed one is **stripped** rather than retyped — the paragraph was always a paragraph, it was only wearing a style this region does not offer — and the style dropdown stops offering it, which is the surface an author applies it from.
+
+Declaring nothing leaves every style available, so this changes nothing for a frontend that doesn't opt in.
+
+### It applies everywhere, not just the toolbar
+
+Hiding a toolbar button is cosmetic — the format still arrives by paste, by hotkey, or by a markdown shortcut. A declaration here is enforced at all of them: the block-format dropdown, `Ctrl+B`-style hotkeys, the `>`-space markdown shortcuts, paste (the pasted HTML is normalized before it becomes blocks), and the stored value itself, which is normalized when the editor loads the page. Anything the load pass would rewrite is also logged to the console, so a migration shows up while editing rather than as a surprise diff on the next save.
+
+### There is no global level, and no per-field level
+
+The page's own blocks fields — declared on the `_page` schema — are the outermost regions, so declaring there **is** the site-wide default. And every slate value belongs to a block, and every block to a region, so a region declaration already reaches a block's own slate fields (a teaser's `description`, a table cell) without a per-field key.
+
+### Inheritance: deny accumulates, allow replaces
+
+Rules fold from the outermost region inwards:
+
+- **\`disallowedStyles\` accumulates.** A style banned at the page level stays
+
+banned for everything nested inside it — a child region cannot re-enable it by   listing it in `allowedStyles`.
+
+- **\`allowedStyles\` replaces.** A nested region restates the list for its own
+
+subtree, and may deliberately widen it — an article region can allow `h4` even   when the page's default list stops at `h3`.
+
+### What a disallowed style becomes
+
+`config.settings.slate.styleAliases` maps a style to what it should become. It is a rename, not a permission — one global map, because a downgrade target has to be valid wherever the downgrade lands:
+
+### Javascript
+
+```javascript
+config.settings.slate.styleAliases = { b: 'strong', i: 'em', blockquote: 'p' };
+```
+
+With no alias, a top-level node becomes `config.settings.slate.defaultBlockType` (`p`), and an inline one is unwrapped — its text stays, without the formatting. Nothing is ever deleted.
+
+A downgrade never changes how many top-level nodes a slate field holds, because [a field always holds exactly one](/docs/visual-editing#one-top-level-node-per-slate-field) and renderers are told they may assume it. So a denied *wrapper* collapses rather than splitting: denying `ul` turns `ul > li, li` into a single paragraph holding both items' content, not two paragraphs. Inline children survive the collapse — a `strong` inside a denied `blockquote` is still bold afterwards.
 
 ## object\_list: a region stored inline
 
@@ -253,6 +373,8 @@ slides: {
 }
 ```
 
+**Worked examples:** [Accordion Block](/docs/examples/accordion) — each panel an inline item holding its own region of child blocks; [Slider Block](/docs/examples/slider) — slides as inline items with fields of their own.
+
 ## object\_list with allowedBlocks: Typed Items
 
 When `allowedBlocks` is set on an `object_list`, items can have different types (like `blocks_layout`) but are still stored as an array. Each item's type is stored in the field specified by `typeField` (defaults to `'@type'`) and its schema is looked up from `blocks`:
@@ -282,11 +404,13 @@ facets: {
 
 Both `blocks_layout` and `object_list` look the same in the editing UI and blocks can be dragged between them — data is automatically adapted when moving between formats (ID fields added/stripped, type fields set appropriately).
 
+**Worked example:** [Form Block](/docs/examples/form) — one item type per kind of field, chosen by `field_type`.
+
 ## widget: 'object': nesting fields (and containers) inside a block field
 
 A `widget: 'object'` field groups sub-fields under one key. Its `schema.properties` are first-class — plain fields OR nested containers — and everything nests **inside** the object, exactly where the schema puts it. No `dataPath` indirection.
 
-An **`object_list`** inside an object stores its array at `object.<field>`:
+An **\`object\_list\`** inside an object stores its array at `object.<field>`:
 
 ### Javascript
 
@@ -303,7 +427,7 @@ table: {
 { "@type": "slateTable", "table": { "rows": [ { "key": "r1", "cells": [ /* … */ ] } ] } }
 ```
 
-A **`blocks_layout`** inside an object makes the object its own mini-container: it holds its own `blocks` dict + `blocks_layout`, just like a columns/grid container block, one level deeper:
+A **\`blocks\_layout\`** inside an object makes the object its own mini-container: it holds its own `blocks` dict + `blocks_layout`, just like a columns/grid container block, one level deeper:
 
 ### Javascript
 
@@ -316,7 +440,7 @@ table: { widget: 'object', schema: { properties: {
   "table": { "blocks": { "b1": { /* … */ } }, "blocks_layout": { "body": ["b1"] } } }
 ```
 
-A **plain field** inside an object is edited in the canvas like any top-level field — address it inline with its `/`-path (`data-edit-text="content/headline"`, and the same for `data-edit-link` / `data-edit-media`). The object is *transparent*: `content/headline` writes back to `block.content.headline`, never a flat key. See [Field Path Syntax](visual-editing.md#field-path-syntax) for the full grammar (`/` object descent, `..` = parent block, `/field` = page).
+A **plain field** inside an object is edited in the canvas like any top-level field — address it inline with its `/`-path (`data-edit-text="content/headline"`, and the same for `data-edit-link` / `data-edit-media`). The object is *transparent*: `content/headline` writes back to `block.content.headline`, never a flat key. See [Field Path Syntax](/docs/visual-editing#field-path-syntax) for the full grammar (`/` object descent, `..` = parent block, `/field` = page).
 
 Blocks inside a nested container are edited in the canvas like any other container. The sidebar prefixes a nested container's **title** with the path (e.g. **Table / Rows**) so the nesting is visible.
 
@@ -324,13 +448,13 @@ This replaces `dataPath`: declare the container inside the object rather than ho
 
 ## Container schema reference
 
-A block's schema is a standard [Volto block schema](https://6.docs.plone.org/volto/blocks/editcomponent.html) (fieldsets, `properties`, widgets, `default`, etc.). Inka reads three container-oriented `widget` values plus a few per-field keys — those are:
+A block's schema is a standard [Volto block schema](https://6.docs.plone.org/volto/blocks/editcomponent.html) (fieldsets, `properties`, widgets, `default`, etc.). Hydra reads three container-oriented `widget` values plus a few per-field keys — those are:
 
 <block type="slateTable" table.fixed table.celled>
 
 | `widget` | Storage | Key fields |
 | --- | --- | --- |
-| `blocks_layout` | children are ids in the parent's shared `blocks` dict; this field's name is a region key under `blocks_layout` | `allowedBlocks`, `maxLength`, `allowedTemplates` |
+| `blocks_layout` | children are ids in the parent's shared `blocks` dict; this field's name is a region key under `blocks_layout` | `allowedBlocks`, `maxLength`, `allowedTemplates`, `allowedStyles` / `disallowedStyles` / `allowedMarks` / `disallowedMarks` ([slate styles](#restricting-slate-styles-per-region)) |
 | `object_list` | inline array on the field itself | `idField` (default `@id`), `schema` (item schema), `allowedBlocks` + `typeField` (typed items), `defaultBlockType`, `maxLength`, `addMode: 'table'` |
 | `object` | groups sub-fields under one key; sub-fields (plain OR the two container widgets above) nest inside | `schema` (the nested properties) |
 
@@ -360,9 +484,19 @@ Add `data-block-uid` to each child element. You don't need to mark the container
 </div>
 ```
 
-- **`data-block-add="bottom|right"`** — Controls where the '+' button appears. By default it will be the opposite of its parent. Use "bottom" for vertical stacking, "right" for horizontal.
-- **`data-block-selector="-1|+1|blockId"`** — Tag paging buttons so sidebar selection can navigate paged containers.
-- **`data-block-selector="uid1 uid2 uid3 …"`** — Space-separated list of uids this element should "expose" when any of them is selected from the admin. The bridge matches with the CSS word-list operator (`[data-block-selector~=...]`), so one trigger can cover many descendants. Use it on a disclosure trigger (collapsed details, accordion header, hidden tab panel button) so that picking any block within from the sidebar opens / scrolls / activates the enclosing container. For `<summary>` triggers the bridge sets `details.open = true` directly (idempotent — won't toggle an already-open disclosure); for everything else it `.click()`s the trigger, skipping the click if `aria-expanded="true"`. The contextNavigation `<summary>` and accordion panel buttons use this pattern; the carousel `+1` / `-1` / specific-slide-uid form above is a special case of the same attribute.
+- **\`data-block-add="bottom|right"\`** — Controls where the '+' button appears. By default it will be the opposite of its parent. Use "bottom" for vertical stacking, "right" for horizontal.
+- **\`data-block-selector="-1|+1|blockId"\`** — Tag paging buttons so sidebar selection can navigate paged containers.
+- **\`data-block-selector="uid1 uid2 uid3 …"\`** — Space-separated list of uids this element should "expose" when any of them is selected from the admin. The bridge matches with the CSS word-list operator (`[data-block-selector~=...]`), so one trigger can cover many descendants. Use it on a disclosure trigger (collapsed details, accordion header, hidden tab panel button) so that picking any block within from the sidebar opens / scrolls / activates the enclosing container. For `<summary>` triggers the bridge sets `details.open = true` directly (idempotent — won't toggle an already-open disclosure); for everything else it `.click()`s the trigger, skipping the click if `aria-expanded="true"`. The contextNavigation `<summary>` and accordion panel buttons use this pattern; the carousel `+1` / `-1` / specific-slide-uid form above is a special case of the same attribute.
+
+The bridge resolves a **descendant** of a container that advertises itself: selecting a block nested below the handle walks up the block path map to the nearest ancestor that published one, so a container only has to name what it can reveal, not enumerate every block inside it. It also opens **outside in** — a handle that is itself inside a closed container is skipped until it can be reached, because clicking a hidden trigger opens its own container while the outer one stays shut. Enumerating uids is still worth doing for anything the path map cannot know, such as items a listing synthesises at render time.
+
+- **\`data-block-selector="uid#fieldName"\`** — a handle that reveals **where one FIELD of that block is edited**, rather than the block as a whole. Use it when a block is drawn in several places at once with a different field in each, and each place has its own trigger. The design system cookie-consent block is the case it was written for: its `message` is rendered into a banner and its category wording into a preferences dialog, both built by the component's own JavaScript into `<body>`, both hidden until their trigger is pressed — while the block's element (an editing bar) is on screen the whole time. A block-level handle is one handle and one click, so whichever half it opened, the other half's wording stayed unreachable from the sidebar. `#` is used because `:` already means navigation (`uid:direction`). Everything except *which handle to click* treats `uid#field` exactly like `uid`: a `data-edit-*` inside such a handle still edits that block — which is why the place a field is edited usually carries the handle **too**, not just the trigger that opens it. Several elements may name the same field; the bridge clicks the first one that is **on screen**, so a hidden half is never the thing it tries to click.
+
+A worked example, with the schema, the data and all four frontends: [Cookie Consent Block](/docs/examples/cookie-consent).
+
+The reveal is driven from the sidebar, through the message that already existed for it: when the cursor lands in a sidebar field the admin sends `FOCUS_FIELD { blockId, fieldName, moveCaret: false }`. The bridge shows that field's place if it is hidden, and does nothing at all unless a `uid#field` handle advertises that exact field — so it is safe to send on every focus. There is deliberately **no fallback to the block's own handle**: most sidebar fields (an alignment, a link, any setting) have no element on the canvas and never will, so "no element" is the ordinary case rather than a hidden one, and falling back meant every sidebar focus clicked whatever handle the block or its ancestors published. A field's place, when it has none of its own, simply IS the block's — and selecting the block already reveals that, transitively. `moveCaret` defaults to **true** — the original meaning, "reveal it and put the cursor in it", which is what the admin sends when handing editing back (a LinkEditor closing). One message, two intents; not two messages.
+
+- **A block drawn in two places** — put `data-block-uid` on the **content**, and `data-block-selector` on the trigger. A tab is the clearest case: its label lives on the button in the tab bar, its code in a panel that is hidden (or not rendered at all) unless that tab is active. If the button carried the uid, the bridge would see a visible element and conclude the block is on screen, so selecting an inactive tab from the sidebar would never reveal the code the author wants to edit. With the uid on the panel, the ordinary visibility check does the right thing, and `data-block-selector` on the button both reveals the tab and tells the bridge that a `data-edit-*` inside it edits *that* block, even though the uid element is elsewhere. Applies to any control that stands in for content it can show — tab buttons, thumbnail strips, step indicators.
 
 ## Table Mode
 
@@ -392,21 +526,23 @@ table: {
 }
 ```
 
+**Worked example:** [Table Block](/docs/examples/table) — `addMode: "table"` with an `idField`, so every row has the same cells.
+
 ## Empty Blocks
 
-A container region can never be truly empty. When its last child is deleted, Inka fills it back in — but *what* it inserts depends on the region's config:
+A container region can never be truly empty. When its last child is deleted, Hydra fills it back in — but *what* it inserts depends on the region's config:
 
-- If the region has a **`defaultBlockType`**, that type is added.
+- If the region has a **\`defaultBlockType\`**, that type is added.
 - If the region allows exactly **one** `allowedBlocks` type, that type is added.
-- Only when the region has **no `defaultBlockType` and more than one `allowedBlocks`** is the choice ambiguous — so Inka inserts a placeholder child with `@type: "empty"` and shows a '+' for the user to pick a type in place.
+- Only when the region has **no \`defaultBlockType\` and more than one \`allowedBlocks\`** is the choice ambiguous — so Hydra inserts a placeholder child with `@type: "empty"` and shows a '+' for the user to pick a type in place.
 
 So the simplest way to never deal with empty placeholders in a region is to give it a `defaultBlockType` (or a single-entry `allowedBlocks`). Otherwise your frontend must render `empty`.
 
-Empty blocks are stripped before saving. Render them as empty space; Inka puts a '+' button in the middle for the user to pick a real type in place. You can override the look of that '+' by rendering something inside the empty block and adding `data-block-add="button"` to it.
+Empty blocks are stripped before saving. Render them as empty space; Hydra puts a '+' button in the middle for the user to pick a real type in place. You can override the look of that '+' by rendering something inside the empty block and adding `data-block-add="button"` to it.
 
 ### Making a region empty by default — `defaultBlockType: "empty"`
 
-The rules above mean a region with a `defaultBlockType`, or a single-entry `allowedBlocks`, is *never* empty — it always seeds a block of that type. To declare a region that should sit **empty until an editor adds something**, while still restricting **what** they can add, set **`defaultBlockType: "empty"`** and do **not** list `"empty"` in `allowedBlocks`:
+The rules above mean a region with a `defaultBlockType`, or a single-entry `allowedBlocks`, is *never* empty — it always seeds a block of that type. To declare a region that should sit **empty until an editor adds something**, while still restricting **what** they can add, set **\`defaultBlockType: "empty"\`** and do **not** list `"empty"` in `allowedBlocks`:
 
 ### Javascript
 
@@ -419,11 +555,19 @@ announcement: {
 }
 ```
 
-This is the one case where `"empty"` is a **configured** default rather than the fallback Inka inserts for an ambiguous region. The seed and the add diverge on purpose:
+This is the one case where `"empty"` is a **configured** default rather than the fallback Hydra inserts for an ambiguous region. The seed and the add diverge on purpose:
 
-- **Passive seed** (region loaded, or its last child deleted): Inka seeds a bare `@type: "empty"` placeholder — nothing renders. `defaultBlockType` wins over the single-`allowedBlocks` auto-fill, so the region genuinely shows empty.
-- **The '+' (active add / fill)**: inserts a real block from `allowedBlocks` (converting the empty placeholder **in place**), never another `empty`. The add path reads `allowedBlocks`, not `defaultBlockType` — so a single-entry `allowedBlocks` fills straight to that type with no chooser.
-- **`"empty"` is never in `allowedBlocks`** — it isn't a type an editor opts into; it's the "region is empty" state. On save the placeholder is stripped, so a genuinely-empty region persists with no blocks.
+- **Passive seed** (region loaded, or its last child deleted): Hydra seeds a bare
+
+`@type: "empty"` placeholder — nothing renders. `defaultBlockType` wins over the   single-`allowedBlocks` auto-fill, so the region genuinely shows empty.
+
+- **The '+' (active add / fill)**: inserts a real block from `allowedBlocks`
+
+(converting the empty placeholder **in place**), never another `empty`. The add   path reads `allowedBlocks`, not `defaultBlockType` — so a single-entry   `allowedBlocks` fills straight to that type with no chooser.
+
+- **\`"empty"\` is never in \`allowedBlocks\`** — it isn't a type an editor opts into;
+
+it's the "region is empty" state. On save the placeholder is stripped, so a   genuinely-empty region persists with no blocks.
 
 Use this for optional site chrome — e.g. a header announcement that is usually absent but can hold a single global alert when needed. (Because the seed is `"empty"`, the frontend must render `empty` as a selectable slot — see below.)
 
@@ -494,7 +638,7 @@ The relationship is local: read the schema and you can see "the children of `sli
 
 ### Field-value syncing
 
-On top of type syncing you can also have field *values* centrally controlled at the parent — set once on the parent, applied to every child. Add ONE enhancer on the parent:
+On top of type syncing you can also have field \_values\_ centrally controlled at the parent — set once on the parent, applied to every child. Add ONE enhancer on the parent:
 
 ### Javascript
 
@@ -515,7 +659,7 @@ gridBlock: {
 1. Surfaces the **parent-claimed** fields on the parent's sidebar under an "Item Defaults" fieldset.
 2. Auto-hides the same fields on every child's sidebar (via a `hideParentOwnedFields` enhancer that's applied to every block at INIT — no per-child opt-in).
 
-The parent declares **what it claims** per child block type via `parentControlled`. If absent, the default is: parent claims everything *not* listed in the child's `fieldMappings['@default']` mapping. The default works for typical cases; set `parentControlled` only when you want a different split (e.g. keep a meta-toggle field editable per-child):
+The parent declares **what it claims** per child block type via `parentControlled`. If absent, the default is: parent claims everything \_not\_ listed in the child's `fieldMappings['@default']` mapping. The default works for typical cases; set `parentControlled` only when you want a different split (e.g. keep a meta-toggle field editable per-child):
 
 ### Javascript
 
@@ -539,12 +683,12 @@ When `parentControlled[childType]` is set, it **replaces** the `@default` fallba
 
 ### Recipe options
 
-- **`inheritSchemaFrom`** — schemaEnhancer recipe; surfaces parent-claimed fields on the parent and hides them on children.
-- **`itemTypeField`** — declared on a `blocks_layout`/`object_list` field; names the sibling field whose value drives every child's `@type`.
-- **`typeField`** — names the sibling field directly on `inheritSchemaFrom`. Use this when there is no blocks field to declare `itemTypeField` on (e.g. listings — see [Listings](listings.md)).
-- **`mappingField`** — name of the field where a per-block `fieldMapping` override is stored. Required for the `FieldMappingWidget` to appear.
-- **`parentControlled`** — `{ childType: [fieldName, ...] }` per-child-type override. Replaces the `fieldMappings['@default']` fallback.
-- **`defaultsField`** — prefix for the inherited fields on the parent's "Item Defaults" fieldset (default: `'itemDefaults'`).
-- **`blockTypeSelect`** widget options:
-  - **`blocksField`** — which sub-blocks field's `allowedBlocks` to use for the choices. Auto-discovers if omitted. Set to `'..'` when the choices should come from the *enclosing parent's* `allowedSiblingTypes`.
-  - **`filterConvertibleFrom`** — only offer types whose `fieldMappings` accept the named source. Typically `'@default'` for listings (every item type must be populatable from canonical content fields).
+- **\`inheritSchemaFrom\`** — schemaEnhancer recipe; surfaces parent-claimed fields on the parent and hides them on children.
+- **\`itemTypeField\`** — declared on a `blocks_layout`/`object_list` field; names the sibling field whose value drives every child's `@type`.
+- **\`typeField\`** — names the sibling field directly on `inheritSchemaFrom`. Use this when there is no blocks field to declare `itemTypeField` on (e.g. listings — see [Listings](/docs/listings)).
+- **\`mappingField\`** — name of the field where a per-block `fieldMapping` override is stored. Required for the `FieldMappingWidget` to appear.
+- **\`parentControlled\`** — `{ childType: [fieldName, ...] }` per-child-type override. Replaces the `fieldMappings['@default']` fallback.
+- **\`defaultsField\`** — prefix for the inherited fields on the parent's "Item Defaults" fieldset (default: `'itemDefaults'`).
+- **\`blockTypeSelect\`** widget options:
+
+\- **\`blocksField\`** — which sub-blocks field's `allowedBlocks` to use for the choices. Auto-discovers if omitted. Set to `'..'` when the choices should come from the *enclosing parent's* `allowedSiblingTypes`.   - **\`filterConvertibleFrom\`** — only offer types whose `fieldMappings` accept the named source. Typically `'@default'` for listings (every item type must be populatable from canonical content fields).

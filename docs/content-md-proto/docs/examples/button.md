@@ -67,7 +67,6 @@ blocks-assignments:
   - { id: ref-button-rendering-jsx-ab4e0b }
   - { id: ref-button-rendering-vue-e704dd }
   - { id: ref-button-rendering-svelte-a8e495 }
-  - { id: ref-button-rendering-astro-1ee456 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -363,12 +362,6 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidu
 
 ```{literalinclude} ../../../examples/examples/svelte/ButtonBlock.svelte
 :language: svelte
-```
-
-### Astro
-
-```{literalinclude} ../../../examples/examples/astro/ButtonBlock.astro
-:language: astro
 ```
 
 </block>

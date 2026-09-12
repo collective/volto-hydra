@@ -32,7 +32,6 @@ blocks-assignments:
   - { id: ref-hero-rendering-jsx-46a2e5 }
   - { id: ref-hero-rendering-vue-337205 }
   - { id: ref-hero-rendering-svelte-a2ecf7 }
-  - { id: ref-hero-rendering-astro-239496 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -80,7 +79,8 @@ A full-width hero section with heading, subheading, image, rich text description
         },
         "description": {
           "title": "Description",
-          "widget": "slate"
+          "widget": "slate",
+          "type": "array"
         }
       }
     },
@@ -147,12 +147,6 @@ A full-width hero section with heading, subheading, image, rich text description
 
 ```{literalinclude} ../../../examples/examples/svelte/HeroBlock.svelte
 :language: svelte
-```
-
-### Astro
-
-```{literalinclude} ../../../examples/examples/astro/HeroBlock.astro
-:language: astro
 ```
 
 </block>

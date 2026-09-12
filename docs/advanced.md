@@ -1,12 +1,12 @@
 # Advanced
 
-Advanced topics for optimising your Inka integration: lazy loading the bridge, authentication, and preventing reloads.
+Advanced topics for optimising your Hydra integration: lazy loading the bridge, authentication, and preventing reloads.
 
 ---
 
 ## Lazy Load the Bridge
 
-Detect the admin iframe and load the bridge only when needed. `window.name` is set by Inka to indicate mode:
+Detect the admin iframe and load the bridge only when needed. `window.name` is set by Hydra to indicate mode:
 
 - **`hydra-edit:<origin>`** — edit mode (e.g., `hydra-edit:http://localhost:3001`)
 - **`hydra-view:<origin>`** — view mode (e.g., `hydra-view:http://localhost:3001`)
@@ -99,16 +99,16 @@ If the auto-generated sidebar UI from your block or content schemas isn't suitab
 - [Volto Block Edit Component documentation](https://6.docs.plone.org/volto/blocks/editcomponent.html)
 
 ```{note}
-Volto is built as a monolith CMS framework, so ignore the parts of the documentation that apply to its presentation layer — Inka replaces that piece.
+Volto is built as a monolith CMS framework, so ignore the parts of the documentation that apply to its presentation layer — Hydra replaces that piece.
 ```
 
 ## Custom Visual Editing (TODO)
 
-In some cases you might want to provide editors with more visual editing inside the preview than Inka currently supports out of the box. For example, a newly created table block might display a form to set the initial number of columns and rows. The bridge exposes the following hooks to make this possible:
+In some cases you might want to provide editors with more visual editing inside the preview than Hydra currently supports out of the box. For example, a newly created table block might display a form to set the initial number of columns and rows. The bridge exposes the following hooks to make this possible:
 
 - **`sendBlockUpdate`** — send an updated version of the block back to the admin after frontend-side changes (TODO).
 - **`sendBlockAction`** — perform actions like select, add, move, copy or remove blocks, or invoke custom actions on the Volto block edit component.
-- You can disable Inka's default handling of selection, DnD, or other interactions if you want to replace some parts of Inka and not others (TODO).
+- You can disable Hydra's default handling of selection, DnD, or other interactions if you want to replace some parts of Hydra and not others (TODO).
 
 ## Custom API Endpoints
 

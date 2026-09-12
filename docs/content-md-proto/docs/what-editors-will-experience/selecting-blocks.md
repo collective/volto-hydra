@@ -32,33 +32,34 @@ blocks-assignments:
   - { uid: p-7 }
   - { uid: ul-8 }
   - { uid: p-9 }
-  - { uid: img-10 }
-  - { uid: h-11 }
-  - { uid: p-12 }
-  - { uid: tbl-13 }
-  - { uid: p-14 }
-  - { uid: ul-15 }
-  - { uid: img-16 }
-  - { uid: h-17 }
-  - { uid: p-18 }
-  - { uid: h-19 }
-  - { uid: p-20 }
-  - { uid: ce-21 }
-  - { id: ce-21-text-3d139a }
-  - { uid: p-22 }
-  - { uid: img-23 }
-  - { uid: p-24 }
-  - { uid: h-25 }
-  - { uid: p-26 }
-  - { uid: ce-27 }
-  - { id: ce-27-text-19ff8a }
-  - { uid: ul-28 }
-  - { uid: p-29 }
-  - { uid: img-30 }
-  - { uid: h-31 }
-  - { uid: p-32 }
-  - { uid: h-33 }
-  - { uid: p-34 }
+  - { uid: p-10 }
+  - { uid: img-11 }
+  - { uid: h-12 }
+  - { uid: p-13 }
+  - { uid: tbl-14 }
+  - { uid: p-15 }
+  - { uid: ul-16 }
+  - { uid: img-17 }
+  - { uid: h-18 }
+  - { uid: p-19 }
+  - { uid: h-20 }
+  - { uid: p-21 }
+  - { uid: ce-22 }
+  - { id: ce-22-text-ab2b2a }
+  - { uid: p-23 }
+  - { uid: img-24 }
+  - { uid: p-25 }
+  - { uid: h-26 }
+  - { uid: p-27 }
+  - { uid: ce-28 }
+  - { id: ce-28-text-e6d028 }
+  - { uid: ul-29 }
+  - { uid: p-30 }
+  - { uid: img-31 }
+  - { uid: h-32 }
+  - { uid: p-33 }
+  - { uid: h-34 }
+  - { uid: p-35 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -102,9 +103,8 @@ Press `Escape` to leave text editing. The block stays selected, but you're no lo
 
 - A full border appears around the block (visually stronger than the text-mode hint).
 - Keyboard shortcuts now operate on the whole block:
-  - **Arrow Up / Down** — move selection to the previous / next sibling block (container-aware: jumps into and out of containers).
-  - **Enter** — add a new block after this one.
-  - **Delete / Backspace** — remove the selected block.
+
+\- **Arrow Up / Down** — move selection to the previous / next sibling block (container-aware: jumps into and out of containers).   - **Enter** — add a new block after this one.   - **Delete / Backspace** — remove the selected block.
 
 Press `Escape` again to **deselect** (or go up to the parent container if this block is inside one). Each `Escape` walks one step up the hierarchy.
 
@@ -133,7 +133,7 @@ While multiple blocks are selected:
 
 - A combined bounding box is drawn around them.
 - `Delete` / `Backspace` removes all of them.
-- The Quanta toolbar dropdown offers actions that apply to all (e.g. "Wrap in...", see [Containers](containers.md)).
+- The Quanta toolbar dropdown offers actions that apply to all (e.g. "Wrap in...", see [Containers](/docs/what-editors-will-experience/containers)).
 - The sidebar shows the count and lists each selected block by type.
 
 ![Two adjacent paragraphs multi-selected — combined bounding box, sidebar shows "2 selected", toolbar shows count badge.](/docs/images/multi-select)
@@ -176,9 +176,9 @@ Slides                    [+]
 ⋮⋮  Slide 3                >
 ```
 
-- **`⋮⋮` drag handle** — drag to reorder children within the container.
-- **`>` drill-in arrow** — selects that child, scrolls the preview to it, switches the sidebar to its settings.
-- **`[+]` add button** — opens the BlockChooser to add a new child to that field.
+- **\`⋮⋮\` drag handle** — drag to reorder children within the container.
+- **\`>\` drill-in arrow** — selects that child, scrolls the preview to it, switches the sidebar to its settings.
+- **\`\[+]\` add button** — opens the BlockChooser to add a new child to that field.
 
 If the container has multiple blocks fields (e.g. a header field and a body field), each appears as a separate section with its own children list and add button.
 

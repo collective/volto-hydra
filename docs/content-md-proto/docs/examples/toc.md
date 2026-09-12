@@ -58,7 +58,6 @@ blocks-assignments:
   - { id: ref-toc-rendering-jsx-ee2124 }
   - { id: ref-toc-rendering-vue-12aef2 }
   - { id: ref-toc-rendering-svelte-397c7f }
-  - { id: ref-toc-rendering-astro-7a8692 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -225,12 +224,6 @@ Text can be **bold** or *italic*.
 
 ```{literalinclude} ../../../examples/examples/svelte/TocBlock.svelte
 :language: svelte
-```
-
-### Astro
-
-```{literalinclude} ../../../examples/examples/astro/TocBlock.astro
-:language: astro
 ```
 
 </block>

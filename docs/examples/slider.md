@@ -4,6 +4,8 @@ A carousel/slider that cycles through slides. Slides are stored as an `object_li
 
 This is a **custom** block — register it via `initBridge`.
 
+**Demonstrates:** [object_list: a region stored inline](../container-blocks.md#object_list-a-region-stored-inline) — slides stored in the block, not in the shared dict.
+
 ## Schema
 
 ```json

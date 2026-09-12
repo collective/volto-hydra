@@ -1,6 +1,6 @@
 {
   "@id": "/templates/newsitem-view",
-  "@type": "Document",
+  "@type": "News Item",
   "UID": "tpl-ct-newsitem-view",
   "id": "newsitem-view",
   "title": "News Item View",
@@ -66,5 +66,13 @@
     "description": "Layout and block templates",
     "title": "Templates",
     "type_title": "Page"
+  },
+  "preview_image": {
+    "blob_path": "templates/newsitem-view/preview_image/newsitem.svg",
+    "content-type": "image/svg+xml",
+    "filename": "newsitem.svg",
+    "height": 36,
+    "size": 703,
+    "width": 36
   }
 }

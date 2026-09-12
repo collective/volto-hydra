@@ -41,7 +41,6 @@ blocks-assignments:
   - { id: ref-listing-rendering-jsx-f33c73 }
   - { id: ref-listing-rendering-vue-3c4a00 }
   - { id: ref-listing-rendering-svelte-aca768 }
-  - { id: ref-listing-rendering-astro-3253f7 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -226,12 +225,6 @@ Displays a list of content items from a query. The listing block fetches items f
 
 ```{literalinclude} ../../../examples/examples/svelte/ListingBlock.svelte
 :language: svelte
-```
-
-### Astro
-
-```{literalinclude} ../../../examples/examples/astro/ListingBlock.astro
-:language: astro
 ```
 
 </block>

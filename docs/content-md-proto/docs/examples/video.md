@@ -52,7 +52,6 @@ blocks-assignments:
   - { id: ref-video-rendering-jsx-b3c5ea }
   - { id: ref-video-rendering-vue-160de2 }
   - { id: ref-video-rendering-svelte-b4e8ba }
-  - { id: ref-video-rendering-astro-e0899a }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -189,12 +188,6 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 ```{literalinclude} ../../../examples/examples/svelte/VideoBlock.svelte
 :language: svelte
-```
-
-### Astro
-
-```{literalinclude} ../../../examples/examples/astro/VideoBlock.astro
-:language: astro
 ```
 
 </block>

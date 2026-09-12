@@ -28,72 +28,86 @@ blocks-assignments:
   - { uid: p-4 }
   - { uid: ce-5 }
   - { id: ce-5-html-6481c1 }
-  - { uid: h-6 }
-  - { uid: p-7 }
-  - { uid: ce-8 }
-  - { id: ce-8-html-5005a4 }
-  - { uid: ul-9 }
-  - { uid: p-10 }
-  - { uid: h-11 }
-  - { uid: p-12 }
-  - { uid: ce-13 }
-  - { id: ce-13-html-20bcae }
-  - { uid: p-14 }
+  - { uid: p-6 }
+  - { uid: h-7 }
+  - { uid: p-8 }
+  - { uid: ce-9 }
+  - { id: ce-9-html-49f5cb }
+  - { uid: ul-10 }
+  - { uid: p-11 }
+  - { uid: h-12 }
+  - { uid: p-13 }
+  - { uid: ce-14 }
+  - { id: ce-14-jsx-1a5f34 }
   - { uid: p-15 }
   - { uid: p-16 }
   - { uid: p-17 }
-  - { uid: h-18 }
-  - { uid: p-19 }
-  - { uid: ce-20 }
-  - { id: ce-20-html-da86a1 }
-  - { uid: h-21 }
-  - { uid: p-22 }
+  - { uid: p-18 }
+  - { uid: h-19 }
+  - { uid: p-20 }
+  - { uid: ce-21 }
+  - { id: ce-21-html-ebe5dd }
+  - { uid: h-22 }
   - { uid: p-23 }
-  - { uid: ul-24 }
-  - { uid: p-25 }
+  - { uid: p-24 }
+  - { uid: ul-25 }
   - { uid: p-26 }
-  - { uid: ul-27 }
-  - { uid: p-28 }
-  - { uid: ce-29 }
-  - { id: ce-29-html-a5e4fc }
+  - { uid: p-27 }
+  - { uid: ul-28 }
+  - { uid: p-29 }
   - { uid: p-30 }
-  - { uid: h-31 }
+  - { uid: ce-31 }
+  - { id: ce-31-html-5ea617 }
   - { uid: p-32 }
-  - { uid: ce-33 }
-  - { id: ce-33-html-6eefe4 }
+  - { uid: h-33 }
   - { uid: p-34 }
-  - { uid: ce-35 }
-  - { id: ce-35-html-9626f2 }
+  - { uid: p-35 }
   - { uid: p-36 }
-  - { uid: p-37 }
-  - { uid: h-38 }
-  - { uid: p-39 }
-  - { uid: ol-40 }
-  - { uid: p-41 }
-  - { uid: ce-42 }
-  - { id: ce-42-html-7ddfd5 }
-  - { uid: h-43 }
-  - { uid: p-44 }
-  - { uid: ul-45 }
-  - { uid: p-46 }
-  - { uid: ce-47 }
-  - { id: ce-47-html-a67f8c }
-  - { uid: p-48 }
+  - { uid: h-37 }
+  - { uid: p-38 }
+  - { uid: ce-39 }
+  - { id: ce-39-html-349939 }
+  - { uid: p-40 }
+  - { uid: ce-41 }
+  - { id: ce-41-html-0d2700 }
+  - { uid: p-42 }
+  - { uid: p-43 }
+  - { uid: h-44 }
+  - { uid: p-45 }
+  - { uid: ol-46 }
+  - { uid: p-47 }
+  - { uid: ce-48 }
+  - { id: ce-48-html-8b45b3 }
   - { uid: h-49 }
   - { uid: p-50 }
-  - { uid: p-51 }
-  - { uid: ul-52 }
-  - { uid: p-53 }
-  - { uid: h-54 }
+  - { uid: ul-51 }
+  - { uid: p-52 }
+  - { uid: ul-53 }
+  - { uid: p-54 }
   - { uid: p-55 }
   - { uid: ce-56 }
-  - { id: ce-56-json-a0b37e }
+  - { id: ce-56-html-1b50a5 }
   - { uid: p-57 }
-  - { uid: ce-58 }
-  - { id: ce-58-javascript-3cee82 }
+  - { uid: h-58 }
   - { uid: p-59 }
-  - { uid: ce-60 }
-  - { id: ce-60-html-7e15f3 }
+  - { uid: p-60 }
+  - { uid: ul-61 }
+  - { uid: p-62 }
+  - { uid: ul-63 }
+  - { uid: p-64 }
+  - { uid: p-65 }
+  - { uid: p-66 }
+  - { uid: h-67 }
+  - { uid: p-68 }
+  - { uid: ce-69 }
+  - { id: ce-69-json-6c465d }
+  - { uid: p-70 }
+  - { uid: ce-71 }
+  - { id: ce-71-javascript-43358a }
+  - { uid: p-72 }
+  - { uid: ce-73 }
+  - { id: ce-73-html-e47175 }
+  - { uid: p-74 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -110,10 +124,10 @@ blocks-matched: |
 
 Add data attributes to your rendered HTML to enable progressively richer visual editing:
 
-- **`data-block-uid="blockId"`** — Click-to-select blocks. Hydra.js adds click handlers and shows a blue outline and Quanta toolbar on selected blocks.
-- **`data-edit-text="fieldName"`** — Inline text editing. For simple text, click and type directly. For rich text (slate widget), select text to apply formatting via the Quanta toolbar.
-- **`data-edit-media="fieldName"`** — Visual media uploading. Editors can upload, pick or drag-and-drop images directly onto the element.
-- **`data-edit-link="fieldName"`** — Link editing. Click behaviour is replaced with a link picker to select content, enter an external URL, or open the link.
+- **\`data-block-uid="blockId"\`** — Click-to-select blocks. Hydra.js adds click handlers and shows a blue outline and Quanta toolbar on selected blocks.
+- **\`data-edit-text="fieldName"\`** — Inline text editing. For simple text, click and type directly. For rich text (slate widget), select text to apply formatting via the Quanta toolbar.
+- **\`data-edit-media="fieldName"\`** — Visual media uploading. Editors can upload, pick or drag-and-drop images directly onto the element.
+- **\`data-edit-link="fieldName"\`** — Link editing. Click behaviour is replaced with a link picker to select content, enter an external URL, or open the link.
 
 Example of a fully annotated slide block:
 
@@ -131,6 +145,8 @@ Example of a fully annotated slide block:
        href="/big_news">Read more</a>
 </div>
 ```
+
+**Worked examples:** [Hero Block](/docs/examples/hero) — text, rich text, media and link annotations in one block; [Button Block](/docs/examples/button) — `data-edit-text` and `data-edit-link` on the same element.
 
 ## Comment Syntax
 
@@ -169,13 +185,13 @@ Render optional fields **data-driven**: no data, no element. Don't render an emp
 {block.image && <img data-edit-media="image" src={block.image} />}
 ```
 
-Plain truthiness is enough — you never need `.length` or a null-safe walk. Inka normalises a field the editor has cleared (widgets write `[]`, which is truthy) to absent before your renderer sees it.
+Plain truthiness is enough — you never need `.length` or a null-safe walk. Hydra normalises a field the editor has cleared (widgets write `[]`, which is truthy) to absent before your renderer sees it.
 
-To fill an empty field from the canvas, the editor selects the block and presses **reveal optional fields** in the Quanta toolbar. Inka feeds your renderer a placeholder value for each empty field, so your own `&&` guard produces the element and it becomes editable. The placeholder exists only in the data handed to your renderer: it is never stored, so fields left unfilled leave no trace in saved content and render nothing in view. Your renderer needs no code for this.
+To fill an empty field from the canvas, the editor selects the block and presses **reveal optional fields** in the Quanta toolbar. Hydra feeds your renderer a placeholder value for each empty field, so your own `&&` guard produces the element and it becomes editable. The placeholder exists only in the data handed to your renderer: it is never stored, so fields left unfilled leave no trace in saved content and render nothing in view. Your renderer needs no code for this.
 
-Reveal is best-effort. Inka offers any field whose type could be edited inline, which it cannot always tell apart from a field you keep in the sidebar (alt text and css classes are strings too). Fields you don't render inline simply don't appear — the editor fills those from the sidebar as usual.
+Reveal is best-effort. Hydra offers any field whose type could be edited inline, which it cannot always tell apart from a field you keep in the sidebar (alt text and css classes are strings too). Fields you don't render inline simply don't appear — the editor fills those from the sidebar as usual.
 
-Reveal replaces a per-block boolean only where "has data" and "should render" are the same thing. When they genuinely differ — the author has content but wants it hidden, or a field should appear only in certain configurations — add your own field and drive it with [`fieldRules`](custom-blocks.md#schema-enhancers).
+Reveal replaces a per-block boolean only where "has data" and "should render" are the same thing. When they genuinely differ — the author has content but wants it hidden, or a field should appear only in certain configurations — add your own field and drive it with [\`fieldRules\`](/docs/custom-blocks#schema-enhancers).
 
 ## Allowed Navigation (data-linkable-allow)
 
@@ -194,16 +210,18 @@ Every `data-edit-*` attribute — `data-edit-text`, `data-edit-link`, `data-edit
 
 **Which block** (the leading part):
 
-- **`fieldName`** — this block's own field (default)
-- **`../fieldName`** — the parent **block**'s field
-- **`../../fieldName`** — the grandparent block's field
-- **`/fieldName`** — a page/root field
+- **\`fieldName\`** — this block's own field (default)
+- **\`../fieldName\`** — the parent **block**'s field
+- **\`../../fieldName\`** — the grandparent block's field
+- **\`/fieldName\`** — a page/root field
 
 `..` always steps up one **block** — never an object or region level (see below).
 
 **Where inside the block** (`/` descends objects):
 
-- **`content/headline`** — descend a [`widget: 'object'`](container-blocks.md#widget-object-nesting-fields-and-containers-inside-a-block-field) field to a nested field (the key mirrors the storage path, `block.content.headline`)
+- **\`content/headline\`** — descend a [\`widget: 'object'\`](/docs/container-blocks#widget-object-nesting-fields-and-containers-inside-a-block-field)
+
+field to a nested field (the key mirrors the storage path, `block.content.headline`)
 
 The two compose: `../content/headline` is "the parent block, its `content.headline`". `/` descends objects only — a region (`object_list` / `blocks_layout`) or a value is the end of a path (a region's children are separate blocks with their own `data-block-uid`).
 
@@ -224,6 +242,14 @@ The two compose: `../content/headline` is "the parent block, its `content.headli
 ```
 
 This lets fixed parts of the page (headers), parent-block fields, and fields grouped inside an object all be edited in place, with one addressing model.
+
+### Where a page field comes from
+
+A `/fieldName` path resolves against the **content type's schema**, not against anything the frontend declares. The admin reads the schema for the content being edited and hands the bridge a field type per property (`View.jsx` `extractBlockFieldTypes`: *"page-level field types from content type schema … accessed via /fieldName"*). So `data-edit-text="/title"` works on any content type with a `title`, and `data-edit-text="/effective"` works on one that has an `effective` — no registration step.
+
+The corollary matters, because getting it wrong is silent: **do not add page metadata to \`initBridge\`'s \`page.schema.properties\`.** That schema lists the page's *blocks fields* (its regions), and the admin turns every entry in it into a region — `widget: 'blocks_layout'` is stamped on and an empty `blocks_layout[<name>]` minted. Declaring `title`/`effective` there gives the page phantom empty regions; page-level selection then lands on one of them, and `Cmd+A` selects one block where it should select all siblings.
+
+If a field is annotated but clicking it does nothing, the field is missing from the content type's schema — the annotation renders either way, since the DOM knows nothing about schemas.
 
 ## Readonly Regions
 
@@ -251,7 +277,7 @@ Or using comment syntax:
 
 `data-block-readonly` is *your* call — use it when your frontend wants to lock a block for its own reasons (a teaser mirroring another page, a listing item).
 
-You do **not** need it for template content. Inka already knows which blocks a template marks read-only from the block data and enforces that itself, so your renderer doesn't need to detect template blocks or mark them.
+You do **not** need it for template content. Hydra already knows which blocks a template marks read-only from the block data and enforces that itself, so your renderer doesn't need to detect template blocks or mark them.
 
 ## Renderer Node-ID Rules
 
@@ -278,8 +304,13 @@ This breaks cursor positioning because hydra.js can't correlate DOM structure to
 
 Sometimes a renderer adds elements to slate output that are **not** part of the editable content — a decorative icon (an "opens in a new tab" glyph), a generated chip, an embedded non-editable widget. These have no `data-node-id` (they aren't Slate nodes), and they must be marked so that **both** the editor's caret and hydra's DOM→Slate reader skip them:
 
-- **`contenteditable="false"`** — the browser treats the element as a non-editable island: the caret steps over it, backspace/delete removes it as a unit, and selection includes it whole. Add this to anything that must not be typed into.
-- **`aria-hidden="true"`** — for purely decorative chrome (e.g. icons), so assistive tech ignores it too.
+- **\`contenteditable="false"\`** — the browser treats the element as a
+
+non-editable island: the caret steps over it, backspace/delete removes it as a   unit, and selection includes it whole. Add this to anything that must not be   typed into.
+
+- **\`aria-hidden="true"\`** — for purely decorative chrome (e.g. icons), so
+
+assistive tech ignores it too.
 
 hydra's DOM→Slate reader skips any child (without a `data-node-id`) that carries **either** attribute — treating it as chrome, not content. Without this, the element's text would be read back into the Slate value on every edit / select / delete over it, corrupting the value.
 
@@ -297,12 +328,19 @@ Contrast this with the wrapper rule above: a wrapper that holds real content car
 
 A slate field's `value` is an array, but it always holds exactly **one top-level node** — a single paragraph, heading, list, or blockquote. Inline content (bold, links, …) lives in that node's `children`.
 
-Editing can transiently produce more than one top-level node — pasting multiple paragraphs, pressing Enter, or a Backspace that demotes a list item to a paragraph (`[ul, p]`). Inka normalizes that immediately:
+Editing can transiently produce more than one top-level node — pasting multiple paragraphs, pressing Enter, or a Backspace that demotes a list item to a paragraph (`[ul, p]`). Hydra normalizes that immediately:
 
-- **Split** — when the field is the `value` of a `slate` block, each extra node becomes its own `slate` block, inserted after the original in the same container (`blocks_layout` or `object_list`). This is how pressing Enter in a text block produces a new block.
-- **Flatten** — when the field *can't* be split — a slate field of a non-slate block (e.g. a `slateTable` cell's `value`), a slate field nested on a `widget: 'object'` (`content/headline`), or a container that's full or in table mode — the extra nodes' content merges back into the first node. No text is lost.
+- **Split** — when the field is the `value` of a `slate` block, each extra
+
+node becomes its own `slate` block, inserted after the original in the   same container (`blocks_layout` or `object_list`). This is how pressing   Enter in a text block produces a new block.
+
+- **Flatten** — when the field *can't* be split — a slate field of a
+
+non-slate block (e.g. a `slateTable` cell's `value`), a slate field nested   on a `widget: 'object'` (`content/headline`), or a container that's full or   in table mode — the extra nodes' content merges back into the first node.   No text is lost.
 
 A frontend renderer can therefore always assume one top-level node per slate field; it never has to handle a multi-node `value`.
+
+**Worked example:** [Table Block](/docs/examples/table) — a slate value per cell, each its own field.
 
 ## Complete Slate Rendering Example
 
@@ -355,3 +393,5 @@ Usage:
   <!-- renderSlate(block.value) output goes here -->
 </div>
 ```
+
+**Worked example:** [Slate (Text) Block](/docs/examples/slate) — the block itself, rendered per stack.

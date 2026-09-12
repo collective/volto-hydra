@@ -6,10 +6,10 @@ contributors: []
 creators:
   - admin
 description: "The link picker, image picker, and upload dialog are part of
-  Inka's chrome — they look the same on every site. What varies by design system
-  is which links and images are click-to-edit in the preview: a site might wire
-  up every link inline, or only a few \"primary\" links, with everything else
-  editable from the sidebar. Same applies to images."
+  Hydra's chrome — they look the same on every site. What varies by design
+  system is which links and images are click-to-edit in the preview: a site
+  might wire up every link inline, or only a few \"primary\" links, with
+  everything else editable from the sidebar. Same applies to images."
 effective: 2025-01-01T00:00:00
 exclude_from_nav: false
 expires: null
@@ -37,22 +37,25 @@ blocks-assignments:
   - { uid: img-10 }
   - { uid: p-11 }
   - { uid: ul-12 }
-  - { uid: h-13 }
-  - { uid: p-14 }
-  - { uid: h-15 }
-  - { uid: p-16 }
-  - { uid: ul-17 }
-  - { uid: img-18 }
-  - { uid: h-19 }
-  - { uid: p-20 }
-  - { uid: ul-21 }
-  - { uid: p-22 }
-  - { uid: h-23 }
-  - { uid: p-24 }
-  - { uid: h-25 }
-  - { uid: p-26 }
-  - { uid: ul-27 }
-  - { uid: p-28 }
+  - { uid: p-13 }
+  - { uid: ul-14 }
+  - { uid: p-15 }
+  - { uid: h-16 }
+  - { uid: p-17 }
+  - { uid: h-18 }
+  - { uid: p-19 }
+  - { uid: ul-20 }
+  - { uid: img-21 }
+  - { uid: h-22 }
+  - { uid: p-23 }
+  - { uid: ul-24 }
+  - { uid: p-25 }
+  - { uid: h-26 }
+  - { uid: p-27 }
+  - { uid: h-28 }
+  - { uid: p-29 }
+  - { uid: ul-30 }
+  - { uid: p-31 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -62,7 +65,7 @@ blocks-matched: |
 
 # Links and media
 
-The link picker, image picker, and upload dialog are part of Inka's chrome — they look the same on every site. What varies by design system is **which** links and images are click-to-edit in the preview: a site might wire up every link inline, or only a few "primary" links, with everything else editable from the sidebar. Same applies to images.
+The link picker, image picker, and upload dialog are part of Hydra's chrome — they look the same on every site. What varies by design system is **which** links and images are click-to-edit in the preview: a site might wire up every link inline, or only a few "primary" links, with everything else editable from the sidebar. Same applies to images.
 
 ## Editing a link
 
@@ -95,8 +98,13 @@ The two buttons at the top right switch between **Sub items** (pages inside this
 
 Which spots are offered is up to the site's design system — most sites make every heading linkable. Two things worth knowing:
 
-- **The page you're editing is live.** Add a heading and it's immediately available as a target, before you save.
-- **Other pages use their last saved version.** If a heading was added to another page but not saved yet, it won't appear until that page is saved.
+- **The page you're editing is live.** Add a heading and it's immediately available as a
+
+target, before you save.
+
+- **Other pages use their last saved version.** If a heading was added to another page but
+
+not saved yet, it won't appear until that page is saved.
 
 ## Uploading media
 

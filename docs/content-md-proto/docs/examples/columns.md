@@ -32,7 +32,6 @@ blocks-assignments:
   - { id: ref-columns-rendering-jsx-a52cb0 }
   - { id: ref-columns-rendering-vue-526eec }
   - { id: ref-columns-rendering-svelte-9b4eec }
-  - { id: ref-columns-rendering-astro-481d9d }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -182,12 +181,6 @@ A horizontal multi-column container. The block has one slot — columns — rest
 
 ```{literalinclude} ../../../examples/examples/svelte/ColumnsBlock.svelte
 :language: svelte
-```
-
-### Astro
-
-```{literalinclude} ../../../examples/examples/astro/ColumnsBlock.astro
-:language: astro
 ```
 
 </block>

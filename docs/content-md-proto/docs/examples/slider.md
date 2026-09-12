@@ -33,7 +33,6 @@ blocks-assignments:
   - { id: ref-slider-rendering-jsx-87bcad }
   - { id: ref-slider-rendering-vue-6e69c4 }
   - { id: ref-slider-rendering-svelte-586973 }
-  - { id: ref-slider-rendering-astro-a4ec65 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -200,12 +199,6 @@ A carousel/slider that cycles through slides. Slides are stored as an object\_li
 
 ```{literalinclude} ../../../examples/examples/svelte/SliderBlock.svelte
 :language: svelte
-```
-
-### Astro
-
-```{literalinclude} ../../../examples/examples/astro/SliderBlock.astro
-:language: astro
 ```
 
 </block>

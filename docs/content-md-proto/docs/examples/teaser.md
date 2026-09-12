@@ -46,7 +46,6 @@ blocks-assignments:
   - { id: ref-teaser-rendering-jsx-d1dd76 }
   - { id: ref-teaser-rendering-vue-fc123a }
   - { id: ref-teaser-rendering-svelte-bf19cf }
-  - { id: ref-teaser-rendering-astro-a9659f }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -188,12 +187,6 @@ A content preview card that links to another page. Selecting a target page via t
 
 ```{literalinclude} ../../../examples/examples/svelte/TeaserBlock.svelte
 :language: svelte
-```
-
-### Astro
-
-```{literalinclude} ../../../examples/examples/astro/TeaserBlock.astro
-:language: astro
 ```
 
 </block>

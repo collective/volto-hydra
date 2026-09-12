@@ -60,6 +60,8 @@ A block can declare several `blocks_layout` regions; they all share the one `blo
 > `blocks_layout`, never at a field named for the region. Renderers must read the
 > ordering from `blocks_layout[<region>]`, not from `<region>.items`.
 
+**Worked examples:** [Grid Block](./examples/grid.md) — one region of free children, narrowed by `allowedBlocks`; [Columns Block](./examples/columns.md) — a `columns` region whose children are themselves regions.
+
 ## Multiple regions
 
 A container (or the page) can declare more than one **region** — each a schema property with its own `allowedBlocks`. The default region is `items`.
@@ -92,11 +94,116 @@ properties: {
 
 Each blocks field has its own `allowedBlocks` / `maxLength`. A declared field appears in the editor even when empty (it gets a seeded empty block so it is editable and a drop target).
 
+**Worked example:** [Search Block](./examples/search.md) — facets in one region and results in another, on the same block.
+
 ### Why these persist (and separate top-level fields don't)
 
 `blocks_layout` regions live as **keys inside the registered `blocks_layout` dict** rather than as separate top-level fields (the older `header_blocks` / `footer_blocks` style) for one concrete reason: **persistence**.
 
 The backend deserializer only saves values for **registered fields**. `blocks` and `blocks_layout` are registered behavior fields, so the entire `blocks_layout` dict — every list inside it — is stored verbatim. An ad-hoc top-level field like `footer_blocks` is **not** a registered field, so the backend **silently drops it on save**. (A footer might still appear on the live site if a layout template re-injects it on every load — but that footer is never actually persisted.) Keeping every region inside the registered `blocks_layout` dict makes them all persist for real.
+
+## Restricting slate styles per region
+
+A region can also declare which **slate styles** its text may carry — the same
+idea as `allowedBlocks`, one level down. Four optional keys, all lists of slate
+element `type` values:
+
+<!-- codeExample: javascript -->
+```javascript
+properties: {
+    items: {
+        widget: 'blocks_layout',
+        allowedBlocks: ['slate', 'image'],
+        allowedStyles: ['p', 'h2', 'h3', 'ul', 'ol', 'li', 'strong', 'em'],
+        disallowedStyles: ['blockquote'],
+        // Leaf marks, for plugins that use Editor.addMark. Rarely needed.
+        allowedMarks: null,
+        disallowedMarks: ['highlight'],
+    },
+}
+```
+
+`allowedStyles` names element types, which covers block-level formats (`p`,
+`h2`, `ul`, `li`) **and** inline ones — volto-slate models bold and italic as
+inline *elements* (`strong`, `em`, `del`, `sub`, `sup`, `u`, `code`), so one
+list matches what the toolbar actually toggles. `link` is structural rather than
+styling and is never restrictable: dropping it would lose an href.
+
+### A design system's own styles
+
+The style menu's entries are named by their CSS class with a **leading dot** —
+`.nsw-small`, the shape `getSlateVocabulary` reports them under, so a class
+called `p` cannot collide with the element type `p`:
+
+<!-- codeExample: javascript -->
+```javascript
+properties: {
+    items: { widget: 'blocks_layout', disallowedStyles: ['.nsw-small'] },
+    footer: { widget: 'blocks_layout' },   // still offers it
+}
+```
+
+They need their own key because volto-slate does not retype the node for them:
+`toggleBlockStyleInSelection` writes `styleName: "nsw-small"` (space separated
+when several apply), beside a `type` that stays `p`. A disallowed one is
+**stripped** rather than retyped — the paragraph was always a paragraph, it was
+only wearing a style this region does not offer — and the style dropdown stops
+offering it, which is the surface an author applies it from.
+
+Declaring nothing leaves every style available, so this changes nothing for a
+frontend that doesn't opt in.
+
+### It applies everywhere, not just the toolbar
+
+Hiding a toolbar button is cosmetic — the format still arrives by paste, by
+hotkey, or by a markdown shortcut. A declaration here is enforced at all of
+them: the block-format dropdown, `Ctrl+B`-style hotkeys, the `>`-space markdown
+shortcuts, paste (the pasted HTML is normalized before it becomes blocks), and
+the stored value itself, which is normalized when the editor loads the page.
+Anything the load pass would rewrite is also logged to the console, so a
+migration shows up while editing rather than as a surprise diff on the next
+save.
+
+### There is no global level, and no per-field level
+
+The page's own blocks fields — declared on the `_page` schema — are the
+outermost regions, so declaring there **is** the site-wide default. And every
+slate value belongs to a block, and every block to a region, so a region
+declaration already reaches a block's own slate fields (a teaser's
+`description`, a table cell) without a per-field key.
+
+### Inheritance: deny accumulates, allow replaces
+
+Rules fold from the outermost region inwards:
+
+- **`disallowedStyles` accumulates.** A style banned at the page level stays
+  banned for everything nested inside it — a child region cannot re-enable it by
+  listing it in `allowedStyles`.
+- **`allowedStyles` replaces.** A nested region restates the list for its own
+  subtree, and may deliberately widen it — an article region can allow `h4` even
+  when the page's default list stops at `h3`.
+
+### What a disallowed style becomes
+
+`config.settings.slate.styleAliases` maps a style to what it should become. It
+is a rename, not a permission — one global map, because a downgrade target has
+to be valid wherever the downgrade lands:
+
+<!-- codeExample: javascript -->
+```javascript
+config.settings.slate.styleAliases = { b: 'strong', i: 'em', blockquote: 'p' };
+```
+
+With no alias, a top-level node becomes `config.settings.slate.defaultBlockType`
+(`p`), and an inline one is unwrapped — its text stays, without the formatting.
+Nothing is ever deleted.
+
+A downgrade never changes how many top-level nodes a slate field holds, because
+[a field always holds exactly one](visual-editing.md#one-top-level-node-per-slate-field)
+and renderers are told they may assume it. So a denied *wrapper* collapses rather
+than splitting: denying `ul` turns `ul > li, li` into a single paragraph holding
+both items' content, not two paragraphs. Inline children survive the collapse —
+a `strong` inside a denied `blockquote` is still bold afterwards.
 
 ## object_list: a region stored inline
 
@@ -128,6 +235,8 @@ slides: {
 }
 ```
 
+**Worked examples:** [Accordion Block](./examples/accordion.md) — each panel an inline item holding its own region of child blocks; [Slider Block](./examples/slider.md) — slides as inline items with fields of their own.
+
 ## object_list with allowedBlocks: Typed Items
 
 When `allowedBlocks` is set on an `object_list`, items can have different types (like `blocks_layout`) but are still stored as an array. Each item's type is stored in the field specified by `typeField` (defaults to `'@type'`) and its schema is looked up from `blocks`:
@@ -155,6 +264,8 @@ facets: {
 ```
 
 Both `blocks_layout` and `object_list` look the same in the editing UI and blocks can be dragged between them — data is automatically adapted when moving between formats (ID fields added/stripped, type fields set appropriately).
+
+**Worked example:** [Form Block](./examples/form.md) — one item type per kind of field, chosen by `field_type`.
 
 ## widget: 'object': nesting fields (and containers) inside a block field
 
@@ -196,11 +307,11 @@ This replaces `dataPath`: declare the container inside the object rather than ho
 
 ## Container schema reference
 
-A block's schema is a standard [Volto block schema](https://6.docs.plone.org/volto/blocks/editcomponent.html) (fieldsets, `properties`, widgets, `default`, etc.). Inka reads three container-oriented `widget` values plus a few per-field keys — those are:
+A block's schema is a standard [Volto block schema](https://6.docs.plone.org/volto/blocks/editcomponent.html) (fieldsets, `properties`, widgets, `default`, etc.). Hydra reads three container-oriented `widget` values plus a few per-field keys — those are:
 
 | `widget` | Storage | Key fields |
 |---|---|---|
-| `blocks_layout` | children are ids in the parent's shared `blocks` dict; this field's name is a region key under `blocks_layout` | `allowedBlocks`, `maxLength`, `allowedTemplates` |
+| `blocks_layout` | children are ids in the parent's shared `blocks` dict; this field's name is a region key under `blocks_layout` | `allowedBlocks`, `maxLength`, `allowedTemplates`, `allowedStyles` / `disallowedStyles` / `allowedMarks` / `disallowedMarks` ([slate styles](#restricting-slate-styles-per-region)) |
 | `object_list` | inline array on the field itself | `idField` (default `@id`), `schema` (item schema), `allowedBlocks` + `typeField` (typed items), `defaultBlockType`, `maxLength`, `addMode: 'table'` |
 | `object` | groups sub-fields under one key; sub-fields (plain OR the two container widgets above) nest inside | `schema` (the nested properties) |
 
@@ -231,6 +342,16 @@ Add `data-block-uid` to each child element. You don't need to mark the container
 - **`data-block-selector="-1|+1|blockId"`** — Tag paging buttons so sidebar selection can navigate paged containers.
 - **`data-block-selector="uid1 uid2 uid3 …"`** — Space-separated list of uids this element should "expose" when any of them is selected from the admin. The bridge matches with the CSS word-list operator (`[data-block-selector~=...]`), so one trigger can cover many descendants. Use it on a disclosure trigger (collapsed details, accordion header, hidden tab panel button) so that picking any block within from the sidebar opens / scrolls / activates the enclosing container. For `<summary>` triggers the bridge sets `details.open = true` directly (idempotent — won't toggle an already-open disclosure); for everything else it `.click()`s the trigger, skipping the click if `aria-expanded="true"`. The contextNavigation `<summary>` and accordion panel buttons use this pattern; the carousel `+1` / `-1` / specific-slide-uid form above is a special case of the same attribute.
 
+  The bridge resolves a **descendant** of a container that advertises itself: selecting a block nested below the handle walks up the block path map to the nearest ancestor that published one, so a container only has to name what it can reveal, not enumerate every block inside it. It also opens **outside in** — a handle that is itself inside a closed container is skipped until it can be reached, because clicking a hidden trigger opens its own container while the outer one stays shut. Enumerating uids is still worth doing for anything the path map cannot know, such as items a listing synthesises at render time.
+
+- **`data-block-selector="uid#fieldName"`** — a handle that reveals **where one FIELD of that block is edited**, rather than the block as a whole. Use it when a block is drawn in several places at once with a different field in each, and each place has its own trigger. The design system cookie-consent block is the case it was written for: its `message` is rendered into a banner and its category wording into a preferences dialog, both built by the component's own JavaScript into `<body>`, both hidden until their trigger is pressed — while the block's element (an editing bar) is on screen the whole time. A block-level handle is one handle and one click, so whichever half it opened, the other half's wording stayed unreachable from the sidebar. `#` is used because `:` already means navigation (`uid:direction`). Everything except *which handle to click* treats `uid#field` exactly like `uid`: a `data-edit-*` inside such a handle still edits that block — which is why the place a field is edited usually carries the handle **too**, not just the trigger that opens it. Several elements may name the same field; the bridge clicks the first one that is **on screen**, so a hidden half is never the thing it tries to click.
+
+  A worked example, with the schema, the data and all four frontends: [Cookie Consent Block](./examples/cookie-consent.md).
+
+  The reveal is driven from the sidebar, through the message that already existed for it: when the cursor lands in a sidebar field the admin sends `FOCUS_FIELD { blockId, fieldName, moveCaret: false }`. The bridge shows that field's place if it is hidden, and does nothing at all unless a `uid#field` handle advertises that exact field — so it is safe to send on every focus. There is deliberately **no fallback to the block's own handle**: most sidebar fields (an alignment, a link, any setting) have no element on the canvas and never will, so "no element" is the ordinary case rather than a hidden one, and falling back meant every sidebar focus clicked whatever handle the block or its ancestors published. A field's place, when it has none of its own, simply IS the block's — and selecting the block already reveals that, transitively. `moveCaret` defaults to **true** — the original meaning, "reveal it and put the cursor in it", which is what the admin sends when handing editing back (a LinkEditor closing). One message, two intents; not two messages.
+
+- **A block drawn in two places** — put `data-block-uid` on the **content**, and `data-block-selector` on the trigger. A tab is the clearest case: its label lives on the button in the tab bar, its code in a panel that is hidden (or not rendered at all) unless that tab is active. If the button carried the uid, the bridge would see a visible element and conclude the block is on screen, so selecting an inactive tab from the sidebar would never reveal the code the author wants to edit. With the uid on the panel, the ordinary visibility check does the right thing, and `data-block-selector` on the button both reveals the tab and tells the bridge that a `data-edit-*` inside it edits *that* block, even though the uid element is elsewhere. Applies to any control that stands in for content it can show — tab buttons, thumbnail strips, step indicators.
+
 ## Table Mode
 
 Set `addMode: 'table'` for table-like structures (rows containing cells). This lets users add and remove columns as easily as rows. The rows live inside a `table` object field (`block.table.rows`) — no `dataPath`:
@@ -258,17 +379,19 @@ table: {
 }
 ```
 
+**Worked example:** [Table Block](./examples/table.md) — `addMode: "table"` with an `idField`, so every row has the same cells.
+
 ## Empty Blocks
 
-A container region can never be truly empty. When its last child is deleted, Inka fills it back in — but *what* it inserts depends on the region's config:
+A container region can never be truly empty. When its last child is deleted, Hydra fills it back in — but *what* it inserts depends on the region's config:
 
 - If the region has a **`defaultBlockType`**, that type is added.
 - If the region allows exactly **one** `allowedBlocks` type, that type is added.
-- Only when the region has **no `defaultBlockType` and more than one `allowedBlocks`** is the choice ambiguous — so Inka inserts a placeholder child with `@type: "empty"` and shows a '+' for the user to pick a type in place.
+- Only when the region has **no `defaultBlockType` and more than one `allowedBlocks`** is the choice ambiguous — so Hydra inserts a placeholder child with `@type: "empty"` and shows a '+' for the user to pick a type in place.
 
 So the simplest way to never deal with empty placeholders in a region is to give it a `defaultBlockType` (or a single-entry `allowedBlocks`). Otherwise your frontend must render `empty`.
 
-Empty blocks are stripped before saving. Render them as empty space; Inka puts a '+' button in the middle for the user to pick a real type in place. You can override the look of that '+' by rendering something inside the empty block and adding `data-block-add="button"` to it.
+Empty blocks are stripped before saving. Render them as empty space; Hydra puts a '+' button in the middle for the user to pick a real type in place. You can override the look of that '+' by rendering something inside the empty block and adding `data-block-add="button"` to it.
 
 ### Making a region empty by default — `defaultBlockType: "empty"`
 
@@ -289,10 +412,10 @@ announcement: {
 ```
 
 This is the one case where `"empty"` is a **configured** default rather than the
-fallback Inka inserts for an ambiguous region. The seed and the add diverge on
+fallback Hydra inserts for an ambiguous region. The seed and the add diverge on
 purpose:
 
-- **Passive seed** (region loaded, or its last child deleted): Inka seeds a bare
+- **Passive seed** (region loaded, or its last child deleted): Hydra seeds a bare
   `@type: "empty"` placeholder — nothing renders. `defaultBlockType` wins over the
   single-`allowedBlocks` auto-fill, so the region genuinely shows empty.
 - **The '+' (active add / fill)**: inserts a real block from `allowedBlocks`

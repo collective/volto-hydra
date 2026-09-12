@@ -44,9 +44,12 @@ blocks-assignments:
   - { uid: dc27e427-babe-4497-a6ae-fdefeaba2d13 }
   - { uid: bde519a7-d6c0-4bf5-b84b-d832f7f4cdd6 }
   - { uid: 38e1fde4-8886-4673-9316-5e1b96bcc222 }
+  - { uid: 38e1fde4-8886-4673-9316-5e1b96bcc222-n2 }
   - { uid: af96daae-955d-42f8-a5e7-c7943fb2e321 }
   - { uid: a7ffd7f2-5dbf-4b5c-b24e-d10db0dff8df }
+  - { uid: a7ffd7f2-5dbf-4b5c-b24e-d10db0dff8df-n2 }
   - { uid: c1163fcc-e2a4-4e81-b6ab-af537c8b4d56 }
+  - { uid: c1163fcc-e2a4-4e81-b6ab-af537c8b4d56-n2 }
   - { uid: 47cef702-7d66-4313-b3ec-585408735218 }
   - { uid: caa483f6-bc0f-4a5a-94d2-925897969928 }
   - { uid: e770913c-fb7b-4cf1-94a8-7eb6e24ff66e }
@@ -122,19 +125,9 @@ Paragraph text (p, 24/33px) -> Lorem ipsum dolor sit amet, consetetur sadipscing
 
 <block type="button" inneralign="left" title="Button text (button, 18/24px)" />
 
-<block type="gridBlock">
+<block type="gridBlock" data-json='{"blocks":[{"@type":"slate","plaintext":"Text Heading (H2, 30/36px)","value":[{"children":[{"text":"Text Heading (H2, 30/36px)"}],"type":"h2"}]},{"@type":"slate","value":[{"children":[{"text":"For grid blocks, the font of the headlines are variable, depending on the number of cells in the grid."}],"type":"p"}],"plaintext":"For grid blocks, the font of the headlines are variable, depending on the number of cells in the grid."}]}' />
 
-**Text Heading (H2, 30/36px)** For grid blocks, the font of the headlines are variable, depending on the number of cells in the grid.
-
-</block>
-
-<block type="gridBlock">
-
-**Text Heading (H3, 24/30px)** Paragraph Text (p, 18/24px)
-
-**Text Heading (H3, 24/30px)** Paragraph Text (p, 18/24px)
-
-</block>
+<block type="gridBlock" data-json='{"blocks":[{"@type":"slate","plaintext":"Text Heading (H3, 24/30px)","value":[{"children":[{"text":"Text Heading (H3, 24/30px)"}],"type":"h2"}]},{"@type":"slate","value":[{"children":[{"text":"Paragraph Text (p, 18/24px)"}],"type":"p"}],"plaintext":"Paragraph Text (p, 18/24px)"},{"@type":"slate","plaintext":"Text Heading (H3, 24/30px)","value":[{"children":[{"text":"Text Heading (H3, 24/30px)"}],"type":"h2"}]},{"@type":"slate","value":[{"children":[{"text":"Paragraph Text (p, 18/24px)"}],"type":"p"}],"plaintext":"Paragraph Text (p, 18/24px)"}]}' />
 
 <block type="toc" variation="default" data-json='{"levels":["h2","h3"]}' />
 

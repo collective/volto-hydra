@@ -1183,14 +1183,361 @@ function buildConceptShell(folder, mdContent) {
 // content/.../docs/<parent>/<slug>/, mirroring the Sphinx tree.
 const DOCS_CONTENT_DIR = join(CONTENT_DIR, 'docs');
 
-// The markdown parser lives in its own module so it can be unit-tested;
-// sync.mjs runs at import time and cannot be imported from a test.
-import {
-  parseInline, inlineToPlaintext, textToSlate, parseConceptsMd as _parseConceptsMd,
-} from './markdown-to-blocks.mjs';
+/**
+ * Parse markdown inline formatting into Slate leaf array.
+ * Handles `code`, **strong**, *em*, [text](url). Anything else stays as plain text.
+ * Returns an array of leaf objects (each `{ text, ...marks }` or `{ type: 'link', ... }`).
+ */
+function parseInline(text) {
+  const leaves = [];
+  let pos = 0;
+  // Combined matcher: link, strong, em, code — first match wins at each position.
+  const re = /\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*|\*([^*\n]+)\*|`([^`]+)`/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > pos) leaves.push({ text: text.slice(pos, m.index) });
+    if (m[1] !== undefined) {
+      // Link: [text](url) — Volto-slate uses an inline element with `data` href
+      leaves.push({
+        type: 'link',
+        data: { url: m[2] },
+        children: [{ text: m[1] }],
+      });
+    } else if (m[3] !== undefined) {
+      // **bold** → inline element { type: 'strong', children: [{text}] }
+      // (the documented slate node type — see docs/examples/slate.md).
+      // Mark form { text, strong: true } is non-canonical and isn't
+      // round-trippable through the renderer.
+      leaves.push({ type: 'strong', children: [{ text: m[3] }] });
+    } else if (m[4] !== undefined) {
+      leaves.push({ type: 'em', children: [{ text: m[4] }] });
+    } else if (m[5] !== undefined) {
+      leaves.push({ type: 'code', children: [{ text: m[5] }] });
+    }
+    pos = m.index + m[0].length;
+  }
+  if (pos < text.length) leaves.push({ text: text.slice(pos) });
+  if (leaves.length === 0) leaves.push({ text: '' });
+  return leaves;
+}
 
-const parseConceptsMd = (md) =>
-  _parseConceptsMd(md, { imagesParentPath: IMAGES_PARENT_PATH });
+/**
+ * Plain text extraction from inline markdown (drop formatting markers).
+ */
+function inlineToPlaintext(text) {
+  return text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*\n]+)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1');
+}
+
+/**
+ * Convert plain text to a Slate paragraph value array, parsing inline marks.
+ */
+function textToSlate(text) {
+  return [{ type: 'p', children: parseInline(text) }];
+}
+
+/**
+ * Parse a markdown file into a sequence of Plone blocks + layout items.
+ * Handles: # title (skip), ## ### #### headings, paragraphs (with inline
+ * `code`, **bold**, *em*, links), bullet/numbered lists, markdown tables,
+ * fenced code blocks, and <!-- codeExample: lang [label="..."] --> markers.
+ */
+function parseConceptsMd(mdContent) {
+  const blocks = {};
+  const items = [];
+  const lines = mdContent.split('\n');
+  let i = 0;
+  let blockCounter = 0;
+
+  function addBlock(id, block) {
+    blocks[id] = block;
+    items.push(id);
+  }
+
+  function nextId(prefix) {
+    return `${prefix}-${++blockCounter}`;
+  }
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Skip H1 title — the title block in the JSON handles it
+    if (line.startsWith('# ')) {
+      i++;
+      continue;
+    }
+
+    // Horizontal rule (---, ***, ___) → separator block
+    if (/^(\s*[-*_]\s*){3,}$/.test(line.trim()) && line.trim().length >= 3) {
+      const id = nextId('sep');
+      addBlock(id, { '@type': 'separator' });
+      i++;
+      continue;
+    }
+
+    // Standalone image: ![alt](path/to/image.png) → image block.
+    // Matches Phase 5's slug rule: filename without extension.
+    const imgMatch = line.trim().match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (imgMatch) {
+      const alt = imgMatch[1];
+      const url = imgMatch[2];
+      const slug = basename(url).replace(/\.[^.]+$/, '');
+      const id = nextId('img');
+      addBlock(id, {
+        '@type': 'image',
+        url: `${IMAGES_PARENT_PATH}/images/${slug}`,
+        alt,
+        align: 'center',
+        size: 'l',
+      });
+      i++;
+      continue;
+    }
+
+    // H2/H3/H4 heading → slate h2/h3/h4 block
+    const headingMatch = line.match(/^(#{2,4})\s+(.+)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;  // 2, 3, or 4
+      const rawText = headingMatch[2].trim();
+      const id = nextId('h');
+      addBlock(id, {
+        '@type': 'slate',
+        plaintext: inlineToPlaintext(rawText),
+        value: [{ type: `h${level}`, children: parseInline(rawText) }],
+      });
+      i++;
+      continue;
+    }
+
+    // <!-- codeExample: lang [label="..."] --> marker
+    const ceMatch = line.match(/^<!-- codeExample: (\w+)(?:\s+label="([^"]+)")?\s*-->$/);
+    if (ceMatch) {
+      const lang = ceMatch[1];
+      const label = ceMatch[2] || lang.charAt(0).toUpperCase() + lang.slice(1);
+      i++;
+      // Next non-empty line should be the opening fence
+      while (i < lines.length && lines[i].trim() === '') i++;
+      if (lines[i] && lines[i].startsWith('```')) {
+        i++; // skip opening fence
+        const codeLines = [];
+        while (i < lines.length && !lines[i].startsWith('```')) {
+          codeLines.push(lines[i]);
+          i++;
+        }
+        i++; // skip closing fence
+        const id = nextId('ce');
+        addBlock(id, {
+          '@type': 'codeExample',
+          tabs: [{
+            '@id': `${id}-${lang}-${hexSuffix()}`,
+            label,
+            language: lang,
+            code: codeLines.join('\n').trimEnd(),
+          }],
+        });
+      }
+      continue;
+    }
+
+    // Bullet list (lines starting with '- ')
+    if (line.startsWith('- ') || line.startsWith('* ')) {
+      const listItems = [];
+      const plainParts = [];
+      while (i < lines.length && (lines[i].startsWith('- ') || lines[i].startsWith('* '))) {
+        const itemText = lines[i].slice(2).trim();
+        listItems.push({ type: 'li', children: parseInline(itemText) });
+        plainParts.push(inlineToPlaintext(itemText));
+        i++;
+      }
+      const id = nextId('ul');
+      addBlock(id, {
+        '@type': 'slate',
+        plaintext: plainParts.join(' '),
+        value: [{ type: 'ul', children: listItems }],
+      });
+      continue;
+    }
+
+    // Numbered list (lines starting with '1. ', '2. ', etc.)
+    if (/^\d+\.\s/.test(line)) {
+      const listItems = [];
+      const plainParts = [];
+      while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
+        const itemText = lines[i].replace(/^\d+\.\s/, '').trim();
+        listItems.push({ type: 'li', children: parseInline(itemText) });
+        plainParts.push(inlineToPlaintext(itemText));
+        i++;
+      }
+      const id = nextId('ol');
+      addBlock(id, {
+        '@type': 'slate',
+        plaintext: plainParts.join(' '),
+        value: [{ type: 'ol', children: listItems }],
+      });
+      continue;
+    }
+
+    // Markdown pipe table:
+    //   | a | b | c |
+    //   | - | - | - |
+    //   | 1 | 2 | 3 |
+    // → slateTable block. Stops at first non-pipe line.
+    if (line.startsWith('|') && i + 1 < lines.length && /^\|[\s:|-]+\|\s*$/.test(lines[i + 1])) {
+      const cellsFrom = (l) => l.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+      const headerCells = cellsFrom(lines[i]);
+      i += 2; // skip header + separator
+      const bodyRows = [];
+      while (i < lines.length && lines[i].startsWith('|')) {
+        bodyRows.push(cellsFrom(lines[i]));
+        i++;
+      }
+      const id = nextId('tbl');
+      const mkCell = (text, isHeader, rIdx, cIdx) => ({
+        key: `${id}-r${rIdx}c${cIdx}`,
+        type: isHeader ? 'header' : 'data',
+        value: [{ type: 'p', children: parseInline(text) }],
+      });
+      const rows = [
+        { key: `${id}-r0`, cells: headerCells.map((c, cIdx) => mkCell(c, true, 0, cIdx)) },
+        ...bodyRows.map((r, rIdx) => ({
+          key: `${id}-r${rIdx + 1}`,
+          cells: r.map((c, cIdx) => mkCell(c, false, rIdx + 1, cIdx)),
+        })),
+      ];
+      addBlock(id, {
+        '@type': 'slateTable',
+        table: { fixed: true, compact: false, basic: false, celled: true, inverted: false, striped: false, rows },
+      });
+      continue;
+    }
+
+    // Fenced code block without a codeExample marker — wrap as codeExample.
+    // Exception: MyST directive fences like ```{toctree}``` or ```{warning}```
+    // are Sphinx-only markup; the toctree is consumed elsewhere (drives sync
+    // ordering), and admonitions render natively. None of them should leak
+    // into Plone as a codeExample. If we ever want admonition text on the
+    // live site, add a directive-aware branch above.
+    if (line.startsWith('```')) {
+      const lang = line.slice(3).trim() || 'text';
+      i++;
+      const codeLines = [];
+      while (i < lines.length && !lines[i].startsWith('```')) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      i++; // skip closing fence
+      // MyST directive fences: ```{toctree}, ```{warning}, ```{raw} html, etc.
+      // The language token always starts with `{` for these.
+      if (lang.startsWith('{')) continue;
+      const id = nextId('ce');
+      const label = lang.charAt(0).toUpperCase() + lang.slice(1);
+      addBlock(id, {
+        '@type': 'codeExample',
+        tabs: [{
+          '@id': `${id}-${lang}-${hexSuffix()}`,
+          label,
+          language: lang,
+          code: codeLines.join('\n').trimEnd(),
+        }],
+      });
+      continue;
+    }
+
+    // Non-empty paragraph line — collect until blank line
+    if (line.trim() !== '') {
+      const paraLines = [];
+      while (i < lines.length && lines[i].trim() !== '') {
+        // Stop if next line is a heading, list, code fence, or table.
+        if (lines[i].startsWith('#') || lines[i].startsWith('- ') ||
+            lines[i].startsWith('* ') || /^\d+\.\s/.test(lines[i]) ||
+            lines[i].startsWith('```') || lines[i].startsWith('<!--') ||
+            lines[i].startsWith('|')) {
+          break;
+        }
+        paraLines.push(lines[i]);
+        i++;
+      }
+      if (paraLines.length > 0) {
+        const text = paraLines.join(' ').trim();
+        const id = nextId('p');
+        addBlock(id, {
+          '@type': 'slate',
+          plaintext: text,
+          value: textToSlate(text),
+        });
+      }
+      continue;
+    }
+
+    i++;
+  }
+
+  return { blocks, items };
+}
+
+/**
+ * Turn a markdown-relative link into the path the SITE serves.
+ *
+ * The markdown is the source of truth and its links are markdown links —
+ * `[Templates](templates.md#slots)` — which is exactly right for Sphinx, where
+ * pages are files. The Plone content built from it is served at
+ * `/docs/templates`, so those hrefs have to be resolved on the way through:
+ * left alone they render as `/docs/templates.md`, which is a dead link on every
+ * generated page (the page integrity crawl found six of them).
+ *
+ * Anchors survive (`#slots`), a folder's `index.md`/`README.md` collapses to the
+ * folder, and anything that isn't a relative .md link — http(s), mailto, a bare
+ * `#anchor`, an already-absolute path — is returned untouched.
+ *
+ * @param {string} url - the href as written in the markdown
+ * @param {string} base - content folder the page's markdown SIBLINGS live in,
+ *   e.g. "docs" for docs/architecture.md, "docs/what-editors-will-experience"
+ *   for anything inside that directory (its index.md included)
+ * @returns {string} the site path, anchor included
+ */
+function resolveMarkdownLink(url, base) {
+  if (!url || /^(https?:|mailto:|#|\/)/.test(url)) return url;
+  const [target, ...anchorParts] = url.split('#');
+  if (!target.endsWith('.md')) return url;
+  const anchor = anchorParts.length ? `#${anchorParts.join('#')}` : '';
+  let rel = target.slice(0, -'.md'.length);
+  if (/\/(index|README)$/.test(rel)) rel = rel.replace(/\/(index|README)$/, '');
+  const segments = [];
+  for (const part of `${base}/${rel}`.split('/')) {
+    if (!part || part === '.') continue;
+    if (part === '..') segments.pop();
+    else segments.push(part);
+  }
+  return `/${segments.join('/')}${anchor}`;
+}
+
+/**
+ * Rewrite every markdown link in a page's blocks to the path the site serves.
+ *
+ * `base` is where the page's markdown SIBLINGS live, which is the directory
+ * holding its .md file — NOT the parent of its content folder. Those coincide
+ * for a leaf page (docs/architecture.md → folder docs/architecture, siblings in
+ * docs/) but not for a folder index: what-editors-will-experience/index.md sits
+ * in the same directory as its siblings, so `[Selecting blocks](selecting-blocks.md)`
+ * resolves to /docs/what-editors-will-experience/selecting-blocks. Deriving the
+ * base by stripping a segment off the content folder sent it to /docs/selecting-blocks,
+ * a 404, on the two links on that page.
+ */
+function resolveMarkdownLinksInBlocks(blocks, base) {
+  const walk = (node) => {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (!node || typeof node !== 'object') return;
+    if (node.type === 'link' && node.data && typeof node.data.url === 'string') {
+      node.data.url = resolveMarkdownLink(node.data.url, base);
+    }
+    for (const value of Object.values(node)) walk(value);
+  };
+  walk(blocks);
+  return blocks;
+}
 
 const docsMdFiles = Object.keys(CONCEPTS_MD_TO_FOLDER);
 
@@ -1206,6 +1553,15 @@ for (const mdFile of docsMdFiles) {
   }
   const mdContent = readFileSync(mdPath, 'utf-8');
   const { blocks: newBlocks, items: newItems } = parseConceptsMd(mdContent);
+  // Markdown links point at .md files; the site serves paths (see
+  // resolveMarkdownLink). Resolve here, where the page's folder is known.
+  // `folder` is relative to DOCS_CONTENT_DIR, which the site serves at /docs.
+  // Siblings live in the directory holding this page's .md file.
+  const mdDir = dirname(mdFile);
+  resolveMarkdownLinksInBlocks(
+    newBlocks,
+    mdDir === '.' ? 'docs' : `docs/${mdDir}`,
+  );
 
   // Build the shell every run — title, description, parent metadata, and
   // is_folderish are derived from CONCEPTS_MD_TO_FOLDER + the markdown's H1
@@ -1287,6 +1643,10 @@ for (const mdFile of docsMdFiles) {
   if (existsSync(indexMdPath) && existsSync(indexJsonPath)) {
     const indexMd = readFileSync(indexMdPath, 'utf-8');
     const { blocks: parsedBlocks, items: parsedItems } = parseConceptsMd(indexMd);
+    // The landing page lives at /docs, so its markdown links resolve there too
+    // (this page is generated here rather than in the loop above, and was the
+    // one place still emitting .md hrefs).
+    resolveMarkdownLinksInBlocks(parsedBlocks, 'docs');
     const originalRootJson = readFileSync(indexJsonPath, 'utf-8');
     const rootData = JSON.parse(originalRootJson);
 
@@ -1333,11 +1693,7 @@ for (const mdFile of docsMdFiles) {
 
     const updatedRoot = {
       ...rootData,
-      // Derived from index.md's H1, the same way every other page's title is.
-      // This was the hard-coded string 'Volto Hydra Documentation', so every
-      // sync silently reset the docs root title and any rename was undone on
-      // the next run.
-      title: (indexMd.match(/^#\s+(.+)$/m)?.[1] || rootData.title).trim(),
+      title: 'Volto Hydra Documentation',
       description: indexMd.split('\n').slice(1).find(l => l.trim() && !l.startsWith('#') && !l.startsWith('```')) || rootData.description,
       blocks: { [titleId]: { '@type': 'title' }, ...parsedBlocks, ...preservedBlocks },
       blocks_layout: { items: newLayout },

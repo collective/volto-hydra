@@ -22,23 +22,10 @@ title: Images
 blocks-assignments:
   - { uid: 55e93046-15ee-41f5-b63c-fde0d9b6ce52 }
   - { uid: 183bf050-57b7-4841-b9c8-f9b5a15fe086 }
-  - { uid: gallery-penguin1 }
-  - { uid: gallery-penguin2 }
-  - { uid: gallery-penguin3 }
-  - { uid: gallery-penguin4 }
-  - { uid: gallery-quadrant }
   - { uid: 2d181d1f-1fac-420a-b410-4f4d5379f8ea }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
-  <block type="image" description="${p?/text}" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
-  <block type="image" url="${img/src}" alt="${img?/alt}" title="${img?/title}" align="center" size="l" />
-blocks-tagged: |
-  <block type="gridBlock" headline="${h/text}">
-    <region name="blocks" widget="blocks_layout">
-      <block type="teaser" title="${h/text}" description="${p/text}" />
-    </region>
-  </block>
 blobs:
   - file: penguin2.jpg
     uid: 05bace45294c45d5ab93de883e7ce702
@@ -64,18 +51,6 @@ blobs:
 
 # Images
 
-<block type="gridBlock">
-
-<block type="image" align="center" image_field="image" size="l" title="Image" url="/images/penguin1.jpg" />
-
-<block type="image" align="center" image_field="image" size="l" title="Image" url="/images/penguin2.jpg" />
-
-<block type="image" align="center" image_field="image" size="l" title="Image" url="/images/penguin3.jpg" />
-
-<block type="image" align="center" image_field="image" size="l" title="Image" url="/images/penguin4.jpg" />
-
-<block type="image" align="center" image_field="image" size="l" title="Image" url="/images/quadrant" />
-
-</block>
+<block type="listing" headlineTag="h2" variation="image" />
 
 <block type="slate" data-json='{"value":[{"children":[{"text":""}],"type":"p"}]}' />

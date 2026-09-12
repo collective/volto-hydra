@@ -4,6 +4,8 @@ A full-width hero section with heading, subheading, image, rich text description
 
 This is a **custom** block — register it via `initBridge`.
 
+**Demonstrates:** [HTML Annotations for Visual Editing](../visual-editing.md#html-annotations-for-visual-editing) — text, rich text, media and link in a single block.
+
 ## Schema
 
 ```json
@@ -33,7 +35,8 @@ This is a **custom** block — register it via `initBridge`.
         },
         "description": {
           "title": "Description",
-          "widget": "slate"
+          "widget": "slate",
+          "type": "array"
         }
       }
     },
@@ -91,7 +94,7 @@ function HeroBlock({ block }) {
   const imageSrc = getImageUrl(block.image);
 
   // Data-driven: render a field only when it has data. No data ⇒ no element, so
-  // view markup stays clean. Inka reveals an empty optional field for editing by
+  // view markup stays clean. Hydra reveals an empty optional field for editing by
   // seeding it, which makes these same checks true — no edit-mode branch needed.
   return (
     <div data-block-uid={block['@uid']} className="hero-block">
@@ -125,7 +128,7 @@ function HeroBlock({ block }) {
 ```vue
 <template>
   <!-- Data-driven: render a field only when it has data. No data ⇒ no element, so
-       view markup stays clean. Inka reveals an empty optional field for editing by
+       view markup stays clean. Hydra reveals an empty optional field for editing by
        seeding it, which makes these same checks true — no edit-mode branch needed. -->
   <div :data-block-uid="block['@uid']" class="hero-block">
     <img v-if="block.image" data-edit-media="image" :src="heroImageSrc" alt="Hero image" />
@@ -166,7 +169,7 @@ const heroImageSrc = computed(() => getImageUrl(props.block.image));
 </script>
 
 <!-- Data-driven: render a field only when it has data. No data ⇒ no element, so
-     view markup stays clean. Inka reveals an empty optional field for editing by
+     view markup stays clean. Hydra reveals an empty optional field for editing by
      seeding it, which makes these same checks true — no edit-mode branch needed. -->
 <div data-block-uid={block['@uid']} class="hero-block">
   {#if block.image}

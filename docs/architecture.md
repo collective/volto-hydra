@@ -1,6 +1,6 @@
-# How Inka Works
+# How Hydra Works
 
-Instead of combining editing and rendering into one framework and codebase, these are separated and during editing a two way communication channel is opened across an iframe so that the editing UI is no longer part of the frontend code. Instead a small JS file called hydra.js is included in your frontend during editing that handles the iframe bridge communication to Inka which is running in the same browser window.
+Instead of combining editing and rendering into one framework and codebase, these are separated and during editing a two way communication channel is opened across an iframe so that the editing UI is no longer part of the frontend code. Instead a small JS file called hydra.js is included in your frontend during editing that handles the iframe bridge communication to Hydra which is running in the same browser window.
 
 ---
 
@@ -25,7 +25,7 @@ You could think of it as splitting Volto into two parts, Rendering and CMS UI/Ad
  Editing UI          │ iFrame Bridge                    │
           │          ▼                                  │
           │   ┌──────────────┐                          │
-          │   │    Inka     │◄─────────────────────────┘
+          │   │    Hydra     │◄─────────────────────────┘
           │   └──────────────┘
 
               ┌──────────────┐                       ┌─────────────┐
@@ -35,7 +35,7 @@ You could think of it as splitting Volto into two parts, Rendering and CMS UI/Ad
 
 ## The iframe ↔ admin bridge
 
-During editing the frontend is loaded inside an iframe owned by Inka's admin UI. The two communicate via `postMessage` over the iframe boundary:
+During editing the frontend is loaded inside an iframe owned by Hydra's admin UI. The two communicate via `postMessage` over the iframe boundary:
 
 - **Admin → frontend**: form-data updates, selection changes, route changes.
 - **Frontend → admin**: which block was clicked (selection), which slate node holds the cursor, where blocks live in the rendered DOM, slate transform requests so the admin can compute the new value.
@@ -89,29 +89,29 @@ In normal mode the net effect matches the merge's own placement rules (a top/bot
 
 ## URL flattening and `publicURL`
 
-Volto's stock URL helpers (`flattenToAppURL`, `isInternalURL`, `toPublicURL`) assume there's one "public URL" — usually the same origin the admin runs on, configured via `RAZZLE_PUBLIC_URL`. In Inka the admin and the published frontend(s) live on different origins, and the editor switches between published frontends at will, so there is no single public URL.
+Volto's stock URL helpers (`flattenToAppURL`, `isInternalURL`, `toPublicURL`) assume there's one "public URL" — usually the same origin the admin runs on, configured via `RAZZLE_PUBLIC_URL`. In Hydra the admin and the published frontend(s) live on different origins, and the editor switches between published frontends at will, so there is no single public URL.
 
-**Do not set `RAZZLE_PUBLIC_URL`** in an Inka deployment. Pinning `settings.publicURL` to one value would break flattening for every other frontend — pastes from them would be misrecognised as external and saved verbatim instead of as `/path` references.
+**Do not set `RAZZLE_PUBLIC_URL`** in a Hydra deployment. Pinning `settings.publicURL` to one value would break flattening for every other frontend — pastes from them would be misrecognised as external and saved verbatim instead of as `/path` references.
 
-Inka makes `settings.publicURL` follow the currently active iframe frontend:
+Hydra makes `settings.publicURL` follow the currently active iframe frontend:
 
 - **Boot** — `applyConfig` reads the `iframe_url_<port>` cookie (set by `View.jsx` on previous visits), looks up the matching saved-frontends entry, and writes `settings.publicURL = entry.publishUrl || entry.url`. A returning editor sees the right value before they open the switcher.
-- **Switch** — when the editor picks a different frontend in the toolbar switcher (`FrontendSwitcherPanel`), it dispatches `setFrontendPreviewUrl(url)`. Inka's `publicUrlSync` Redux middleware intercepts the action and updates `settings.publicURL` before the next render.
+- **Switch** — when the editor picks a different frontend in the toolbar switcher (`FrontendSwitcherPanel`), it dispatches `setFrontendPreviewUrl(url)`. Hydra's `publicUrlSync` Redux middleware intercepts the action and updates `settings.publicURL` before the next render.
 - **Other frontends** — `flattenToAppURL` and `isInternalURL` are shadowed to strip `publicURL` (the active frontend) **plus** every other saved frontend's edit / publish URL, so a paste from a frontend you're not currently viewing still flattens cleanly.
 
 Saved frontends come from two sources, merged: the `RAZZLE_DEFAULT_IFRAME_URL` env (baseline list shipped with the deployment, format `Name|EditURL[|PublishURL],…`) and the `saved_urls_<port>` cookie (per-editor additions made via the toolbar Settings modal). The optional third slot in each entry is for setups where the published site lives at a different origin than the edit-mode frontend (e.g. `edit.example.com` for previews, `www.example.com` for production).
 
-What we deliberately did NOT shadow: `UniversalLink`'s fallback `href` when an item is empty, Volto's admin-side `Robots.txt` / `Sitemap.xml` generators, `ContentMetadataTags` / `AlternateHrefLangs` in the admin's `<head>`, and the `RegistryImageWidget` site-logo URL. All of these inherit the dynamic `publicURL` transparently, and in an Inka deployment the authoritative `robots.txt` / `sitemap.xml` / SEO tags are served by the frontends, not the admin.
+What we deliberately did NOT shadow: `UniversalLink`'s fallback `href` when an item is empty, Volto's admin-side `Robots.txt` / `Sitemap.xml` generators, `ContentMetadataTags` / `AlternateHrefLangs` in the admin's `<head>`, and the `RegistryImageWidget` site-logo URL. All of these inherit the dynamic `publicURL` transparently, and in a Hydra deployment the authoritative `robots.txt` / `sitemap.xml` / SEO tags are served by the frontends, not the admin.
 
 ## Building a frontend
 
-The steps for creating an Inka-compatible frontend are the same across frameworks: catch-all route → fetch page from Plone REST API → render blocks recursively → add `data-block-uid` and `data-edit-*` attributes on editable elements → load `hydra.js` only inside the admin iframe.
+The steps for creating a Hydra-compatible frontend are the same across frameworks: catch-all route → fetch page from Plone REST API → render blocks recursively → add `data-block-uid` and `data-edit-*` attributes on editable elements → load `hydra.js` only inside the admin iframe.
 
 See [Build a frontend](build-a-frontend.md) for the full step-by-step guide, or the example frontends: [Nuxt.js](https://github.com/collective/volto-hydra/tree/main/examples/nuxt-blog-starter), [Next.js](https://github.com/collective/volto-hydra/tree/main/examples/hydra-nextjs), [F7-Vue](https://github.com/collective/volto-hydra/tree/main/examples/hydra-vue-f7).
 
 ## Layers of adoption
 
-Inka is **additive**: each layer below works on its own, and each next row enhances editing without breaking what came before. You can ship at any row, mix rows on the same site, and add the next layer when you're ready.
+Hydra is **additive**: each layer below works on its own, and each next row enhances editing without breaking what came before. You can ship at any row, mix rows on the same site, and add the next layer when you're ready.
 
 | Step | What you wire up | What editors get |
 | ---- | ---------------- | ---------------- |
@@ -123,6 +123,6 @@ Inka is **additive**: each layer below works on its own, and each next row enhan
 | **Direct field editing** | Add `data-edit-text`, `data-edit-link`, `data-edit-media` to specific elements. | Click rendered text and start typing. Click an image to pick or upload. Click a link to open the link picker. Markdown shortcuts (`##`, `**bold**`, etc.). |
 | **Templates and layouts** | Configure `allowedTemplates` / `allowedLayouts` on a region; use `expandTemplates` at render time. See [Templates](templates.md). | Editors pick layouts from a dropdown, insert template snippets via the BlockChooser, recognise locked vs editable vs slot blocks. |
 | **Listings and dynamic content** | Configure listing block types and pass `fetchItems` to `expandListingBlocks`. See [Listings](listings.md). | A `fieldMapping` widget on listing blocks maps query results to item fields. Listings render as repeated blocks, editable per item. |
-| **Custom UI / advanced** | Override Volto components, or drive frontend-side editing via `sendBlockUpdate` / `sendBlockAction`. See [Advanced](advanced.md#custom-sidebar-and-cms-ui). | Bespoke widgets, custom block edit forms, in-frontend interactions for blocks Inka's defaults don't fit. |
+| **Custom UI / advanced** | Override Volto components, or drive frontend-side editing via `sendBlockUpdate` / `sendBlockAction`. See [Advanced](advanced.md#custom-sidebar-and-cms-ui). | Bespoke widgets, custom block edit forms, in-frontend interactions for blocks Hydra's defaults don't fit. |
 
 Different parts of the same site can sit at different rows — inline-editable headlines on a marketing page, sidebar-only editing on a complex catalog page.

@@ -4,6 +4,8 @@ A call-to-action button with an editable label and link.
 
 This is a **custom** block — register it via `initBridge`.
 
+**Demonstrates:** [HTML Annotations for Visual Editing](../visual-editing.md#html-annotations-for-visual-editing) — `data-edit-text` and `data-edit-link` on one element.
+
 ## Schema
 
 ```json

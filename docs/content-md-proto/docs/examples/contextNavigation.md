@@ -36,7 +36,6 @@ blocks-assignments:
   - { id: ref-contextNavigation-rendering-jsx-25968a }
   - { id: ref-contextNavigation-rendering-vue-af752b }
   - { id: ref-contextNavigation-rendering-svelte-a27836 }
-  - { id: ref-contextNavigation-rendering-astro-7718b9 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -216,12 +215,6 @@ A vertical navigation list for grouped pages — a left sidebar on desktop and a
 
 ```{literalinclude} ../../../examples/examples/svelte/ContextNavigationBlock.svelte
 :language: svelte
-```
-
-### Astro
-
-```{literalinclude} ../../../examples/examples/astro/ContextNavigationBlock.astro
-:language: astro
 ```
 
 </block>

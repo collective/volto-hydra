@@ -57,17 +57,18 @@ blocks-assignments:
   - { uid: p-30 }
   - { uid: ol-31 }
   - { uid: p-32 }
-  - { uid: h-33 }
-  - { uid: p-34 }
+  - { uid: p-33 }
+  - { uid: h-34 }
   - { uid: p-35 }
   - { uid: p-36 }
-  - { uid: ul-37 }
-  - { uid: p-38 }
-  - { uid: img-39 }
-  - { uid: h-40 }
-  - { uid: p-41 }
-  - { uid: h-42 }
-  - { uid: p-43 }
+  - { uid: p-37 }
+  - { uid: ul-38 }
+  - { uid: p-39 }
+  - { uid: img-40 }
+  - { uid: h-41 }
+  - { uid: p-42 }
+  - { uid: h-43 }
+  - { uid: p-44 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -150,9 +151,8 @@ When `allowedLayouts` is configured for a page (or a region), the sidebar shows 
 
 1. The new layout's structure replaces the old one.
 2. Your existing content is **redistributed** into the new layout's slots based on `slotId`:
-   - Content tagged with a slot name is placed into the matching slot in the new layout.
-   - Content with no slot tag falls into the `"default"` slot if the new layout has one; otherwise into the bottom or top slot, or is dropped.
-   - Fixed blocks with the same `slotId` get their editable content carried over (text, media); their structural settings come from the new layout.
+
+\- Content tagged with a slot name is placed into the matching slot in the new layout.    - Content with no slot tag falls into the `"default"` slot if the new layout has one; otherwise into the bottom or top slot, or is dropped.    - Fixed blocks with the same `slotId` get their editable content carried over (text, media); their structural settings come from the new layout.
 
 The point of `slotId` is that two layouts can share the same set of region names — switch between them and your content lands in the right places automatically.
 

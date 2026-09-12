@@ -5,7 +5,7 @@ allow_discussion: false
 contributors: []
 creators:
   - admin
-description: This guide is for content editors using an Inka-powered site. It
+description: This guide is for content editors using a Hydra-powered site. It
   covers how to use the editor — how to select things, edit text, add and move
   blocks, work with containers and templates — without assuming you know how the
   site was built.
@@ -97,13 +97,13 @@ order:
 
 # Editor Guide
 
-This guide is for **content editors** using an Inka-powered site. It covers how to use the editor — how to select things, edit text, add and move blocks, work with containers and templates — without assuming you know how the site was built.
+This guide is for **content editors** using a Hydra-powered site. It covers how to use the editor — how to select things, edit text, add and move blocks, work with containers and templates — without assuming you know how the site was built.
 
-## Inka mechanics vs your site's design system
+## Hydra mechanics vs your site's design system
 
 Two layers are stacked on the editor screen:
 
-- **Inka's mechanics** — the toolbar, sidebar, selection borders, Quanta toolbar, slash menu, link picker, image picker, container operations. These look and behave the same on every Inka-powered site, and this guide covers them.
+- **Hydra's mechanics** — the toolbar, sidebar, selection borders, Quanta toolbar, slash menu, link picker, image picker, container operations. These look and behave the same on every Hydra-powered site, and this guide covers them.
 - **Your site's design system** — what block types exist, how they render, which fields are inline-editable, the names you see in menus. The live preview comes straight from your frontend, so a "paragraph" might be called "Lead paragraph", an image block might have a caption your developers added, the slash-menu list of available block types reflects what your site registered. The mechanics are the same; only the labels and visuals change.
 
 If something in this guide doesn't match what you see, it's almost always because your design system named or styled it differently — the underlying interaction is still the same.
@@ -128,14 +128,14 @@ The editor screen has three regions:
 
 - **Toolbar (left)** — saving, navigating to other pages, site settings. Standard Volto, plus the **Frontend switcher** (see below).
 - **Live preview (centre)** — your actual frontend, running inside an iframe. This is what readers will see. Click directly into the preview to edit.
-- **Sidebar (right)** — when no block is selected, lists the page-level fields (title, description, blocks). When a block is selected, shows that block's settings, the chain of parent containers, and (for container blocks) the list of children. See [Selecting blocks](selecting-blocks.md) for the navigation patterns.
+- **Sidebar (right)** — when no block is selected, lists the page-level fields (title, description, blocks). When a block is selected, shows that block's settings, the chain of parent containers, and (for container blocks) the list of children. See [Selecting blocks](/docs/what-editors-will-experience/selecting-blocks) for the navigation patterns.
 
 ### Frontend switcher
 
 A toolbar button opens the **Frontend switcher** panel with two sections:
 
 - **Viewport** — preview the page at common screen sizes (desktop, tablet, mobile). Pure visual switch — no content change.
-- **Frontend** — list of saved frontend URLs the editor can switch between. Picking one swaps the iframe to that frontend immediately. Same content, different rendering — an Inka-defining feature: edit a page once, see it on the marketing site, the docs site, the mobile app's web version, and the email-renderer in turn without leaving the page.
+- **Frontend** — list of saved frontend URLs the editor can switch between. Picking one swaps the iframe to that frontend immediately. Same content, different rendering — a Hydra-defining feature: edit a page once, see it on the marketing site, the docs site, the mobile app's web version, and the email-renderer in turn without leaving the page.
 
 A **Settings** button at the bottom of the panel manages the saved URLs (add, remove, rename). The currently active frontend is highlighted in the list.
 
@@ -168,7 +168,7 @@ Pressing `Escape` is always safe. It progressively backs out:
 2. If a block is selected (block mode) → goes up to the parent container.
 3. If nothing is selected → no-op.
 
-So `Escape` repeatedly takes you up one level at a time. See [Selecting blocks](selecting-blocks.md) for what selection looks like at each level.
+So `Escape` repeatedly takes you up one level at a time. See [Selecting blocks](/docs/what-editors-will-experience/selecting-blocks) for what selection looks like at each level.
 
 ## Editing on a phone
 
@@ -202,7 +202,7 @@ A side panel is impossible on a 375 px screen. Instead, opening the sidebar (via
 
 ### Escaping nested blocks with `⬆`
 
-Phones don't have an `Escape` key. To walk back up out of a nested block (a teaser inside a grid, a paragraph inside a column), the Quanta toolbar shows an extra **`⬆` button** to the left of `⋯` whenever the selected block has a parent. One tap selects the parent container; tap again to keep walking up.
+Phones don't have an `Escape` key. To walk back up out of a nested block (a teaser inside a grid, a paragraph inside a column), the Quanta toolbar shows an extra **\`⬆\` button** to the left of `⋯` whenever the selected block has a parent. One tap selects the parent container; tap again to keep walking up.
 
 <block type="image">
 

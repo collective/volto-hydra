@@ -359,10 +359,9 @@ test.describe('Navigation and URL Handling', () => {
     // Go to view mode (not edit)
     await page.goto(helper.contentUrl('/test-page'));
 
-    // Wait for all blocks to render (Nuxt async components)
-    await helper.getStableBlockCount();
-
-    // Wait for iframe content to load
+    // No quiescence wait here: the assertion below IS the condition (the
+    // paragraph is visible once the blocks have rendered), and it fails with a
+    // useful message if they never do.
     const iframe = helper.getIframe();
     await expect(iframe.locator('text=This is a test paragraph')).toBeVisible({ timeout: 10000 });
 

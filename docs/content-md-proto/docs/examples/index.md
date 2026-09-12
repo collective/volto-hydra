@@ -28,6 +28,7 @@ order:
   - button
   - columns
   - contextNavigation
+  - cookie-consent
   - form
   - grid
   - heading
@@ -44,6 +45,7 @@ order:
   - separator
   - slate
   - slider
+  - suggest
   - table
   - teaser
   - toc

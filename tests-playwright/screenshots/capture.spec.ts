@@ -109,9 +109,12 @@ test.describe('Editor Guide screenshots', () => {
     await helper.login();
     await helper.navigateToEdit(SHOWCASE_PATH);
 
-    // Click the empty image block to surface its placeholder UI.
-    await helper.clickBlockInIframe('image-empty');
-    await helper.waitForBlockSelectedInAdmin('image-empty');
+    // Snap an image block before a file is picked — the state an author sees
+    // the moment they insert one. NOT stored in the fixture: `url` is required,
+    // and stored content with an empty required field contradicts its schema.
+    const uid = await helper.addBlockOnCanvas('empty-slate', 'image');
+    await helper.clickBlockInIframe(uid);
+    await helper.waitForBlockSelectedInAdmin(uid);
 
     await snap(page, 'media-empty-placeholder');
   });

@@ -5,9 +5,8 @@ allow_discussion: null
 contributors: []
 creators:
   - admin
-description: Design-system-first page building. Strike the right balance for
-  your site — make it easy for editors to create engagement while staying
-  compliant.
+description: A Visual Headless CMS — true visual editing with drag and drop
+  blocks using any frontend stack
 effective: null
 exclude_from_nav: false
 expires: null
@@ -18,19 +17,24 @@ review_state: null
 rights: ""
 subjects: []
 table_of_contents: null
-title: Inka
+title: Volto Hydra
 blocks-assignments:
   - { uid: hero-headline }
   - { uid: hero-subhead }
   - { uid: hero-cta }
+  - { uid: video-hero-001 }
   - { uid: why-hydra-heading }
   - { uid: why-hydra-tagline }
   - { uid: why-hydra-quadrant }
   - { uid: why-hydra-grid }
   - { uid: box-visual }
+  - { uid: box-visual-n2 }
   - { uid: box-frontend }
+  - { uid: box-frontend-n2 }
   - { uid: box-enterprise }
+  - { uid: box-enterprise-n2 }
   - { uid: box-opensource }
+  - { uid: box-opensource-n2 }
   - { uid: quickstart-heading }
   - { uid: quickstart-code }
   - { id: tab-nuxt }
@@ -43,8 +47,12 @@ blocks-assignments:
   - { id: ef8ceecc-7c1d-4e0a-9b67-a56e7d03f6e3 }
   - { uid: fae599f3-e7d4-451b-a413-84355c796b7e }
   - { uid: c9f92df8-81fd-4259-a149-5c8798735350 }
+  - { uid: c9f92df8-81fd-4259-a149-5c8798735350-n2 }
   - { uid: d78b666f-b07b-4036-9853-efe6263515aa }
+  - { uid: d78b666f-b07b-4036-9853-efe6263515aa-n2 }
+  - { uid: d78b666f-b07b-4036-9853-efe6263515aa-n3 }
   - { uid: d105783c-fa27-4c92-a3d9-6323adbe5e72 }
+  - { uid: d105783c-fa27-4c92-a3d9-6323adbe5e72-n2 }
   - { uid: 0ab1a8f7-2d26-4933-800c-2f10474afe63 }
   - { uid: e972541f-b114-494b-a51e-cc8b11c8207d }
   - { uid: 9567ae6d-191c-43f1-91cc-4288bbb98f88 }
@@ -86,11 +94,11 @@ blobs:
 
 <block type="slate">
 
-# Design-system-first page building
+# Visual editing. Any frontend.
 
 </block>
 
-Strike the right balance for your site. Make it easy for editors to create engagement — while staying compliant.
+A visual headless CMS using Plone — drag-and-drop blocks and inline text editing, with whichever frontend stack you choose.
 
 <block type="slate">
 
@@ -100,21 +108,31 @@ Strike the right balance for your site. Make it easy for editors to create engag
 
 </block>
 
-## Why Inka
+<block type="video" url="/docs/static/hydra-demo" align="center" data-json='{"autoplay":true,"loop":true,"muted":true,"controls":false}' />
 
-Compliance or engagement is a false choice. You decide where the dial sits for each site.
+## Why Hydra
+
+Most CMS platforms force a trade-off: visual editing or frontend freedom. Hydra gives you both.
 
 <block type="image" align="center" size="l" url="/images/quadrant/@@download/image/quadrant.svg" />
 
 <block type="gridBlock">
 
-**Visual Editing** True WYSIWYG with drag-and-drop blocks. No special frontend framework required — just HTML attributes.
+**Visual Editing**
 
-**Multi frontend, multi backend** Use React, Vue, Nuxt, Next.js or any stack, and switch channels mid-edit.
+True WYSIWYG with drag-and-drop blocks. No special frontend framework required — just HTML attributes.
 
-**Truly Decoupled** Your frontend is independent code you own. Upgrade the CMS without rewriting your site; switch frameworks and get the same editing experience.
+**Any Frontend**
 
-**Open Source** Secure, scalable Plone backend. Host anywhere, control your costs and security.
+Use React, Vue, Nuxt, Next.js, or any stack. Switch between frontends mid-edit for omni-channel delivery.
+
+**Truly Decoupled**
+
+Your frontend is independent code you own. Upgrade the CMS without rewriting your site; switch frameworks and get the same editing experience.
+
+**Open Source**
+
+Secure, scalable Plone backend. Host anywhere, control your costs and security.
 
 </block>
 
@@ -409,9 +427,9 @@ export const POST = async ({ request }) => {
 
 <block type="slider" autoplayDelay=4000>
 
-## You can use this site to test Inka
+## You can use this site to test Hydra
 
-**Welcome to Inka**
+**Welcome to Hydra**
 
 You can log in and experience currently working features (Volto like but on any frontend)
 
@@ -423,7 +441,7 @@ You can log in and experience currently working features (Volto like but on any 
 
 ## You are enjoying one of many possible frontends
 
-**Welcome to Inka's many frontends**
+**Welcome to Hydra's many frontends**
 
 Frontend freedom makes it easy to create beautiful and fast experiences
 
@@ -437,11 +455,20 @@ Frontend freedom makes it easy to create beautiful and fast experiences
 
 <block type="gridBlock">
 
-You can use this site to test Inka Edit. **Disclaimer**: This instance is reset every night, so all changes will be lost afterwards.
+<block type="slate" data-json='{"value":[{"children":[{"text":""},{"children":[{"text":""}],"type":"strong"},{"text":"You can use this site to test Hydra Edit."}],"type":"p"}]}' />
 
-You can **log in** and use it as an admin user using these **credentials**: username: **admin** password: **admin**
+**Disclaimer**: This instance is reset every night, so all changes will be lost afterwards.
 
-This site uses some recommended **add-ons**: Some blocks that are suitable to be used with volto-light-theme. [volto-form-block](https://github.com/collective/volto-form-block)
+You can **log in** and use it as an admin user using these **credentials**:
+
+username: **admin**
+
+password: **admin**
+
+This site uses some recommended **add-ons**:
+
+- Some blocks that are suitable to be used with volto-light-theme.
+- [volto-form-block](https://github.com/collective/volto-form-block)
 
 </block>
 
@@ -454,8 +481,8 @@ This site uses some recommended **add-ons**: Some blocks that are suitable to be
 - [Next.js Example](https://hydra-blogsite-nextjs.vercel.app)
 - [Edit either of these frontends: hydra.pretagov.com](https://hydra.pretagov.com)
 
-## Find out more about Inka
+## Find out more about Hydra
 
-- [Inka on GitHub — source code, issues, and documentation](https://github.com/collective/volto-hydra)
+- [Hydra on GitHub — source code, issues, and documentation](https://github.com/collective/volto-hydra)
 - [Plone 6 Documentation](https://6.docs.plone.org)
 - [Plone Community Forum](https://community.plone.org)

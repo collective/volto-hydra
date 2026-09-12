@@ -22,6 +22,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { test, expect } from '../fixtures';
+import { URLS } from '../ports';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 // When CAPTURE_MOBILE_SCREENSHOTS=1, the four "snapshot" tests at the
@@ -723,7 +724,7 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     await page.setViewportSize({ width: 375, height: 812 });
     const helper = new AdminUIHelper(page);
     await helper.login();
-    await page.goto('http://localhost:3001/test-page');
+    await page.goto(`${URLS.voltoSsr}/test-page`);
 
     await page.locator('#toolbar-frontend-switcher').click();
     await isBottomSheet(page, '.frontend-switcher-panel');
@@ -735,7 +736,7 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     await page.setViewportSize({ width: 375, height: 812 });
     const helper = new AdminUIHelper(page);
     await helper.login();
-    await page.goto('http://localhost:3001/test-page');
+    await page.goto(`${URLS.voltoSsr}/test-page`);
 
     await page.locator('#toolbar-frontend-switcher').click();
     await page
@@ -756,7 +757,7 @@ test.describe('Admin layout — mobile (≤767px)', () => {
       {
         name: 'sidebar_expanded',
         value: 'true',
-        url: 'http://localhost:3001',
+        url: URLS.voltoSsr,
       },
     ]);
     await page.setViewportSize({ width: 375, height: 812 });
@@ -803,7 +804,7 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     await page.setViewportSize({ width: 412, height: 915 });
     const helper = new AdminUIHelper(page);
     await helper.login();
-    await page.goto('http://localhost:3001/test-page');
+    await page.goto(`${URLS.voltoSsr}/test-page`);
     const bar = page.locator('#toolbar-body');
     await expect(bar).toBeVisible();
 
@@ -833,7 +834,7 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     await page.setViewportSize({ width: 412, height: 915 });
     const helper = new AdminUIHelper(page);
     await helper.login();
-    await page.goto('http://localhost:3001/test-page');
+    await page.goto(`${URLS.voltoSsr}/test-page`);
     const bar = page.locator('#toolbar-body');
     await expect(bar).toBeVisible();
 

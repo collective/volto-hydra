@@ -48,7 +48,6 @@ blocks-assignments:
   - { id: ref-highlight-rendering-jsx-659b6c }
   - { id: ref-highlight-rendering-vue-dd8730 }
   - { id: ref-highlight-rendering-svelte-d3a4c8 }
-  - { id: ref-highlight-rendering-astro-5277f3 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -71,7 +70,7 @@ A prominent content section with a background image, overlay, title, rich text b
 
 </block>
 
-<fields title="Highlight-Block" cta_title="Button" image="/docs/examples/content-types/image-light/@@images/image" data-json='{"description":[{"children":[{"text":"Lorem ipsum dolor sit amet, "},{"children":[{"text":"consetetur sadipscing"}],"data":{"url":"/docs/examples/button"},"type":"link"},{"text":" elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt."}],"type":"p"}],"cta_link":[{"@id":"/docs/examples/content-types/page"}]}'>
+<fields title="Highlight-Block" cta_title="Button" image="/docs/examples/content-types/example-image.jpg/@@images/image" data-json='{"description":[{"children":[{"text":"Lorem ipsum dolor sit amet, "},{"children":[{"text":"consetetur sadipscing"}],"data":{"url":"/docs/examples/button"},"type":"link"},{"text":" elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt."}],"type":"p"}],"cta_link":[{"@id":"/docs/examples/content-types/page"}]}'>
 
 <block type="highlight" data-json='{"styles":{"descriptionColor":"highlight-custom-color-1"}}' />
 
@@ -101,7 +100,8 @@ A prominent content section with a background image, overlay, title, rich text b
         },
         "description": {
           "title": "Description",
-          "widget": "slate"
+          "widget": "slate",
+          "type": "array"
         },
         "image": {
           "title": "Background Image",
@@ -171,12 +171,6 @@ A prominent content section with a background image, overlay, title, rich text b
 
 ```{literalinclude} ../../../examples/examples/svelte/HighlightBlock.svelte
 :language: svelte
-```
-
-### Astro
-
-```{literalinclude} ../../../examples/examples/astro/HighlightBlock.astro
-:language: astro
 ```
 
 </block>

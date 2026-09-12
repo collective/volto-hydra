@@ -36,57 +36,67 @@ blocks-assignments:
   - { uid: p-7 }
   - { uid: ce-8 }
   - { id: ce-8-jsx-37efcc }
-  - { uid: h-9 }
-  - { uid: ul-10 }
-  - { uid: h-11 }
-  - { uid: p-12 }
-  - { uid: tbl-13 }
-  - { uid: p-14 }
+  - { uid: p-9 }
+  - { uid: h-10 }
+  - { uid: ul-11 }
+  - { uid: h-12 }
+  - { uid: p-13 }
+  - { uid: tbl-14 }
   - { uid: p-15 }
-  - { uid: ce-16 }
-  - { id: ce-16-json-38bb3a }
-  - { uid: p-17 }
+  - { uid: p-16 }
+  - { uid: ce-17 }
+  - { id: ce-17-json-4de3c6 }
   - { uid: p-18 }
-  - { uid: h-19 }
-  - { uid: p-20 }
-  - { uid: tbl-21 }
-  - { uid: p-22 }
-  - { uid: ce-23 }
-  - { id: ce-23-json-6d0894 }
-  - { uid: p-24 }
-  - { uid: h-25 }
-  - { uid: p-26 }
+  - { uid: p-19 }
+  - { uid: h-20 }
+  - { uid: p-21 }
+  - { uid: tbl-22 }
+  - { uid: p-23 }
+  - { uid: ce-24 }
+  - { id: ce-24-javascript-db456f }
+  - { uid: p-25 }
+  - { uid: h-26 }
   - { uid: p-27 }
-  - { uid: tbl-28 }
-  - { uid: ce-29 }
-  - { id: ce-29-json-a7c4dc }
-  - { uid: h-30 }
+  - { uid: p-28 }
+  - { uid: tbl-29 }
+  - { uid: ce-30 }
+  - { id: ce-30-json-917152 }
   - { uid: p-31 }
-  - { uid: ce-32 }
-  - { id: ce-32-javascript-f6757f }
+  - { uid: h-32 }
   - { uid: p-33 }
-  - { uid: p-34 }
-  - { uid: h-35 }
+  - { uid: ce-34 }
+  - { id: ce-34-javascript-40451b }
+  - { uid: p-35 }
   - { uid: p-36 }
-  - { uid: ce-37 }
-  - { id: ce-37-javascript-2ec596 }
+  - { uid: h-37 }
   - { uid: p-38 }
-  - { uid: p-39 }
-  - { uid: ul-40 }
+  - { uid: tbl-39 }
+  - { uid: p-40 }
   - { uid: p-41 }
-  - { uid: h-42 }
-  - { uid: p-43 }
-  - { uid: ce-44 }
-  - { id: ce-44-javascript-82ad8e }
-  - { uid: p-45 }
-  - { uid: h-46 }
-  - { uid: p-47 }
-  - { uid: ul-48 }
+  - { uid: p-42 }
+  - { uid: ul-43 }
+  - { uid: p-44 }
+  - { uid: h-45 }
+  - { uid: p-46 }
+  - { uid: ce-47 }
+  - { id: ce-47-javascript-a1148c }
+  - { uid: p-48 }
   - { uid: p-49 }
-  - { uid: p-50 }
+  - { uid: ul-50 }
   - { uid: p-51 }
   - { uid: h-52 }
   - { uid: p-53 }
+  - { uid: ce-54 }
+  - { id: ce-54-javascript-7c227d }
+  - { uid: p-55 }
+  - { uid: h-56 }
+  - { uid: p-57 }
+  - { uid: ul-58 }
+  - { uid: p-59 }
+  - { uid: p-60 }
+  - { uid: p-61 }
+  - { uid: h-62 }
+  - { uid: p-63 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -181,14 +191,16 @@ async function ListingItems({ id, blocks, paging, seen, fetchItems, onPaging }) 
 }
 ```
 
+**Worked example:** [Listing Block](/docs/examples/listing) — the built-in block, with renderers for all four stacks.
+
 ## expandListingBlocks Options
 
-- **`blocks`** — Map of blockId to block data
-- **`fetchItems`** — Required. Map of `{ blockType: async (block, { start, size }) => { items, total } }`. Keys declare which block types to expand; values are fetcher functions. Use `ploneFetchItems()` for Plone backends.
-- **`paging`** — Paging input `{ start, size }` (not mutated). Computed values are returned in the response.
-- **`seen`** — Number of items already seen by prior calls (default: 0). Chain `paging.seen` from one call to the next for grids.
-- **`itemTypeField`** — Field on the listing block that holds the item type (default: `'itemType'`)
-- **`defaultItemType`** — Fallback type when field is not set (default: `'summary'`)
+- **\`blocks\`** — Map of blockId to block data
+- **\`fetchItems\`** — Required. Map of `{ blockType: async (block, { start, size }) => { items, total } }`. Keys declare which block types to expand; values are fetcher functions. Use `ploneFetchItems()` for Plone backends.
+- **\`paging\`** — Paging input `{ start, size }` (not mutated). Computed values are returned in the response.
+- **\`seen\`** — Number of items already seen by prior calls (default: 0). Chain `paging.seen` from one call to the next for grids.
+- **\`itemTypeField\`** — Field on the listing block that holds the item type (default: `'itemType'`)
+- **\`defaultItemType\`** — Fallback type when field is not set (default: `'summary'`)
 
 ## ploneFetchItems Helper
 
@@ -283,9 +295,11 @@ Built-in item types and the fields they expose:
 Types: string (array→join, image→URL), link (→[{@id}]), image (pass through)
 ```
 
+**Worked example:** [RSS Feed Block](/docs/examples/rssFeed) — feed entries mapped onto the item schema by a fetcher you provide.
+
 ## Item Type Selection
 
-Use `variation` on the listing block to control what `@type` expanded items get. Listings reuse the same `inheritSchemaFrom` recipe as container blocks (see [Container Blocks › Synchronised Block Types](container-blocks.md#synchronised-block-types-in-a-container)) but differ in one structural way: there's no blocks field to declare `itemTypeField` on, since listing children are *virtual* (produced from query results at render time, not authored as page data). Instead, declare the typeField directly on the `inheritSchemaFrom` recipe:
+Use `variation` on the listing block to control what `@type` expanded items get. Listings reuse the same `inheritSchemaFrom` recipe as container blocks (see [Container Blocks › Synchronised Block Types](/docs/container-blocks#synchronised-block-types-in-a-container)) but differ in one structural way: there's no blocks field to declare `itemTypeField` on, since listing children are *virtual* (produced from query results at render time, not authored as page data). Instead, declare the typeField directly on the `inheritSchemaFrom` recipe:
 
 ### Javascript
 
@@ -313,9 +327,34 @@ listing: {
 }
 ```
 
-`filterConvertibleFrom: '@default'` restricts the dropdown to types that have a `fieldMappings['@default']` entry — i.e. types that can be populated from the canonical content fields (`@id`, `title`, `description`, `image`) that listing queries return. Each item type's `fieldMappings['@default']` (on its own block config) defines how those source fields land on its schema; that static mapping is enough to render listings. Adding `mappingField` to the enhancer exposes the `FieldMappingWidget` so the editor can override the mapping per listing instance.
+`filterConvertibleFrom: '@default'` restricts the dropdown to types that have a `fieldMappings['@default']` entry — i.e. types that can be populated from the canonical content fields (`@id`, `title`, `description`, `image`) that listing queries return. Each item type's `fieldMappings['@default']` (on its own block config) defines how those source fields land on its schema. Adding `mappingField` to the enhancer exposes the `FieldMappingWidget` so the editor can override the mapping per listing instance.
 
-The widget saves its output as `fieldMapping` (singular) on the block data. `expandListingBlocks` reads that at render time to translate each query result into an item block.
+**Worked example:** [Related Items Block](/docs/examples/relatedItemsListing) — the page's relation field, drawn with a configurable item type.
+
+### Where the mapping lives
+
+`fieldMappings` (plural, on a **block config**) and `fieldMapping` (singular, on **block data**) are different things, and only the singular one is read at render:
+
+<block type="slateTable" table.fixed table.celled>
+
+|  | `fieldMappings['@default']` | `fieldMapping` |
+| --- | --- | --- |
+| Lives on | the item type's block config | the listing block's saved data |
+| Used by | `FieldMappingWidget`, while **editing** | `expandListingBlocks`, at **render** |
+| Role | seeds the widget's smart defaults for the chosen item type | the mapping actually applied to query results |
+
+</block>
+
+The registry mapping is an *editing-time* input: it decides what the widget proposes for the selected `variation`. `expandListingBlocks` never reads a block config — it reads `block.fieldMapping`, and when that is absent falls back to its own default, `{ @id → href, title, description, image }`.
+
+That fallback targets `href`, which suits `link`-shaped item types and not others. A `card`, for example, renders its link from `url`, so a listing of cards with no saved `fieldMapping` produces cards with no link at all.
+
+Two ways to end up with no saved mapping:
+
+- **Hand-authored content.** A listing block written directly into a distribution or fixture JSON never passes through the widget, so nothing is saved. Author `fieldMapping` explicitly.
+- **An untouched widget.** `FieldMappingWidget` *displays* `{ ...smartDefaults, ...saved }`, but only persists rows the editor actually changes. Accepting every proposed default without touching a row leaves `fieldMapping` empty — the sidebar shows one mapping while the page renders with another.
+
+If the item type's fields don't match the render-time fallback, set `fieldMapping` on the block rather than relying on the defaults shown in the sidebar.
 
 ## Combining Listings with Container Syncing
 
@@ -372,13 +411,13 @@ The `pathToApiPath` function is called whenever hydra.js sends a `PATH_CHANGE` m
 
 Both `expandListingBlocks` and `staticBlocks` return `{ items, paging }`. You pass `{ start, size }` as input (not mutated) and get back computed paging values:
 
-- **`currentPage`** (number) — Zero-based current page index
-- **`totalPages`** (number) — Total number of pages
-- **`totalItems`** (number) — Total item count across all blocks
-- **`prev`** (number | null) — Previous page index, or null on first page
-- **`next`** (number | null) — Next page index, or null on last page
-- **`pages`** (array) — Window of \~5 page objects: `{ start, page }` where page is 1-based
-- **`seen`** (number) — Running item count — pass to the next call's `seen` option for position tracking in grids
+- **\`currentPage\`** (number) — Zero-based current page index
+- **\`totalPages\`** (number) — Total number of pages
+- **\`totalItems\`** (number) — Total item count across all blocks
+- **\`prev\`** (number | null) — Previous page index, or null on first page
+- **\`next\`** (number | null) — Next page index, or null on last page
+- **\`pages\`** (array) — Window of \~5 page objects: `{ start, page }` where page is 1-based
+- **\`seen\`** (number) — Running item count — pass to the next call's `seen` option for position tracking in grids
 
 Neither function mutates the input `paging` object — calling again with the same `{ start, size }` is safe.
 

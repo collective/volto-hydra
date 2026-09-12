@@ -48,7 +48,6 @@ blocks-assignments:
   - { id: ref-heading-rendering-jsx-eb01a3 }
   - { id: ref-heading-rendering-vue-754dc2 }
   - { id: ref-heading-rendering-svelte-f5f71c }
-  - { id: ref-heading-rendering-astro-a73687 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -191,12 +190,6 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 ```{literalinclude} ../../../examples/examples/svelte/HeadingBlock.svelte
 :language: svelte
-```
-
-### Astro
-
-```{literalinclude} ../../../examples/examples/astro/HeadingBlock.astro
-:language: astro
 ```
 
 </block>

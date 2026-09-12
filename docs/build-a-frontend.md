@@ -22,7 +22,7 @@ option on `initBridge` plus one small HTTP endpoint.
 
 Before you dive into the steps, here's what your frontend ends up doing.
 
-To make a site editable with Inka you break a page into:
+To make a site editable with Hydra you break a page into:
 
 - **Blocks fields** — one or more named, ordered lists of blocks. Each is a schema property with `widget: 'blocks_layout'`; the field name is a key inside the page's `blocks_layout` dict (the default field is `items`, plus e.g. `header`, `footer`). Every field's blocks live in the page's single shared `blocks` dict; the field only records ordering.
 - **Blocks** — discrete visual elements with a schema and settings that can be moved and edited.
@@ -31,7 +31,7 @@ To make a site editable with Inka you break a page into:
     - `slate` is a special field that contains JSON for a paragraph, heading etc.
     - `blocks` fields let a block hold other blocks.
 
-When the page loads inside Inka's edit iframe, you initialise the bridge and declare your blocks; otherwise you render normally from the API:
+When the page loads inside Hydra's edit iframe, you initialise the bridge and declare your blocks; otherwise you render normally from the API:
 
 ```js
 let bridge;
@@ -93,7 +93,7 @@ Page data ends up shaped like this — one shared `blocks` dict, and a region pe
 Regions are sub-keys of `blocks_layout` — **not** separate top-level fields — because that is what makes them persist. `blocks_layout` is a registered backend field (a Plone behavior field), so the whole dict, including every region, is saved verbatim. A separate top-level field such as `footer_blocks` would be **silently dropped** by the backend on save, because it isn't a registered field. See [Container blocks](container-blocks.md) for the data model in full.
 ```
 
-Then you augment the rendered HTML with `data-` attributes (or `<!-- hydra ... -->` comments) so Inka can find your blocks and editable fields:
+Then you augment the rendered HTML with `data-` attributes (or `<!-- hydra ... -->` comments) so Hydra can find your blocks and editable fields:
 
 ```html
 <!-- hydra edit-text=title -->
@@ -109,7 +109,7 @@ Then you augment the rendered HTML with `data-` attributes (or `<!-- hydra ... -
 ```
 
 ```{tip}
-You can embed the Inka tags directly if you want:
+You can embed the Hydra tags directly if you want:
 `<p data-edit-text="title">A caption</p>`
 ```
 
@@ -132,14 +132,14 @@ block) can show a hierarchy:
 <figure id="fig-1" data-linkable-id="Figure 1">…</figure>
 ```
 
-Inka harvests these per block on render as `{ id, name, level }` and stores them in
+Hydra harvests these per block on render as `{ id, name, level }` and stores them in
 the block's data, so the object browser offers them as `path#pricing` link targets —
 as a nested list reflecting the page's structure. Both attributes must survive into your
-**published** render for the anchor to resolve at runtime — Inka only reads them in
+**published** render for the anchor to resolve at runtime — Hydra only reads them in
 edit mode.
 
 **Level is optional / automatic.** If you use plain `data-linkable-id` on an element
-that is *itself* an `h1`–`h6`, Inka infers the level from the tag — so tagging every
+that is *itself* an `h1`–`h6`, Hydra infers the level from the tag — so tagging every
 heading with `data-linkable-id` still yields a hierarchy for free. Precedence is:
 explicit `data-linkable-h{n}` > the element's heading tag > none (a level-less leaf).
 Given the flat, document-ordered anchor list, `buildAnchorTree` (in
@@ -149,7 +149,7 @@ a flat list.
 It's your choice which elements are linkable — a common pattern is to tag every heading,
 deriving its `id` from a slug of the heading text. If you want a heading to be linkable
 *while it's being edited* (before save), keep its `id`/`data-linkable-id` current as the
-text changes — e.g. a small `input` listener that re-slugifies the heading. Inka harvests
+text changes — e.g. a small `input` listener that re-slugifies the heading. Hydra harvests
 anchors both on render **and** when inline edits flush, merging them into the edit form's
 `block._linkableAnchors` so a freshly-typed heading becomes linkable on the page being
 edited without saving first; other pages use their last saved anchors.
@@ -256,15 +256,15 @@ Form-block is a plugin that allows a visual form builder:
 
 ## Deployment patterns
 
-Inka separates your production frontend from the editing experience, which gives you choice in how each is deployed.
+Hydra separates your production frontend from the editing experience, which gives you choice in how each is deployed.
 
 ### SPA / Hybrid — full visual editing
 
 The simplest setup — your frontend handles both production and editing:
 
 1. Deploy your frontend as SPA or Hybrid (SSR + client-side hydration).
-2. Deploy Inka and the Plone API server.
-3. Log in to Inka, go to user preferences, set your frontend URL.
+2. Deploy Hydra and the Plone API server.
+3. Log in to Hydra, go to user preferences, set your frontend URL.
 
 This gives you all visual editing features including inline text editing, drag and drop, and realtime preview.
 
@@ -273,16 +273,16 @@ This gives you all visual editing features including inline text editing, drag a
 Get the speed of static generation while keeping visual editing. Deploy two versions of the same frontend:
 
 1. **Production** — deploy your frontend in SSG or SSR mode (fast, cacheable).
-2. **Editing** — deploy the same frontend in SPA mode to a separate URL (used only inside Inka).
-3. **Inka + Plone** — only needs to run during editing, so scale-to-zero / serverless works.
+2. **Editing** — deploy the same frontend in SPA mode to a separate URL (used only inside Hydra).
+3. **Hydra + Plone** — only needs to run during editing, so scale-to-zero / serverless works.
 4. **SSG rebuild** — for SSG, configure [collective.webhook](https://github.com/collective/collective.webhook) to trigger a rebuild on edit. SSR doesn't need this.
 
 ### Example: the Nuxt.js demo
 
-The default Inka demo uses exactly the SSG / SSR pattern above:
+The default Hydra demo uses exactly the SSG / SSR pattern above:
 
 - **Production** — [SSG on Netlify](https://hydra-nuxt-flowbrite.netlify.app/). All pages statically generated, images optimized, fast globally.
-- **Editing** — same Nuxt codebase deployed as SPA to a different Netlify URL. Only loaded inside Inka's iframe.
-- **Inka + Plone** — deployed to [fly.io](https://hydra.pretagov.com) with scale-to-zero. Cost is free or minimal since it only runs during editing.
+- **Editing** — same Nuxt codebase deployed as SPA to a different Netlify URL. Only loaded inside Hydra's iframe.
+- **Hydra + Plone** — deployed to [fly.io](https://hydra.pretagov.com) with scale-to-zero. Cost is free or minimal since it only runs during editing.
 
 For most frameworks, switching between SSG / SSR and SPA is just a config toggle, so you get the best of both worlds with minimal effort.

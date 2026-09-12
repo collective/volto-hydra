@@ -5,7 +5,7 @@ allow_discussion: false
 contributors: []
 creators:
   - admin
-description: Inka works with any frontend, including ones that have no client-side
+description: Hydra works with any frontend, including ones that have no client-side
 effective: 2025-01-01T00:00:00
 exclude_from_nav: false
 expires: null
@@ -62,6 +62,13 @@ blocks-assignments:
   - { uid: p-30 }
   - { uid: h-31 }
   - { uid: ul-32 }
+  - { uid: p-33 }
+  - { uid: ul-34 }
+  - { uid: p-35 }
+  - { uid: ul-36 }
+  - { uid: p-37 }
+  - { uid: ul-38 }
+  - { uid: p-39 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -84,7 +91,7 @@ blocks-tagged: |
 
 # Server-rendered frontends
 
-Inka works with any frontend, including ones that have no client-side reactivity at all — pure server-rendered frameworks like **Astro**, **PHP**, **Django**, **Rails**, **Laravel**, **Symfony**, **Go html/template**. The bridge ships a built-in pattern for these: one config option on `initBridge` and one small endpoint on your server.
+Hydra works with any frontend, including ones that have no client-side reactivity at all — pure server-rendered frameworks like **Astro**, **PHP**, **Django**, **Rails**, **Laravel**, **Symfony**, **Go html/template**. The bridge ships a built-in pattern for these: one config option on `initBridge` and one small endpoint on your server.
 
 ## When you need this
 
@@ -138,7 +145,7 @@ For the bridge to swap `[data-block-uid=X].outerHTML` reliably, every block's **
 
 The recommended pattern: write a `BlockRenderer` (or equivalent) wrapper in your templating language that puts the `<div data-block-uid={id}>` around every block before dispatching to the block's own template. Then block authors don't think about it — the wrapper IS the contract.
 
-That dispatch must also handle `@type: "empty"` — the placeholder Inka seeds into any container region with no `defaultBlockType` and more than one `allowedBlocks` — by rendering an empty, selectable slot (with its `data-block-uid`) rather than erroring. See [Empty Blocks](container-blocks.md#empty-blocks).
+That dispatch must also handle `@type: "empty"` — the placeholder Hydra seeds into any container region with no `defaultBlockType` and more than one `allowedBlocks` — by rendering an empty, selectable slot (with its `data-block-uid`) rather than erroring. See [Empty Blocks](/docs/container-blocks#empty-blocks).
 
 ## Worked example: Astro
 
@@ -214,7 +221,7 @@ function findBlockById(formData, blockId) {
 }
 ```
 
-The full working example lives at [`docs/examples/test-astro/`](https://github.com/collective/volto-hydra/tree/main/docs/examples/test-astro) with block components in [`docs/examples/examples/astro/`](https://github.com/collective/volto-hydra/tree/main/docs/examples/examples/astro).
+The full working example lives at [\`docs/examples/test-astro/\`](https://github.com/collective/volto-hydra/tree/main/docs/examples/test-astro) with block components in [\`docs/examples/examples/astro/\`](https://github.com/collective/volto-hydra/tree/main/docs/examples/examples/astro).
 
 ## Worked example: PHP
 
@@ -322,7 +329,18 @@ Everything else — the diff, the POST, the swap, the `data-block-uid` contract 
 
 ## Caveats
 
-- **Network round trip per edit.** Faster than full reload (Sanity's approach) but slower than client-side reconciliation. For a typical edit (one block at a time) it's a few hundred bytes and a few milliseconds on a same-origin endpoint. Don't put the endpoint behind authentication that adds another round trip.
-- **`data-block-uid` MUST be the outer element.** A wrapper around the block from outside the renderer (e.g. a CSS-grid `<li>` your layout adds) will break `outerHTML` swaps — the swap would replace the wrapper too. Always wrap inside the renderer.
-- **The endpoint must be on the same origin** as the rendered page (or CORS-enabled). The bridge POSTs from the iframe child to whatever URL you give it; cross-origin without CORS will fail.
-- **The endpoint receives the full formData on every edit.** Don't log it to disk or replay it — it's editing state, potentially containing unpublished content.
+- **Network round trip per edit.** Faster than full reload (Sanity's
+
+approach) but slower than client-side reconciliation. For a typical   edit (one block at a time) it's a few hundred bytes and a few   milliseconds on a same-origin endpoint. Don't put the endpoint behind   authentication that adds another round trip.
+
+- **\`data-block-uid\` MUST be the outer element.** A wrapper around the
+
+block from outside the renderer (e.g. a CSS-grid `<li>` your layout   adds) will break `outerHTML` swaps — the swap would replace the wrapper   too. Always wrap inside the renderer.
+
+- **The endpoint must be on the same origin** as the rendered page (or
+
+CORS-enabled). The bridge POSTs from the iframe child to whatever URL   you give it; cross-origin without CORS will fail.
+
+- **The endpoint receives the full formData on every edit.** Don't log
+
+it to disk or replay it — it's editing state, potentially containing   unpublished content.

@@ -5,7 +5,7 @@ allow_discussion: false
 contributors: []
 creators:
   - admin
-description: The block chooser, slash menu, and drag handles are part of Inka
+description: The block chooser, slash menu, and drag handles are part of Hydra
   and look the same everywhere. What you can pick from those choosers — the list
   of block types — comes from your site's design system. One site might offer
   "Lead paragraph", "Pull quote", "Stat highlight"; another might just have
@@ -75,7 +75,7 @@ blocks-tagged: |
 
 # Adding and moving blocks
 
-The block chooser, slash menu, and drag handles are part of Inka and look the same everywhere. What you can pick from those choosers — the list of block types — comes from your site's design system. One site might offer "Lead paragraph", "Pull quote", "Stat highlight"; another might just have "Text" and "Image". Mechanic is identical.
+The block chooser, slash menu, and drag handles are part of Hydra and look the same everywhere. What you can pick from those choosers — the list of block types — comes from your site's design system. One site might offer "Lead paragraph", "Pull quote", "Stat highlight"; another might just have "Text" and "Image". Mechanic is identical.
 
 ## Adding a block
 
@@ -113,7 +113,7 @@ Drop targets are filtered by `allowedBlocks` — the line/shade indicator only a
 
 ### Reordering from the sidebar
 
-The sidebar's children list (visible when a container block is selected) has a drag handle (`⋮⋮`) on each child row. Drag it up or down to reorder children **within** the same container. Useful when the children are paged (slides of a slider, panels of an accordion) and you can't drag in the preview because only one is visible at a time. See [Selecting blocks › The children list](selecting-blocks.md#the-children-list-going-down).
+The sidebar's children list (visible when a container block is selected) has a drag handle (`⋮⋮`) on each child row. Drag it up or down to reorder children **within** the same container. Useful when the children are paged (slides of a slider, panels of an accordion) and you can't drag in the preview because only one is visible at a time. See [Selecting blocks › The children list](/docs/what-editors-will-experience/selecting-blocks#the-children-list-going-down).
 
 ### Cut / copy / paste
 
@@ -144,11 +144,11 @@ In block mode (after pressing `Escape`):
 
 ## Working with multiple blocks at once
 
-If you've selected multiple blocks (see [Selecting blocks](selecting-blocks.md)):
+If you've selected multiple blocks (see [Selecting blocks](/docs/what-editors-will-experience/selecting-blocks)):
 
 - **Drag and drop** — works on the whole group; line indicator shows where the group will land.
 - **Delete** — removes all selected blocks.
-- **Wrap / Convert / Cut / Copy / Paste** — all apply to the group. See [Containers](containers.md) for wrap.
+- **Wrap / Convert / Cut / Copy / Paste** — all apply to the group. See [Containers](/docs/what-editors-will-experience/containers) for wrap.
 
 ## Empty containers
 

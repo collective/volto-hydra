@@ -4,6 +4,8 @@ A prominent content section with a background image, overlay, title, rich text b
 
 This is a **custom** block — register it via `initBridge`.
 
+**Demonstrates:** [HTML Annotations for Visual Editing](../visual-editing.md#html-annotations-for-visual-editing) — a slate body and a link, annotated where they are read.
+
 ## Schema
 
 ```json
@@ -16,7 +18,8 @@ This is a **custom** block — register it via `initBridge`.
         },
         "description": {
           "title": "Description",
-          "widget": "slate"
+          "widget": "slate",
+          "type": "array"
         },
         "image": {
           "title": "Background Image",

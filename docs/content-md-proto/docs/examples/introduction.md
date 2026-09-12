@@ -48,7 +48,6 @@ blocks-assignments:
   - { id: ref-introduction-rendering-jsx-599242 }
   - { id: ref-introduction-rendering-vue-53106b }
   - { id: ref-introduction-rendering-svelte-9e2b59 }
-  - { id: ref-introduction-rendering-astro-6e9a3b }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
@@ -97,7 +96,8 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
       "properties": {
         "value": {
           "title": "Text",
-          "widget": "slate"
+          "widget": "slate",
+          "type": "array"
         }
       }
     }
@@ -147,12 +147,6 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 ```{literalinclude} ../../../examples/examples/svelte/IntroductionBlock.svelte
 :language: svelte
-```
-
-### Astro
-
-```{literalinclude} ../../../examples/examples/astro/IntroductionBlock.astro
-:language: astro
 ```
 
 </block>

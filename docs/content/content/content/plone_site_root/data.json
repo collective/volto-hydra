@@ -61,13 +61,13 @@
     },
     "why-hydra-heading": {
       "@type": "slate",
-      "plaintext": "Why Inka",
+      "plaintext": "Why Hydra",
       "styles": {},
       "value": [
         {
           "children": [
             {
-              "text": "Why Inka"
+              "text": "Why Hydra"
             }
           ],
           "type": "h2"
@@ -76,13 +76,13 @@
     },
     "why-hydra-tagline": {
       "@type": "slate",
-      "plaintext": "Compliance or engagement is a false choice. You decide where the dial sits for each site.",
+      "plaintext": "Most CMS platforms force a trade-off: visual editing or frontend freedom. Hydra gives you both.",
       "styles": {},
       "value": [
         {
           "children": [
             {
-              "text": "Compliance or engagement is a false choice. You decide where the dial sits for each site."
+              "text": "Most CMS platforms force a trade-off: visual editing or frontend freedom. Hydra gives you both."
             }
           ],
           "type": "p"
@@ -100,10 +100,9 @@
       "blocks": {
         "box-visual": {
           "@type": "slate",
-          "plaintext": "Visual Editing. True WYSIWYG with drag-and-drop blocks. No special frontend framework required — just HTML attributes.",
+          "plaintext": "Visual Editing",
           "value": [
             {
-              "type": "p",
               "children": [
                 {
                   "children": [
@@ -112,42 +111,36 @@
                     }
                   ],
                   "type": "strong"
-                },
-                {
-                  "text": " True WYSIWYG with drag-and-drop blocks. No special frontend framework required — just HTML attributes."
                 }
-              ]
+              ],
+              "type": "p"
             }
           ]
         },
         "box-frontend": {
           "@type": "slate",
-          "plaintext": "Multi frontend, multi backend. Use React, Vue, Nuxt, Next.js or any stack, and switch channels mid-edit.",
+          "plaintext": "Any Frontend",
           "value": [
             {
-              "type": "p",
               "children": [
                 {
                   "children": [
                     {
-                      "text": "Multi frontend, multi backend"
+                      "text": "Any Frontend"
                     }
                   ],
                   "type": "strong"
-                },
-                {
-                  "text": " Use React, Vue, Nuxt, Next.js or any stack, and switch channels mid-edit."
                 }
-              ]
+              ],
+              "type": "p"
             }
           ]
         },
         "box-enterprise": {
           "@type": "slate",
-          "plaintext": "Truly Decoupled. Your frontend is independent code you own. Upgrade the CMS without rewriting your site; switch frameworks and get the same editing experience.",
+          "plaintext": "Truly Decoupled",
           "value": [
             {
-              "type": "p",
               "children": [
                 {
                   "children": [
@@ -156,20 +149,17 @@
                     }
                   ],
                   "type": "strong"
-                },
-                {
-                  "text": " Your frontend is independent code you own. Upgrade the CMS without rewriting your site; switch frameworks and get the same editing experience."
                 }
-              ]
+              ],
+              "type": "p"
             }
           ]
         },
         "box-opensource": {
           "@type": "slate",
-          "plaintext": "Open Source. Secure, scalable Plone backend. Host anywhere, control your costs and security.",
+          "plaintext": "Open Source",
           "value": [
             {
-              "type": "p",
               "children": [
                 {
                   "children": [
@@ -178,33 +168,91 @@
                     }
                   ],
                   "type": "strong"
-                },
-                {
-                  "text": " Secure, scalable Plone backend. Host anywhere, control your costs and security."
                 }
-              ]
+              ],
+              "type": "p"
             }
           ]
+        },
+        "box-visual-n2": {
+          "@type": "slate",
+          "value": [
+            {
+              "children": [
+                {
+                  "text": "True WYSIWYG with drag-and-drop blocks. No special frontend framework required — just HTML attributes."
+                }
+              ],
+              "type": "p"
+            }
+          ],
+          "plaintext": "True WYSIWYG with drag-and-drop blocks. No special frontend framework required — just HTML attributes."
+        },
+        "box-frontend-n2": {
+          "@type": "slate",
+          "value": [
+            {
+              "children": [
+                {
+                  "text": "Use React, Vue, Nuxt, Next.js, or any stack. Switch between frontends mid-edit for omni-channel delivery."
+                }
+              ],
+              "type": "p"
+            }
+          ],
+          "plaintext": "Use React, Vue, Nuxt, Next.js, or any stack. Switch between frontends mid-edit for omni-channel delivery."
+        },
+        "box-enterprise-n2": {
+          "@type": "slate",
+          "value": [
+            {
+              "children": [
+                {
+                  "text": "Your frontend is independent code you own. Upgrade the CMS without rewriting your site; switch frameworks and get the same editing experience."
+                }
+              ],
+              "type": "p"
+            }
+          ],
+          "plaintext": "Your frontend is independent code you own. Upgrade the CMS without rewriting your site; switch frameworks and get the same editing experience."
+        },
+        "box-opensource-n2": {
+          "@type": "slate",
+          "value": [
+            {
+              "children": [
+                {
+                  "text": "Secure, scalable Plone backend. Host anywhere, control your costs and security."
+                }
+              ],
+              "type": "p"
+            }
+          ],
+          "plaintext": "Secure, scalable Plone backend. Host anywhere, control your costs and security."
         }
       },
       "blocks_layout": {
         "items": [
           "box-visual",
+          "box-visual-n2",
           "box-frontend",
+          "box-frontend-n2",
           "box-enterprise",
-          "box-opensource"
+          "box-enterprise-n2",
+          "box-opensource",
+          "box-opensource-n2"
         ]
       },
       "styles": {}
     },
     "0d0c0506-f9bb-48d8-af0a-1352d81b45de": {
       "@type": "slate",
-      "plaintext": "Find out more about Inka",
+      "plaintext": "Find out more about Hydra",
       "value": [
         {
           "children": [
             {
-              "text": "Find out more about Inka"
+              "text": "Find out more about Hydra"
             }
           ],
           "type": "h2"
@@ -226,7 +274,7 @@
                 {
                   "children": [
                     {
-                      "text": "Inka on GitHub — source code, issues, and documentation"
+                      "text": "Hydra on GitHub — source code, issues, and documentation"
                     }
                   ],
                   "data": {
@@ -300,7 +348,7 @@
           "buttonText": "See all Content Types",
           "description": "You can log in and experience currently working features (Volto like but on any frontend)",
           "flagAlign": "left",
-          "head_title": "Welcome to Inka",
+          "head_title": "Welcome to Hydra",
           "href": [
             {
               "@id": "/docs/examples/content-types",
@@ -366,14 +414,14 @@
               "type_title": "Bild"
             }
           ],
-          "title": "You can use this site to test Inka"
+          "title": "You can use this site to test Hydra"
         },
         {
           "@id": "ef8ceecc-7c1d-4e0a-9b67-a56e7d03f6e3",
           "buttonText": "See all blocks",
           "description": "Frontend freedom makes it easy to create beautiful and fast experiences",
           "flagAlign": "right",
-          "head_title": "Welcome to Inka's many frontends",
+          "head_title": "Welcome to Hydra's many frontends",
           "hideButton": false,
           "href": [
             {
@@ -565,35 +613,34 @@
       "blocks": {
         "c9f92df8-81fd-4259-a149-5c8798735350": {
           "@type": "slate",
-          "plaintext": "  You can use this site to test Plone 6.\n Disclaimer : This instance is reset every night, so all changes will be lost afterwards.",
+          "plaintext": "You can use this site to test Hydra Edit.\n",
           "value": [
             {
-              "type": "p",
               "children": [
                 {
-                  "text": "You can use this site to test Inka Edit. "
+                  "text": ""
                 },
                 {
                   "children": [
                     {
-                      "text": "Disclaimer"
+                      "text": ""
                     }
                   ],
                   "type": "strong"
                 },
                 {
-                  "text": ": This instance is reset every night, so all changes will be lost afterwards."
+                  "text": "You can use this site to test Hydra Edit."
                 }
-              ]
+              ],
+              "type": "p"
             }
           ]
         },
         "d105783c-fa27-4c92-a3d9-6323adbe5e72": {
           "@type": "slate",
-          "plaintext": "This site uses some recommended add-ons :\n and some blocks that are suitable to be used with volto-light-theme.  volto-form-block ",
+          "plaintext": "This site uses some recommended add-ons:",
           "value": [
             {
-              "type": "p",
               "children": [
                 {
                   "text": "This site uses some recommended "
@@ -607,26 +654,16 @@
                   "type": "strong"
                 },
                 {
-                  "text": ": Some blocks that are suitable to be used with volto-light-theme. "
-                },
-                {
-                  "children": [
-                    {
-                      "text": "volto-form-block"
-                    }
-                  ],
-                  "data": {
-                    "url": "https://github.com/collective/volto-form-block"
-                  },
-                  "type": "link"
+                  "text": ":"
                 }
-              ]
+              ],
+              "type": "p"
             }
           ]
         },
         "d78b666f-b07b-4036-9853-efe6263515aa": {
           "@type": "slate",
-          "plaintext": "You can log in and use it as an admin user using these credentials :\n\nusername: admin password: admin ",
+          "plaintext": "You can log in and use it as an admin user using these credentials:",
           "value": [
             {
               "children": [
@@ -653,7 +690,86 @@
                   "type": "strong"
                 },
                 {
-                  "text": ": username: "
+                  "text": ":"
+                }
+              ],
+              "type": "p"
+            }
+          ]
+        },
+        "c9f92df8-81fd-4259-a149-5c8798735350-n2": {
+          "@type": "slate",
+          "value": [
+            {
+              "children": [
+                {
+                  "text": ""
+                },
+                {
+                  "children": [
+                    {
+                      "text": "Disclaimer"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": ": This instance is reset every night, so all changes will be lost afterwards."
+                }
+              ],
+              "type": "p"
+            }
+          ],
+          "plaintext": "Disclaimer: This instance is reset every night, so all changes will be lost afterwards."
+        },
+        "d105783c-fa27-4c92-a3d9-6323adbe5e72-n2": {
+          "@type": "slate",
+          "value": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "Some blocks that are suitable to be used with volto-light-theme."
+                    }
+                  ],
+                  "type": "li"
+                },
+                {
+                  "children": [
+                    {
+                      "text": ""
+                    },
+                    {
+                      "children": [
+                        {
+                          "text": "volto-form-block"
+                        }
+                      ],
+                      "data": {
+                        "url": "https://github.com/collective/volto-form-block"
+                      },
+                      "type": "link"
+                    },
+                    {
+                      "text": ""
+                    }
+                  ],
+                  "type": "li"
+                }
+              ],
+              "type": "ul"
+            }
+          ],
+          "plaintext": "Some blocks that are suitable to be used with volto-light-theme.volto-form-block"
+        },
+        "d78b666f-b07b-4036-9853-efe6263515aa-n2": {
+          "@type": "slate",
+          "value": [
+            {
+              "children": [
+                {
+                  "text": "username: "
                 },
                 {
                   "children": [
@@ -662,9 +778,20 @@
                     }
                   ],
                   "type": "strong"
-                },
+                }
+              ],
+              "type": "p"
+            }
+          ],
+          "plaintext": "username: admin"
+        },
+        "d78b666f-b07b-4036-9853-efe6263515aa-n3": {
+          "@type": "slate",
+          "value": [
+            {
+              "children": [
                 {
-                  "text": " password: "
+                  "text": "password: "
                 },
                 {
                   "children": [
@@ -680,17 +807,32 @@
               ],
               "type": "p"
             }
-          ]
+          ],
+          "plaintext": "password: admin"
         }
       },
       "blocks_layout": {
         "items": [
           "c9f92df8-81fd-4259-a149-5c8798735350",
+          "c9f92df8-81fd-4259-a149-5c8798735350-n2",
           "d78b666f-b07b-4036-9853-efe6263515aa",
-          "d105783c-fa27-4c92-a3d9-6323adbe5e72"
+          "d78b666f-b07b-4036-9853-efe6263515aa-n2",
+          "d78b666f-b07b-4036-9853-efe6263515aa-n3",
+          "d105783c-fa27-4c92-a3d9-6323adbe5e72",
+          "d105783c-fa27-4c92-a3d9-6323adbe5e72-n2"
         ]
       },
       "styles": {}
+    },
+    "video-hero-001": {
+      "@type": "video",
+      "url": "/docs/static/hydra-demo",
+      "align": "center",
+      "styles": {},
+      "autoplay": true,
+      "loop": true,
+      "muted": true,
+      "controls": false
     },
     "hero-cta": {
       "@type": "slate",
@@ -733,13 +875,13 @@
     },
     "hero-headline": {
       "@type": "slate",
-      "plaintext": "Design-system-first page building",
+      "plaintext": "Visual editing. Any frontend.",
       "value": [
         {
           "type": "h1",
           "children": [
             {
-              "text": "Design-system-first page building"
+              "text": "Visual editing. Any frontend."
             }
           ]
         }
@@ -748,13 +890,13 @@
     },
     "hero-subhead": {
       "@type": "slate",
-      "plaintext": "Strike the right balance for your site. Make it easy for editors to create engagement — while staying compliant.",
+      "plaintext": "A visual headless CMS using Plone — drag-and-drop blocks and inline text editing, with whichever frontend stack you choose.",
       "value": [
         {
           "type": "p",
           "children": [
             {
-              "text": "Strike the right balance for your site. Make it easy for editors to create engagement — while staying compliant."
+              "text": "A visual headless CMS using Plone — drag-and-drop blocks and inline text editing, with whichever frontend stack you choose."
             }
           ]
         }
@@ -767,6 +909,7 @@
       "hero-headline",
       "hero-subhead",
       "hero-cta",
+      "video-hero-001",
       "why-hydra-heading",
       "why-hydra-tagline",
       "why-hydra-quadrant",
@@ -786,7 +929,7 @@
   "creators": [
     "admin"
   ],
-  "description": "Design-system-first page building. Strike the right balance for your site — make it easy for editors to create engagement while staying compliant.",
+  "description": "A Visual Headless CMS — true visual editing with drag and drop blocks using any frontend stack",
   "effective": null,
   "exclude_from_nav": false,
   "expires": null,
@@ -806,7 +949,7 @@
   "rights": "",
   "subjects": [],
   "table_of_contents": null,
-  "title": "Inka",
+  "title": "Volto Hydra",
   "type_title": "Plone Site",
   "workflow_history": {}
 }

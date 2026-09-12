@@ -61,13 +61,7 @@ blocks-matched: |
 
 </block>
 
-<block type="slate">
-
-Pass this object inside the `blocks` option when calling `initBridge()` to register this block type with the admin UI. See [Custom Blocks](/docs/live-preview) for the full setup guide.
-
-<fields slotId="schema-desc" />
-
-</block>
+<block type="slate" slotId="schema-desc" data-json='{"value":[{"type":"p","children":[{"text":"Pass this object inside the "},{"type":"code","children":[{"text":"blocks"}]},{"text":" option when calling "},{"type":"code","children":[{"text":"initBridge()"}]},{"text":" to register this block type with the admin UI. See "},{"type":"a","data":{"url":"/docs/live-preview"},"children":[{"text":"Custom Blocks"}]},{"text":" for the full setup guide."}]}]}' />
 
 </fields>
 
