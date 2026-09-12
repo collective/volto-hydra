@@ -20,6 +20,40 @@ const firstSlate = (md) => {
   return blocks[id].value;
 };
 
+describe('myst admonitions -> callout blocks', () => {
+  const firstOfType = (md, type) => {
+    const { blocks, items } = parseConceptsMd(md);
+    const id = items.find((i) => blocks[i]['@type'] === type);
+    return id ? blocks[id] : null;
+  };
+
+  it('converts {note} to a callout block (variation note, body as slate)', () => {
+    const b = firstOfType('```{note}\nBe careful with **this**.\n```\n', 'callout');
+    expect(b).not.toBeNull();
+    expect(b.variation).toBe('note');
+    expect(shape(b.value)).toBe('<p>"Be careful with "<strong>"this"</strong>"."</p>');
+  });
+
+  it('maps tip/warning/important to their variation', () => {
+    for (const kind of ['tip', 'warning', 'important']) {
+      const b = firstOfType('```{' + kind + '}\nHeads up.\n```\n', 'callout');
+      expect(b.variation).toBe(kind);
+    }
+  });
+
+  it('keeps multiple paragraphs in the body', () => {
+    const b = firstOfType('```{note}\nFirst para.\n\nSecond para.\n```\n', 'callout');
+    expect(b.value.length).toBe(2);
+    expect(shape(b.value)).toBe('<p>"First para."</p><p>"Second para."</p>');
+  });
+
+  it('still drops {toctree} and {raw} (not content blocks)', () => {
+    const { blocks } = parseConceptsMd('```{toctree}\n:hidden:\na\nb\n```\n\n```{raw} html\n<video></video>\n```\n');
+    expect(Object.values(blocks).some((b) => b['@type'] === 'callout')).toBe(false);
+    expect(Object.values(blocks).some((b) => b['@type'] === 'codeExample')).toBe(false);
+  });
+});
+
 describe('inline formatting', () => {
   // docs/architecture.md:83. The old regex used \*\*([^*]+)\*\* for strong,
   // which cannot contain an asterisk, so this never matched as strong; the em

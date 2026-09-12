@@ -359,7 +359,33 @@ export function parseConceptsMd(mdContent, { imagesParentPath = "" } = {}) {
       i++; // skip closing fence
       // MyST directive fences: ```{toctree}, ```{warning}, ```{raw} html, etc.
       // The language token always starts with `{` for these.
-      if (lang.startsWith('{')) continue;
+      if (lang.startsWith('{')) {
+        // Admonitions become callout blocks so their content lives on the site
+        // (a <block>->myst emitter maps the variation back to the directive).
+        // Other directives (toctree = nav from the tree; raw = Sphinx-only) are
+        // dropped, as before.
+        const kind = lang.slice(1).split('}')[0].trim();
+        if (['note', 'tip', 'warning', 'important'].includes(kind)) {
+          // Split the body into paragraphs on blank lines; soft-wrapped lines
+          // join with a space, as markdown treats a single newline.
+          const paras = [];
+          let cur = [];
+          for (const l of codeLines) {
+            if (l.trim() === '') { if (cur.length) { paras.push(cur.join(' ')); cur = []; } }
+            else cur.push(l.trim());
+          }
+          if (cur.length) paras.push(cur.join(' '));
+          const value = paras.map((p) => ({ type: 'p', children: parseInline(p) }));
+          const id = nextId('callout');
+          addBlock(id, {
+            '@type': 'callout',
+            variation: kind,
+            value,
+            plaintext: paras.join('\n\n'),
+          });
+        }
+        continue;
+      }
       const id = nextId('ce');
       const label = lang.charAt(0).toUpperCase() + lang.slice(1);
       addBlock(id, {
