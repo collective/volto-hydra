@@ -27,58 +27,38 @@ generated artifact.
   + `check-content-validate.mjs` are retired; the single-node-slate rule lives in
   the one validator and is enforced on both mounts.
 
-## Containers: use Hydra's `blockPath`, don't reimplement (no duplication)
+## Containers: schema-free model-alignment (DONE — blockPath import REJECTED)
 
-The engine reimplements container walking/ordering/nesting
-(`unkeyBlocks`/`keyBlocks`/`decodeRegion`/`emitContainer`) that Hydra's
-`packages/volto-hydra/src/utils/blockPath.js` **already does** — schema-driven,
-handling blocks_layout **and** object_list, arbitrary nesting, add/remove/reorder,
-and heavily tested. The parallel copy is also buggy (a `columns` block — a
-blocks_layout container ordered under `blocks_layout.columns` — tier-3s when
-nested, because `unkeyBlocks` hardcodes `blocks_layout.items` and the depth-≥2
-verify-on-emit fails).
+The engine had its own container walk/order/nest (`unkeyBlocks`/`keyBlocks`/
+`decodeRegion`/`emitContainer`) that diverged from the schema's model and was
+buggy — a `columns` block (a blocks_layout container ordered under
+`blocks_layout.columns`) tier-3'd when nested, because `unkeyBlocks` hardcoded
+`blocks_layout.items`.
 
-**Why the duplication exists — and why it should go:**
-- Markdown decode is **schema-free today** (`decodePage(md)` takes no schema); the
-  prototypes' `<region widget=…>` declarations re-encode the container kind.
-- But the *only* thing that needs the container kind is the **object_list vs
-  blocks_layout vs object_browser** ambiguity (same `[{"@id"}]` shape, no
-  heuristic). That knowledge is **in the schema**, which `blockPath` reads. So the
-  prototype's region declarations are a *second copy of the schema's container
-  knowledge*, and the engine's container code is a *second implementation* of
-  `blockPath`.
+**Decision (shipped `ca8276f4`): align the engine to the same container MODEL the
+schema / `blockPath` use, but keep the engine's own lean, SCHEMA-FREE code —
+do NOT import `blockPath`.**
 
-**Reorientation — reuse the traversal, keep schema-free via a synthesized config.**
-`blockPath` is *parameterized* by a `blocksConfig`-shaped object
-(`buildBlockPathMap(formData, blocksConfig, intl)` → `blockPathMap`; then it reads
-`schema.properties[region].widget`). It doesn't care whether that config came
-from the real schema or was **synthesized** — so:
-1. **Keep** the prototype's `<region widget=…>` declaration — it *is* the
-   schema-free container descriptor (which field is a container, of what kind,
-   with the object_list id/type field). Not the duplication.
-2. **Synthesize a minimal `blocksConfig`** from those declarations (only the
-   container fields + kinds), and feed it to the reused traversal. The document
-   stays self-describing — **no external schema required**.
-3. **Reuse `blockPath`'s traversal/insert/nesting** for decode + emit; **retire**
-   the engine's parallel container code (`unkeyBlocks`/`decodeRegion`/
-   `emitContainer` container paths) — that reimplementation is the real waste.
+Why not import `blockPath` (this reverses an earlier draft of this section):
+- Decode is **schema-free** today, and that is the property we want: the
+  prototype's `<region widget=…>` declaration is self-describing, so a document
+  decodes with no external schema.
+- `blockPath`/`buildBlockPathMap` is **schema-driven** (reads `blocksConfig`).
+  Reusing it would force decode to require an external schema — **strictly
+  worse.** Synthesizing a config from the prototypes to feed it is *possible* but
+  pointless: it bolts ~985 lines of admin-shaped code (allowedBlocks, sibling
+  types, template instances, `intl`) onto a converter that only needs
+  "traverse + order".
+- The real fix was the **model, not the code**. A blocks_layout region's NAME is
+  its layout key (`gridBlock→items`, `columns→columns`); children live in the
+  shared `blocks` dict. `keyBlocks`/`unkeyBlocks` now key/order by that;
+  `collectProtos` finds nested item protos; a tier-3 block keeps its own
+  `blocks_layout` (guarded delete).
 
-So it is NOT "drop schema-free" — it is "the config `blockPath` needs is derived
-from the document, not an external schema." Both properties hold: reuse (no
-duplicated traversal) **and** schema-free (document-derived config).
-
-**Payoff:** one traversal implementation (tested), `columns` + arbitrary nesting
-work with no special-casing, no duplicated container logic — and the format
-stays decodable without an external schema.
-
-**Feasibility (checked):** the traversal core is `hydra-js/buildBlockPathMap.js`
-— the **framework-agnostic** bridge package, not the Volto/React wrapper — and
-`slateMerge.js` is pure (no React/DOM). So prefer reusing the hydra-js core
-directly (feed the synthesized config + a stub `intl`); confirm `blockPath.js`'s
-other wrapper imports (`injectedVoltoConfig`, `@volto-hydra/helpers`) are
-import-pure, else call the hydra-js core beneath the wrapper. Confirm a minimal
-synthesized config (container fields + widget only) satisfies `buildBlockPathMap`
-without the editing-only bits (`allowedBlocks`/`maxLength`/`itemSchema`).
+**Result:** `columns` + arbitrary nesting emit as clean markdown, schema-free.
+Engine 76, site proto-parity 8/0, site clean 69→89%. The ~50 lines of engine
+container code is a correct, schema-free implementation — acceptable, and NOT
+duplication worth trading schema-freedom away to remove.
 
 ## Consolidate the two markdown dialects (the remaining duplication)
 
