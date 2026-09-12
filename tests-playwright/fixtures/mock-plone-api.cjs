@@ -40,7 +40,7 @@ function parseContentMounts() {
   const mountsEnv = process.env.CONTENT_MOUNTS;
   if (!mountsEnv) {
     return [
-      { mountPath: '/', dirPath: path.join(__dirname, '../../docs/content/content/content') },
+      { mountPath: '/', dirPath: path.join(__dirname, '../../docs/content-md-proto') },
       { mountPath: '/_test_data', dirPath: path.join(__dirname, 'content') },
     ];
   }
