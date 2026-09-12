@@ -1,6 +1,6 @@
 # Links and media
 
-The link picker, image picker, and upload dialog are part of Hydra's chrome — they look the same on every site. What varies by design system is **which** links and images are click-to-edit in the preview: a site might wire up every link inline, or only a few "primary" links, with everything else editable from the sidebar. Same applies to images.
+The link picker, image picker, and upload dialog are part of Inka's chrome — they look the same on every site. What varies by design system is **which** links and images are click-to-edit in the preview: a site might wire up every link inline, or only a few "primary" links, with everything else editable from the sidebar. Same applies to images.
 
 ## Editing a link
 

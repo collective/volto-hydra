@@ -19,7 +19,7 @@ blocks-matched: |
 
 <block type="slate">
 
-Hydra — visual editing for headless Plone. © 2024-2026 Plone Foundation.
+Inka — design-system-first page building. © 2024-2026 Plone Foundation.
 
 <fields slotId="copyright" />
 

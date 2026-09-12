@@ -5,8 +5,9 @@ allow_discussion: null
 contributors: []
 creators:
   - admin
-description: A Visual Headless CMS — true visual editing with drag and drop
-  blocks using any frontend stack
+description: Design-system-first page building. Strike the right balance for
+  your site — make it easy for editors to create engagement while staying
+  compliant.
 effective: null
 exclude_from_nav: false
 expires: null
@@ -17,12 +18,11 @@ review_state: null
 rights: ""
 subjects: []
 table_of_contents: null
-title: Volto Hydra
+title: Inka
 blocks-assignments:
   - { uid: hero-headline }
   - { uid: hero-subhead }
   - { uid: hero-cta }
-  - { uid: video-hero-001 }
   - { uid: why-hydra-heading }
   - { uid: why-hydra-tagline }
   - { uid: why-hydra-quadrant }
@@ -94,11 +94,11 @@ blobs:
 
 <block type="slate">
 
-# Visual editing. Any frontend.
+# Design-system-first page building
 
 </block>
 
-A visual headless CMS using Plone — drag-and-drop blocks and inline text editing, with whichever frontend stack you choose.
+Strike the right balance for your site. Make it easy for editors to create engagement — while staying compliant.
 
 <block type="slate">
 
@@ -108,11 +108,9 @@ A visual headless CMS using Plone — drag-and-drop blocks and inline text editi
 
 </block>
 
-<block type="video" url="/docs/static/hydra-demo" align="center" data-json='{"autoplay":true,"loop":true,"muted":true,"controls":false}' />
+## Why Inka
 
-## Why Hydra
-
-Most CMS platforms force a trade-off: visual editing or frontend freedom. Hydra gives you both.
+Compliance or engagement is a false choice. You decide where the dial sits for each site.
 
 <block type="image" align="center" size="l" url="/images/quadrant/@@download/image/quadrant.svg" />
 
@@ -122,11 +120,11 @@ Most CMS platforms force a trade-off: visual editing or frontend freedom. Hydra 
 
 True WYSIWYG with drag-and-drop blocks. No special frontend framework required — just HTML attributes.
 
-**Any Frontend**
+**Multi frontend, multi backend**
 
 Use React, Vue, Nuxt, Next.js, or any stack. Switch between frontends mid-edit for omni-channel delivery.
 
-**Truly Decoupled**
+Use React, Vue, Nuxt, Next.js or any stack, and switch channels mid-edit.
 
 Your frontend is independent code you own. Upgrade the CMS without rewriting your site; switch frameworks and get the same editing experience.
 
@@ -427,9 +425,9 @@ export const POST = async ({ request }) => {
 
 <block type="slider" autoplayDelay=4000>
 
-## You can use this site to test Hydra
+## You can use this site to test Inka
 
-**Welcome to Hydra**
+**Welcome to Inka**
 
 You can log in and experience currently working features (Volto like but on any frontend)
 
@@ -441,7 +439,7 @@ You can log in and experience currently working features (Volto like but on any 
 
 ## You are enjoying one of many possible frontends
 
-**Welcome to Hydra's many frontends**
+**Welcome to Inka's many frontends**
 
 Frontend freedom makes it easy to create beautiful and fast experiences
 
@@ -455,7 +453,7 @@ Frontend freedom makes it easy to create beautiful and fast experiences
 
 <block type="gridBlock">
 
-<block type="slate" data-json='{"value":[{"children":[{"text":""},{"children":[{"text":""}],"type":"strong"},{"text":"You can use this site to test Hydra Edit."}],"type":"p"}]}' />
+<block type="slate" data-json='{"value":[{"children":[{"text":""},{"children":[{"text":""}],"type":"strong"},{"text":"You can use this site to test Inka Edit.\n"}],"type":"p"}]}' />
 
 **Disclaimer**: This instance is reset every night, so all changes will be lost afterwards.
 
@@ -481,8 +479,8 @@ This site uses some recommended **add-ons**:
 - [Next.js Example](https://hydra-blogsite-nextjs.vercel.app)
 - [Edit either of these frontends: hydra.pretagov.com](https://hydra.pretagov.com)
 
-## Find out more about Hydra
+## Find out more about Inka
 
-- [Hydra on GitHub — source code, issues, and documentation](https://github.com/collective/volto-hydra)
+- [Inka on GitHub — source code, issues, and documentation](https://github.com/collective/volto-hydra)
 - [Plone 6 Documentation](https://6.docs.plone.org)
 - [Plone Community Forum](https://community.plone.org)

@@ -307,7 +307,7 @@ This replaces `dataPath`: declare the container inside the object rather than ho
 
 ## Container schema reference
 
-A block's schema is a standard [Volto block schema](https://6.docs.plone.org/volto/blocks/editcomponent.html) (fieldsets, `properties`, widgets, `default`, etc.). Hydra reads three container-oriented `widget` values plus a few per-field keys — those are:
+A block's schema is a standard [Volto block schema](https://6.docs.plone.org/volto/blocks/editcomponent.html) (fieldsets, `properties`, widgets, `default`, etc.). Inka reads three container-oriented `widget` values plus a few per-field keys — those are:
 
 | `widget` | Storage | Key fields |
 |---|---|---|
@@ -383,15 +383,15 @@ table: {
 
 ## Empty Blocks
 
-A container region can never be truly empty. When its last child is deleted, Hydra fills it back in — but *what* it inserts depends on the region's config:
+A container region can never be truly empty. When its last child is deleted, Inka fills it back in — but *what* it inserts depends on the region's config:
 
 - If the region has a **`defaultBlockType`**, that type is added.
 - If the region allows exactly **one** `allowedBlocks` type, that type is added.
-- Only when the region has **no `defaultBlockType` and more than one `allowedBlocks`** is the choice ambiguous — so Hydra inserts a placeholder child with `@type: "empty"` and shows a '+' for the user to pick a type in place.
+- Only when the region has **no `defaultBlockType` and more than one `allowedBlocks`** is the choice ambiguous — so Inka inserts a placeholder child with `@type: "empty"` and shows a '+' for the user to pick a type in place.
 
 So the simplest way to never deal with empty placeholders in a region is to give it a `defaultBlockType` (or a single-entry `allowedBlocks`). Otherwise your frontend must render `empty`.
 
-Empty blocks are stripped before saving. Render them as empty space; Hydra puts a '+' button in the middle for the user to pick a real type in place. You can override the look of that '+' by rendering something inside the empty block and adding `data-block-add="button"` to it.
+Empty blocks are stripped before saving. Render them as empty space; Inka puts a '+' button in the middle for the user to pick a real type in place. You can override the look of that '+' by rendering something inside the empty block and adding `data-block-add="button"` to it.
 
 ### Making a region empty by default — `defaultBlockType: "empty"`
 
@@ -412,10 +412,10 @@ announcement: {
 ```
 
 This is the one case where `"empty"` is a **configured** default rather than the
-fallback Hydra inserts for an ambiguous region. The seed and the add diverge on
+fallback Inka inserts for an ambiguous region. The seed and the add diverge on
 purpose:
 
-- **Passive seed** (region loaded, or its last child deleted): Hydra seeds a bare
+- **Passive seed** (region loaded, or its last child deleted): Inka seeds a bare
   `@type: "empty"` placeholder — nothing renders. `defaultBlockType` wins over the
   single-`allowedBlocks` auto-fill, so the region genuinely shows empty.
 - **The '+' (active add / fill)**: inserts a real block from `allowedBlocks`

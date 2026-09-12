@@ -1,12 +1,12 @@
-# Volto Hydra Documentation
+# Inka Documentation
 
-A Visual Headless CMS using Plone as a server, providing true visual editing with drag-and-drop blocks and editable text — with any frontend stack you choose.
+A design-system-first page-builder toolkit. Strike the right balance for your site — make it easy for editors to create engagement while staying compliant.
 
 ```{raw} html
 <video src="_static/hydra-demo.mp4"
        autoplay loop muted playsinline
        style="width:100%;max-width:960px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.15);margin:1.5em 0;"
-       aria-label="Hydra editor demo: live edits, formatting, drag-and-drop, container ops, frontend switching">
+       aria-label="Inka editor demo: live edits, formatting, drag-and-drop, container ops, frontend switching">
   Your browser doesn't support inline video — see <a href="https://hydra.pretagov.com">the live demo</a>.
 </video>
 ```
@@ -29,18 +29,20 @@ advanced
 examples/README
 ```
 
-## Why Hydra?
+## Why Inka?
 
-- **Visual + True Headless + Open Source** — a unique combination in the CMS space
-- **Framework agnostic** — Next.js, Nuxt.js, Astro, plus server-only stacks (PHP, Django, Rails, Laravel) via the [server-render pattern](./server-rendered-frontends.md)
-- **Quick visual editing** — enable it with simple HTML data attributes, no React or Vue required in your frontend
-- **Omni-channel** — switch between multiple frontends mid-edit
+- **Compliance and engagement, not a trade-off** — you decide where the dial sits for each site, instead of choosing between locking editors down and letting the design system drift
+- **Design-system-first** — components declare what they tolerate, so off-system output can't be produced
+- **Multi frontend, multi backend** — Next.js, Nuxt.js, Astro, plus server-only stacks (PHP, Django, Rails, Laravel) via the [server-render pattern](./server-rendered-frontends.md); switch channels mid-edit
+- **AI under the same constraints** — everyone's AI can build you a page; ours can't build one that breaks your design system
+- **Evidence, not just warnings** — rules a machine can't decide go to the people who can, and the determination is recorded against that version of the content
+- **Quick to adopt** — enable visual editing with simple HTML data attributes, no React or Vue required in your frontend
+- **A toolkit, not a CMS** — good out of the box with zero configuration, extensible when you need more; open source and self-hostable
 - **Enterprise features** — versioning, i18n, workflow, and automated content rules
-- **Customisable** — both the admin interface and block definitions are fully configurable
 
 ## Try the online demo
 
-The fastest way to feel what Hydra does is to log into the hosted demo and edit a real page against a real frontend.
+The fastest way to feel what Inka does is to log into the hosted demo and edit a real page against a real frontend.
 
 Open <https://hydra.pretagov.com>, log in, then:
 
@@ -50,9 +52,9 @@ Open <https://hydra.pretagov.com>, log in, then:
 
 The default preset is a Nuxt.js frontend deployed as an [SSG](https://hydra-nuxt-flowbrite.netlify.app/) to demonstrate scale-to-zero editing on free hosting. An [Astro example](https://github.com/collective/volto-hydra/tree/main/docs/examples/test-astro) demonstrates the [server-render pattern](./server-rendered-frontends.md) for static-first frameworks. See [Build a frontend › Deployment patterns](./build-a-frontend.md#deployment-patterns).
 
-To run Hydra locally against your own frontend, see the **Run Locally** section of the [project README](https://github.com/collective/volto-hydra#run-locally).
+To run Inka locally against your own frontend, see the **Run Locally** section of the [project README](https://github.com/collective/volto-hydra#run-locally).
 
 ```{warning}
-Volto Hydra is a [Work in Progress](https://github.com/orgs/collective/projects/3/views/4).
+Inka is a [Work in Progress](https://github.com/orgs/collective/projects/3/views/4).
 It should not be used in production yet.
 ```
