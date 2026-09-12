@@ -420,6 +420,32 @@ describe('plone-content-validator checkIntegrity()', () => {
     assert.equal(r.stats.resolveuidBroken, 1);
   });
 
+  it('FAILS on a multi-node slate value (must be a single top-level node)', () => {
+    // The editor makes one block per paragraph, and a paragraph boundary is a
+    // block boundary, so a slate value with >1 top-level node (a title + body
+    // packed into one block) has no bare-markdown spelling. lib/slate-normalize
+    // collapses it; a multi-block cell belongs in a `columns` block instead.
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/page-a', '@type': 'Document', id: 'page-a',
+        UID: 'pageauid1234567', parent: { '@id': '/' },
+        blocks: {
+          s: {
+            '@type': 'slate',
+            value: [
+              { type: 'p', children: [{ type: 'strong', children: [{ text: 'Title' }] }] },
+              { type: 'p', children: [{ text: 'Body paragraph.' }] },
+            ],
+          },
+        },
+        blocks_layout: { items: ['s'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.ok(r.errors.some((e) => e.includes('top-level nodes')), r.errors.join('\n'));
+  });
+
   it('FAILS on a template block with no templateId', () => {
     // A forced-layout template's blocks are matched to a page's region by
     // templateId + slotId. A block carrying only slotId is silently skipped by

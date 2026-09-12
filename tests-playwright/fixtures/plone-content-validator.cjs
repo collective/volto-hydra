@@ -527,6 +527,15 @@ function imageDimensions(file) {
   }
 
   function checkBlockRefs(rel, bid, block) {
+    // A slate value must be a SINGLE top-level node. The editor makes one block
+    // per paragraph, and a paragraph boundary is a block boundary, so a value
+    // with >1 top-level node (a title + body packed into one slate) has no
+    // bare-markdown spelling. lib/slate-normalize collapses it; a genuine
+    // multi-block cell belongs in a `columns` block. (Recurses via the sub-item
+    // walk below, so object_list/column children are checked too.)
+    if (block['@type'] === 'slate' && Array.isArray(block.value) && block.value.length > 1) {
+      errors.push(`  ${rel}: block ${bid} (slate) value has ${block.value.length} top-level nodes (expected 1; run normalizeSlateValue)`);
+    }
     for (const url of slateLinkUrls(block.value)) {
       const reason = refFailure(url);
       if (reason) {
