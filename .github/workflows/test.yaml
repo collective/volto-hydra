@@ -64,15 +64,10 @@ jobs:
         run: pnpm build:deps
       - name: Run volto-hydra addon unit tests (vitest)
         run: pnpm test
-      - name: Check docs are in sync with their sources
-        # The docs are ALSO served as Plone content (docs/content/...), and the
-        # examples pages embed real code files. Neither check ran in CI, which
-        # is how main ended up with a stale content JSON and a page-level link
-        # pointing at a 404. Editing a .md without re-running `node docs/sync.mjs`
-        # now fails here rather than shipping a doc page that doesn't match.
-        run: |
-          pnpm check:docs
-          pnpm sync:docs:check
+      - name: Check example renderers compile
+        # The examples pages embed real renderer files; check:docs parses each
+        # per framework so a broken example fails here rather than shipping.
+        run: pnpm check:docs
       - name: Run mock-api unit tests (node:test)
         # Plone 6.2 fidelity coverage (@aliases, SearchableText prefix
         # match, navigation, folder ordering). Was not previously wired

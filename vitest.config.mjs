@@ -38,7 +38,7 @@ export default defineConfig({
     environment: 'jsdom',
     include: [
       'packages/volto-hydra/**/*.{test,spec}.{js,jsx,ts,tsx}',
-      // the docs markdown->blocks parser (docs/markdown-to-blocks.mjs)
+      // any docs-tree unit tests
       'docs/**/*.{test,spec}.mjs',
       // the block <-> markdown converter and the prototype-mapping spike
       'lib/**/*.{test,spec}.mjs',
