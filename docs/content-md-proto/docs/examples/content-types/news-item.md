@@ -21,53 +21,6 @@ rights: ""
 subjects:
   - news
 title: News Item
-blocks-assignments:
-  - { uid: ni-date-m3i1uy1k }
-  - { uid: d3f1c443-583f-4e8e-a682-3bf25752a300 }
-  - { uid: f16a700c-3b02-47aa-9d08-ade7dea4f683 }
-  - { uid: b5b151a1-fb13-458a-8232-4a87bb8c2904 }
-  - { uid: 4ad62079-8826-4677-9a53-4bce2ebb0caf }
-  - { uid: 4ad62079-8826-4677-9a53-4bce2ebb0caf-split-1 }
-  - { uid: 9c1f17e7-4c01-4f6f-8241-7ee47b7f1ce9 }
-  - { uid: 83af2a96-6f44-4c03-9178-bd6b3678d524 }
-  - { uid: fa56fc9a-574e-4a7f-b6ef-703bccc54667 }
-  - { uid: 6a9f0ce0-6918-439e-9abf-aeba220d9a61 }
-  - { uid: ddd8af02-b007-40d2-aec2-4a7f6651f3a7 }
-  - { uid: 97070cac-5043-4d42-a782-3fb51f1c4bae }
-  - { uid: 23e7d05e-f9c4-4278-83bb-d691d1dd3606 }
-  - { uid: 7f1c54fe-5061-471d-970d-5d4dca0854fc }
-  - { uid: 83b29f62-44cb-4122-baac-cf5c86402757 }
-  - { uid: 38243fe2-81f9-4afe-8abf-e90d38f92cdf }
-  - { uid: c9d141e5-c8d2-4255-b288-ce305a51d40e }
-  - { uid: 3961e879-3e3a-4ab2-9b0c-0f4c7786679c }
-  - { uid: 7d8dcf49-e41f-4253-b217-a0df26511977 }
-  - { uid: bfab529b-06c6-4931-b907-aa0538bb68ae }
-  - { uid: e0950549-5612-483d-a16c-a6481b1f4f83 }
-  - { uid: 3d76738a-e02c-4f98-84a3-9b0adc1caf69 }
-  - { uid: a91ef2a4-336d-4d4f-90e5-d1d31befcaa8 }
-  - { uid: 6a19b315-8b57-4c4d-8b2c-486fc7df34b8 }
-  - { uid: 3642f388-4b3c-4019-ae58-0c56b3487aef }
-  - { uid: c5ac2a89-5637-42cb-ac29-4448ca0a54b0 }
-  - { uid: 1225bf63-e058-44b2-8834-5cdc29ecbcbd }
-  - { uid: c31e4ec0-788b-4988-b193-5ae9ca30c253 }
-  - { uid: 7a4c45bc-f969-4d18-8556-bd2cb955fea8 }
-  - { uid: 2a61f06a-9960-4c9c-85eb-bac7a3853fdc }
-  - { uid: 0fc24145-c346-4031-adc5-7ad06bd0656a }
-  - { uid: 95a19acf-2d32-4b99-bf3e-d90d3470735c }
-  - { uid: 57903d6a-6ed1-4e65-acef-22ccf51c5530 }
-  - { uid: 2220580b-204f-4e6d-822d-7e28f37512a9 }
-  - { uid: 80177065-93a8-41b9-b45e-e71154294a82 }
-  - { uid: ca682edf-ea8f-49fc-92ce-c9a2a782a42e }
-  - { uid: 6f2d9fbe-05b4-46db-a6f7-22e57e08eddf }
-  - { uid: e38d6b59-9c34-44a7-a694-36ad6367b617 }
-  - { uid: a9807954-cb10-4170-8ebd-e3ba1baa3fde }
-  - { uid: 07f0bb3b-a762-4f41-9f02-052921e9fd28 }
-  - { uid: dd0ab22f-fe24-45e6-8e0b-ab0573519657 }
-  - { uid: a1bf6371-37e8-4054-924d-36c99a5f0f78 }
-  - { uid: 4e771550-447e-4112-b998-81d00adb2797 }
-  - { uid: 71c6a6c6-6f0b-4cf5-be93-23ad2af9b2c9 }
-  - { uid: 09891614-7ed6-444c-9925-8589801ca8ea }
-  - { uid: 8fe9052b-d9a4-48dd-ae47-80b256826aca }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

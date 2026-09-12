@@ -21,36 +21,6 @@ subjects:
   - blocks
   - media
 title: Maps
-blocks-assignments:
-  - { uid: 68370edd-bfe5-47fb-937e-16a19a3a92ad }
-  - { uid: ref-maps-description }
-  - { uid: editor-screenshot }
-  - { uid: e36a9020-5e7e-4ef5-97f7-862c45fea81c }
-  - { uid: 96789bf6-953b-4777-a022-0f4cd852be64 }
-  - { uid: ce3be1bc-5e35-409d-971b-194bb084db4a }
-  - { uid: 7248c659-f678-4e2f-8ac7-5bc5a8abf729 }
-  - { uid: bd950eb2-f462-4146-9d4a-3c8139abbb94 }
-  - { uid: d5fe5f6d-2a9b-4e65-b5bf-2faded6073b7 }
-  - { uid: b94908e2-0600-493a-8a92-0b8a23e2938b }
-  - { uid: 6ce27ed7-7470-4f83-a418-31b2c23e7f50 }
-  - { uid: 0e3611aa-3dfe-421b-a8dc-c45ec3cf7262 }
-  - { uid: 3dac46d2-adca-4557-bcab-9a85015804cf }
-  - { uid: fa7180fb-feab-42fc-adb4-eafc20f8b1c6 }
-  - { uid: 642c75ac-0c4a-4138-8ad7-954a3fa561e6 }
-  - { uid: aaf7adb1-00b2-4cc2-8729-91c33ea8fe6a }
-  - { uid: 43a4b392-f0c3-4b8d-a17d-9b4ddea3f0f0 }
-  - { uid: 2df07c02-09d1-4da5-b3ad-ce58f5629fb8 }
-  - { uid: a469581f-f805-4e31-a880-3fc05b3959f2 }
-  - { uid: ceee1cfa-80ff-44f1-b3af-3cfd4be3f4ba }
-  - { uid: f9dec030-b72d-4940-af4c-6dc123cea7a6 }
-  - { uid: ref-maps-schema }
-  - { id: ref-maps-schema-javascript-45f9f0 }
-  - { uid: ref-maps-json-data }
-  - { id: ref-maps-json-data-json-04466f }
-  - { uid: ref-maps-rendering }
-  - { id: ref-maps-rendering-jsx-7fbc14 }
-  - { id: ref-maps-rendering-vue-85ab6d }
-  - { id: ref-maps-rendering-svelte-4d9083 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

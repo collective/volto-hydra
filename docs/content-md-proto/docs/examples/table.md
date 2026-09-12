@@ -26,26 +26,6 @@ rights: ""
 subjects:
   - blocks
 title: Table
-blocks-assignments:
-  - { uid: fb451586-3dab-4b40-a5f8-f73056685165 }
-  - { uid: ref-table-description }
-  - { uid: editor-screenshot }
-  - { uid: ff4fd61a-f5eb-4733-a883-816985c44348 }
-  - { uid: 0d727fc0-71c0-4e2c-918a-35b726636569 }
-  - { uid: 7aafc602-902a-4d21-bf63-2e7c5c8d4839 }
-  - { uid: 4a5779a4-fda5-431c-80e5-3c789375ce10 }
-  - { uid: 10566683-a8b2-4b47-b64b-b01ddf43c307 }
-  - { uid: 0b0891c8-812e-41ca-b572-b7851361025f }
-  - { uid: aa800193-7bf4-4f54-9bb6-a6c5b4e02b81 }
-  - { uid: 4266731a-e721-4f2f-95de-c7c3e885677b }
-  - { uid: ref-table-schema }
-  - { id: ref-table-schema-javascript-237d52 }
-  - { uid: ref-table-json-data }
-  - { id: ref-table-json-data-json-472dd4 }
-  - { uid: ref-table-rendering }
-  - { id: ref-table-rendering-jsx-ee1611 }
-  - { id: ref-table-rendering-vue-570ccb }
-  - { id: ref-table-rendering-svelte-de27fc }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

@@ -13,11 +13,6 @@ preview_image:
   height: 36
   size: 703
   width: 36
-blocks-assignments:
-  - { uid: tpl-ni-date }
-  - { uid: tpl-ni-title }
-  - { uid: tpl-ni-leadimage }
-  - { uid: tpl-ni-content }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

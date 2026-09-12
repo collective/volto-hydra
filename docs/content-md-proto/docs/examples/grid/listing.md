@@ -29,11 +29,6 @@ review_state: published
 rights: ""
 subjects: []
 title: Grid-Listing
-blocks-assignments:
-  - { uid: fc7973d9-34e3-484c-a20b-1af7eecd9879 }
-  - { uid: 5a361b25-3e19-4c06-866f-a2db6feed983 }
-  - { uid: b940ae89-2b34-472b-aac8-f3d96dfe46f4 }
-  - { uid: 0fae8b67-374c-4ca2-b3e0-86114e2f17e1 }
 blocks-matched: |
   <block type="title" _="${h1}" />
 blocks-tagged: |

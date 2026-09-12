@@ -23,24 +23,6 @@ subjects:
   - blocks
   - listings
 title: Listing
-blocks-assignments:
-  - { uid: 43068b6d-d8e9-4acc-912b-eabcdc650939 }
-  - { uid: ref-listing-description }
-  - { uid: editor-screenshot }
-  - { uid: 24280e07-e962-4414-8ee5-cdaf58ca5f35 }
-  - { uid: 53ececaa-4219-42a9-861d-862be364fd60 }
-  - { uid: 2a597dde-dd2b-4c66-816c-09e243a188f5 }
-  - { uid: grid-listing-1 }
-  - { uid: c2eaacd0-4e96-4344-a0ac-26ed644fc503 }
-  - { id: slider-listing-1 }
-  - { uid: ref-listing-schema }
-  - { id: ref-listing-schema-javascript-bd0476 }
-  - { uid: ref-listing-json-data }
-  - { id: ref-listing-json-data-json-829696 }
-  - { uid: ref-listing-rendering }
-  - { id: ref-listing-rendering-jsx-f33c73 }
-  - { id: ref-listing-rendering-vue-3c4a00 }
-  - { id: ref-listing-rendering-svelte-aca768 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

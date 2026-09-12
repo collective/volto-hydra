@@ -22,34 +22,6 @@ review_state: published
 rights: ""
 subjects: []
 title: Editing text
-blocks-assignments:
-  - { uid: title-1 }
-  - { uid: p-1 }
-  - { uid: h-2 }
-  - { uid: p-3 }
-  - { uid: h-4 }
-  - { uid: p-5 }
-  - { uid: ul-6 }
-  - { uid: h-7 }
-  - { uid: p-8 }
-  - { uid: h-9 }
-  - { uid: tbl-10 }
-  - { uid: h-11 }
-  - { uid: tbl-12 }
-  - { uid: h-13 }
-  - { uid: p-14 }
-  - { uid: h-15 }
-  - { uid: p-16 }
-  - { uid: img-17 }
-  - { uid: p-18 }
-  - { uid: h-19 }
-  - { uid: p-20 }
-  - { uid: ul-21 }
-  - { uid: p-22 }
-  - { uid: h-23 }
-  - { uid: p-24 }
-  - { uid: h-25 }
-  - { uid: ul-26 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

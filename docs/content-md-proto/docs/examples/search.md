@@ -30,20 +30,6 @@ subjects:
   - listings
   - navigation
 title: Search
-blocks-assignments:
-  - { uid: f6d35d7e-6422-4496-8a65-f7cfd42fb519 }
-  - { uid: ref-search-description }
-  - { uid: editor-screenshot }
-  - { uid: 42b7d589-4d35-4b81-9fe9-ea17437beb81 }
-  - { uid: 518c46e7-9823-4e03-aa3a-d2a9ec1746dd }
-  - { uid: ref-search-schema }
-  - { id: ref-search-schema-javascript-8711ec }
-  - { uid: ref-search-json-data }
-  - { id: ref-search-json-data-json-155258 }
-  - { uid: ref-search-rendering }
-  - { id: ref-search-rendering-jsx-dd082e }
-  - { id: ref-search-rendering-vue-3c1873 }
-  - { id: ref-search-rendering-svelte-7ba7ad }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

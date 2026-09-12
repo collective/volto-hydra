@@ -31,34 +31,6 @@ subjects:
   - blocks
   - media
 title: Image
-blocks-assignments:
-  - { uid: 4bfc973c-5fbf-45a3-819a-750a3eff4def }
-  - { uid: ref-image-description }
-  - { uid: editor-screenshot }
-  - { uid: ed863393-7692-4cc3-8b39-503591d4ea80 }
-  - { uid: bcc07f9d-7f53-450a-b3f4-20286fd66692 }
-  - { uid: e8178fee-0fb3-405d-8c81-cf47c1d2139f }
-  - { uid: 3b647cba-a65f-4d55-9a50-9c8b37c52372 }
-  - { uid: 0f4f3139-9386-4023-9c50-add562acab5d }
-  - { uid: cd47ee9d-014f-4726-ad87-91d35b6f5231 }
-  - { uid: e68341fb-401f-4a19-84e9-ae1dc73db915 }
-  - { uid: 1bf3b6c3-8db1-4293-9088-00d1c5b8c91c }
-  - { uid: 961969c7-1292-4c3e-bf4f-557fb87f4342 }
-  - { uid: 44bc28fb-2431-46c8-9c1f-ec09cde7dae5 }
-  - { uid: d48b2411-07fd-4911-8185-56e8760abab5 }
-  - { uid: c4eddbb6-cb34-479f-bf35-52adc6dd0f4e }
-  - { uid: 5ea2e916-7224-43ad-adc8-7bd6b4fadf53 }
-  - { uid: bd53c8f5-d1eb-49e1-ac9d-463e0c50d4ce }
-  - { uid: b7d57c29-c082-4b41-b6e0-7ccf83d46b97 }
-  - { uid: b6bf35d7-7536-4a32-9821-4ae209de88fe }
-  - { uid: ref-image-schema }
-  - { id: ref-image-schema-javascript-979df6 }
-  - { uid: ref-image-json-data }
-  - { id: ref-image-json-data-json-ddd34d }
-  - { uid: ref-image-rendering }
-  - { id: ref-image-rendering-jsx-a59bc5 }
-  - { id: ref-image-rendering-vue-c3dead }
-  - { id: ref-image-rendering-svelte-52a7e2 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

@@ -23,41 +23,6 @@ review_state: published
 rights: ""
 subjects: []
 title: Adding and moving blocks
-blocks-assignments:
-  - { uid: title-1 }
-  - { uid: p-1 }
-  - { uid: h-2 }
-  - { uid: p-3 }
-  - { uid: h-4 }
-  - { uid: p-5 }
-  - { uid: p-6 }
-  - { uid: h-7 }
-  - { uid: p-8 }
-  - { uid: p-9 }
-  - { uid: h-10 }
-  - { uid: p-11 }
-  - { uid: p-12 }
-  - { uid: h-13 }
-  - { uid: h-14 }
-  - { uid: p-15 }
-  - { uid: ul-16 }
-  - { uid: p-17 }
-  - { uid: h-18 }
-  - { uid: p-19 }
-  - { uid: h-20 }
-  - { uid: p-21 }
-  - { uid: ul-22 }
-  - { uid: p-23 }
-  - { uid: h-24 }
-  - { uid: p-25 }
-  - { uid: tbl-26 }
-  - { uid: p-27 }
-  - { uid: h-28 }
-  - { uid: p-29 }
-  - { uid: ul-30 }
-  - { uid: h-31 }
-  - { uid: p-32 }
-  - { uid: p-33 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

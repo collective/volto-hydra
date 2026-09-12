@@ -31,19 +31,6 @@ subjects:
   - blocks
   - containers
 title: Grid
-blocks-assignments:
-  - { uid: d3f1c443-583f-4e8e-a682-3bf25752a300 }
-  - { uid: ref-grid-description }
-  - { uid: 616b625c-b79f-4881-8536-b67a9e401a7d }
-  - { uid: 7624cf59-05d0-4055-8f55-5fd6597d84b0 }
-  - { uid: ref-grid-schema }
-  - { id: ref-grid-schema-javascript-af1095 }
-  - { uid: ref-grid-json-data }
-  - { id: ref-grid-json-data-json-5ff79e }
-  - { uid: ref-grid-rendering }
-  - { id: ref-grid-rendering-jsx-f30d80 }
-  - { id: ref-grid-rendering-vue-1d61ab }
-  - { id: ref-grid-rendering-svelte-8158ec }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

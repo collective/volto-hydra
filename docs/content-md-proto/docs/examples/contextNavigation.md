@@ -25,17 +25,6 @@ subjects:
   - navigation
   - templates
 title: Context Navigation Block
-blocks-assignments:
-  - { uid: title-1 }
-  - { uid: ref-contextNavigation-description }
-  - { uid: ref-contextNavigation-schema }
-  - { id: ref-contextNavigation-schema-javascript-38f58f }
-  - { uid: ref-contextNavigation-json-data }
-  - { id: ref-contextNavigation-json-data-json-62b3b4 }
-  - { uid: ref-contextNavigation-rendering }
-  - { id: ref-contextNavigation-rendering-jsx-25968a }
-  - { id: ref-contextNavigation-rendering-vue-af752b }
-  - { id: ref-contextNavigation-rendering-svelte-a27836 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

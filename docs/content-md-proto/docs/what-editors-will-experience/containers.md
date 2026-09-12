@@ -21,38 +21,6 @@ review_state: published
 rights: ""
 subjects: []
 title: Containers
-blocks-assignments:
-  - { uid: title-1 }
-  - { uid: p-1 }
-  - { uid: p-2 }
-  - { uid: h-3 }
-  - { uid: p-4 }
-  - { uid: ol-5 }
-  - { uid: p-6 }
-  - { uid: img-7 }
-  - { uid: p-8 }
-  - { uid: h-9 }
-  - { uid: p-10 }
-  - { uid: p-11 }
-  - { uid: p-12 }
-  - { uid: h-13 }
-  - { uid: p-14 }
-  - { uid: ul-15 }
-  - { uid: p-16 }
-  - { uid: img-17 }
-  - { uid: p-18 }
-  - { uid: p-19 }
-  - { uid: h-20 }
-  - { uid: p-21 }
-  - { uid: ul-22 }
-  - { uid: img-23 }
-  - { uid: p-24 }
-  - { uid: h-25 }
-  - { uid: p-26 }
-  - { uid: h-27 }
-  - { uid: ul-28 }
-  - { uid: h-29 }
-  - { uid: ul-30 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

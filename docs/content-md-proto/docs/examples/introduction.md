@@ -30,24 +30,6 @@ subjects:
   - blocks
   - text
 title: Introduction
-blocks-assignments:
-  - { uid: 50727b9a-1f8a-4857-aab5-8acc6985bfc6 }
-  - { uid: ref-introduction-description }
-  - { uid: editor-screenshot }
-  - { uid: d0438a28-aaaf-4db1-8887-c9b3351787d3 }
-  - { uid: d35f209e-12c1-4a30-ae36-52f84a4a0b7b }
-  - { uid: d35f209e-12c1-4a30-ae36-52f84a4a0b7b-split-1 }
-  - { uid: cec08900-0334-4288-9ece-f5d15d4dd6f1 }
-  - { uid: 26accd80-9715-43ea-9b7c-aa0b3be7d0da }
-  - { uid: 177de529-ce72-4721-a58c-15feadaf285e }
-  - { uid: ref-introduction-schema }
-  - { id: ref-introduction-schema-javascript-e14a03 }
-  - { uid: ref-introduction-json-data }
-  - { id: ref-introduction-json-data-json-d959f7 }
-  - { uid: ref-introduction-rendering }
-  - { id: ref-introduction-rendering-jsx-599242 }
-  - { id: ref-introduction-rendering-vue-53106b }
-  - { id: ref-introduction-rendering-svelte-9e2b59 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

@@ -17,8 +17,6 @@ review_state: published
 rights: null
 subjects: []
 table_of_contents: false
-blocks-assignments:
-  - { uid: search-block }
 ---
 
 <block type="search" headline="Search" variation="facetsLeftSide" data-json='{"showSearchInput":true,"showSortOn":true,"showTotalResults":true,"facets":[{"@id":"facet-type","title":"Content Type","field":"portal_type","type":"checkboxFacet","multiple":true}],"sortOnOptions":["effective","sortable_title"],"blocks":{"results-listing":{"@type":"listing","variation":"default","fieldMapping":{"@id":{"field":"href","type":"link"},"title":"title","description":"description"},"querystring":{"query":[{"i":"path","o":"plone.app.querystring.operation.string.absolutePath","v":"/"}],"sort_on":"effective","sort_order":"descending"}}},"blocks_layout":{"listing":["results-listing"]}}' />

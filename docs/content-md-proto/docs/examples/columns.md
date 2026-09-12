@@ -21,17 +21,6 @@ subjects:
   - blocks
   - containers
 title: Grid Block
-blocks-assignments:
-  - { uid: title-1 }
-  - { uid: ref-columns-description }
-  - { uid: ref-columns-schema }
-  - { id: ref-columns-schema-javascript-45206c }
-  - { uid: ref-columns-json-data }
-  - { id: ref-columns-json-data-json-9ddfde }
-  - { uid: ref-columns-rendering }
-  - { id: ref-columns-rendering-jsx-a52cb0 }
-  - { id: ref-columns-rendering-vue-526eec }
-  - { id: ref-columns-rendering-svelte-9b4eec }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

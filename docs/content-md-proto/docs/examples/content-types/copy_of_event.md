@@ -35,13 +35,6 @@ subjects:
 sync_uid: null
 title: Another Event
 whole_day: true
-blocks-assignments:
-  - { uid: dd8d27df-ded3-49f5-afdf-239623a6adba }
-  - { uid: d634fc64-0178-4e61-904c-c9963f8c0c7d }
-  - { uid: b8adc074-62bd-42c1-98de-51d3551b4148 }
-  - { uid: 4564e5bf-3f00-491d-80f9-730d17da6990 }
-  - { uid: 7cc3f9dc-c91b-41ec-8a51-ce2cf7affe17 }
-  - { uid: 1a9dbeac-4f8e-4a75-9859-fd8012bd2c1a }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

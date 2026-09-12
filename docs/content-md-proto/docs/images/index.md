@@ -17,8 +17,6 @@ review_state: published
 rights: ""
 subjects: []
 title: Images
-blocks-assignments:
-  - { uid: title-1 }
 blocks-matched: |
   <block type="title" _="${h1}" />
 blobs:

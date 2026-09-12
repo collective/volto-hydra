@@ -21,20 +21,6 @@ subjects:
   - blocks
   - forms
 title: Form
-blocks-assignments:
-  - { uid: 00e8d49b-5b99-4d2f-83b3-7d69bc80b893 }
-  - { uid: ref-form-description }
-  - { uid: editor-screenshot }
-  - { uid: 3687103d-0766-4d5e-8aae-fc7e65c457a6 }
-  - { uid: eb25b89c-d64a-4566-8e6e-71fd0f371964 }
-  - { uid: ref-form-schema }
-  - { id: ref-form-schema-javascript-2285e7 }
-  - { uid: ref-form-json-data }
-  - { id: ref-form-json-data-json-6e9c29 }
-  - { uid: ref-form-rendering }
-  - { id: ref-form-rendering-jsx-29590c }
-  - { id: ref-form-rendering-vue-3f1bde }
-  - { id: ref-form-rendering-svelte-f8f39b }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

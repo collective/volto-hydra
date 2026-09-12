@@ -31,34 +31,6 @@ subjects:
   - text
   - editing
 title: Text
-blocks-assignments:
-  - { uid: ccff41c6-b733-4b88-b02e-4c07460a19e2 }
-  - { uid: ref-text-description }
-  - { uid: editor-screenshot }
-  - { uid: da904eda-9add-496c-ab09-4fee9820af1f }
-  - { uid: 244197b5-ac86-4d92-b235-18986a351580 }
-  - { uid: 5783a103-3129-48f8-80af-f7ad7af1efa4 }
-  - { uid: 9704c0d2-3e17-41c6-b3f6-9ae051d8c2f8 }
-  - { uid: 2abcc2af-dc78-4ca6-8882-6682f7e9a5b9 }
-  - { uid: 8df2a31d-76a5-445c-aacc-0437c48331d8 }
-  - { uid: 3a2f8507-01bf-49a4-a670-2159005075df }
-  - { uid: 9aa1cf78-c6dd-4f31-8673-4a3fc2653add }
-  - { uid: 291012a9-ca10-4011-9121-32a210f24d58 }
-  - { uid: 55df52be-8681-4d09-a17b-f32f31632213 }
-  - { uid: cd44a7ba-b521-41fb-a609-0d1b8d9df592 }
-  - { uid: 801d735a-2d81-428e-a4e9-85d1e82c3639 }
-  - { uid: 910a3f25-0318-41b3-a1a6-6e35cdf83451 }
-  - { uid: 486c4646-de10-40a9-9470-58b7b1449240 }
-  - { uid: f0a56edf-a963-4177-877c-76d9a4d6c20b }
-  - { uid: 00146980-5c86-4ecd-a84e-d373183231ad }
-  - { uid: ref-text-schema }
-  - { id: ref-text-schema-javascript-6ffd2e }
-  - { uid: ref-text-json-data }
-  - { id: ref-text-json-data-json-f6d82b }
-  - { uid: ref-text-rendering }
-  - { id: ref-text-rendering-jsx-076433 }
-  - { id: ref-text-rendering-vue-54b4b7 }
-  - { id: ref-text-rendering-svelte-2aa474 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

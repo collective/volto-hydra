@@ -20,39 +20,6 @@ rights: ""
 subjects:
   - content
 title: Typography - Page Title (H1, 48/56px)
-blocks-assignments:
-  - { uid: a6cad3f3-57e8-4bb7-8ac2-b12096e974d2 }
-  - { uid: 8fe8fc9b-221c-4c74-b66f-671d638222f3 }
-  - { uid: 4be85eba-b165-4a87-8585-d8697616004d }
-  - { uid: e5a7baea-d795-4e31-9145-53accbbe7bc3 }
-  - { uid: 4092b07d-31df-4aaa-9cfd-5bbdf814bb04 }
-  - { uid: c86e09b4-faaa-4f71-ba71-c3cf69f2d260 }
-  - { uid: 92f80d54-c607-4360-8e2f-ca8dc6b792c5 }
-  - { uid: f5858bf7-5485-479c-b0b2-10eee0dc937c }
-  - { uid: 11e4610d-dfac-493d-b9be-345949ca3276 }
-  - { uid: b8c4c6dc-47f1-493d-a2ba-d1ca958def4a }
-  - { uid: 5991123b-bf50-4684-ba6e-6a4f582d4640 }
-  - { uid: bdeb47df-9fb6-48ad-a633-2c7532c8694d }
-  - { uid: 4a035155-91fc-4371-82e8-b6d56866647f }
-  - { uid: 0a8e2813-414f-42f7-9aee-7ae6df4c338e }
-  - { uid: 9f276d9d-f3c9-4529-9a69-9c93f2d6c5ea }
-  - { uid: 55d58a5e-01a0-469e-b80b-3a5059593833 }
-  - { uid: 96e308ec-74e6-4ddd-bf31-4a9e66e0584e }
-  - { uid: 96e308ec-74e6-4ddd-bf31-4a9e66e0584e-split-1 }
-  - { uid: 875e2811-edb6-4842-8cc0-246fa1be6f58 }
-  - { uid: f4104455-1f80-4209-827d-416f2f07dec9 }
-  - { uid: dc27e427-babe-4497-a6ae-fdefeaba2d13 }
-  - { uid: bde519a7-d6c0-4bf5-b84b-d832f7f4cdd6 }
-  - { uid: 38e1fde4-8886-4673-9316-5e1b96bcc222 }
-  - { uid: 38e1fde4-8886-4673-9316-5e1b96bcc222-n2 }
-  - { uid: af96daae-955d-42f8-a5e7-c7943fb2e321 }
-  - { uid: a7ffd7f2-5dbf-4b5c-b24e-d10db0dff8df }
-  - { uid: a7ffd7f2-5dbf-4b5c-b24e-d10db0dff8df-n2 }
-  - { uid: c1163fcc-e2a4-4e81-b6ab-af537c8b4d56 }
-  - { uid: c1163fcc-e2a4-4e81-b6ab-af537c8b4d56-n2 }
-  - { uid: 47cef702-7d66-4313-b3ec-585408735218 }
-  - { uid: caa483f6-bc0f-4a5a-94d2-925897969928 }
-  - { uid: e770913c-fb7b-4cf1-94a8-7eb6e24ff66e }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

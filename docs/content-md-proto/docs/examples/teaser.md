@@ -28,24 +28,6 @@ subjects:
   - blocks
   - media
 title: Teaser
-blocks-assignments:
-  - { uid: b986b92c-e180-42d3-b755-4728854e5a50 }
-  - { uid: ref-teaser-description }
-  - { uid: editor-screenshot }
-  - { uid: 61f0e286-0527-43a7-b8fe-29f1be40a8c3 }
-  - { uid: 03fd3352-0845-4c70-9d01-805996bd127b }
-  - { uid: 530939e1-8579-4d37-a111-716475c00cac }
-  - { uid: 95648579-7116-401f-a448-e48938c88246 }
-  - { uid: b798dde4-6a5d-4cef-9e25-fd532e1ea9a7 }
-  - { uid: 620f0540-8c3d-422d-a1c6-47037b5dbfbc }
-  - { uid: ref-teaser-schema }
-  - { id: ref-teaser-schema-javascript-bfff08 }
-  - { uid: ref-teaser-json-data }
-  - { id: ref-teaser-json-data-json-7f117c }
-  - { uid: ref-teaser-rendering }
-  - { id: ref-teaser-rendering-jsx-d1dd76 }
-  - { id: ref-teaser-rendering-vue-fc123a }
-  - { id: ref-teaser-rendering-svelte-bf19cf }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

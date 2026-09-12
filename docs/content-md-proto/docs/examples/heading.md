@@ -24,30 +24,6 @@ subjects:
   - blocks
   - text
 title: Heading
-blocks-assignments:
-  - { uid: e58cca3c-95d4-4819-951d-48415706bf41 }
-  - { uid: ref-heading-description }
-  - { uid: 4a0352d5-89df-48aa-944e-7270e81351d4 }
-  - { uid: faabad67-4aa2-4774-a48c-b1accf288700 }
-  - { uid: fe637263-126e-4a7f-b4aa-36369c5155cc }
-  - { uid: 36960cee-ec85-458b-b0be-d2e7a5a41e5f }
-  - { uid: 36960cee-ec85-458b-b0be-d2e7a5a41e5f-split-1 }
-  - { uid: e328753b-d914-4bcb-8b8b-2d5060476efe }
-  - { uid: 06a960a6-795c-409d-a55f-94d5047e3514 }
-  - { uid: b4691078-153d-451f-9b47-fa6f852a1e6c }
-  - { uid: 7a405d27-e5ca-426c-bca4-e40cc338f7ba }
-  - { uid: 7ebc67e3-e666-43f4-9fce-5dc14f98834f }
-  - { uid: 0126e819-d955-41c5-a736-2f0b5ffda8a1 }
-  - { uid: 1bedcc9d-1c02-44e8-bb8e-5c46d6c67d3d }
-  - { uid: 882e7872-bcf3-4234-a510-d1cff6bf2f7f }
-  - { uid: ref-heading-schema }
-  - { id: ref-heading-schema-javascript-f00bc9 }
-  - { uid: ref-heading-json-data }
-  - { id: ref-heading-json-data-json-87c435 }
-  - { uid: ref-heading-rendering }
-  - { id: ref-heading-rendering-jsx-eb01a3 }
-  - { id: ref-heading-rendering-vue-754dc2 }
-  - { id: ref-heading-rendering-svelte-f5f71c }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

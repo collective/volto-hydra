@@ -19,19 +19,6 @@ review_state: published
 rights: ""
 subjects: []
 title: Cookie Consent Block
-blocks-assignments:
-  - { uid: title-1 }
-  - { uid: ref-cookie-consent-description }
-  - { uid: cookie-live-heading }
-  - { uid: cookie-live-1 }
-  - { uid: ref-cookie-consent-schema }
-  - { id: ref-cookie-consent-schema-javascript-6ba1e2 }
-  - { uid: ref-cookie-consent-json-data }
-  - { id: ref-cookie-consent-json-data-json-bacd31 }
-  - { uid: ref-cookie-consent-rendering }
-  - { id: ref-cookie-consent-rendering-jsx-06f33f }
-  - { id: ref-cookie-consent-rendering-vue-49ac4b }
-  - { id: ref-cookie-consent-rendering-svelte-92073b }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

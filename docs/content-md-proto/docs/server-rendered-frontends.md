@@ -20,55 +20,6 @@ rights: ""
 subjects:
   - frontend
 title: Server-rendered frontends
-blocks-assignments:
-  - { uid: title-1 }
-  - { uid: p-1 }
-  - { uid: h-2 }
-  - { uid: p-3 }
-  - { uid: p-4 }
-  - { uid: p-5 }
-  - { uid: h-6 }
-  - { uid: ce-7 }
-  - { id: ce-7-text-316e7d }
-  - { uid: h-8 }
-  - { uid: p-9 }
-  - { uid: ul-10 }
-  - { uid: p-11 }
-  - { uid: h-12 }
-  - { uid: p-13 }
-  - { uid: p-14 }
-  - { uid: p-15 }
-  - { uid: h-16 }
-  - { uid: ce-17 }
-  - { id: ce-17-astro-6cfb06 }
-  - { uid: ce-18 }
-  - { id: ce-18-ts-ad6a37 }
-  - { uid: ce-19 }
-  - { id: ce-19-ts-892388 }
-  - { uid: p-20 }
-  - { uid: h-21 }
-  - { uid: ce-22 }
-  - { id: ce-22-php-e87720 }
-  - { uid: ce-23 }
-  - { id: ce-23-php-9a04e4 }
-  - { uid: ce-24 }
-  - { id: ce-24-php-ebbd45 }
-  - { uid: p-25 }
-  - { uid: ce-26 }
-  - { id: ce-26-html-476b8c }
-  - { uid: h-27 }
-  - { uid: p-28 }
-  - { uid: tbl-29 }
-  - { uid: p-30 }
-  - { uid: h-31 }
-  - { uid: ul-32 }
-  - { uid: p-33 }
-  - { uid: ul-34 }
-  - { uid: p-35 }
-  - { uid: ul-36 }
-  - { uid: p-37 }
-  - { uid: ul-38 }
-  - { uid: p-39 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

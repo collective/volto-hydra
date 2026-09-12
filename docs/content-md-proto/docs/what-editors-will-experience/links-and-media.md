@@ -23,39 +23,6 @@ review_state: published
 rights: ""
 subjects: []
 title: Links and media
-blocks-assignments:
-  - { uid: title-1 }
-  - { uid: p-1 }
-  - { uid: h-2 }
-  - { uid: p-3 }
-  - { uid: ul-4 }
-  - { uid: img-5 }
-  - { uid: p-6 }
-  - { uid: h-7 }
-  - { uid: p-8 }
-  - { uid: p-9 }
-  - { uid: img-10 }
-  - { uid: p-11 }
-  - { uid: ul-12 }
-  - { uid: p-13 }
-  - { uid: ul-14 }
-  - { uid: p-15 }
-  - { uid: h-16 }
-  - { uid: p-17 }
-  - { uid: h-18 }
-  - { uid: p-19 }
-  - { uid: ul-20 }
-  - { uid: img-21 }
-  - { uid: h-22 }
-  - { uid: p-23 }
-  - { uid: ul-24 }
-  - { uid: p-25 }
-  - { uid: h-26 }
-  - { uid: p-27 }
-  - { uid: h-28 }
-  - { uid: p-29 }
-  - { uid: ul-30 }
-  - { uid: p-31 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

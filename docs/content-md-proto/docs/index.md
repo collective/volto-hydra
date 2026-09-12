@@ -21,18 +21,6 @@ review_state: published
 rights: ""
 subjects: []
 title: Volto Hydra Documentation
-blocks-assignments:
-  - { uid: title-1 }
-  - { uid: p-1 }
-  - { uid: h-2 }
-  - { uid: ul-3 }
-  - { uid: h-4 }
-  - { uid: p-5 }
-  - { uid: p-6 }
-  - { uid: ul-7 }
-  - { uid: p-8 }
-  - { uid: p-9 }
-  - { uid: listing-1 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

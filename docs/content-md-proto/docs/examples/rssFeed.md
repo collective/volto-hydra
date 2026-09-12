@@ -20,20 +20,6 @@ subjects:
   - blocks
   - listings
 title: RSS Feed Block
-blocks-assignments:
-  - { uid: title-1 }
-  - { uid: ref-rssFeed-description }
-  - { uid: rss-live-heading }
-  - { uid: rss-live-1 }
-  - { uid: ref-rssFeed-schema }
-  - { id: ref-rssFeed-schema-javascript-d79cf2 }
-  - { uid: ref-rssFeed-json-data }
-  - { id: ref-rssFeed-json-data-json-c55bf4 }
-  - { uid: ref-rssFeed-rendering-intro }
-  - { uid: ref-rssFeed-fetcher }
-  - { id: ref-rssFeed-fetcher-javascript-7f0034 }
-  - { uid: ref-rssFeed-rendering }
-  - { id: ref-rssFeed-rendering-javascript-df4061 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

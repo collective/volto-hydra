@@ -21,45 +21,6 @@ review_state: published
 rights: ""
 subjects: []
 title: Selecting blocks
-blocks-assignments:
-  - { uid: title-1 }
-  - { uid: p-1 }
-  - { uid: h-2 }
-  - { uid: p-3 }
-  - { uid: ul-4 }
-  - { uid: img-5 }
-  - { uid: h-6 }
-  - { uid: p-7 }
-  - { uid: ul-8 }
-  - { uid: p-9 }
-  - { uid: p-10 }
-  - { uid: img-11 }
-  - { uid: h-12 }
-  - { uid: p-13 }
-  - { uid: tbl-14 }
-  - { uid: p-15 }
-  - { uid: ul-16 }
-  - { uid: img-17 }
-  - { uid: h-18 }
-  - { uid: p-19 }
-  - { uid: h-20 }
-  - { uid: p-21 }
-  - { uid: ce-22 }
-  - { id: ce-22-text-ab2b2a }
-  - { uid: p-23 }
-  - { uid: img-24 }
-  - { uid: p-25 }
-  - { uid: h-26 }
-  - { uid: p-27 }
-  - { uid: ce-28 }
-  - { id: ce-28-text-e6d028 }
-  - { uid: ul-29 }
-  - { uid: p-30 }
-  - { uid: img-31 }
-  - { uid: h-32 }
-  - { uid: p-33 }
-  - { uid: h-34 }
-  - { uid: p-35 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

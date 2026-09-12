@@ -31,23 +31,6 @@ subjects:
   - blocks
   - text
 title: Highlight
-blocks-assignments:
-  - { uid: af3c704a-1f80-48c8-843b-dc29368d43d9 }
-  - { uid: ref-highlight-description }
-  - { uid: editor-screenshot }
-  - { uid: 8d932379-1247-4281-bd30-dfecd5b3c378 }
-  - { uid: 417e7343-af04-4da4-96bf-29321a3e0fc6 }
-  - { uid: 67a6a73a-5ae7-4e14-a11b-bd0139e56513 }
-  - { uid: 25a0a1b5-3ce9-468f-8968-9a7f83ca4e53 }
-  - { uid: 94655cc3-817d-48ba-bc20-6e9f7796dc46 }
-  - { uid: ref-highlight-schema }
-  - { id: ref-highlight-schema-javascript-80590c }
-  - { uid: ref-highlight-json-data }
-  - { id: ref-highlight-json-data-json-a2bfa3 }
-  - { uid: ref-highlight-rendering }
-  - { id: ref-highlight-rendering-jsx-659b6c }
-  - { id: ref-highlight-rendering-vue-dd8730 }
-  - { id: ref-highlight-rendering-svelte-d3a4c8 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

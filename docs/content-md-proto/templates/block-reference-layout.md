@@ -6,23 +6,6 @@ title: Block Reference Layout
 review_state: published
 description: Template for code examples at the bottom of block reference pages
 effective: 2025-01-01T00:00:00
-blocks-assignments:
-  - { uid: tpl-sep }
-  - { uid: tpl-examples-heading }
-  - { uid: tpl-schema-heading }
-  - { uid: tpl-schema-desc }
-  - { uid: tpl-schema }
-  - { id: tpl-schema-javascript-000000 }
-  - { uid: tpl-json-heading }
-  - { uid: tpl-json-desc }
-  - { uid: tpl-json }
-  - { id: tpl-json-json-000000 }
-  - { uid: tpl-rendering-heading }
-  - { uid: tpl-rendering-desc }
-  - { uid: tpl-rendering }
-  - { id: tpl-rendering-jsx-000000 }
-  - { id: tpl-rendering-vue-000000 }
-  - { id: tpl-rendering-svelte-000000 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="separator" _="${hr}" styles={"align":"full"} />

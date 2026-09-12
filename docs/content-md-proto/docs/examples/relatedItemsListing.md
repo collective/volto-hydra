@@ -21,20 +21,6 @@ subjects:
   - blocks
   - listings
 title: Related Items Block
-blocks-assignments:
-  - { uid: title-1 }
-  - { uid: ref-relatedItemsListing-description }
-  - { uid: ri-live-heading }
-  - { uid: ri-live-1 }
-  - { uid: ref-relatedItemsListing-schema }
-  - { id: ref-relatedItemsListing-schema-javascript-a1a504 }
-  - { uid: ref-relatedItemsListing-json-data }
-  - { id: ref-relatedItemsListing-json-data-json-ba9577 }
-  - { uid: ref-relatedItemsListing-rendering-intro }
-  - { uid: ref-relatedItemsListing-fetcher }
-  - { id: ref-relatedItemsListing-fetcher-javascript-1c975d }
-  - { uid: ref-relatedItemsListing-rendering }
-  - { id: ref-relatedItemsListing-rendering-javascript-2b9d44 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

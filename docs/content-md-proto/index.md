@@ -19,45 +19,6 @@ rights: ""
 subjects: []
 table_of_contents: null
 title: Inka
-blocks-assignments:
-  - { uid: hero-headline }
-  - { uid: hero-subhead }
-  - { uid: hero-cta }
-  - { uid: why-hydra-heading }
-  - { uid: why-hydra-tagline }
-  - { uid: why-hydra-quadrant }
-  - { uid: why-hydra-grid }
-  - { uid: box-visual }
-  - { uid: box-visual-n2 }
-  - { uid: box-frontend }
-  - { uid: box-frontend-n2 }
-  - { uid: box-enterprise }
-  - { uid: box-enterprise-n2 }
-  - { uid: box-opensource }
-  - { uid: box-opensource-n2 }
-  - { uid: quickstart-heading }
-  - { uid: quickstart-code }
-  - { id: tab-nuxt }
-  - { id: tab-nextjs }
-  - { id: tab-svelte }
-  - { id: tab-vanilla }
-  - { id: tab-astro }
-  - { uid: 303984b4-693a-408f-83f7-5a88b243d7db }
-  - { id: b09f39ea-36c3-4f09-9a18-30aef3565a22 }
-  - { id: ef8ceecc-7c1d-4e0a-9b67-a56e7d03f6e3 }
-  - { uid: fae599f3-e7d4-451b-a413-84355c796b7e }
-  - { uid: c9f92df8-81fd-4259-a149-5c8798735350 }
-  - { uid: c9f92df8-81fd-4259-a149-5c8798735350-n2 }
-  - { uid: d78b666f-b07b-4036-9853-efe6263515aa }
-  - { uid: d78b666f-b07b-4036-9853-efe6263515aa-n2 }
-  - { uid: d78b666f-b07b-4036-9853-efe6263515aa-n3 }
-  - { uid: d105783c-fa27-4c92-a3d9-6323adbe5e72 }
-  - { uid: d105783c-fa27-4c92-a3d9-6323adbe5e72-n2 }
-  - { uid: 0ab1a8f7-2d26-4933-800c-2f10474afe63 }
-  - { uid: e972541f-b114-494b-a51e-cc8b11c8207d }
-  - { uid: 9567ae6d-191c-43f1-91cc-4288bbb98f88 }
-  - { uid: 0d0c0506-f9bb-48d8-af0a-1352d81b45de }
-  - { uid: 2fac7e5d-affb-4a8e-969f-2fac4d08e0fd }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="separator" _="${hr}" styles={"align":"full"} />

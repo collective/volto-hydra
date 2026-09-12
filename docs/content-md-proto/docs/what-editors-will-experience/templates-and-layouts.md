@@ -23,52 +23,6 @@ review_state: published
 rights: ""
 subjects: []
 title: Templates and layouts
-blocks-assignments:
-  - { uid: title-1 }
-  - { uid: p-1 }
-  - { uid: p-2 }
-  - { uid: ul-3 }
-  - { uid: p-4 }
-  - { uid: h-5 }
-  - { uid: p-6 }
-  - { uid: h-7 }
-  - { uid: p-8 }
-  - { uid: ul-9 }
-  - { uid: p-10 }
-  - { uid: p-11 }
-  - { uid: h-12 }
-  - { uid: p-13 }
-  - { uid: ul-14 }
-  - { uid: p-15 }
-  - { uid: ul-16 }
-  - { uid: p-17 }
-  - { uid: h-18 }
-  - { uid: p-19 }
-  - { uid: img-20 }
-  - { uid: h-21 }
-  - { uid: p-22 }
-  - { uid: p-23 }
-  - { uid: h-24 }
-  - { uid: p-25 }
-  - { uid: ul-26 }
-  - { uid: p-27 }
-  - { uid: p-28 }
-  - { uid: h-29 }
-  - { uid: p-30 }
-  - { uid: ol-31 }
-  - { uid: p-32 }
-  - { uid: p-33 }
-  - { uid: h-34 }
-  - { uid: p-35 }
-  - { uid: p-36 }
-  - { uid: p-37 }
-  - { uid: ul-38 }
-  - { uid: p-39 }
-  - { uid: img-40 }
-  - { uid: h-41 }
-  - { uid: p-42 }
-  - { uid: h-43 }
-  - { uid: p-44 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

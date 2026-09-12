@@ -24,37 +24,6 @@ subjects:
   - blocks
   - text
 title: Separator
-blocks-assignments:
-  - { uid: 47b1e791-6f01-4b9b-a923-6658e7bc7871 }
-  - { uid: ref-separator-description }
-  - { uid: editor-screenshot }
-  - { uid: dee0a2a5-dda7-407d-be26-1cecf1ba55a6 }
-  - { uid: be9ea3ae-29e1-41b8-b338-f32070a82675 }
-  - { uid: cf7e08f3-b9a8-4604-b208-e3a8bc88ec83 }
-  - { uid: 360c5f14-05d0-4292-afcb-e4edb164addc }
-  - { uid: 6d7874ae-a64d-4e79-8264-ef56cebd4ccf }
-  - { uid: a4eccaa5-e954-4c35-9d1d-bd3ce3a68691 }
-  - { uid: d4d24182-f2b9-4f42-8775-92ceeabeb962 }
-  - { uid: a10b2026-51da-421a-a2b7-1e9617362366 }
-  - { uid: d65027a5-7bc8-476b-8061-779ba923b04a }
-  - { uid: 16d92364-84f3-4ef1-a24a-8d217ee15456 }
-  - { uid: e28cf868-7156-445c-a512-dba929aa6977 }
-  - { uid: da5327a4-144c-4327-a38e-98a58643f9d0 }
-  - { uid: 9128144d-66f8-4943-8b1d-253cb11431de }
-  - { uid: 462237eb-7cbe-4fc3-8fcb-7cd18eeeaf7f }
-  - { uid: 512e7346-36b6-4b57-a4ee-54c23ea27aa0 }
-  - { uid: ef3f8f79-11c3-4495-b98f-15f0568645b5 }
-  - { uid: 9c102ef1-5044-41cf-9859-025b23a90c26 }
-  - { uid: c209c305-cde3-497d-9a58-3dc642f3cb5d }
-  - { uid: c0f46bdd-58ae-48a1-9ee7-a9ba780d7386 }
-  - { uid: ref-separator-schema }
-  - { id: ref-separator-schema-javascript-3157d9 }
-  - { uid: ref-separator-json-data }
-  - { id: ref-separator-json-data-json-9d890c }
-  - { uid: ref-separator-rendering }
-  - { id: ref-separator-rendering-jsx-470901 }
-  - { id: ref-separator-rendering-vue-4281a1 }
-  - { id: ref-separator-rendering-svelte-8c1d19 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

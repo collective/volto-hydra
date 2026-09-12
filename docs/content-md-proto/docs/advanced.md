@@ -21,35 +21,6 @@ rights: ""
 subjects:
   - frontend
 title: Advanced
-blocks-assignments:
-  - { uid: title-1 }
-  - { uid: p-1 }
-  - { uid: sep-2 }
-  - { uid: h-3 }
-  - { uid: p-4 }
-  - { uid: ul-5 }
-  - { uid: p-6 }
-  - { uid: ce-7 }
-  - { id: ce-7-javascript-f6a08c }
-  - { uid: h-8 }
-  - { uid: p-9 }
-  - { uid: p-10 }
-  - { uid: ce-11 }
-  - { id: ce-11-javascript-060e3a }
-  - { uid: p-12 }
-  - { uid: ce-13 }
-  - { id: ce-13-javascript-852336 }
-  - { uid: h-14 }
-  - { uid: p-15 }
-  - { uid: h-16 }
-  - { uid: p-17 }
-  - { uid: ul-18 }
-  - { uid: h-19 }
-  - { uid: p-20 }
-  - { uid: ul-21 }
-  - { uid: h-22 }
-  - { uid: p-23 }
-  - { uid: ul-24 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

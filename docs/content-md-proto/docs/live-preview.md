@@ -22,24 +22,6 @@ rights: ""
 subjects:
   - editing
 title: Live Preview
-blocks-assignments:
-  - { uid: title-1 }
-  - { uid: p-1 }
-  - { uid: sep-2 }
-  - { uid: h-3 }
-  - { uid: p-4 }
-  - { uid: ce-5 }
-  - { id: ce-5-javascript-3259a0 }
-  - { uid: p-6 }
-  - { uid: p-7 }
-  - { uid: h-8 }
-  - { uid: p-9 }
-  - { uid: ce-10 }
-  - { id: ce-10-javascript-23153e }
-  - { uid: h-11 }
-  - { uid: p-12 }
-  - { uid: ce-13 }
-  - { id: ce-13-javascript-4aeb0d }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

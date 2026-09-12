@@ -23,49 +23,6 @@ rights: ""
 subjects:
   - editing
 title: Editor Guide
-blocks-assignments:
-  - { uid: title-1 }
-  - { uid: p-1 }
-  - { uid: h-2 }
-  - { uid: p-3 }
-  - { uid: ul-4 }
-  - { uid: p-5 }
-  - { uid: h-6 }
-  - { uid: p-7 }
-  - { uid: ce-8 }
-  - { id: ce-8-text-6b4738 }
-  - { uid: ul-9 }
-  - { uid: h-10 }
-  - { uid: p-11 }
-  - { uid: ul-12 }
-  - { uid: p-13 }
-  - { uid: img-14 }
-  - { uid: h-15 }
-  - { uid: p-16 }
-  - { uid: ul-17 }
-  - { uid: p-18 }
-  - { uid: h-19 }
-  - { uid: p-20 }
-  - { uid: p-21 }
-  - { uid: h-22 }
-  - { uid: p-23 }
-  - { uid: ol-24 }
-  - { uid: p-25 }
-  - { uid: h-26 }
-  - { uid: p-27 }
-  - { uid: img-28 }
-  - { uid: h-29 }
-  - { uid: p-30 }
-  - { uid: img-31 }
-  - { uid: h-32 }
-  - { uid: p-33 }
-  - { uid: img-34 }
-  - { uid: h-35 }
-  - { uid: p-36 }
-  - { uid: img-37 }
-  - { uid: h-38 }
-  - { uid: tbl-39 }
-  - { uid: p-40 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

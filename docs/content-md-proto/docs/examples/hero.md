@@ -21,17 +21,6 @@ subjects:
   - blocks
   - media
 title: Hero Block
-blocks-assignments:
-  - { uid: title-1 }
-  - { uid: ref-hero-description }
-  - { uid: ref-hero-schema }
-  - { id: ref-hero-schema-javascript-698e6b }
-  - { uid: ref-hero-json-data }
-  - { id: ref-hero-json-data-json-fc17f8 }
-  - { uid: ref-hero-rendering }
-  - { id: ref-hero-rendering-jsx-46a2e5 }
-  - { id: ref-hero-rendering-vue-337205 }
-  - { id: ref-hero-rendering-svelte-a2ecf7 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

@@ -22,17 +22,6 @@ subjects:
   - containers
   - media
 title: Slider Block
-blocks-assignments:
-  - { uid: title-1 }
-  - { uid: ref-slider-description }
-  - { uid: ref-slider-schema }
-  - { id: ref-slider-schema-javascript-ce9b5a }
-  - { uid: ref-slider-json-data }
-  - { id: ref-slider-json-data-json-c5167b }
-  - { uid: ref-slider-rendering }
-  - { id: ref-slider-rendering-jsx-87bcad }
-  - { id: ref-slider-rendering-vue-6e69c4 }
-  - { id: ref-slider-rendering-svelte-586973 }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

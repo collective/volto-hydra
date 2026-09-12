@@ -23,35 +23,6 @@ subjects:
   - blocks
   - media
 title: Video
-blocks-assignments:
-  - { uid: 604e5248-8521-403d-9e5f-3f50d1229454 }
-  - { uid: ref-video-description }
-  - { uid: editor-screenshot }
-  - { uid: 7ace8ba6-13cb-4a5c-ab1c-fc6f8ce8737c }
-  - { uid: c97a926c-b2d2-4a73-9691-fc6e1aca6c52 }
-  - { uid: 30c476a0-65fe-4e3a-895e-f59f6695929b }
-  - { uid: 42767d3a-3186-4e50-843d-3ea96c380943 }
-  - { uid: 458576df-767e-4412-9e9f-2733e8334d5d }
-  - { uid: e6e1484a-c2c2-4788-a8c4-a26a979d18cd }
-  - { uid: 38e88a05-b1b0-4958-af71-b3bd6e37297f }
-  - { uid: 70d958cb-14b6-4689-84ad-cd3aa4ac19ee }
-  - { uid: 45a46c1b-f619-4e95-9b8c-932d524336af }
-  - { uid: 3664a470-22c4-47d9-8a30-89c34f1f7c99 }
-  - { uid: 0d092cea-0518-428c-8aaa-c90a7cff183f }
-  - { uid: 205fa3ab-9358-46f3-81d6-4ea90dc8c290 }
-  - { uid: c9eb00a4-23c8-4a13-a19d-9ee056646e16 }
-  - { uid: 5212b457-984a-4666-ab67-7c9f6429b2a7 }
-  - { uid: b75aeb62-6aca-440b-ab6d-66b063dbdab9 }
-  - { uid: 19a3d50a-a683-4e59-ac7c-d2ba2149cdd7 }
-  - { uid: 49a61581-70ce-4810-84c2-1d91ac421197 }
-  - { uid: ref-video-schema }
-  - { id: ref-video-schema-javascript-104794 }
-  - { uid: ref-video-json-data }
-  - { id: ref-video-json-data-json-9ce28f }
-  - { uid: ref-video-rendering }
-  - { id: ref-video-rendering-jsx-b3c5ea }
-  - { id: ref-video-rendering-vue-160de2 }
-  - { id: ref-video-rendering-svelte-b4e8ba }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

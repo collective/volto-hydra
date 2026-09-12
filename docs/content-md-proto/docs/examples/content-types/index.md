@@ -19,10 +19,6 @@ review_state: published
 rights: ""
 subjects: []
 title: Content Types
-blocks-assignments:
-  - { uid: 7f1d39a2-a57c-4b2a-93bd-4dd30ee3f6cc }
-  - { uid: e3bb641a-0252-4fff-a6a0-80ce155d4ee5 }
-  - { uid: fdb1dfd1-6073-4ad0-a147-c0709c39734d }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

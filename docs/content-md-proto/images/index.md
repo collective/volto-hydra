@@ -19,10 +19,6 @@ review_state: published
 rights: ""
 subjects: []
 title: Images
-blocks-assignments:
-  - { uid: 55e93046-15ee-41f5-b63c-fde0d9b6ce52 }
-  - { uid: 183bf050-57b7-4841-b9c8-f9b5a15fe086 }
-  - { uid: 2d181d1f-1fac-420a-b410-4f4d5379f8ea }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />

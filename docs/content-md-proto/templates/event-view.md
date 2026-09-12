@@ -11,10 +11,6 @@ end: 2023-12-31T12:00:00+00:00
 location: Musterhausener Landstrasse 134 Standort E123 67111 Musterhausen
 contact_name: Max Mustermann
 contact_phone: +49 1234 567-890
-blocks-assignments:
-  - { uid: tpl-ev-title }
-  - { uid: tpl-ev-metadata }
-  - { uid: tpl-ev-content }
 blocks-matched: |
   <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
   <block type="title" _="${h1}" />
