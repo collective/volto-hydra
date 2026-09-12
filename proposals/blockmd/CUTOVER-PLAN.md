@@ -48,22 +48,37 @@ verify-on-emit fails).
   knowledge*, and the engine's container code is a *second implementation* of
   `blockPath`.
 
-**Reorientation:**
-1. The loader/engine gets container shape + item traversal/insert from the schema
-   via `blockPath` (`getAllContainerFields`, `getContainerItems`,
-   `insertBlockInContainer`, …). Retire the engine's parallel container code.
-2. Prototypes keep **only the leaf markdown-shape mapping** (paragraph→slate,
-   `---`→separator, `${p/slate}`) — not `<region>` container declarations.
-3. Decode/emit become **schema-driven** (drop the schema-free goal). Acceptable:
-   the mock API has `blocksConfig`; Sphinx renders markdown (never decodes to
-   blocks); tooling can load the schema. No consumer needs schema-free
-   block-decode.
+**Reorientation — reuse the traversal, keep schema-free via a synthesized config.**
+`blockPath` is *parameterized* by a `blocksConfig`-shaped object
+(`buildBlockPathMap(formData, blocksConfig, intl)` → `blockPathMap`; then it reads
+`schema.properties[region].widget`). It doesn't care whether that config came
+from the real schema or was **synthesized** — so:
+1. **Keep** the prototype's `<region widget=…>` declaration — it *is* the
+   schema-free container descriptor (which field is a container, of what kind,
+   with the object_list id/type field). Not the duplication.
+2. **Synthesize a minimal `blocksConfig`** from those declarations (only the
+   container fields + kinds), and feed it to the reused traversal. The document
+   stays self-describing — **no external schema required**.
+3. **Reuse `blockPath`'s traversal/insert/nesting** for decode + emit; **retire**
+   the engine's parallel container code (`unkeyBlocks`/`decodeRegion`/
+   `emitContainer` container paths) — that reimplementation is the real waste.
 
-**Payoff:** one container implementation (tested), one source of container-kind
-(the schema), `columns` + arbitrary nesting work with no special-casing, and no
-duplicated container logic. Prerequisite check: `blockPath.js` is importable by
-the loader (it pulls `@volto-hydra/hydra-js` + `slateMerge` — confirm no
-React/DOM at import time, or extract the pure core).
+So it is NOT "drop schema-free" — it is "the config `blockPath` needs is derived
+from the document, not an external schema." Both properties hold: reuse (no
+duplicated traversal) **and** schema-free (document-derived config).
+
+**Payoff:** one traversal implementation (tested), `columns` + arbitrary nesting
+work with no special-casing, no duplicated container logic — and the format
+stays decodable without an external schema.
+
+**Feasibility (checked):** the traversal core is `hydra-js/buildBlockPathMap.js`
+— the **framework-agnostic** bridge package, not the Volto/React wrapper — and
+`slateMerge.js` is pure (no React/DOM). So prefer reusing the hydra-js core
+directly (feed the synthesized config + a stub `intl`); confirm `blockPath.js`'s
+other wrapper imports (`injectedVoltoConfig`, `@volto-hydra/helpers`) are
+import-pure, else call the hydra-js core beneath the wrapper. Confirm a minimal
+synthesized config (container fields + widget only) satisfies `buildBlockPathMap`
+without the editing-only bits (`allowedBlocks`/`maxLength`/`itemSchema`).
 
 ## Consolidate the two markdown dialects (the remaining duplication)
 
