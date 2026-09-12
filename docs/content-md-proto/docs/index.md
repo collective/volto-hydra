@@ -50,6 +50,8 @@ order:
 
 A design-system-first page-builder toolkit. Strike the right balance for your site — make it easy for editors to create engagement while staying compliant.
 
+<block type="video" align="full" url="/docs/static/hydra-demo/@@download/file" data-json='{"autoplay":true,"loop":true,"muted":true,"controls":false}' />
+
 <block type="callout" variation="warning">
 
 Inka is a [Work in Progress](https://github.com/orgs/collective/projects/3/views/4). It should not be used in production yet.
