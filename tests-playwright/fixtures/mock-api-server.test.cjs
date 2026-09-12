@@ -486,3 +486,40 @@ describe('image blocks', () => {
     assert.equal(data.blocks['title-1'].image_scales, undefined);
   });
 });
+
+describe('/@export (tree export, json | markdown)', () => {
+  it('exports the whole content tree as json (stored shape)', async () => {
+    const res = await fetch(`${baseUrl}/@export`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ format: 'json' }),
+    });
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.ok(Object.keys(data).length > 0, 'has items');
+    assert.ok(Object.values(data).some((v) => v && v['@type']), 'items carry their stored shape');
+  });
+
+  it('exports markdown using the prototypes passed in the body (mock API needs no config)', async () => {
+    const res = await fetch(`${baseUrl}/@export`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        format: 'markdown',
+        prototypes: { matched: '<block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />' },
+      }),
+    });
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    // block-bearing items come back as markdown strings
+    const md = Object.values(data).find((v) => typeof v === 'string' && v.length);
+    assert.equal(typeof md, 'string');
+    assert.ok(md.length > 0, 'produced markdown');
+  });
+
+  it('rejects an unknown format', async () => {
+    const res = await fetch(`${baseUrl}/@export`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ format: 'yaml' }),
+    });
+    assert.equal(res.status, 400);
+  });
+});

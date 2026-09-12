@@ -177,6 +177,8 @@ let ready = Promise.resolve();
 // and held so a mount can be reloaded SYNCHRONOUSLY (on a watcher change or a
 // cache miss) without re-awaiting a dynamic import.
 let mdRuntime = null;
+// The prototype engine, imported once for the /@export endpoint's markdown mode.
+let engine = null; // { emitPage, parsePrototypes }
 
 // Map UIDs to URL paths (for resolveuid endpoint)
 const uidToPathMap = {};
@@ -1708,6 +1710,13 @@ function reloadMount(mount) {
 }
 
 /** Import the ESM loaders once, hold them, and load every markdown mount. */
+/** Import the prototype engine once (for /@export markdown), independent of
+ *  whether any markdown mounts are configured. */
+async function initEngine() {
+  const { emitPage, parsePrototypes } = await import('../../lib/prototype-mapping.mjs');
+  engine = { emitPage, parsePrototypes };
+}
+
 async function initMarkdownMounts() {
   const mounts = CONTENT_MOUNTS.filter(isMarkdownMount);
   if (!mounts.length) return;
@@ -1742,7 +1751,7 @@ initContentDirMap();
 // Markdown mounts need a dynamic import, so loading them is async. Anything
 // that serves requests must await `ready` first, or the first request can
 // arrive before the tree is in memory.
-ready = initMarkdownMounts();
+ready = Promise.all([initMarkdownMounts(), initEngine()]);
 
 // Watch content mounts for additions/deletions/modifications and rebuild
 // contentDirMap. node --watch only restarts the JS process on .cjs edits —
@@ -2059,6 +2068,39 @@ app.delete('/*', (req, res, next) => {
  * Create new content (e.g., Image upload)
  * Used by ImageWidget for file uploads
  */
+/**
+ * Export the whole content tree (mock-API extra feature). `format` picks the
+ * serializer: `json` returns each item's stored shape; `markdown` runs each
+ * item through the prototype engine. The CALLER supplies the prototypes in the
+ * body (`{ matched, tagged }` declaration text) so the mock API needs no format
+ * config of its own -- it just parses and applies what it's given.
+ *   POST /@export  { format: 'json'|'markdown', prototypes?: { matched, tagged } }
+ *   -> { "/path": <data.json | markdown string>, ... }
+ */
+app.post('/@export', async (req, res) => {
+  await ready;
+  const { format = 'json', prototypes = {} } = req.body || {};
+  const paths = Object.keys(contentDirMap);
+  const out = {};
+  if (format === 'markdown') {
+    const { emitPage, parsePrototypes } = engine;
+    const protos = [
+      ...parsePrototypes(prototypes.matched || ''),
+      ...parsePrototypes(prototypes.tagged || '', { explicit: true }),
+    ];
+    for (const p of paths) {
+      const c = loadRawContentFromDisk(p);
+      if (!c || !c.blocks) continue; // only block-bearing content items get a body
+      out[p] = emitPage(protos, { blocks: c.blocks, blocks_layout: c.blocks_layout }).markdown;
+    }
+  } else if (format === 'json') {
+    for (const p of paths) { const c = loadRawContentFromDisk(p); if (c) out[p] = c; }
+  } else {
+    return res.status(400).json({ error: `unknown format "${format}" (use json|markdown)` });
+  }
+  return res.json(out);
+});
+
 app.post('/*', (req, res, next) => {
   // Skip special endpoints (already handled above or below)
   if (req.path.startsWith('/@') || req.path.includes('/@')) {
