@@ -163,8 +163,8 @@ const contentDirMap = {};
 // enrichment, @components, search, @@images, resolveuid -- is unchanged,
 // because it all works on the raw content object.
 //
-// blockmd is ESM and this file is CommonJS, so the module is pulled in with a
-// single dynamic import during startup. `ready` resolves when the trees are
+// The markdown loader is ESM and this file is CommonJS, so it is pulled in with
+// a single dynamic import during startup. `ready` resolves when the trees are
 // loaded; the server awaits it before listening.
 const MARKDOWN_BLOB_MIME = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
@@ -175,9 +175,9 @@ const MARKDOWN_BLOB_MIME = {
 const markdownItems = new Map();   // url path -> raw content
 const markdownBlobs = new Map();   // url path -> absolute blob file
 let ready = Promise.resolve();
-// The ESM loaders (readTree, validateTree, schema) are imported once at startup
-// and held so a mount can be reloaded SYNCHRONOUSLY (on a watcher change or a
-// cache miss) without re-awaiting a dynamic import.
+// The ESM loaders (readTree, checkIntegrity) are imported once at startup and
+// held so a mount can be reloaded SYNCHRONOUSLY (on a watcher change or a cache
+// miss) without re-awaiting a dynamic import.
 let mdRuntime = null;
 // The prototype engine, imported once for the /@export endpoint's markdown mode.
 let engine = null; // { emitPage, parsePrototypes }
