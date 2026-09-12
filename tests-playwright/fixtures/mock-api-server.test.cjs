@@ -2,6 +2,8 @@ const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
+const { execFileSync } = require('node:child_process');
 const { app } = require('./mock-api-server.cjs');
 
 let server;
@@ -488,15 +490,37 @@ describe('image blocks', () => {
 });
 
 describe('/@export (tree export, json | markdown)', () => {
-  it('exports the whole content tree as json (stored shape)', async () => {
+  it('exports json as a gzipped tar distribution that validates clean', async () => {
     const res = await fetch(`${baseUrl}/@export`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ format: 'json' }),
     });
-    assert.equal(res.status, 200);
-    const data = await res.json();
-    assert.ok(Object.keys(data).length > 0, 'has items');
-    assert.ok(Object.values(data).some((v) => v && v['@type']), 'items carry their stored shape');
+    assert.equal(res.status, 200, 'export succeeded');
+    // Same wire format as Plone's @@export-content: a gzipped tar.
+    assert.equal(res.headers.get('content-type'), 'application/gzip');
+    const buf = Buffer.from(await res.arrayBuffer());
+    assert.equal(buf[0], 0x1f); assert.equal(buf[1], 0x8b); // gzip magic
+
+    // Extract it and confirm it's a real, importable distribution.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'export-test-'));
+    try {
+      fs.writeFileSync(path.join(dir, 'export.tar.gz'), buf);
+      execFileSync('tar', ['-xzf', 'export.tar.gz', '-C', dir], { cwd: dir });
+      const meta = JSON.parse(fs.readFileSync(path.join(dir, 'content/__metadata__.json'), 'utf8'));
+      assert.ok(meta._data_files_.length > 0, 'distribution lists data files');
+      assert.ok(fs.existsSync(path.join(dir, 'content', meta._data_files_[0])), 'first data file present');
+      // Blob files referenced by the tree must actually be in the tar.
+      for (const blob of meta._blob_files_) {
+        assert.ok(fs.existsSync(path.join(dir, 'content', blob)), `blob present: ${blob}`);
+      }
+      // And it passes the same validator the mounts are checked with.
+      const { validate, checkIntegrity } = require('./plone-content-validator.cjs');
+      const contentDir = path.join(dir, 'content');
+      assert.deepEqual(validate(contentDir).errors, [], 'validate: no errors');
+      assert.deepEqual(checkIntegrity(contentDir).errors, [], 'checkIntegrity: no errors');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('exports markdown using the prototypes passed in the body (mock API needs no config)', async () => {

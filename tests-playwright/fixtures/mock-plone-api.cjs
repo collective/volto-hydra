@@ -11,6 +11,8 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const { execFileSync } = require('child_process');
 
 const app = express();
 const PORT = process.env.PORT || 8888;
@@ -2068,37 +2070,222 @@ app.delete('/*', (req, res, next) => {
  * Create new content (e.g., Image upload)
  * Used by ImageWidget for file uploads
  */
+// The plone.exportimport siblings that ride alongside a content tree.
+const DISTRIBUTION_SIBLINGS = ['discussions.json', 'portlets.json', 'principals.json',
+                               'redirects.json', 'relations.json', 'translations.json'];
+// A blob rides in one of these two fields on Image/File content.
+const BLOB_FIELDS = ['image', 'file'];
+// Minimal, importer-valid siblings for a mount that ships none of its own.
+const SIBLING_DEFAULTS = {
+  'discussions.json': {}, 'portlets.json': [], 'principals.json': { groups: [], users: [] },
+  'redirects.json': {}, 'relations.json': [], 'translations.json': [],
+};
+
 /**
- * Export the whole content tree (mock-API extra feature). `format` picks the
- * serializer: `json` returns each item's stored shape; `markdown` runs each
- * item through the prototype engine. The CALLER supplies the prototypes in the
- * body (`{ matched, tagged }` declaration text) so the mock API needs no format
- * config of its own -- it just parses and applies what it's given.
+ * Emit a plone.exportimport distribution at `dest/content` from IN-MEMORY items
+ * — the served content shape, not disk. This is the only correct source: a
+ * markdown mount has no exportimport tree on disk (it is decoded into memory at
+ * load), and a mount's on-disk folder layout is not the served layout. Each
+ * item's own data.json is written verbatim (its blob_path is already valid for
+ * its mount, be it UID-keyed from JSON or tree-relative from markdown — the
+ * format only requires blob_path to appear in _blob_files_ with its bytes
+ * present, which this keeps true either way); blob bytes are copied in from
+ * wherever they live via `blobSourceOf`.
+ *
+ * @param {string} dest                       staging dir (content/ is (re)created)
+ * @param {Array<{urlPath, data}>} items       served items, data = data.json shape
+ * @param {(uid:string)=>number|undefined} opts.positionOf  getObjPositionInParent, for ordering
+ * @param {(urlPath,field,blobPath)=>string} opts.blobSourceOf  abs source file for a blob's bytes
+ * @param {string[]} [opts.siblingsFrom]       dirs to copy the 6 siblings from (first that has each wins)
+ * @returns the written __metadata__
+ */
+function writeDistribution(dest, items, { positionOf = () => undefined, blobSourceOf, siblingsFrom = [] } = {}) {
+  const destContent = path.join(dest, 'content');
+  fs.rmSync(destContent, { recursive: true, force: true });
+  fs.mkdirSync(destContent, { recursive: true });
+
+  const dirKeyFor = (urlPath) => (urlPath === '/' ? 'plone_site_root' : urlPath.replace(/^\/+/, ''));
+  const dataFiles = [];
+  const blobFiles = new Set();
+  const localRoles = {};
+  const ordering = {};
+
+  for (const { urlPath, data } of items) {
+    const dirKey = dirKeyFor(urlPath);
+    const itemDir = path.join(destContent, dirKey);
+    fs.mkdirSync(itemDir, { recursive: true });
+
+    // Blobs are normalised to the canonical exportimport layout,
+    // `<item dir>/<field>/<filename>`. A mount's own blob_path can't be trusted
+    // to be safe here: a markdown standalone Image is served at, say,
+    // `/images/p.jpg` with blob_path `images/p.jpg`, so its data.json dir and its
+    // blob file would claim the very same path. Placing the blob under a field
+    // subfolder (as Plone does) removes that collision and unifies both mount
+    // kinds. `data` may be a shared cache object, so rewrite a shallow copy.
+    const out = { ...data };
+    for (const field of BLOB_FIELDS) {
+      const blobPath = data[field] && data[field].blob_path;
+      if (!blobPath) continue;
+      const src = blobSourceOf(urlPath, field, blobPath);
+      if (!src || !fs.existsSync(src)) {
+        throw new Error(`${urlPath}: no bytes for ${field}.blob_path "${blobPath}" (looked at ${src})`);
+      }
+      const filename = (data[field].filename) || path.basename(blobPath);
+      const canonical = `${dirKey}/${field}/${filename}`;
+      const destBlob = path.join(destContent, canonical);
+      fs.mkdirSync(path.dirname(destBlob), { recursive: true });
+      fs.copyFileSync(src, destBlob);
+      blobFiles.add(canonical);
+      out[field] = { ...data[field], blob_path: canonical };
+    }
+
+    fs.writeFileSync(path.join(itemDir, 'data.json'), JSON.stringify(out, null, 2) + '\n');
+    dataFiles.push(`${dirKey}/data.json`);
+    if (data.UID) {
+      // local_roles is constant in this content set; every item is Owner-admin.
+      localRoles[data.UID] = { local_roles: { admin: ['Owner'] } };
+      const pos = positionOf(data.UID);
+      if (pos !== undefined) ordering[data.UID] = pos;
+    }
+  }
+
+  // Parents before children (plone_site_root first) so the importer can attach
+  // each item to an already-created parent.
+  const depthOf = (rel) => (rel.startsWith('plone_site_root/') ? 0 : rel.split('/').length);
+  dataFiles.sort((a, b) => depthOf(a) - depthOf(b) || a.localeCompare(b));
+
+  for (const sib of DISTRIBUTION_SIBLINGS) {
+    const from = siblingsFrom.map((d) => path.join(d, sib)).find((p) => fs.existsSync(p));
+    if (from) fs.copyFileSync(from, path.join(dest, sib));
+    else fs.writeFileSync(path.join(dest, sib), JSON.stringify(SIBLING_DEFAULTS[sib], null, 2) + '\n');
+  }
+
+  const meta = {
+    __version__: '1.0.0',
+    _data_files_: dataFiles,
+    _blob_files_: [...blobFiles].sort(),
+    default_page: {},
+    local_roles: localRoles,
+    ordering,
+    relations: [],
+  };
+  fs.writeFileSync(path.join(destContent, '__metadata__.json'), JSON.stringify(meta, null, 2) + '\n');
+  return meta;
+}
+
+/**
+ * Gather every served content item from memory (JSON items read through their
+ * cache, markdown items straight from the decoded cache — `loadRawContentFromDisk`
+ * unifies both) and emit them as one distribution via `writeDistribution`. Blob
+ * bytes come from `markdownBlobs` for a markdown item, else from the owning JSON
+ * mount's dir (its blob_path is relative to that content root). Returns the
+ * written __metadata__, or null when there is no content to export.
+ */
+function buildDistributionFromMemory(dest) {
+  // Only genuine content-source mounts are exportable: a plone.exportimport tree
+  // (has __metadata__.json) or a markdown tree (has index.md). A loose fixture
+  // mount like /_test_data is neither — it holds intentionally-malformed test
+  // pages and must never end up in a deploy tar. Pick each path's MOST-SPECIFIC
+  // mount (longest matching mountPath), since '/' nominally owns everything.
+  const exportable = (m) => isMarkdownMount(m) || fs.existsSync(path.join(m.dirPath, '__metadata__.json'));
+  const ownerMount = (urlPath) => CONTENT_MOUNTS
+    .filter((m) => m.mountPath === '/' || urlPath === m.mountPath || urlPath.startsWith(`${m.mountPath}/`))
+    .sort((a, b) => b.mountPath.length - a.mountPath.length)[0];
+
+  const items = [];
+  for (const urlPath of Object.keys(contentDirMap)) {
+    const owner = ownerMount(urlPath);
+    if (!owner || !exportable(owner)) continue;
+    const data = loadRawContentFromDisk(urlPath);
+    if (data) items.push({ urlPath, data });
+  }
+  if (!items.length) return null;
+
+  const blobSourceOf = (urlPath, _field, blobPath) => {
+    if (markdownBlobs.has(urlPath)) return markdownBlobs.get(urlPath);
+    const mount = mountFor(urlPath);
+    return mount ? path.join(mount.dirPath, blobPath) : null;
+  };
+  // Siblings come from any JSON mount that carries them (one level up from its
+  // content dir); a pure-markdown deploy falls back to the defaults.
+  const siblingsFrom = CONTENT_MOUNTS
+    .map((m) => path.join(m.dirPath, '..'))
+    .filter((d) => DISTRIBUTION_SIBLINGS.some((s) => fs.existsSync(path.join(d, s))));
+
+  return writeDistribution(dest, items, {
+    positionOf: (uid) => uidPositionMap[uid],
+    blobSourceOf,
+    siblingsFrom,
+  });
+}
+
+/**
+ * Export the whole content tree (mock-API extra feature). The real Plone
+ * @@export-content answers with a gzipped tar of the plone.exportimport tree
+ * (data.json + __metadata__.json + siblings + blob files), so `format: 'json'`
+ * responds the same way — a deployable distribution, byte-for-byte importable —
+ * emitted from the IN-MEMORY served content across every content-source mount
+ * (JSON or markdown alike, since markdown mounts have no exportimport tree on
+ * disk), and validated before it ships.
+ * `format: 'markdown'` runs each block-bearing item through the prototype engine
+ * and returns a { "/path": markdown } map; the CALLER supplies the prototypes in
+ * the body (`{ matched, tagged }` declaration text) so the mock API needs no
+ * format config of its own.
  *   POST /@export  { format: 'json'|'markdown', prototypes?: { matched, tagged } }
- *   -> { "/path": <data.json | markdown string>, ... }
+ *     json     -> application/gzip  (export.tar.gz: content/**, siblings)
+ *     markdown -> { "/path": markdown string, ... }
  */
 app.post('/@export', async (req, res) => {
   await ready;
   const { format = 'json', prototypes = {} } = req.body || {};
-  const paths = Object.keys(contentDirMap);
-  const out = {};
+
   if (format === 'markdown') {
     const { emitPage, parsePrototypes } = engine;
     const protos = [
       ...parsePrototypes(prototypes.matched || ''),
       ...parsePrototypes(prototypes.tagged || '', { explicit: true }),
     ];
-    for (const p of paths) {
+    const out = {};
+    for (const p of Object.keys(contentDirMap)) {
       const c = loadRawContentFromDisk(p);
       if (!c || !c.blocks) continue; // only block-bearing content items get a body
       out[p] = emitPage(protos, { blocks: c.blocks, blocks_layout: c.blocks_layout }).markdown;
     }
-  } else if (format === 'json') {
-    for (const p of paths) { const c = loadRawContentFromDisk(p); if (c) out[p] = c; }
-  } else {
+    return res.json(out);
+  }
+
+  if (format !== 'json') {
     return res.status(400).json({ error: `unknown format "${format}" (use json|markdown)` });
   }
-  return res.json(out);
+
+  // json: respond exactly like @@export-content — a gzipped tar of the
+  // distribution. Build it in a temp dir, validate, tar, stream, clean up.
+  const staging = fs.mkdtempSync(path.join(os.tmpdir(), 'plone-export-'));
+  try {
+    const merged = buildDistributionFromMemory(staging);
+    if (!merged) {
+      return res.status(409).json({ error: 'no content to export' });
+    }
+    // Never ship a tree the importer would choke on.
+    const { validate, checkIntegrity } = require('./plone-content-validator.cjs');
+    const contentDir = path.join(staging, 'content');
+    const v = validate(contentDir);
+    const c = checkIntegrity(contentDir);
+    const errors = [...v.errors, ...c.errors];
+    if (errors.length) {
+      return res.status(500).json({ error: 'export failed validation', errors: errors.slice(0, 20) });
+    }
+    const tarPath = path.join(staging, 'export.tar.gz');
+    // Tar the tree relative to `staging` so paths are content/... and siblings.
+    const members = ['content', ...DISTRIBUTION_SIBLINGS.filter((s) => fs.existsSync(path.join(staging, s)))];
+    execFileSync('tar', ['-czf', tarPath, '-C', staging, ...members]);
+    const buf = fs.readFileSync(tarPath);
+    res.set('Content-Type', 'application/gzip');
+    res.set('Content-Disposition', 'attachment; filename="export.tar.gz"');
+    return res.send(buf);
+  } finally {
+    fs.rmSync(staging, { recursive: true, force: true });
+  }
 });
 
 app.post('/*', (req, res, next) => {
@@ -4653,4 +4840,4 @@ if (require.main === module) {
 }
 
 // Export for use by test frontend server or test harnesses
-module.exports = { app, server, contentDirMap, CONTENT_MOUNTS, ready, formSubmissions };
+module.exports = { app, server, contentDirMap, CONTENT_MOUNTS, ready, formSubmissions, writeDistribution };

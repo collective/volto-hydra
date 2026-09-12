@@ -36,6 +36,6 @@ blocks-matched: |
 
 </fields>
 
-<block type="slate" slotId="content" data-json='{"value":[{"type":"p","children":[{"text":""}]}]}' />
+<block type="slate" slotId="content" data-json='{"value":[{"type":"p","children":[{"text":""}]}],"fixed":false}' />
 
 </fields>

@@ -65,7 +65,7 @@ blocks-matched: |
 
 </fields>
 
-<block type="codeExample" slotId="schema">
+<block type="codeExample" slotId="schema" data-json='{"fixed":false}'>
 
 ### Schema
 
@@ -95,7 +95,7 @@ Example JSON as stored in the Plone content API. This is the data structure your
 
 </fields>
 
-<block type="codeExample" slotId="json-data">
+<block type="codeExample" slotId="json-data" data-json='{"fixed":false}'>
 
 ### JSON Block Data
 
@@ -125,7 +125,7 @@ How this block renders in your frontend. Add its handling to your renderer, or â
 
 </fields>
 
-<block type="codeExample" slotId="rendering">
+<block type="codeExample" slotId="rendering" data-json='{"fixed":false}'>
 
 ### React
 
