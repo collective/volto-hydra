@@ -32,6 +32,7 @@
     "test:e2e:debug": "playwright test --debug",
     "test:api": "node --test tests-playwright/fixtures/*.test.cjs",
     "check:docs": "node docs/examples/check-examples.mjs",
+    "gen:myst": "node docs/gen-myst.mjs docs/content-md-proto docs/_myst",
     "demo:capture": "playwright test --project=demo-video",
     "demo:encode": "bash tests-playwright/demo-video/encode.sh",
     "lint": "eslint --max-warnings=0 'packages/**/src/**/*.{js,jsx,ts,tsx}'",
