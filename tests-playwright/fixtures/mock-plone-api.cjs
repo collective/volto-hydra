@@ -1666,7 +1666,7 @@ function mountFor(urlPath) {
  *  is what clears deletions. */
 function loadMarkdownMount(mount) {
   if (!mdRuntime) return;
-  const { readTree, validateTree, schema } = mdRuntime;
+  const { readTree, checkIntegrity } = mdRuntime;
   const { mountPath, dirPath } = mount;
   const { items, blobFiles } = readTree(dirPath);
   const urlFor = (p) => (mountPath === '/' ? p : mountPath + (p === '/' ? '' : p));
@@ -1682,14 +1682,17 @@ function loadMarkdownMount(mount) {
   }
   for (const [p, file] of blobFiles) markdownBlobs.set(urlFor(p), file);
   console.log(`Registered ${items.size} markdown items from ${dirPath} at ${mountPath}`);
-  // Content validation over the whole loaded tree: blocks_layout integrity, schema
-  // type-check, and cross-tree references. Loud but non-fatal so a --watch restart
-  // (or a reload) surfaces a problem while developing, not at test time.
+  // Content validation via the SAME validator the JSON mounts use
+  // (plone-content-validator) -- markdown and JSON decode to the same content
+  // shape, so one validation path serves both. checkIntegrity takes the
+  // in-memory [{rel, data}] form. Loud but non-fatal so a --watch restart (or a
+  // reload) surfaces a problem while developing, not at test time.
   if (process.env.SKIP_CONTENT_VALIDATION !== 'true') {
-    const problems = validateTree(markdownItems, { schema });
-    if (problems.length) {
-      console.log(`[content-check] ${problems.length} problem(s) in markdown content:`);
-      for (const m of problems.slice(0, 30)) console.log(`  ${m}`);
+    const source = [...markdownItems].map(([rel, data]) => ({ rel, data }));
+    const { errors } = checkIntegrity(source);
+    if (errors.length) {
+      console.log(`[content-check] ${errors.length} problem(s) in markdown content:`);
+      for (const m of errors.slice(0, 30)) console.log(`  ${m}`);
     }
   }
 }
@@ -1709,10 +1712,11 @@ async function initMarkdownMounts() {
   const mounts = CONTENT_MOUNTS.filter(isMarkdownMount);
   if (!mounts.length) return;
   const { readTree } = await import('../../lib/markdown-mount.mjs');
-  const { validateTree } = await import('../../lib/content-validator.mjs');
-  const { sharedBlocksConfig } = await import('./shared-block-schemas.js');
-  const { allBlocksConfig } = await import('./core-block-schemas.js');
-  mdRuntime = { readTree, validateTree, schema: allBlocksConfig(sharedBlocksConfig) };
+  // One validator for both mounts: the JSON tree and the markdown tree decode to
+  // the same content shape, so markdown validates through plone-content-validator
+  // too (checkIntegrity accepts the in-memory [{rel, data}] form).
+  const { checkIntegrity } = require('./plone-content-validator.cjs');
+  mdRuntime = { readTree, checkIntegrity };
   for (const mount of mounts) loadMarkdownMount(mount);
 }
 
