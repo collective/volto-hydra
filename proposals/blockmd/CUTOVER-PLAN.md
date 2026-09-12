@@ -26,6 +26,31 @@ generated artifact.
   and the markdown-decoded tree (same shape). The parallel `content-validator.mjs`
   + `check-content-validate.mjs` are retired; the single-node-slate rule lives in
   the one validator and is enforced on both mounts.
+- **Deploy export from memory.** `POST /@export?format=json` emits a deployable
+  `.tar.gz` (plone.exportimport) from the in-memory served content of every
+  content-source mount, JSON or markdown alike — the `writeDistribution` emitter
+  normalises blobs to `<item dir>/<field>/<filename>`. `markdown-mount` ships a
+  content item's own image/file blob (leadimage). (`0e3afe67`→`cfef8768`.)
+- **Dialect consolidation — steps 1-3.** slate/md helpers live in `lib/slate-md.mjs`;
+  the loader's `decodeAuto` reads ONLY the `<block>` prototype format (directive
+  arm dropped, `738a355c`); `resolveMarkdownLink` ported into the loader for
+  hand-authored `.md` cross-links (`ea985faf`).
+- **Step 4 — serving half.** `/` mounts `docs/content-md-proto` (mock default, dev
+  script, playwright) — markdown is the served source of truth (`0fa96e39`).
+  Parity proven first: check-proto-parity 64/0-diff, check-proto-mount
+  63/0-block-diff/0-state-diff/45-of-45 blobs, paths 115=115; green on markdown
+  across node:test 25/25 + vitest 568 + playwright api-contract/mock.
+
+## Remaining for step 4/5 (the JSON-tree deletion)
+
+The generated JSON docs tree (`docs/content/content/content`) is still read by:
+the deploy build (`build-distribution-content.mjs`, `api/scripts/validate-content.py`),
+`start:mock-api`'s `--watch-path` (harmless), tests (`doc-examples.spec.ts`,
+`mock-api-server.test.cjs`), and the proto parity tooling (`check-proto-*` need
+both trees to compare). So deletion waits on: (a) step 5 deploy emitter sourcing
+docs from markdown; (b) repointing those tests; (c) retiring the parity tooling
+once markdown is frozen (step 3/7). Until then markdown (served) and the JSON
+tree (deployed) are proven-equivalent and both committed.
 
 ## Containers: schema-free model-alignment (DONE — blockPath import REJECTED)
 
