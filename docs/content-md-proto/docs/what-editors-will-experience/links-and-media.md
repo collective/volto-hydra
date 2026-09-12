@@ -48,7 +48,7 @@ When the frontend has wired up a link field as inline-editable, clicking the lin
 - **Open the URL in a new tab** (toggle the "Open in new tab" option).
 - **Clear the link.**
 
-![Link picker on a slate link — URL field with /another-page, browse / clear / open-new-tab / submit icons.](/docs/images/link-picker)
+![Link picker on a slate link — URL field with /another-page, browse / clear / open-new-tab / submit icons.](/docs/images/link-picker.png)
 
 <block type="callout" variation="tip">
 
@@ -70,7 +70,7 @@ The two buttons at the top right switch between **Sub items** (pages inside this
 
 <block type="image">
 
-![Object browser opened on Deep Link Page with the top-right switch set to Fragments, listing the page's headings — Intro and Details — as link targets.](/docs/images/link-fragments)
+![Object browser opened on Deep Link Page with the top-right switch set to Fragments, listing the page's headings — Intro and Details — as link targets.](/docs/images/link-fragments.png)
 
 </block>
 
@@ -96,7 +96,7 @@ You'll see an empty placeholder with a prompt to **upload, browse, or drag in** 
 - Drag an image file from your desktop and drop it directly onto the placeholder.
 - Drag an image from another tab / source if your browser supports it.
 
-![Empty image block selected — placeholder with image icon, "Browse the site, drop an image..." input, sidebar showing "NO IMAGE SELECTED".](/docs/images/media-empty-placeholder)
+![Empty image block selected — placeholder with image icon, "Browse the site, drop an image..." input, sidebar showing "NO IMAGE SELECTED".](/docs/images/media-empty-placeholder.png)
 
 ### Replacing an existing media element
 

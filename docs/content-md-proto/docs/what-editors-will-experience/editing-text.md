@@ -108,7 +108,7 @@ Type `/` at the start of an empty text block to open a menu of block types you c
 
 <block type="image">
 
-![Empty paragraph showing the slash menu listing block types — Accordion, Columns, Description, etc.](/docs/images/slash-menu)
+![Empty paragraph showing the slash menu listing block types — Accordion, Columns, Description, etc.](/docs/images/slash-menu.png)
 
 </block>
 

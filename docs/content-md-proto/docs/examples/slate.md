@@ -55,7 +55,7 @@ Rich text block powered by the Slate editor. Supports paragraphs, headings, list
 
 <block type="image">
 
-![The slate example block being edited in Volto Hydra](/docs/images/slate-edit)
+![The slate example block being edited in Volto Hydra](/docs/images/slate-edit.png)
 
 </block>
 

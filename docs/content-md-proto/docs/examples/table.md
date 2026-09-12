@@ -54,7 +54,7 @@ A table with rich text (Slate) content in each cell. Supports adding/removing ro
 
 <block type="image">
 
-![The table example block being edited in Volto Hydra](/docs/images/table-edit)
+![The table example block being edited in Volto Hydra](/docs/images/table-edit.png)
 
 </block>
 

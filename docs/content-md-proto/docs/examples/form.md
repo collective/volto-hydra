@@ -39,7 +39,7 @@ A multi-field form with configurable field types, validation, and email submissi
 
 <block type="image">
 
-![The form example block being edited in Volto Hydra](/docs/images/form-edit)
+![The form example block being edited in Volto Hydra](/docs/images/form-edit.png)
 
 </block>
 

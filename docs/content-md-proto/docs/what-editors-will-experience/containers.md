@@ -56,7 +56,7 @@ Pick one. The selected blocks are pulled out of their original positions and pla
 
 <block type="image">
 
-![Two adjacent paragraphs multi-selected, "Wrap in..." chooser open showing container types in Most Used / Common groups.](/docs/images/wrap-chooser)
+![Two adjacent paragraphs multi-selected, "Wrap in..." chooser open showing container types in Most Used / Common groups.](/docs/images/wrap-chooser.png)
 
 </block>
 
@@ -87,7 +87,7 @@ Multiple blocks can cross in a single drag — keep dragging and a "ghost bounda
 
 <block type="image">
 
-![Container selected with edge handles visible. The bottom handle is being dragged toward the next sibling.](/docs/images/edge-drag-ghost)
+![Container selected with edge handles visible. The bottom handle is being dragged toward the next sibling.](/docs/images/edge-drag-ghost.png)
 
 </block>
 
@@ -102,7 +102,7 @@ In the Quanta toolbar dropdown, **Convert to...** lists block types this block c
 - **Layout shape conversion** — children move into the new container's layout field automatically (whether the source uses `blocks_layout` or `object_list`).
 - **Recursive child conversion** — if some children's `@type` isn't in the target's `allowedBlocks`, those children are themselves converted (using their `fieldMappings`) so they fit. If no path exists, the conversion target is shown disabled with a tooltip.
 
-![A grid container selected, "Convert to..." chooser open showing compatible target container types.](/docs/images/container-convert)
+![A grid container selected, "Convert to..." chooser open showing compatible target container types.](/docs/images/container-convert.png)
 
 <block type="slate">
 

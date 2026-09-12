@@ -73,7 +73,7 @@ Strike the right balance for your site. Make it easy for editors to create engag
 
 Compliance or engagement is a false choice. You decide where the dial sits for each site.
 
-<block type="image" align="center" size="l" url="/images/quadrant/@@download/image/quadrant.svg" />
+<block type="image" align="center" size="l" url="/images/quadrant.svg/@@download/image/quadrant.svg" />
 
 <block type="gridBlock">
 
