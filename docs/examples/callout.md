@@ -4,9 +4,7 @@ A labelled admonition box — **note**, **tip**, **warning**, or **important** �
 
 This is a **custom** block — register it via `initBridge`.
 
-The level is the block's `variation`; it drives the label and colour. The body is a `slate` value, so it takes the same inline formatting as any slate block. This mirrors the myst `` ```{note} `` / `` ```{warning} `` directives, so docs authored as blocks keep their callouts (and a `<block>`→myst emitter maps `variation` back to the directive).
-
-**Demonstrates:** [HTML Annotations for Visual Editing](../visual-editing.md#html-annotations-for-visual-editing) — a slate body annotated where it is read.
+The level is the block's `variation`; it drives the label and colour. The body is a **region** of child blocks (a `blocks_layout` field named `items`), so it holds real markdown — multiple paragraphs, lists, code — authored as blocks rather than a single slate value or a `data-json` blob. This mirrors the myst `` ```{note} `` / `` ```{warning} `` directives, so docs authored as blocks keep their callouts (and a `<block>`→myst emitter maps `variation` back to the directive).
 
 ## Schema
 
@@ -25,10 +23,9 @@ The level is the block's `variation`; it drives the label and colour. The body i
           ],
           "default": "note"
         },
-        "value": {
-          "title": "Body",
-          "widget": "slate",
-          "type": "array"
+        "items": {
+          "widget": "blocks_layout",
+          "allowedBlocks": ["slate"]
         }
       }
     }
@@ -42,16 +39,20 @@ The level is the block's `variation`; it drives the label and colour. The body i
 {
   "@type": "callout",
   "variation": "warning",
-  "value": [
-    {
-      "type": "p",
-      "children": [
+  "blocks": {
+    "co-body-1": {
+      "@type": "slate",
+      "value": [
         {
-          "text": "Inka is a Work in Progress. It should not be used in production yet."
+          "type": "p",
+          "children": [
+            { "text": "Inka is a Work in Progress. It should not be used in production yet." }
+          ]
         }
       ]
     }
-  ]
+  },
+  "blocks_layout": { "items": ["co-body-1"] }
 }
 ```
 
@@ -70,7 +71,8 @@ const calloutLevels = {
 
 function CalloutBlock({ block }) {
   const level = calloutLevels[block.variation] || calloutLevels.note;
-  const body = block.value || [];
+  const blocks = block.blocks || {};
+  const items = block.blocks_layout?.items || [];
   return (
     <aside
       data-block-uid={block['@uid']}
@@ -80,9 +82,9 @@ function CalloutBlock({ block }) {
       <div className="callout__label" style={{ fontWeight: 700, color: level.color, textTransform: 'uppercase', fontSize: '0.8em', letterSpacing: '0.05em', marginBottom: '4px' }}>
         {level.label}
       </div>
-      <div className="callout__body" data-edit-text="value">
-        {body.map((node, i) => (
-          <SlateNode key={i} node={node} />
+      <div className="callout__body">
+        {items.map((id) => (
+          <BlockRenderer key={id} block={{ ...blocks[id], '@uid': id }} />
         ))}
       </div>
     </aside>
@@ -106,14 +108,15 @@ function CalloutBlock({ block }) {
     >
       {{ level.label }}
     </div>
-    <div class="callout__body" data-edit-text="value">
-      <SlateNode v-for="(node, i) in block.value || []" :key="i" :node="node" />
+    <div class="callout__body">
+      <BlockRenderer v-for="id in items" :key="id" :block="{ ...block.blocks?.[id], '@uid': id }" />
     </div>
   </aside>
 </template>
 
 <script setup>
 import { computed } from 'vue';
+import BlockRenderer from './BlockRenderer.vue';
 const props = defineProps({ block: Object });
 
 const calloutLevels = {
@@ -123,6 +126,7 @@ const calloutLevels = {
   important: { label: 'Important', color: '#dc2626', bg: '#fef2f2' },
 };
 const level = computed(() => calloutLevels[props.block.variation] || calloutLevels.note);
+const items = computed(() => props.block.blocks_layout?.items || []);
 </script>
 ```
 
@@ -131,7 +135,7 @@ const level = computed(() => calloutLevels[props.block.variation] || calloutLeve
 <!-- file: examples/svelte/CalloutBlock.svelte -->
 ```svelte
 <script>
-  import SlateNode from './SlateNode.svelte';
+  import BlockRenderer from './BlockRenderer.svelte';
   export let block;
 
   const calloutLevels = {
@@ -141,6 +145,8 @@ const level = computed(() => calloutLevels[props.block.variation] || calloutLeve
     important: { label: 'Important', color: '#dc2626', bg: '#fef2f2' },
   };
   $: level = calloutLevels[block.variation] || calloutLevels.note;
+  $: blocks = block.blocks || {};
+  $: items = block.blocks_layout?.items || [];
 </script>
 
 <aside
@@ -151,9 +157,9 @@ const level = computed(() => calloutLevels[props.block.variation] || calloutLeve
   <div class="callout__label" style="font-weight:700;color:{level.color};text-transform:uppercase;font-size:0.8em;letter-spacing:0.05em;margin-bottom:4px">
     {level.label}
   </div>
-  <div class="callout__body" data-edit-text="value">
-    {#each block.value || [] as node, i (i)}
-      <SlateNode {node} />
+  <div class="callout__body">
+    {#each items as id (id)}
+      <BlockRenderer block={{ ...blocks[id], '@uid': id }} />
     {/each}
   </div>
 </aside>
@@ -166,10 +172,11 @@ const level = computed(() => calloutLevels[props.block.variation] || calloutLeve
 ---
 /**
  * Callout block — a labelled admonition box (note / tip / warning / important).
- * The level is block.variation; the body is a slate value. No data-block-uid:
- * BlockRenderer.astro wraps every block in <div data-block-uid={uid}>.
+ * The level is block.variation; the body is a region of child blocks (items),
+ * each rendered by BlockRenderer. No data-block-uid: BlockRenderer.astro wraps
+ * every block in <div data-block-uid={uid}>.
  */
-import SlateNode from './SlateNode.astro';
+import BlockRenderer from './BlockRenderer.astro';
 const { block } = Astro.props;
 const calloutLevels: Record<string, { label: string; color: string; bg: string }> = {
   note:      { label: 'Note',      color: '#2563eb', bg: '#eff6ff' },
@@ -178,7 +185,8 @@ const calloutLevels: Record<string, { label: string; color: string; bg: string }
   important: { label: 'Important', color: '#dc2626', bg: '#fef2f2' },
 };
 const level = calloutLevels[block.variation] || calloutLevels.note;
-const body = block.value || [];
+const subBlocks = block.blocks || {};
+const items = block.blocks_layout?.items || [];
 ---
 <aside
   class={`callout callout--${block.variation || 'note'}`}
@@ -187,14 +195,12 @@ const body = block.value || [];
   <div class="callout__label" style={`font-weight:700;color:${level.color};text-transform:uppercase;font-size:0.8em;letter-spacing:0.05em;margin-bottom:4px`}>
     {level.label}
   </div>
-  <div class="callout__body" data-edit-text="value">
-    {body.map((node: any) => <SlateNode node={node} />)}
+  <div class="callout__body">
+    {items.map((id: string) => <BlockRenderer block={{ ...subBlocks[id], '@uid': id }} />)}
   </div>
 </aside>
 ```
 
 ### Data Attributes
 
-| Attribute | Purpose |
-|-----------|---------|
-| `data-edit-text="value"` | Makes the callout body inline-editable |
+The body's child blocks carry their own editing annotations (e.g. a slate block is inline-editable on its own); the callout wrapper adds none.

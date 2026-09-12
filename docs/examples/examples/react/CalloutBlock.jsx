@@ -7,7 +7,8 @@ const calloutLevels = {
 
 function CalloutBlock({ block }) {
   const level = calloutLevels[block.variation] || calloutLevels.note;
-  const body = block.value || [];
+  const blocks = block.blocks || {};
+  const items = block.blocks_layout?.items || [];
   return (
     <aside
       data-block-uid={block['@uid']}
@@ -17,9 +18,9 @@ function CalloutBlock({ block }) {
       <div className="callout__label" style={{ fontWeight: 700, color: level.color, textTransform: 'uppercase', fontSize: '0.8em', letterSpacing: '0.05em', marginBottom: '4px' }}>
         {level.label}
       </div>
-      <div className="callout__body" data-edit-text="value">
-        {body.map((node, i) => (
-          <SlateNode key={i} node={node} />
+      <div className="callout__body">
+        {items.map((id) => (
+          <BlockRenderer key={id} block={{ ...blocks[id], '@uid': id }} />
         ))}
       </div>
     </aside>

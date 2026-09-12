@@ -10,14 +10,15 @@
     >
       {{ level.label }}
     </div>
-    <div class="callout__body" data-edit-text="value">
-      <SlateNode v-for="(node, i) in block.value || []" :key="i" :node="node" />
+    <div class="callout__body">
+      <BlockRenderer v-for="id in items" :key="id" :block="{ ...block.blocks?.[id], '@uid': id }" />
     </div>
   </aside>
 </template>
 
 <script setup>
 import { computed } from 'vue';
+import BlockRenderer from './BlockRenderer.vue';
 const props = defineProps({ block: Object });
 
 const calloutLevels = {
@@ -27,4 +28,5 @@ const calloutLevels = {
   important: { label: 'Important', color: '#dc2626', bg: '#fef2f2' },
 };
 const level = computed(() => calloutLevels[props.block.variation] || calloutLevels.note);
+const items = computed(() => props.block.blocks_layout?.items || []);
 </script>

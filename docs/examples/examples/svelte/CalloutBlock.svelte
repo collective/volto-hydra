@@ -1,5 +1,5 @@
 <script>
-  import SlateNode from './SlateNode.svelte';
+  import BlockRenderer from './BlockRenderer.svelte';
   export let block;
 
   const calloutLevels = {
@@ -9,6 +9,8 @@
     important: { label: 'Important', color: '#dc2626', bg: '#fef2f2' },
   };
   $: level = calloutLevels[block.variation] || calloutLevels.note;
+  $: blocks = block.blocks || {};
+  $: items = block.blocks_layout?.items || [];
 </script>
 
 <aside
@@ -19,9 +21,9 @@
   <div class="callout__label" style="font-weight:700;color:{level.color};text-transform:uppercase;font-size:0.8em;letter-spacing:0.05em;margin-bottom:4px">
     {level.label}
   </div>
-  <div class="callout__body" data-edit-text="value">
-    {#each block.value || [] as node, i (i)}
-      <SlateNode {node} />
+  <div class="callout__body">
+    {#each items as id (id)}
+      <BlockRenderer block={{ ...blocks[id], '@uid': id }} />
     {/each}
   </div>
 </aside>

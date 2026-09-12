@@ -15,6 +15,10 @@ export const sharedBlocksConfig = {
         title: 'Callout',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 5a1.25 1.25 0 110 2.5A1.25 1.25 0 0112 7zm1.5 10h-3v-1.5h.75V12h-.75v-1.5h2.25V15.5h.75V17z"/></svg>',
         group: 'text',
+        // The body is a region of child blocks (a blocks_layout field named
+        // `items`), so it holds real markdown — multiple paragraphs, lists, code —
+        // authored as blocks, not a single slate value or a data-json blob.
+        allowedBlocks: ['slate'],
         variations: [
             { id: 'note', title: 'Note', isDefault: true },
             { id: 'tip', title: 'Tip' },
@@ -22,14 +26,14 @@ export const sharedBlocksConfig = {
             { id: 'important', title: 'Important' },
         ],
         blockSchema: {
-            fieldsets: [{ id: 'default', title: 'Default', fields: ['variation', 'value'] }],
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['variation', 'items'] }],
             properties: {
                 variation: {
                     title: 'Level',
                     choices: [['note', 'Note'], ['tip', 'Tip'], ['warning', 'Warning'], ['important', 'Important']],
                     default: 'note',
                 },
-                value: { title: 'Body', widget: 'slate', type: 'array' },
+                items: { widget: 'blocks_layout', allowedBlocks: ['slate'] },
             },
             required: [],
         },
