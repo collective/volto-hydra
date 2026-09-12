@@ -27,6 +27,44 @@ generated artifact.
   + `check-content-validate.mjs` are retired; the single-node-slate rule lives in
   the one validator and is enforced on both mounts.
 
+## Containers: use Hydra's `blockPath`, don't reimplement (no duplication)
+
+The engine reimplements container walking/ordering/nesting
+(`unkeyBlocks`/`keyBlocks`/`decodeRegion`/`emitContainer`) that Hydra's
+`packages/volto-hydra/src/utils/blockPath.js` **already does** — schema-driven,
+handling blocks_layout **and** object_list, arbitrary nesting, add/remove/reorder,
+and heavily tested. The parallel copy is also buggy (a `columns` block — a
+blocks_layout container ordered under `blocks_layout.columns` — tier-3s when
+nested, because `unkeyBlocks` hardcodes `blocks_layout.items` and the depth-≥2
+verify-on-emit fails).
+
+**Why the duplication exists — and why it should go:**
+- Markdown decode is **schema-free today** (`decodePage(md)` takes no schema); the
+  prototypes' `<region widget=…>` declarations re-encode the container kind.
+- But the *only* thing that needs the container kind is the **object_list vs
+  blocks_layout vs object_browser** ambiguity (same `[{"@id"}]` shape, no
+  heuristic). That knowledge is **in the schema**, which `blockPath` reads. So the
+  prototype's region declarations are a *second copy of the schema's container
+  knowledge*, and the engine's container code is a *second implementation* of
+  `blockPath`.
+
+**Reorientation:**
+1. The loader/engine gets container shape + item traversal/insert from the schema
+   via `blockPath` (`getAllContainerFields`, `getContainerItems`,
+   `insertBlockInContainer`, …). Retire the engine's parallel container code.
+2. Prototypes keep **only the leaf markdown-shape mapping** (paragraph→slate,
+   `---`→separator, `${p/slate}`) — not `<region>` container declarations.
+3. Decode/emit become **schema-driven** (drop the schema-free goal). Acceptable:
+   the mock API has `blocksConfig`; Sphinx renders markdown (never decodes to
+   blocks); tooling can load the schema. No consumer needs schema-free
+   block-decode.
+
+**Payoff:** one container implementation (tested), one source of container-kind
+(the schema), `columns` + arbitrary nesting work with no special-casing, and no
+duplicated container logic. Prerequisite check: `blockPath.js` is importable by
+the loader (it pulls `@volto-hydra/hydra-js` + `slateMerge` — confirm no
+React/DOM at import time, or extract the pure core).
+
 ## Consolidate the two markdown dialects (the remaining duplication)
 
 The branch still carries **two markdown dialects** for the same blocks — the old
