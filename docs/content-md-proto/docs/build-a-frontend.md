@@ -48,7 +48,7 @@ The actual code you write will depend on the framework you choose. You can look 
 
 This guide describes the integration pattern for frameworks with client-side reactivity (React, Vue, Svelte, Solid, Next, Nuxt, etc.) — your component tree consumes `formData` and re-renders, the framework's virtual DOM diff handles the per-block update.
 
-For server-only frameworks without client-side reactivity (Astro, PHP, Django, Rails, Laravel, Symfony, Go templates), use the [server-render pattern](/docs/server-rendered-frontends) instead — one config option on `initBridge` plus one small HTTP endpoint.
+For server-only frameworks without client-side reactivity (Astro, PHP, Django, Rails, Laravel, Symfony, Go templates), use the [server-render pattern](./server-rendered-frontends.md) instead — one config option on `initBridge` plus one small HTTP endpoint.
 
 </block>
 
@@ -127,7 +127,7 @@ Page data ends up shaped like this — one shared `blocks` dict, and a region pe
 
 <block type="callout" variation="note">
 
-Regions are sub-keys of `blocks_layout` — **not** separate top-level fields — because that is what makes them persist. `blocks_layout` is a registered backend field (a Plone behavior field), so the whole dict, including every region, is saved verbatim. A separate top-level field such as `footer_blocks` would be **silently dropped** by the backend on save, because it isn't a registered field. See [Container blocks](/docs/container-blocks) for the data model in full.
+Regions are sub-keys of `blocks_layout` — **not** separate top-level fields — because that is what makes them persist. `blocks_layout` is a registered backend field (a Plone behavior field), so the whole dict, including every region, is saved verbatim. A separate top-level field such as `footer_blocks` would be **silently dropped** by the backend on save, because it isn't a registered field. See [Container blocks](./container-blocks.md) for the data model in full.
 
 </block>
 
@@ -229,7 +229,7 @@ In your page template, fill title etc. from the content metadata.
 4. In your page, iterate down the `blocks_layout` list and render a `Block` component for each
 5. Rendering Slate — split into a separate component as it's used in many blocks and is also recursive
 
-Give `Block` an `@type: "empty"` case: a container region with no `defaultBlockType` and more than one `allowedBlocks` seeds an `empty` placeholder for the user to type in place, and any custom container renderer must route its children through `Block` so `empty` is handled rather than rejected. See [Empty Blocks](/docs/container-blocks#empty-blocks).
+Give `Block` an `@type: "empty"` case: a container region with no `defaultBlockType` and more than one `allowedBlocks` seeds an `empty` placeholder for the user to type in place, and any custom container renderer must route its children through `Block` so `empty` is handled rather than rejected. See [Empty Blocks](./container-blocks.md#empty-blocks).
 
 ## 7. Helper Functions
 
@@ -242,7 +242,7 @@ Several helper functions get reused in many blocks:
 
 ## 8. Listing Blocks
 
-- Use the [Listing Helpers](/docs/listings) or make your own [REST API call to query items](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/querystring.html)
+- Use the [Listing Helpers](./listings.md) or make your own [REST API call to query items](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/querystring.html)
 - Create your own pagination scheme (e.g., embed page in URL for static generation)
 - Render the items and pagination
 

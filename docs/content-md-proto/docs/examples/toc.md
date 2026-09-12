@@ -86,7 +86,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 Text can be **bold** or *italic*.
 
-[Link internal](/docs/examples/heading)
+[Link internal](./heading.md)
 
 [Link external](https://www.google.com/)
 

@@ -62,7 +62,7 @@ Inka is a [Work in Progress](https://github.com/orgs/collective/projects/3/views
 
 - **Compliance and engagement, not a trade-off** — you decide where the dial sits for each site, instead of choosing between locking editors down and letting the design system drift
 - **Design-system-first** — components declare what they tolerate, so off-system output can't be produced
-- **Multi frontend, multi backend** — Next.js, Nuxt.js, Astro, plus server-only stacks (PHP, Django, Rails, Laravel) via the [server-render pattern](/docs/server-rendered-frontends); switch channels mid-edit
+- **Multi frontend, multi backend** — Next.js, Nuxt.js, Astro, plus server-only stacks (PHP, Django, Rails, Laravel) via the [server-render pattern](./server-rendered-frontends.md); switch channels mid-edit
 - **AI under the same constraints** — everyone's AI can build you a page; ours can't build one that breaks your design system
 - **Evidence, not just warnings** — rules a machine can't decide go to the people who can, and the determination is recorded against that version of the content
 - **Quick to adopt** — enable visual editing with simple HTML data attributes, no React or Vue required in your frontend
@@ -79,7 +79,7 @@ The fastest way to feel what Inka does is to log into the hosted demo and edit a
 - Pick one of the preset frontends, or paste in your own frontend URL.
 - Edit any page — every change updates the live preview.
 
-The default preset is a Nuxt.js frontend deployed as an [SSG](https://hydra-nuxt-flowbrite.netlify.app/) to demonstrate scale-to-zero editing on free hosting. An [Astro example](https://github.com/collective/volto-hydra/tree/main/docs/examples/test-astro) demonstrates the [server-render pattern](/docs/server-rendered-frontends) for static-first frameworks. See [Build a frontend › Deployment patterns](/docs/build-a-frontend#deployment-patterns).
+The default preset is a Nuxt.js frontend deployed as an [SSG](https://hydra-nuxt-flowbrite.netlify.app/) to demonstrate scale-to-zero editing on free hosting. An [Astro example](https://github.com/collective/volto-hydra/tree/main/docs/examples/test-astro) demonstrates the [server-render pattern](./server-rendered-frontends.md) for static-first frameworks. See [Build a frontend › Deployment patterns](./build-a-frontend.md#deployment-patterns).
 
 To run Inka locally against your own frontend, see the **Run Locally** section of the [project README](https://github.com/collective/volto-hydra#run-locally).
 

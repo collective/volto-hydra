@@ -47,7 +47,7 @@ Which container types are available depends on your design system. A site might 
 
 ## Wrap
 
-Select one or more blocks (see [Selecting blocks](/docs/what-editors-will-experience/selecting-blocks)), then choose **Wrap in...** from the Quanta toolbar dropdown (or sidebar block actions). A popup shows container types that:
+Select one or more blocks (see [Selecting blocks](./selecting-blocks.md)), then choose **Wrap in...** from the Quanta toolbar dropdown (or sidebar block actions). A popup shows container types that:
 
 1. Accept every selected block type (their `allowedBlocks` covers the selection).
 2. Are themselves allowed in the current parent container.

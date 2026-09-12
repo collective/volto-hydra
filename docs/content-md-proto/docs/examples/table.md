@@ -64,10 +64,10 @@ A table with rich text (Slate) content in each cell. Supports adding/removing ro
 
 | Title Tablehead | Title Tablehead | Title Tablehead | Title Tablehead |
 | --- | --- | --- | --- |
-| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples)&#x20; | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) |
-| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) |
-| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) |
-| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) |
+| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md)&#x20; | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) |
+| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) |
+| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) |
+| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) |
 
 </block>
 
@@ -77,10 +77,10 @@ A table with rich text (Slate) content in each cell. Supports adding/removing ro
 
 | Title Tablehead | Title Tablehead | Title Tablehead | Title Tablehead |
 | --- | --- | --- | --- |
-| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples)&#x20; | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) |
-| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) |
-| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) |
-| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) |
+| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md)&#x20; | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) |
+| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) |
+| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) |
+| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) |
 
 </block>
 
@@ -92,10 +92,10 @@ A table with rich text (Slate) content in each cell. Supports adding/removing ro
 
 | Title Tablehead | Title Tablehead | Title Tablehead | Title Tablehead |
 | --- | --- | --- | --- |
-| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples)&#x20; | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) |
-| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) |
-| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) |
-| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) |
+| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md)&#x20; | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) |
+| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) |
+| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) |
+| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) |
 
 </block>
 
@@ -105,10 +105,10 @@ A table with rich text (Slate) content in each cell. Supports adding/removing ro
 
 | Title Tablehead | Title Tablehead | Title Tablehead | Title Tablehead |
 | --- | --- | --- | --- |
-| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples)&#x20; | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) |
-| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) |
-| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) |
-| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](/docs/examples) |
+| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md)&#x20; | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) |
+| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) |
+| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) |
+| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) |
 
 </block>
 

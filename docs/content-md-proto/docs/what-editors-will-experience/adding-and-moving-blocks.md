@@ -78,7 +78,7 @@ Drop targets are filtered by `allowedBlocks` — the line/shade indicator only a
 
 ### Reordering from the sidebar
 
-The sidebar's children list (visible when a container block is selected) has a drag handle (`⋮⋮`) on each child row. Drag it up or down to reorder children **within** the same container. Useful when the children are paged (slides of a slider, panels of an accordion) and you can't drag in the preview because only one is visible at a time. See [Selecting blocks › The children list](/docs/what-editors-will-experience/selecting-blocks#the-children-list-going-down).
+The sidebar's children list (visible when a container block is selected) has a drag handle (`⋮⋮`) on each child row. Drag it up or down to reorder children **within** the same container. Useful when the children are paged (slides of a slider, panels of an accordion) and you can't drag in the preview because only one is visible at a time. See [Selecting blocks › The children list](./selecting-blocks.md#the-children-list-going-down).
 
 ### Cut / copy / paste
 
@@ -109,11 +109,11 @@ In block mode (after pressing `Escape`):
 
 ## Working with multiple blocks at once
 
-If you've selected multiple blocks (see [Selecting blocks](/docs/what-editors-will-experience/selecting-blocks)):
+If you've selected multiple blocks (see [Selecting blocks](./selecting-blocks.md)):
 
 - **Drag and drop** — works on the whole group; line indicator shows where the group will land.
 - **Delete** — removes all selected blocks.
-- **Wrap / Convert / Cut / Copy / Paste** — all apply to the group. See [Containers](/docs/what-editors-will-experience/containers) for wrap.
+- **Wrap / Convert / Cut / Copy / Paste** — all apply to the group. See [Containers](./containers.md) for wrap.
 
 ## Empty containers
 

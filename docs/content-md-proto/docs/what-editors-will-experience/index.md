@@ -85,7 +85,7 @@ The editor screen has three regions:
 
 - **Toolbar (left)** — saving, navigating to other pages, site settings. Standard Volto, plus the **Frontend switcher** (see below).
 - **Live preview (centre)** — your actual frontend, running inside an iframe. This is what readers will see. Click directly into the preview to edit.
-- **Sidebar (right)** — when no block is selected, lists the page-level fields (title, description, blocks). When a block is selected, shows that block's settings, the chain of parent containers, and (for container blocks) the list of children. See [Selecting blocks](/docs/what-editors-will-experience/selecting-blocks) for the navigation patterns.
+- **Sidebar (right)** — when no block is selected, lists the page-level fields (title, description, blocks). When a block is selected, shows that block's settings, the chain of parent containers, and (for container blocks) the list of children. See [Selecting blocks](./selecting-blocks.md) for the navigation patterns.
 
 ### Frontend switcher
 
@@ -125,7 +125,7 @@ Pressing `Escape` is always safe. It progressively backs out:
 2. If a block is selected (block mode) → goes up to the parent container.
 3. If nothing is selected → no-op.
 
-So `Escape` repeatedly takes you up one level at a time. See [Selecting blocks](/docs/what-editors-will-experience/selecting-blocks) for what selection looks like at each level.
+So `Escape` repeatedly takes you up one level at a time. See [Selecting blocks](./selecting-blocks.md) for what selection looks like at each level.
 
 ## Editing on a phone
 

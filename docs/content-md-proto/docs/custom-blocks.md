@@ -88,7 +88,7 @@ Per-field options:
 
 - **\`title\`** — sidebar section title (defaults to the field name).
 - **\`allowedBlocks\`** — array of block-type names this region accepts. Acts as a per-region filter on top of the registry.
-- **\`allowedTemplates\`** — array of template URLs shown in the BlockChooser's "Templates" group for this field. See [Templates](/docs/templates).
+- **\`allowedTemplates\`** — array of template URLs shown in the BlockChooser's "Templates" group for this field. See [Templates](./templates.md).
 - **\`allowedLayouts\`** — array of template URLs shown in the Layout dropdown for this field.
 - **\`maxLength\`** — maximum number of blocks in the field.
 
@@ -131,7 +131,7 @@ Per-block options (most are passed through to Volto's block config):
 - **\`restricted\`** — `true` hides the block from the chooser; can also be a function for conditional restrictions.
 - **\`mostUsed\`** — pin to the top of the chooser.
 - **\`disableCustomSidebarEditForm\`** — use only the schema form in the sidebar (no custom edit component). **Defaults to \`true\` for any block you give a \`blockSchema\`** — see [Overriding a built-in block](#overriding-a-built-in-block). Set `false` to keep the admin's own edit component for a block whose sidebar does something a JSON schema cannot express.
-- **\`blockSchema\`** — JSON-schema-style definition of the block's fields. See [Schema Enhancers](#schema-enhancers) below and the [Block reference](/docs/examples).
+- **\`blockSchema\`** — JSON-schema-style definition of the block's fields. See [Schema Enhancers](#schema-enhancers) below and the [Block reference](./examples/index.md).
 - **\`fieldMappings\`** — block-to-block conversion rules. See [Block Conversion & fieldMappings](#block-conversion--fieldmappings) below.
 - **\`schemaEnhancer\`** — recipe-based schema modifier; supports `fieldRules`, `inheritSchemaFrom`, etc. See [Schema Enhancers](#schema-enhancers).
 
@@ -172,14 +172,14 @@ To keep the admin's edit component for one block — a picker or upload UI a sch
 
 ### Other top-level options
 
-- **\`onEditChange(formData)\`** — callback invoked with the new form data whenever the editor changes anything. See [Live Preview › Setting Up the Bridge](/docs/live-preview#setting-up-the-bridge).
-- **\`pathToApiPath(path)\`** — function transforming a frontend path to the API/admin path on `PATH_CHANGE` messages. Use when your frontend embeds state (paging, filters) in URL segments that don't exist on the CMS side. See [Listings › Path Transformation](/docs/listings#path-transformation-pathtoapipath).
+- **\`onEditChange(formData)\`** — callback invoked with the new form data whenever the editor changes anything. See [Live Preview › Setting Up the Bridge](./live-preview.md#setting-up-the-bridge).
+- **\`pathToApiPath(path)\`** — function transforming a frontend path to the API/admin path on `PATH_CHANGE` messages. Use when your frontend embeds state (paging, filters) in URL segments that don't exist on the CMS side. See [Listings › Path Transformation](./listings.md#path-transformation-pathtoapipath).
 - **\`voltoConfig\`** — passes additional Volto config (non-block settings) through to the admin. Future home for things like slate formats ([TODO #109](https://github.com/collective/volto-hydra/issues/109)) and toolbar actions.
 - **\`debug\`** — `true` enables verbose console logging in the bridge. Default `false`.
 
 ### Returns
 
-The `Bridge` instance, which exposes additional API methods you can call from the frontend (e.g. `getAccessToken()`, `sendBlockUpdate()`, `sendBlockAction()`). See [Advanced › Custom Sidebar UI](/docs/advanced#custom-sidebar-and-cms-ui) for those.
+The `Bridge` instance, which exposes additional API methods you can call from the frontend (e.g. `getAccessToken()`, `sendBlockUpdate()`, `sendBlockAction()`). See [Advanced › Custom Sidebar UI](./advanced.md#custom-sidebar-and-cms-ui) for those.
 
 ## Defining a custom block
 
@@ -245,9 +245,9 @@ Child block types (like `slide` above) must be defined at the top level of `bloc
 - Set `disableCustomSidebarEditForm: true` to use only the schema form in the sidebar (no custom edit component)
 - Use `fieldsets` in the schema to organize fields into tabs
 
-**A \`widget: 'slate'\` field holds one top-level node.** A slate field — like `description` on the `slide` above — stores a single paragraph, heading, or list, not a document of several. Pasting or typing multiple paragraphs into it flattens them back into one node; only the built-in `slate` *block* splits multi-node content into separate blocks. Design slate fields for single-node content, and use a `blocks_layout`/`object_list` of `slate` blocks when you need several. See [Visual Editing › One top-level node per slate field](/docs/visual-editing#one-top-level-node-per-slate-field).
+**A \`widget: 'slate'\` field holds one top-level node.** A slate field — like `description` on the `slide` above — stores a single paragraph, heading, or list, not a document of several. Pasting or typing multiple paragraphs into it flattens them back into one node; only the built-in `slate` *block* splits multi-node content into separate blocks. Design slate fields for single-node content, and use a `blocks_layout`/`object_list` of `slate` blocks when you need several. See [Visual Editing › One top-level node per slate field](./visual-editing.md#one-top-level-node-per-slate-field).
 
-**Worked example:** [Heading Block](/docs/examples/heading) — roughly the smallest custom block there is: one field, one annotation.
+**Worked example:** [Heading Block](./examples/heading.md) — roughly the smallest custom block there is: one field, one annotation.
 
 ## Inline-editable fields: annotation and schema must agree
 
@@ -291,8 +291,8 @@ A schema names a widget by string, so anything in `config.widgets.widget` is ava
 
 | widget | picks | documented |
 | --- | --- | --- |
-| `blockTypeSelect` | which block type a container's item is | [container blocks](/docs/container-blocks#blocktypeselect-widget-options) |
-| `schemaFieldSelect` | a field of a CONTENT TYPE, from `/@types` | [listings](/docs/listings) |
+| `blockTypeSelect` | which block type a container's item is | [container blocks](./container-blocks.md#blocktypeselect-widget-options) |
+| `schemaFieldSelect` | a field of a CONTENT TYPE, from `/@types` | [listings](./listings.md) |
 | `vocabularySelect` | WHICH vocabulary (not a term from one) | below |
 | `blockPicker` | a block, storing a named field value from it | below |
 | `querystringSelect` | catalog indexes, one or several | below |
@@ -654,21 +654,21 @@ A block that isn't an `object_list` item yields an unset `@index`, so comparison
 
 Field paths: `../field` for the parent block's field (and `@index` / `../@index` for position), `/field` for a page metadata field.
 
-**Worked examples:** two blocks in the reference carry rules for their own reasons — the [Teaser Block](/docs/examples/teaser) has nothing to ask for while it borrows the linked page's wording (`overwrite` off), and the [Image Block](/docs/examples/image-block) offers no size for a full-width image, written as a list of rules with a bare `false` as the catch-all.
+**Worked examples:** two blocks in the reference carry rules for their own reasons — the [Teaser Block](./examples/teaser.md) has nothing to ask for while it borrows the linked page's wording (`overwrite` off), and the [Image Block](./examples/image-block.md) offers no size for a full-width image, written as a list of rules with a bare `false` as the catch-all.
 
 ## Block Conversion & fieldMappings
 
 `fieldMappings` (plural) on a block config defines how fields map between block types (and from linked content). This enables:
 
 - **"Convert to..." UI action** — editors can convert a block to another type (e.g. teaser → image).
-- **Listing item types** — query results are mapped to item blocks via `@default` (see [Listings](/docs/listings)).
-- **Synchronised container children** — a parent controls child type, all children convert together (see [Container Blocks › Synchronised Block Types](/docs/container-blocks#synchronised-block-types-in-a-container)).
+- **Listing item types** — query results are mapped to item blocks via `@default` (see [Listings](./listings.md)).
+- **Synchronised container children** — a parent controls child type, all children convert together (see [Container Blocks › Synchronised Block Types](./container-blocks.md#synchronised-block-types-in-a-container)).
 - **Drag / paste via conversion** — a block can be dropped or pasted into a container that only accepts a *convertible* type; it's converted on drop (see below).
 - **Copy from a linked target** — a block pulls fields from the content item its link field points at, with a per-field linked/custom toggle (see [\`@target\`](#target--copy-from-a-linked-content-item)).
 
 Each key in `fieldMappings` is either a **specific block type name**, **\`@default\`**, or **\`@target\`**.
 
-**Worked example:** [Teaser Block](/docs/examples/teaser) — `@default` mappings, so a converted or dragged block keeps its title, description and image.
+**Worked example:** [Teaser Block](./examples/teaser.md) — `@default` mappings, so a converted or dragged block keeps its title, description and image.
 
 ### `@default` — the canonical content shape
 

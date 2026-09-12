@@ -112,7 +112,7 @@ Type `/` at the start of an empty text block to open a menu of block types you c
 
 </block>
 
-The slash menu changes the block's `@type`. If you wanted to add a *new* block, see [Adding and moving blocks](/docs/what-editors-will-experience/adding-and-moving-blocks) instead.
+The slash menu changes the block's `@type`. If you wanted to add a *new* block, see [Adding and moving blocks](./adding-and-moving-blocks.md) instead.
 
 ## Splitting and joining paragraphs
 
@@ -131,4 +131,4 @@ There's no "save" inside a field — every keystroke is reflected in the page st
 
 - Pasting rich HTML doesn't currently preserve all formatting — pasted text comes in as plain.
 - A few markdown shortcuts (`#### ` for h4 etc.) aren't wired up; the supported set is the table above.
-- Text-region "make this part read-only" markup isn't yet exposed to editors — frontend developers can mark whole blocks as readonly (see [Templates and layouts](/docs/what-editors-will-experience/templates-and-layouts)).
+- Text-region "make this part read-only" markup isn't yet exposed to editors — frontend developers can mark whole blocks as readonly (see [Templates and layouts](./templates-and-layouts.md)).

@@ -58,7 +58,7 @@ Example of a fully annotated slide block:
 </div>
 ```
 
-**Worked examples:** [Hero Block](/docs/examples/hero) — text, rich text, media and link annotations in one block; [Button Block](/docs/examples/button) — `data-edit-text` and `data-edit-link` on the same element.
+**Worked examples:** [Hero Block](./examples/hero.md) — text, rich text, media and link annotations in one block; [Button Block](./examples/button.md) — `data-edit-text` and `data-edit-link` on the same element.
 
 ## Comment Syntax
 
@@ -103,7 +103,7 @@ To fill an empty field from the canvas, the editor selects the block and presses
 
 Reveal is best-effort. Hydra offers any field whose type could be edited inline, which it cannot always tell apart from a field you keep in the sidebar (alt text and css classes are strings too). Fields you don't render inline simply don't appear — the editor fills those from the sidebar as usual.
 
-Reveal replaces a per-block boolean only where "has data" and "should render" are the same thing. When they genuinely differ — the author has content but wants it hidden, or a field should appear only in certain configurations — add your own field and drive it with [\`fieldRules\`](/docs/custom-blocks#schema-enhancers).
+Reveal replaces a per-block boolean only where "has data" and "should render" are the same thing. When they genuinely differ — the author has content but wants it hidden, or a field should appear only in certain configurations — add your own field and drive it with [\`fieldRules\`](./custom-blocks.md#schema-enhancers).
 
 ## Allowed Navigation (data-linkable-allow)
 
@@ -131,7 +131,7 @@ Every `data-edit-*` attribute — `data-edit-text`, `data-edit-link`, `data-edit
 
 **Where inside the block** (`/` descends objects):
 
-- **\`content/headline\`** — descend a [\`widget: 'object'\`](/docs/container-blocks#widget-object-nesting-fields-and-containers-inside-a-block-field)
+- **\`content/headline\`** — descend a [\`widget: 'object'\`](./container-blocks.md#widget-object-nesting-fields-and-containers-inside-a-block-field)
 
 field to a nested field (the key mirrors the storage path, `block.content.headline`)
 
@@ -252,7 +252,7 @@ non-slate block (e.g. a `slateTable` cell's `value`), a slate field nested   on 
 
 A frontend renderer can therefore always assume one top-level node per slate field; it never has to handle a multi-node `value`.
 
-**Worked example:** [Table Block](/docs/examples/table) — a slate value per cell, each its own field.
+**Worked example:** [Table Block](./examples/table.md) — a slate value per cell, each its own field.
 
 ## Complete Slate Rendering Example
 
@@ -306,4 +306,4 @@ Usage:
 </div>
 ```
 
-**Worked example:** [Slate (Text) Block](/docs/examples/slate) — the block itself, rendered per stack.
+**Worked example:** [Slate (Text) Block](./examples/slate.md) — the block itself, rendered per stack.

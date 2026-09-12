@@ -392,7 +392,7 @@ export const POST = async ({ request }) => {
 
 You can log in and experience currently working features (Volto like but on any frontend)
 
-[See all Content Types](/docs/examples/content-types)
+[See all Content Types](./docs/examples/content-types/index.md)
 
 ![](/images/penguin1.jpg)
 
@@ -404,7 +404,7 @@ You can log in and experience currently working features (Volto like but on any 
 
 Frontend freedom makes it easy to create beautiful and fast experiences
 
-[See all blocks](/docs/examples)
+[See all blocks](./docs/examples/index.md)
 
 ![](/images/penguin2.jpg)
 

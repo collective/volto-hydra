@@ -99,7 +99,7 @@ While multiple blocks are selected:
 
 - A combined bounding box is drawn around them.
 - `Delete` / `Backspace` removes all of them.
-- The Quanta toolbar dropdown offers actions that apply to all (e.g. "Wrap in...", see [Containers](/docs/what-editors-will-experience/containers)).
+- The Quanta toolbar dropdown offers actions that apply to all (e.g. "Wrap in...", see [Containers](./containers.md)).
 - The sidebar shows the count and lists each selected block by type.
 
 ![Two adjacent paragraphs multi-selected — combined bounding box, sidebar shows "2 selected", toolbar shows count badge.](/docs/images/multi-select)

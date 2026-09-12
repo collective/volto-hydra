@@ -87,7 +87,7 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 Text can be **bold** or *Italic*.
 
-[Link internal ](/docs/examples/button)
+[Link internal ](../button.md)
 
 [Link external](https://www.google.com)
 

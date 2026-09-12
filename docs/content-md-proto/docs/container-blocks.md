@@ -89,7 +89,7 @@ A block can declare several `blocks_layout` regions; they all share the one `blo
 
 \> **The region name is a key inside \`blocks\_layout\` — not a top-level field.** The > ordering list lives at `blocks_layout.<region>` (a plain array of ids). A tempting > mistake is to store it as a top-level field named after the region: > > \<!-- codeExample: json --> > \`\``json > // ✅ CORRECT — ordering keyed inside the shared blocks_layout dict > { "@type": "slider", "blocks": { … }, "blocks_layout": { "slides": ["slide-1", "slide-2"] } } > > // ❌ WRONG — an ad-hoc top-level `slides`  field holding { items: [...] } > { "@type": "slider", "blocks": { … }, "slides": { "items": ["slide-1", "slide-2"] } } >  `\``  > > The wrong form may *look* fine in a frontend that reads it back the same way, but >  `slides`  is **not a registered field**, so the backend **silently drops it on save** > (see [Why these persist](#why-these-persist-and-separate-top-level-fields-dont)) — > and tools that walk the shared dict (the block path map, the sanity checks, the > editor's reorder/drag) never see the region, because they look under >  `blocks\_layout`, never at a field named for the region. Renderers must read the > ordering from `blocks\_layout\[\<region>]`, not from `\<region>.items\`.
 
-**Worked examples:** [Grid Block](/docs/examples/grid) — one region of free children, narrowed by `allowedBlocks`; [Columns Block](/docs/examples/columns) — a `columns` region whose children are themselves regions.
+**Worked examples:** [Grid Block](./examples/grid/index.md) — one region of free children, narrowed by `allowedBlocks`; [Columns Block](./examples/columns.md) — a `columns` region whose children are themselves regions.
 
 ## Multiple regions
 
@@ -124,7 +124,7 @@ properties: {
 
 Each blocks field has its own `allowedBlocks` / `maxLength`. A declared field appears in the editor even when empty (it gets a seeded empty block so it is editable and a drop target).
 
-**Worked example:** [Search Block](/docs/examples/search) — facets in one region and results in another, on the same block.
+**Worked example:** [Search Block](./examples/search.md) — facets in one region and results in another, on the same block.
 
 ### Why these persist (and separate top-level fields don't)
 
@@ -203,7 +203,7 @@ config.settings.slate.styleAliases = { b: 'strong', i: 'em', blockquote: 'p' };
 
 With no alias, a top-level node becomes `config.settings.slate.defaultBlockType` (`p`), and an inline one is unwrapped — its text stays, without the formatting. Nothing is ever deleted.
 
-A downgrade never changes how many top-level nodes a slate field holds, because [a field always holds exactly one](/docs/visual-editing#one-top-level-node-per-slate-field) and renderers are told they may assume it. So a denied *wrapper* collapses rather than splitting: denying `ul` turns `ul > li, li` into a single paragraph holding both items' content, not two paragraphs. Inline children survive the collapse — a `strong` inside a denied `blockquote` is still bold afterwards.
+A downgrade never changes how many top-level nodes a slate field holds, because [a field always holds exactly one](./visual-editing.md#one-top-level-node-per-slate-field) and renderers are told they may assume it. So a denied *wrapper* collapses rather than splitting: denying `ul` turns `ul > li, li` into a single paragraph holding both items' content, not two paragraphs. Inline children survive the collapse — a `strong` inside a denied `blockquote` is still bold afterwards.
 
 ## object\_list: a region stored inline
 
@@ -236,7 +236,7 @@ slides: {
 }
 ```
 
-**Worked examples:** [Accordion Block](/docs/examples/accordion) — each panel an inline item holding its own region of child blocks; [Slider Block](/docs/examples/slider) — slides as inline items with fields of their own.
+**Worked examples:** [Accordion Block](./examples/accordion.md) — each panel an inline item holding its own region of child blocks; [Slider Block](./examples/slider.md) — slides as inline items with fields of their own.
 
 ## object\_list with allowedBlocks: Typed Items
 
@@ -267,7 +267,7 @@ facets: {
 
 Both `blocks_layout` and `object_list` look the same in the editing UI and blocks can be dragged between them — data is automatically adapted when moving between formats (ID fields added/stripped, type fields set appropriately).
 
-**Worked example:** [Form Block](/docs/examples/form) — one item type per kind of field, chosen by `field_type`.
+**Worked example:** [Form Block](./examples/form.md) — one item type per kind of field, chosen by `field_type`.
 
 ## widget: 'object': nesting fields (and containers) inside a block field
 
@@ -303,7 +303,7 @@ table: { widget: 'object', schema: { properties: {
   "table": { "blocks": { "b1": { /* … */ } }, "blocks_layout": { "body": ["b1"] } } }
 ```
 
-A **plain field** inside an object is edited in the canvas like any top-level field — address it inline with its `/`-path (`data-edit-text="content/headline"`, and the same for `data-edit-link` / `data-edit-media`). The object is *transparent*: `content/headline` writes back to `block.content.headline`, never a flat key. See [Field Path Syntax](/docs/visual-editing#field-path-syntax) for the full grammar (`/` object descent, `..` = parent block, `/field` = page).
+A **plain field** inside an object is edited in the canvas like any top-level field — address it inline with its `/`-path (`data-edit-text="content/headline"`, and the same for `data-edit-link` / `data-edit-media`). The object is *transparent*: `content/headline` writes back to `block.content.headline`, never a flat key. See [Field Path Syntax](./visual-editing.md#field-path-syntax) for the full grammar (`/` object descent, `..` = parent block, `/field` = page).
 
 Blocks inside a nested container are edited in the canvas like any other container. The sidebar prefixes a nested container's **title** with the path (e.g. **Table / Rows**) so the nesting is visible.
 
@@ -355,7 +355,7 @@ The bridge resolves a **descendant** of a container that advertises itself: sele
 
 - **\`data-block-selector="uid#fieldName"\`** — a handle that reveals **where one FIELD of that block is edited**, rather than the block as a whole. Use it when a block is drawn in several places at once with a different field in each, and each place has its own trigger. The design system cookie-consent block is the case it was written for: its `message` is rendered into a banner and its category wording into a preferences dialog, both built by the component's own JavaScript into `<body>`, both hidden until their trigger is pressed — while the block's element (an editing bar) is on screen the whole time. A block-level handle is one handle and one click, so whichever half it opened, the other half's wording stayed unreachable from the sidebar. `#` is used because `:` already means navigation (`uid:direction`). Everything except *which handle to click* treats `uid#field` exactly like `uid`: a `data-edit-*` inside such a handle still edits that block — which is why the place a field is edited usually carries the handle **too**, not just the trigger that opens it. Several elements may name the same field; the bridge clicks the first one that is **on screen**, so a hidden half is never the thing it tries to click.
 
-A worked example, with the schema, the data and all four frontends: [Cookie Consent Block](/docs/examples/cookie-consent).
+A worked example, with the schema, the data and all four frontends: [Cookie Consent Block](./examples/cookie-consent.md).
 
 The reveal is driven from the sidebar, through the message that already existed for it: when the cursor lands in a sidebar field the admin sends `FOCUS_FIELD { blockId, fieldName, moveCaret: false }`. The bridge shows that field's place if it is hidden, and does nothing at all unless a `uid#field` handle advertises that exact field — so it is safe to send on every focus. There is deliberately **no fallback to the block's own handle**: most sidebar fields (an alignment, a link, any setting) have no element on the canvas and never will, so "no element" is the ordinary case rather than a hidden one, and falling back meant every sidebar focus clicked whatever handle the block or its ancestors published. A field's place, when it has none of its own, simply IS the block's — and selecting the block already reveals that, transitively. `moveCaret` defaults to **true** — the original meaning, "reveal it and put the cursor in it", which is what the admin sends when handing editing back (a LinkEditor closing). One message, two intents; not two messages.
 
@@ -389,7 +389,7 @@ table: {
 }
 ```
 
-**Worked example:** [Table Block](/docs/examples/table) — `addMode: "table"` with an `idField`, so every row has the same cells.
+**Worked example:** [Table Block](./examples/table.md) — `addMode: "table"` with an `idField`, so every row has the same cells.
 
 ## Empty Blocks
 
@@ -548,7 +548,7 @@ When `parentControlled[childType]` is set, it **replaces** the `@default` fallba
 
 - **\`inheritSchemaFrom\`** — schemaEnhancer recipe; surfaces parent-claimed fields on the parent and hides them on children.
 - **\`itemTypeField\`** — declared on a `blocks_layout`/`object_list` field; names the sibling field whose value drives every child's `@type`.
-- **\`typeField\`** — names the sibling field directly on `inheritSchemaFrom`. Use this when there is no blocks field to declare `itemTypeField` on (e.g. listings — see [Listings](/docs/listings)).
+- **\`typeField\`** — names the sibling field directly on `inheritSchemaFrom`. Use this when there is no blocks field to declare `itemTypeField` on (e.g. listings — see [Listings](./listings.md)).
 - **\`mappingField\`** — name of the field where a per-block `fieldMapping` override is stored. Required for the `FieldMappingWidget` to appear.
 - **\`parentControlled\`** — `{ childType: [fieldName, ...] }` per-child-type override. Replaces the `fieldMappings['@default']` fallback.
 - **\`defaultsField\`** — prefix for the inherited fields on the parent's "Item Defaults" fieldset (default: `'itemDefaults'`).
