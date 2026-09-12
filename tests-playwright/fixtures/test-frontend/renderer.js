@@ -368,6 +368,9 @@ async function renderBlock(blockId, block) {
         case 'highlight':
             wrapper.innerHTML = renderHighlightBlock(block);
             break;
+        case 'callout':
+            wrapper.innerHTML = renderCalloutBlock(block);
+            break;
         case 'toc':
             wrapper.innerHTML = renderTocBlock(block);
             break;
@@ -1178,6 +1181,32 @@ function renderHighlightBlock(block) {
             ${ctaHtml}
         </div>
     </section>`;
+}
+
+/**
+ * Render a callout block — a labelled admonition box (note/tip/warning/important).
+ * Level = block.variation (drives label + colour); body = a slate value.
+ * @param {Object} block - Callout block data
+ * @returns {string} HTML string
+ */
+function renderCalloutBlock(block) {
+    const levels = {
+        note:      { label: 'Note',      color: '#2563eb', bg: '#eff6ff' },
+        tip:       { label: 'Tip',       color: '#059669', bg: '#ecfdf5' },
+        warning:   { label: 'Warning',   color: '#d97706', bg: '#fffbeb' },
+        important: { label: 'Important', color: '#dc2626', bg: '#fef2f2' },
+    };
+    const level = levels[block.variation] || levels.note;
+    let bodyHtml = '';
+    (block.value || []).forEach((node) => {
+        const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
+        const tag = /^h[1-6]$/.test(node.type || '') ? node.type : 'p';
+        bodyHtml += `<${tag}${nodeIdAttr}>${renderChildren(node.children)}</${tag}>`;
+    });
+    return `<aside class="callout callout--${block.variation || 'note'}" style="border-left:4px solid ${level.color};background:${level.bg};padding:12px 16px;border-radius:4px;margin:1em 0;">
+        <div class="callout__label" style="font-weight:700;color:${level.color};text-transform:uppercase;font-size:0.8em;letter-spacing:0.05em;margin-bottom:4px;">${level.label}</div>
+        <div class="callout__body" data-edit-text="value">${bodyHtml}</div>
+    </aside>`;
 }
 
 /**
