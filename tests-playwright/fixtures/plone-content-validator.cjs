@@ -205,6 +205,21 @@ function validate(contentDir) {
         warnings.push(`  ${entry} Image has no image data`);
       }
     }
+
+    // A File's blob lives at data.file.blob_path (same shape as an Image's
+    // data.image), but was never checked -- a File pointing at a missing blob
+    // imported as a broken download with no error. Mirror the Image blob checks.
+    if (contentType === 'File') {
+      const blobPath = (data.file || {}).blob_path || '';
+      if (blobPath) {
+        if (!fs.existsSync(path.join(contentDir, blobPath))) {
+          errors.push(`  ${entry} blob_path file missing: ${blobPath}`);
+        }
+        if (!listedBlobs.has(blobPath)) {
+          warnings.push(`  ${entry} blob_path not in _blob_files_: ${blobPath}`);
+        }
+      }
+    }
   }
 
   // Parent containers must be listed, and must be listed BEFORE their children.
