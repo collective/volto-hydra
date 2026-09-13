@@ -105,6 +105,10 @@ test.describe('docs/examples/* screenshots', () => {
       const iframe = helper.getIframe();
       const blockEl = iframe.locator(`[data-block-uid="${uid}"]`).first();
       await blockEl.waitFor({ state: 'attached', timeout: 15000 });
+      // Lay the block out on screen before the hit-test below: getBoundingClientRect
+      // and elementFromPoint only mean anything once it is visible and in view.
+      await blockEl.scrollIntoViewIfNeeded();
+      await blockEl.waitFor({ state: 'visible', timeout: 15000 });
 
       // Pick which editable element to click. `.locator` descends to any
       // depth. When the container holds *restricted* child blocks — form
@@ -118,14 +122,33 @@ test.describe('docs/examples/* screenshots', () => {
       // blocks carry only `data-block-uid`. Otherwise click the first
       // editable; with no editable at all (e.g. separator) select the
       // block itself via the bridge.
+      //
+      // The fallback prefers the first editable that is actually HIT-TESTABLE
+      // (the topmost element at its own centre). Overlay-layout blocks like
+      // `highlight` render a full-bleed background-image editable first in DOM
+      // order but paint their text content on top of it, so clicking the
+      // background is intercepted by the overlay. Skipping to the first
+      // clickable editable (the title) selects the block without fighting the
+      // overlay; blocks whose first editable is already on top are unaffected.
       const editSel = '[data-edit-text], [data-edit-link], [data-edit-media]';
       const pick = await blockEl.evaluate((root, sel) => {
+        const hittable = (el) => {
+          const r = el.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) return false;
+          const top = document.elementFromPoint(
+            r.left + r.width / 2,
+            r.top + r.height / 2,
+          );
+          return !!top && (top === el || el.contains(top));
+        };
         const all = Array.from(root.querySelectorAll(sel));
         let fallback = -1;
+        let hittableFallback = -1;
         for (let i = 0; i < all.length; i++) {
           const owner = all[i].closest('[data-block-uid]');
           if (!owner) continue;
           if (fallback === -1) fallback = i;
+          if (hittableFallback === -1 && hittable(all[i])) hittableFallback = i;
           if (owner !== root && owner.hasAttribute('data-block-type')) {
             return {
               index: i,
@@ -134,10 +157,11 @@ test.describe('docs/examples/* screenshots', () => {
             };
           }
         }
-        if (fallback === -1) return null;
+        const index = hittableFallback !== -1 ? hittableFallback : fallback;
+        if (index === -1) return null;
         return {
-          index: fallback,
-          uid: all[fallback]
+          index,
+          uid: all[index]
             .closest('[data-block-uid]')
             ?.getAttribute('data-block-uid'),
           restricted: false,
