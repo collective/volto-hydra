@@ -159,11 +159,12 @@ test.describe('Navigation and URL Handling', () => {
     await expect(iframe.locator('text=This is a test paragraph')).toBeVisible();
 
     // Open the "Test Data" mega menu to reveal its children.
-    // The top-level "Test Data" link navigates to the folder; its children
-    // are disclosed by the adjacent chevron button (aria-label from header.vue).
+    // Reveal "Test Data"'s children, then click one. The Nuxt mega-menu hides
+    // them behind a chevron disclosure button (its title link navigates); the
+    // mock frontend renders every child as an always-visible <a>. Open the
+    // panel when that button exists, otherwise the child link is already shown.
     const testDataToggle = iframe.locator('nav').getByRole('button', { name: 'Show Test Data sections' });
-    await testDataToggle.waitFor({ state: 'visible' });
-    await testDataToggle.click();
+    if (await testDataToggle.count()) await testDataToggle.click();
 
     // Click "Another Page" under Test Data (filter by href to avoid matching
     // a different "Another Page" in another section like Content Types)
@@ -246,11 +247,12 @@ test.describe('Navigation and URL Handling', () => {
     // Try to navigate away by clicking a nav link in the iframe
     // First open the Test Data mega menu, then click a child link to trigger real navigation
     const iframe = helper.getIframe();
-    // The top-level "Test Data" link navigates to the folder; its children
-    // are disclosed by the adjacent chevron button (aria-label from header.vue).
+    // Reveal "Test Data"'s children, then click one. The Nuxt mega-menu hides
+    // them behind a chevron disclosure button (its title link navigates); the
+    // mock frontend renders every child as an always-visible <a>. Open the
+    // panel when that button exists, otherwise the child link is already shown.
     const testDataToggle = iframe.locator('nav').getByRole('button', { name: 'Show Test Data sections' });
-    await testDataToggle.waitFor({ state: 'visible' });
-    await testDataToggle.click();
+    if (await testDataToggle.count()) await testDataToggle.click();
     const navLink = iframe.locator('nav a[href*="_test_data"]').filter({ hasText: 'Accordion Test Page' }).first();
     await navLink.waitFor({ state: 'visible' });
     await navLink.click();
@@ -282,11 +284,12 @@ test.describe('Navigation and URL Handling', () => {
     });
 
     // Open Test Data mega menu, then click a child link to navigate away
-    // The top-level "Test Data" link navigates to the folder; its children
-    // are disclosed by the adjacent chevron button (aria-label from header.vue).
+    // Reveal "Test Data"'s children, then click one. The Nuxt mega-menu hides
+    // them behind a chevron disclosure button (its title link navigates); the
+    // mock frontend renders every child as an always-visible <a>. Open the
+    // panel when that button exists, otherwise the child link is already shown.
     const testDataToggle = iframe.locator('nav').getByRole('button', { name: 'Show Test Data sections' });
-    await testDataToggle.waitFor({ state: 'visible' });
-    await testDataToggle.click();
+    if (await testDataToggle.count()) await testDataToggle.click();
     const navLink = iframe.locator('nav a[href*="_test_data"]').filter({ hasText: 'Accordion Test Page' }).first();
     await navLink.waitFor({ state: 'visible' });
     await navLink.click();
@@ -343,11 +346,12 @@ test.describe('Navigation and URL Handling', () => {
     });
 
     // Open Test Data mega menu, then click Accordion Test Page to navigate
-    // The top-level "Test Data" link navigates to the folder; its children
-    // are disclosed by the adjacent chevron button (aria-label from header.vue).
+    // Reveal "Test Data"'s children, then click one. The Nuxt mega-menu hides
+    // them behind a chevron disclosure button (its title link navigates); the
+    // mock frontend renders every child as an always-visible <a>. Open the
+    // panel when that button exists, otherwise the child link is already shown.
     const testDataToggle = iframe.locator('nav').getByRole('button', { name: 'Show Test Data sections' });
-    await testDataToggle.waitFor({ state: 'visible' });
-    await testDataToggle.click();
+    if (await testDataToggle.count()) await testDataToggle.click();
     const navLink = iframe.locator('nav a[href*="_test_data"]').filter({ hasText: 'Accordion Test Page' }).first();
     await navLink.waitFor({ state: 'visible' });
     await navLink.click();
