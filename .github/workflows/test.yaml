@@ -170,6 +170,12 @@ jobs:
             docs/static/hydra-demo.mp4
           key: docs-assets-${{ github.sha }}
           restore-keys: docs-assets-
+      - name: Install and build Nuxt
+        # build:test bakes the LOCAL backend (localhost:8888) into the static
+        # .output; without it preview:test serves the prod-backed build and every
+        # /docs/examples/* is a 404 (the new content isn't on prod), so the
+        # screenshots can't render. Same step the test-nuxt-* jobs use.
+        run: cd examples/nuxt-blog-starter && pnpm install --ignore-workspace && pnpm run build:test
       - name: Start servers
         # The screenshot specs drive the Volto admin (3001) with the Nuxt iframe
         # (3003); mock-parent is served by the vite frontend (8889); content by
