@@ -91,11 +91,11 @@ for (const f of walk(SRC)) {
   // Site content (templates, search, image folders) isn't docs — the parent
   // provides it and its pages have no prose title — so keep it out of the nav.
   const NOT_DOCS = new Set(['templates', 'search', 'images', 'static', '_static']);
-  if (order && basename(f) === 'index.md') {
+  if (order && (basename(f) === 'index.md' || basename(f) === 'README.md')) {
     const here = dirname(f);
     const entries = order
       .filter((name) => !NOT_DOCS.has(name))
-      .map((name) => (existsSync(join(here, name, 'index.md')) ? `${name}/index`
+      .map((name) => (existsSync(join(here, name, 'index.md')) || existsSync(join(here, name, 'README.md')) ? `${name}/index`
         : existsSync(join(here, `${name}.md`)) ? name : null))
       .filter(Boolean);
     if (entries.length) out += `\n\`\`\`{toctree}\n:hidden:\n\n${entries.join('\n')}\n\`\`\`\n`;
