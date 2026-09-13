@@ -3,16 +3,15 @@
  *
  * For each docs/examples/<slug>.md page, opens /docs/examples/<slug>/edit,
  * selects the block instance that the page is showcasing, and writes a
- * full-page screenshot into docs/examples/_images/<slug>-edit.png.
+ * full-page screenshot straight into docs/images/<slug>-edit.png — the
+ * committed blob the example page embeds (`![...](/docs/images/<slug>-edit.png)`).
+ * Re-running this regenerates those images in place; the markdown is the
+ * single source, so there is no separate staging/materialise step (the old
+ * sync.mjs Phase 5/5b that copied a staging dir into Plone content is gone).
  *
- * The example .md files carry no image reference — the screenshot is
- * Plone-only; it documents the live editor, not the Sphinx build. On the
- * next `node docs/sync.mjs`, sync discovers docs/examples/_images/*.png
- * directly, materialises a Plone Image at /docs/images/<slug>-edit
- * (Phase 5), and injects an `image` block into the example page's Plone
- * content just below its title (Phase 5b). The synced Image content +
- * blob are committed; the docs/examples/_images/ originals are git-
- * ignored regenerable staging files.
+ * Which block to select is read from the SERVED page over the mock API
+ * (/docs/examples/<slug>), never from a content tree on disk — the served
+ * block uids are what the iframe actually renders, so the selector matches.
  *
  * Run with:
  *   pnpm exec playwright test --project=screenshots-nuxt \
@@ -30,16 +29,7 @@ import { URLS } from '../ports';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..', '..');
-const OUT_DIR = path.join(REPO_ROOT, 'docs', 'examples', '_images');
-const EXAMPLES_CONTENT_DIR = path.join(
-  REPO_ROOT,
-  'docs',
-  'content',
-  'content',
-  'content',
-  'docs',
-  'examples',
-);
+const OUT_DIR = path.join(REPO_ROOT, 'docs', 'images');
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
@@ -69,27 +59,32 @@ const EXAMPLES: Array<{ slug: string; blockType: string }> = [
 ];
 
 /**
- * Find the first block UID on the page whose @type matches `blockType`.
- * Reads the same data.json the mock-api serves (mount-point `/` ->
- * docs/content/content/content), so the UID is what the iframe will
- * render.
+ * Find the first block UID on the page whose @type matches `blockType`, read
+ * from the SERVED page over the mock API — never a content tree on disk. The
+ * served block uids are exactly what the iframe renders (the markdown mount
+ * auto-mints them on decode), so the selector matches; reading a JSON artifact
+ * off disk gave hex uids the markdown-served DOM no longer has.
  *
- * Skips the `editor-screenshot` block: sync.mjs Phase 5b injects one
- * `@type: image` block (the page's own editor screenshot) into every
- * example page, and it would otherwise shadow the real `image` example
- * block when blockType==='image'.
+ * Skips the page's own embedded editor screenshot: each example page carries an
+ * `![...](/docs/images/<slug>-edit.png)` image block, which would otherwise
+ * shadow the real `image` example block when blockType==='image'.
  */
-function firstBlockUidOfType(slug: string, blockType: string): string {
-  const dataPath = path.join(EXAMPLES_CONTENT_DIR, slug, 'data.json');
-  const data = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+async function firstBlockUidOfType(slug: string, blockType: string): Promise<string> {
+  const url = `${URLS.mockApi}/docs/examples/${slug}`;
+  const resp = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (!resp.ok) throw new Error(`fetch ${url} failed: ${resp.status} ${resp.statusText}`);
+  const data = await resp.json();
   const items: string[] = data.blocks_layout?.items || [];
   for (const uid of items) {
-    if (uid === 'editor-screenshot') continue;
-    if (data.blocks?.[uid]?.['@type'] === blockType) return uid;
+    const block = data.blocks?.[uid];
+    if (block?.['@type'] !== blockType) continue;
+    // The page's own screenshot image references /docs/images/<slug>-edit.png.
+    if (JSON.stringify(block).includes(`${slug}-edit`)) continue;
+    return uid;
   }
   throw new Error(
-    `No block of @type=${blockType} found in ${dataPath}; ` +
-      `update EXAMPLES or the example fixture.`,
+    `No block of @type=${blockType} found on ${url}; ` +
+      `update EXAMPLES or the example page.`,
   );
 }
 
@@ -106,7 +101,7 @@ test.describe('docs/examples/* screenshots', () => {
       await helper.login();
       await helper.navigateToEdit(`/docs/examples/${slug}`);
 
-      const uid = firstBlockUidOfType(slug, blockType);
+      const uid = await firstBlockUidOfType(slug, blockType);
       const iframe = helper.getIframe();
       const blockEl = iframe.locator(`[data-block-uid="${uid}"]`).first();
       await blockEl.waitFor({ state: 'attached', timeout: 15000 });

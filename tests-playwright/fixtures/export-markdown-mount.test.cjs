@@ -4,9 +4,17 @@
 // from memory: a markdown tree has no exportimport layout on disk, so the tar can
 // only come from the decoded-in-memory content. CONTENT_MOUNTS is set BEFORE the
 // api module loads (node --test isolates each file in its own process), mounting
-// the docs markdown tree at '/'.
+// the real three-mount site: docs at '/docs' (the content's own absolute links
+// are '/docs/...', and exported blob paths carry that prefix), the test-data
+// fixtures at '/_test_data', and the test site root at '/' (home/search/templates
+// — the target of the docs' cross-links to '/' and '/images/*').
 const path = require('node:path');
-process.env.CONTENT_MOUNTS = '/:' + path.resolve(__dirname, '../../docs/content-md-proto');
+const abs = (p) => path.resolve(__dirname, p);
+process.env.CONTENT_MOUNTS = [
+  '/docs:' + abs('../../docs'),
+  '/_test_data:' + abs('content'),
+  '/:' + abs('site-root'),
+].join(',');
 
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
@@ -14,6 +22,16 @@ const fs = require('node:fs');
 const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 const { app, ready } = require('./mock-plone-api.cjs');
+
+// A deployable export must bundle every referenced blob's bytes — so this test
+// needs the generated doc assets (editor screenshots, demo video) PRESENT. Those
+// are git-ignored and regenerated/cache-restored (see docs/.gitignore), so on a
+// fresh checkout / cache miss they are absent and export legitimately fails on
+// the missing bytes. Skip then: this is an images-present test. It runs in the
+// record-doc-assets CI job (after `pnpm docs:assets`) and locally where the
+// images exist; the media gate `pnpm docs:assets:check` is the presence check.
+const HAVE_ASSETS = fs.existsSync(abs('../../docs/images/accordion-edit.png'))
+  && fs.existsSync(abs('../../docs/static/hydra-demo.mp4'));
 
 let server, baseUrl;
 before(async () => {
@@ -24,7 +42,7 @@ before(async () => {
 });
 after(async () => { if (server) await new Promise((r) => server.close(r)); });
 
-describe('/@export json from a markdown mount', () => {
+describe('/@export json from a markdown mount', { skip: HAVE_ASSETS ? false : 'generated doc assets absent — run `pnpm docs:assets` first (images-present test)' }, () => {
   it('emits a deployable, validator-clean tar with markdown blobs bundled', async () => {
     const res = await fetch(`${baseUrl}/@export`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },

@@ -39,9 +39,16 @@ const FIXTURE_ORIGIN = 'http://localhost:8888';
 function parseContentMounts() {
   const mountsEnv = process.env.CONTENT_MOUNTS;
   if (!mountsEnv) {
+    // Three mounts, most-specific first (mountFor resolves top-down; '/' owns
+    // everything so it must be last):
+    //   /docs        the docs, authored as <block> markdown in the repo docs/ dir
+    //                (one source of truth: readable md + website + Sphinx source)
+    //   /_test_data  block-coverage fixtures the integration tests drive
+    //   /            the test site root — home, search page, layout templates
     return [
-      { mountPath: '/', dirPath: path.join(__dirname, '../../docs/content-md-proto') },
+      { mountPath: '/docs', dirPath: path.join(__dirname, '../../docs') },
       { mountPath: '/_test_data', dirPath: path.join(__dirname, 'content') },
+      { mountPath: '/', dirPath: path.join(__dirname, 'site-root') },
     ];
   }
 
@@ -1672,7 +1679,9 @@ function loadMarkdownMount(mount) {
   if (!mdRuntime) return;
   const { readTree, checkIntegrity } = mdRuntime;
   const { mountPath, dirPath } = mount;
-  const { items, blobFiles } = readTree(dirPath);
+  // Pass the mountPath as the link prefix so hand-authored .md cross-links resolve
+  // to the served @ids (a /docs mount serves its tree under /docs, not at root).
+  const { items, blobFiles } = readTree(dirPath, { prefix: mountPath === '/' ? '' : mountPath });
   const urlFor = (p) => (mountPath === '/' ? p : mountPath + (p === '/' ? '' : p));
   for (const [p, item] of items) {
     const urlPath = urlFor(p);
@@ -1686,25 +1695,30 @@ function loadMarkdownMount(mount) {
   }
   for (const [p, file] of blobFiles) markdownBlobs.set(urlFor(p), file);
   console.log(`Registered ${items.size} markdown items from ${dirPath} at ${mountPath}`);
-  // Content validation via the SAME validator the JSON mounts use
-  // (plone-content-validator) -- markdown and JSON decode to the same content
-  // shape, so one validation path serves both. checkIntegrity takes the
-  // in-memory [{rel, data}] form. Loud but non-fatal so a --watch restart (or a
-  // reload) surfaces a problem while developing, not at test time.
-  if (process.env.SKIP_CONTENT_VALIDATION !== 'true') {
-    const source = [...markdownItems].map(([rel, data]) => ({ rel, data }));
-    const { errors } = checkIntegrity(source);
-    if (errors.length) {
-      console.log(`[content-check] ${errors.length} problem(s) in markdown content:`);
-      for (const m of errors.slice(0, 30)) console.log(`  ${m}`);
-    }
+}
+
+/** Validate the WHOLE markdown tree at once, via the SAME validator the JSON
+ *  mounts use (plone-content-validator) -- markdown and JSON decode to the same
+ *  content shape, so one validation path serves both. It runs after every
+ *  markdown mount is loaded (not per-mount): a /docs page's cross-link to the
+ *  site root '/' or '/images/*' is only resolvable once the '/' mount is in, so
+ *  a per-mount check would cry false positives on the mount that loads first.
+ *  Loud but non-fatal, so a --watch restart or reload surfaces a real problem
+ *  while developing rather than at test time. */
+function validateMarkdownContent() {
+  if (process.env.SKIP_CONTENT_VALIDATION === 'true') return;
+  const source = [...markdownItems].map(([rel, data]) => ({ rel, data }));
+  const { errors } = mdRuntime.checkIntegrity(source);
+  if (errors.length) {
+    console.log(`[content-check] ${errors.length} problem(s) in markdown content:`);
+    for (const m of errors.slice(0, 30)) console.log(`  ${m}`);
   }
 }
 
 /** Reload one mount, format-agnostically -- the ContentSource.reload() seam that
  *  both the watcher and the cache-miss path call, so neither is JSON-specific. */
 function reloadMount(mount) {
-  if (isMarkdownMount(mount)) { loadMarkdownMount(mount); return; }
+  if (isMarkdownMount(mount)) { loadMarkdownMount(mount); validateMarkdownContent(); return; }
   if (mount.mountPath !== '/' && fs.existsSync(path.join(mount.dirPath, 'data.json'))) {
     contentDirMap[mount.mountPath] = { dirPath: mount.dirPath, dirName: path.basename(mount.dirPath) };
   }
@@ -1729,11 +1743,18 @@ async function initMarkdownMounts() {
   const { checkIntegrity } = require('./plone-content-validator.cjs');
   mdRuntime = { readTree, checkIntegrity };
   for (const mount of mounts) loadMarkdownMount(mount);
+  validateMarkdownContent();
 }
 
 // Scan content directories on startup (content loaded on-demand)
 function initContentDirMap() {
   CONTENT_MOUNTS.forEach(({ mountPath, dirPath }) => {
+    // A markdown mount is loaded from its index.md tree by initMarkdownMounts and
+    // must NOT be JSON-scanned: scanContentDir walks for data.json dirs and would
+    // pick up any nested distribution tree (e.g. docs/content/, the generated
+    // deploy artifact that lives inside the docs source dir), double-registering
+    // content the markdown `exclude:` manifest deliberately skips.
+    if (isMarkdownMount({ dirPath })) return;
     // Register the mount point itself if it has a root data.json (e.g., /_test_data folder page).
     // The '/' mount is handled via plone_site_root inside scanContentDir.
     if (mountPath !== '/') {

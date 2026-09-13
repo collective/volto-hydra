@@ -1,14 +1,48 @@
+---
+"@type": Document
+UID: docs-examples-slider-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
+description: A carousel/slider that cycles through slides. Slides are stored as
+  an object_list — each slide has a title, description, image, and optional
+  button.
+effective: null
+exclude_from_nav: false
+expires: null
+id: slider
+is_folderish: false
+language: "##DEFAULT##"
+layout: document_view
+review_state: published
+rights: ""
+subjects:
+  - blocks
+  - containers
+  - media
+title: Slider Block
+blocks-matched: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
+  <block type="title" _="${h1}" />
+  <block type="codeExample">
+    <region name="tabs" widget="object_list">
+      <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
+    </region>
+  </block>
+---
+
 # Slider Block
 
-A carousel/slider that cycles through slides. Slides are stored as an `object_list` — each slide has a title, description, image, and optional button.
+A carousel/slider that cycles through slides. Slides are stored as an object\_list — each slide has a title, description, image, and optional button.
 
-This is a **custom** block — register it via `initBridge`.
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-slider">
 
-**Demonstrates:** [object_list: a region stored inline](../container-blocks.md#object_list-a-region-stored-inline) — slides stored in the block, not in the shared dict.
+<block type="codeExample" slotId="schema">
 
-## Schema
+### Schema
 
-```json
+```javascript
 {
   "slider": {
     "schemaEnhancer": {
@@ -92,8 +126,11 @@ This is a **custom** block — register it via `initBridge`.
 }
 ```
 
+</block>
 
-## JSON Block Data
+<block type="codeExample" slotId="json-data">
+
+### JSON Block Data
 
 ```json
 {
@@ -131,178 +168,28 @@ This is a **custom** block — register it via `initBridge`.
 }
 ```
 
-## Rendering
+</block>
+
+<block type="codeExample" slotId="rendering">
 
 ### React
 
-<!-- file: examples/react/SliderBlock.jsx -->
-```jsx
-import { getImageUrl } from './utils.js';
-
-function SliderBlock({ block }) {
-  const [current, setCurrent] = useState(0);
-  const slides = expandTemplatesSync(block.slides || [], { idField: '@id' });
-
-  return (
-    <div data-block-uid={block['@uid']} className="slider-block">
-      {slides.map((slide, i) => (
-        <div
-          key={slide['@id']}
-          data-block-uid={slide['@id']}
-          className="slide"
-          style={{ display: i === current ? 'block' : 'none' }}
-        >
-          {slide.preview_image && (
-            <img
-              data-edit-media="preview_image"
-              src={getImageUrl(slide.preview_image)}
-              alt=""
-            />
-          )}
-          <span data-edit-text="head_title">{slide.head_title}</span>
-          <h2 data-edit-text="title">{slide.title}</h2>
-          <p data-edit-text="description">{slide.description}</p>
-          <button data-edit-text="buttonText">{slide.buttonText}</button>
-        </div>
-      ))}
-      <div className="slider-dots">
-        {slides.map((_, i) => (
-          <button key={i} onClick={() => setCurrent(i)} className={i === current ? 'active' : ''} />
-        ))}
-      </div>
-    </div>
-  );
-}
+```{literalinclude} examples/react/SliderBlock.jsx
+:language: jsx
 ```
 
 ### Vue
 
-<!-- file: examples/vue/SliderBlock.vue -->
-```vue
-<template>
-  <div :data-block-uid="block['@uid']" class="slider-block">
-    <div
-      v-for="(slide, i) in slides"
-      :key="slide['@id']"
-      :data-block-uid="slide['@id']"
-      class="slide"
-      v-show="i === current"
-    >
-      <img
-        v-if="slide.preview_image"
-        data-edit-media="preview_image"
-        :src="getImageUrl(slide.preview_image)"
-        alt=""
-      />
-      <span data-edit-text="head_title">{{ slide.head_title }}</span>
-      <h2 data-edit-text="title">{{ slide.title }}</h2>
-      <p data-edit-text="description">{{ slide.description }}</p>
-      <button data-edit-text="buttonText">{{ slide.buttonText }}</button>
-    </div>
-    <div class="slider-dots">
-      <button
-        v-for="(_, i) in slides"
-        :key="i"
-        @click="current = i"
-        :class="{ active: i === current }"
-      />
-    </div>
-  </div>
-</template>
-
-<script setup>
-import { ref, computed } from 'vue';
-import { getImageUrl } from './utils.js';
-const props = defineProps({ block: Object });
-const current = ref(0);
-// Expand the slides object_list (keyed by @id). Edit-mode pass-through sets each slide's @uid.
-const slides = computed(() => expandTemplatesSync(props.block.slides || [], { idField: '@id' }));
-</script>
+```{literalinclude} examples/vue/SliderBlock.vue
+:language: vue
 ```
 
 ### Svelte
 
-<!-- file: examples/svelte/SliderBlock.svelte -->
-```svelte
-<script>
-  import { getImageUrl } from './utils.js';
-  export let block;
-  let current = 0;
-  // Expand the slides object_list (keyed by @id). Edit-mode pass-through sets each slide's @uid.
-  $: slides = expandTemplatesSync(block.slides || [], { idField: '@id' });
-</script>
-
-<div data-block-uid={block['@uid']} class="slider-block">
-  {#each slides as slide, i (slide['@id'])}
-    <div
-      data-block-uid={slide['@id']}
-      class="slide"
-      style:display={i === current ? 'block' : 'none'}
-    >
-      {#if slide.preview_image}
-        <img
-          data-edit-media="preview_image"
-          src={getImageUrl(slide.preview_image)}
-          alt=""
-        />
-      {/if}
-      <span data-edit-text="head_title">{slide.head_title}</span>
-      <h2 data-edit-text="title">{slide.title}</h2>
-      <p data-edit-text="description">{slide.description}</p>
-      <button data-edit-text="buttonText">{slide.buttonText}</button>
-    </div>
-  {/each}
-  <div class="slider-dots">
-    {#each slides as _, i}
-      <button on:click={() => current = i} class:active={i === current} />
-    {/each}
-  </div>
-</div>
+```{literalinclude} examples/svelte/SliderBlock.svelte
+:language: svelte
 ```
 
-### Astro
+</block>
 
-<!-- file: examples/astro/SliderBlock.astro -->
-```astro
----
-/**
- * Slider/carousel. Server-render shows the first slide visible and the
- * rest hidden, mirroring the svelte version's initial state. There's no
- * client interactivity in the SSR example — tests only verify per-slide
- * DOM hooks render.
- *
- * Each slide keeps its own data-block-uid so the bridge can target slides
- * individually.
- */
-import { getImageUrl } from './utils.js';
-import { expandTemplatesSync } from '$helpers';
-// astro renders ONLY via the edit render API (SSR has no window.name), so default to edit mode —
-// also covers a slider nested in a container, whose BlockRenderer doesn't thread editMode down.
-const { block, editMode = true } = Astro.props;
-// Expand the slides object_list (idField @id). Edit mode makes this a pass-through that sets each
-// slide's @uid (a view render would need pre-loaded templates instead).
-const slides = expandTemplatesSync(block.slides || [], { idField: '@id', editMode });
----
-<div class="slider-block">
-  {slides.map((slide: any, i: number) => (
-    <div
-      data-block-uid={slide['@id']}
-      class="slide"
-      style={`display: ${i === 0 ? 'block' : 'none'}`}
-    >
-      {slide.preview_image && (
-        <img data-edit-media="preview_image" src={getImageUrl(slide.preview_image)} alt="" />
-      )}
-      <span data-edit-text="head_title">{slide.head_title}</span>
-      <h2 data-edit-text="title">{slide.title}</h2>
-      <p data-edit-text="description">{slide.description}</p>
-      <button data-edit-text="buttonText">{slide.buttonText}</button>
-    </div>
-  ))}
-  <div class="slider-dots">
-    {slides.map((_: any, i: number) => (
-      <button class={i === 0 ? 'active' : ''} />
-    ))}
-  </div>
-</div>
-```
+</fields>

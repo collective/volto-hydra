@@ -1,14 +1,47 @@
+---
+"@type": Document
+UID: docs-examples-hero-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
+description: "A full-width hero section with heading, subheading, image, rich
+  text description, and a call-to-action button. Demonstrates multiple field
+  types in a single block: string, textarea, slate, image, and object_browser."
+effective: null
+exclude_from_nav: false
+expires: null
+id: hero
+is_folderish: false
+language: "##DEFAULT##"
+layout: document_view
+review_state: published
+rights: ""
+subjects:
+  - blocks
+  - media
+title: Hero Block
+blocks-matched: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
+  <block type="title" _="${h1}" />
+  <block type="codeExample">
+    <region name="tabs" widget="object_list">
+      <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
+    </region>
+  </block>
+---
+
 # Hero Block
 
-A full-width hero section with heading, subheading, image, rich text description, and a call-to-action button. Demonstrates multiple field types in a single block: `string`, `textarea`, `slate`, `image`, and `object_browser`.
+A full-width hero section with heading, subheading, image, rich text description, and a call-to-action button. Demonstrates multiple field types in a single block: string, textarea, slate, image, and object\_browser.
 
-This is a **custom** block — register it via `initBridge`.
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-hero">
 
-**Demonstrates:** [HTML Annotations for Visual Editing](../visual-editing.md#html-annotations-for-visual-editing) — text, rich text, media and link in a single block.
+<block type="codeExample" slotId="schema">
 
-## Schema
+### Schema
 
-```json
+```javascript
 {
   "hero": {
     "blockSchema": {
@@ -52,8 +85,11 @@ This is a **custom** block — register it via `initBridge`.
 }
 ```
 
+</block>
 
-## JSON Block Data
+<block type="codeExample" slotId="json-data">
+
+### JSON Block Data
 
 ```json
 {
@@ -80,153 +116,28 @@ This is a **custom** block — register it via `initBridge`.
 }
 ```
 
-## Rendering
+</block>
+
+<block type="codeExample" slotId="rendering">
 
 ### React
 
-<!-- file: examples/react/HeroBlock.jsx -->
-```jsx
-import { getImageUrl } from './utils.js';
-
-function HeroBlock({ block }) {
-  const subheading = (block.subheading || '').replace(/\n/g, '<br>');
-  const buttonLink = block.buttonLink?.[0]?.['@id'] || '';
-  const imageSrc = getImageUrl(block.image);
-
-  // Data-driven: render a field only when it has data. No data ⇒ no element, so
-  // view markup stays clean. Hydra reveals an empty optional field for editing by
-  // seeding it, which makes these same checks true — no edit-mode branch needed.
-  return (
-    <div data-block-uid={block['@uid']} className="hero-block">
-      {imageSrc && (
-        <img data-edit-media="image" src={imageSrc} alt="Hero image" />
-      )}
-      {block.heading && <h1 data-edit-text="heading">{block.heading}</h1>}
-      {block.subheading && (
-        <p data-edit-text="subheading" dangerouslySetInnerHTML={{ __html: subheading }} />
-      )}
-      {block.description && (
-        <div className="hero-description" data-edit-text="description">
-          {block.description.map((node, i) => (
-            <SlateNode key={i} node={node} />
-          ))}
-        </div>
-      )}
-      {(block.buttonText || block.buttonLink) && (
-        <a data-edit-text="buttonText" data-edit-link="buttonLink" href={buttonLink}>
-          {block.buttonText}
-        </a>
-      )}
-    </div>
-  );
-}
+```{literalinclude} examples/react/HeroBlock.jsx
+:language: jsx
 ```
 
 ### Vue
 
-<!-- file: examples/vue/HeroBlock.vue -->
-```vue
-<template>
-  <!-- Data-driven: render a field only when it has data. No data ⇒ no element, so
-       view markup stays clean. Hydra reveals an empty optional field for editing by
-       seeding it, which makes these same checks true — no edit-mode branch needed. -->
-  <div :data-block-uid="block['@uid']" class="hero-block">
-    <img v-if="block.image" data-edit-media="image" :src="heroImageSrc" alt="Hero image" />
-    <h1 v-if="block.heading" data-edit-text="heading">{{ block.heading }}</h1>
-    <p v-if="block.subheading" data-edit-text="subheading" v-html="subheadingHtml" />
-    <div v-if="block.description" class="hero-description" data-edit-text="description">
-      <SlateNode v-for="(node, i) in block.description" :key="i" :node="node" />
-    </div>
-    <a v-if="block.buttonText || block.buttonLink"
-       data-edit-text="buttonText" data-edit-link="buttonLink" :href="buttonLink">
-      {{ block.buttonText }}
-    </a>
-  </div>
-</template>
-
-<script setup>
-import { computed } from 'vue';
-import { getImageUrl } from './utils.js';
-const props = defineProps({ block: Object });
-const subheadingHtml = computed(() => (props.block.subheading || '').replace(/\n/g, '<br>'));
-const buttonLink = computed(() => props.block.buttonLink?.[0]?.['@id'] || '');
-const heroImageSrc = computed(() => getImageUrl(props.block.image));
-</script>
+```{literalinclude} examples/vue/HeroBlock.vue
+:language: vue
 ```
 
 ### Svelte
 
-<!-- file: examples/svelte/HeroBlock.svelte -->
-```svelte
-<script>
-  import SlateNode from './SlateNode.svelte';
-  import { getImageUrl } from './utils.js';
-  export let block;
-
-  $: subheadingHtml = (block.subheading || '').replace(/\n/g, '<br>');
-  $: buttonLink = block.buttonLink?.[0]?.['@id'] || '';
-  $: heroImageSrc = getImageUrl(block.image);
-</script>
-
-<!-- Data-driven: render a field only when it has data. No data ⇒ no element, so
-     view markup stays clean. Hydra reveals an empty optional field for editing by
-     seeding it, which makes these same checks true — no edit-mode branch needed. -->
-<div data-block-uid={block['@uid']} class="hero-block">
-  {#if block.image}
-    <img data-edit-media="image" src={heroImageSrc} alt="Hero image" />
-  {/if}
-  {#if block.heading}
-    <h1 data-edit-text="heading">{block.heading}</h1>
-  {/if}
-  {#if block.subheading}
-    <p data-edit-text="subheading">{@html subheadingHtml}</p>
-  {/if}
-  {#if block.description}
-    <div class="hero-description" data-edit-text="description">
-      {#each block.description as node, i (i)}
-        <SlateNode {node} />
-      {/each}
-    </div>
-  {/if}
-  {#if block.buttonText || block.buttonLink}
-    <a data-edit-text="buttonText" data-edit-link="buttonLink" href={buttonLink}>
-      {block.buttonText}
-    </a>
-  {/if}
-</div>
+```{literalinclude} examples/svelte/HeroBlock.svelte
+:language: svelte
 ```
 
-### Astro
+</block>
 
-<!-- file: examples/astro/HeroBlock.astro -->
-```astro
----
-/**
- * Hero block. Heading, subheading (with simple newline→<br> support),
- * description slate tree, optional image, and a button. Each editable
- * field carries the relevant `data-edit-*` hook so the bridge can map
- * iframe edits back to the right field.
- *
- * `subheadingHtml` mirrors the svelte version's {@html} interpolation —
- * astro's `set:html` on a wrapper element fills the same role.
- */
-import SlateNode from './SlateNode.astro';
-import { getImageUrl } from './utils.js';
-const { block } = Astro.props;
-const subheadingHtml = (block.subheading || '').replace(/\n/g, '<br>');
-const buttonLink = block.buttonLink?.[0]?.['@id'] || '';
-const heroImageSrc = getImageUrl(block.image);
-const description = block.description || [];
----
-<div class="hero-block">
-  {block.image && <img data-edit-media="image" src={heroImageSrc} alt="Hero image" />}
-  <h1 data-edit-text="heading">{block.heading}</h1>
-  <p data-edit-text="subheading" set:html={subheadingHtml}></p>
-  <div class="hero-description" data-edit-text="description">
-    {description.map((node: any) => <SlateNode node={node} />)}
-  </div>
-  <a data-edit-text="buttonText" data-edit-link="buttonLink" href={buttonLink}>
-    {block.buttonText}
-  </a>
-</div>
-```
+</fields>

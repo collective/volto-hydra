@@ -2,10 +2,11 @@
 /**
  * Generate the Sphinx/myst version of the docs from the <block> markdown source.
  *
- * The source (content-md-proto) is authored for the LOADER: block bodies are
+ * The source (the repo docs/ dir) is authored for the LOADER: block bodies are
  * plain markdown, but wrapped in <block>/<region>/<fields> tags, with nav in
- * `order:` frontmatter. Sphinx wants plain myst + `{toctree}`s. This emits that
- * — a BUILD ARTIFACT, never committed (the source stays loader-shaped):
+ * `order:` frontmatter and non-page dirs named in `exclude:`. Sphinx wants plain
+ * myst + `{toctree}`s. This emits that to a dir OUTSIDE docs/ — a BUILD ARTIFACT,
+ * never committed (the source stays loader-shaped):
  *
  *   node docs/gen-myst.mjs <src> <out>
  *
@@ -21,11 +22,24 @@
  */
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync, rmSync, cpSync, statSync } from 'fs';
 import { join, dirname, relative, basename } from 'path';
+import { folderExcludes } from '../lib/markdown-mount.mjs';
 
 const [SRC, OUT] = process.argv.slice(2);
 if (!SRC || !OUT) { console.error('usage: gen-myst.mjs <src> <out>'); process.exit(1); }
 
-const walk = (d, acc = []) => { for (const e of readdirSync(d, { withFileTypes: true })) { const p = join(d, e.name); if (e.isDirectory()) walk(p, acc); else acc.push(p); } return acc; };
+// Honor the same per-folder `exclude:` manifest the mount uses, so the docs/ dir
+// (which also holds the JSON distribution, build output, and renderer sources)
+// contributes only its doc pages to the myst build — one source of truth.
+const walk = (d, acc = []) => {
+  const isExcluded = folderExcludes(d);
+  for (const e of readdirSync(d, { withFileTypes: true })) {
+    if (isExcluded(e.name)) continue;
+    const p = join(d, e.name);
+    if (e.isDirectory()) walk(p, acc);
+    else acc.push(p);
+  }
+  return acc;
+};
 
 // A callout block -> a myst admonition. The body is already markdown.
 function calloutToAdmonition(md) {

@@ -1,12 +1,50 @@
+---
+"@type": Document
+UID: docs-examples-rssFeed-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
+description: Renders entries from an external RSS feed, reusing the listing
+  machinery. Each entry is rendered with a configurable item type (variation).
+effective: null
+exclude_from_nav: false
+expires: null
+id: rssFeed
+is_folderish: false
+language: "##DEFAULT##"
+layout: document_view
+review_state: published
+rights: ""
+subjects:
+  - blocks
+  - listings
+title: RSS Feed Block
+blocks-matched: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
+  <block type="title" _="${h1}" />
+  <block type="codeExample">
+    <region name="tabs" widget="object_list">
+      <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
+    </region>
+  </block>
+---
+
 # RSS Feed Block
 
 Renders entries from an external RSS feed. Its items are fetched at render time (by a fetcher you provide) and shown with a configurable item type (variation).
 
-It's a custom block type whose items come from a fetcher; `expandListingBlocks` expands it in any region (see Rendering).
+## Live example
 
-## Schema
+<block type="rssFeed" feedUrl="https://pypi.org/rss/project/plone/releases.xml" variation="default" />
 
-```json
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed">
+
+<block type="codeExample" slotId="schema">
+
+### Schema
+
+```javascript
 {
   "rssFeed": {
     "id": "rssFeed",
@@ -53,8 +91,11 @@ It's a custom block type whose items come from a fetcher; `expandListingBlocks` 
 }
 ```
 
+</block>
 
-## JSON Block Data
+<block type="codeExample" slotId="json-data">
+
+### JSON Block Data
 
 ```json
 {
@@ -65,9 +106,13 @@ It's a custom block type whose items come from a fetcher; `expandListingBlocks` 
 }
 ```
 
-## Fetcher
+</block>
 
-The whole block is a **fetcher** — everything block-specific lives here. A fetcher is `async (block, { start, size }) => ({ items, total })`; `expandListingBlocks` calls it, keyed by the block's `@type` in your `fetchItems` map. Return raw result objects — set each item's `@id` to what you want its link to be (here, the entry's link), and the default `@id → href` mapping turns it into a link item, so nothing renderer-side is special.
+<fields slotId="rendering">
+
+This block has no bespoke renderer. Add its fetcher to your fetchItems map (keyed by @type) and expandListingBlocks expands it in any region you render — the same seam that powers [listings](../listings.md) and other collection blocks. See [Custom Blocks](../custom-blocks.md) to define the block type. Only the fetcher below is block-specific.
+
+### Fetcher
 
 ```javascript
 // packages/helpers — client-side, best-effort (CORS-permitting feeds).
@@ -97,11 +142,9 @@ function parseRssEntries(xml) {
 }
 ```
 
-Because this fetch runs in the browser, the feed must send an `Access-Control-Allow-Origin` header — most feeds don't. This example points at the [PyPI Plone releases feed](https://pypi.org/rss/project/plone/releases.xml), which does. For an arbitrary feed, fetch it server-side (SSR/SSG) or proxy it through your own route and point `feedUrl` at that.
+<block type="codeExample">
 
-## Rendering
-
-There's no bespoke renderer. Add this block's fetcher to your `fetchItems` map (keyed by `@type`) alongside any other fetch-based blocks, then expand each region with `expandListingBlocks` — it turns every block whose `@type` is in the map into ready-to-render item blocks. Only the fetcher above is block-specific.
+### Render
 
 ```javascript
 // One fetchItems map, keyed by @type, holds every fetch-based block you use.
@@ -117,4 +160,8 @@ const { items } = await expandListingBlocks(regionBlockIds, {
 items.forEach((item) => renderBlock(item)); // your normal per-block renderer
 ```
 
-See the [Listing block](./listing.md#rendering) for full per-stack (React / Vue / Svelte / Astro) render components, and [Listings](../listings.md) for the expand pattern.
+</block>
+
+</fields>
+
+</fields>

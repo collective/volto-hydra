@@ -1,14 +1,47 @@
-# Columns Block
+---
+"@type": Document
+UID: docs-examples-columns-001
+allow_discussion: false
+contributors: []
+creators:
+  - admin
+description: A responsive grid layout container. Each cell is a child block
+  (teaser, slate, image, etc.) rendered inside the grid. This is the built-in
+  Volto grid block (gridBlock).
+effective: null
+exclude_from_nav: false
+expires: null
+id: columns
+is_folderish: false
+language: "##DEFAULT##"
+layout: document_view
+review_state: published
+rights: ""
+subjects:
+  - blocks
+  - containers
+title: Grid Block
+blocks-matched: |
+  <block type="slate" value="${p,h*,ul,ol,blockquote,strong,em/slate}" />
+  <block type="title" _="${h1}" />
+  <block type="codeExample">
+    <region name="tabs" widget="object_list">
+      <block type="tab" label="${h3/text}" language="${pre/lang}" code="${pre/text}" />
+    </region>
+  </block>
+---
 
-A horizontal multi-column container. The block has one slot — `columns` — restricted to `column` children, capped at four. Each `column` is itself a container holding any of its allowed inner block types (slate, image, …).
+# Grid Block
 
-This is a **custom** block — register it via `initBridge`.
+A horizontal multi-column container. The block has one slot — columns — restricted to column children, capped at four. Each column is itself a container holding any of its allowed inner block types (slate, image, …).
 
-**Demonstrates:** [blocks_layout: a region in the shared dict](../container-blocks.md#blocks_layout-a-region-in-the-shared-dict) — a container whose children are containers.
+<fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-columns">
 
-## Schema
+<block type="codeExample" slotId="schema">
 
-```json
+### Schema
+
+```javascript
 {
   "columns": {
     "blockSchema": {
@@ -48,8 +81,11 @@ This is a **custom** block — register it via `initBridge`.
 }
 ```
 
+</block>
 
-## JSON Block Data
+<block type="codeExample" slotId="json-data">
+
+### JSON Block Data
 
 ```json
 {
@@ -114,103 +150,28 @@ This is a **custom** block — register it via `initBridge`.
 }
 ```
 
-## Rendering
+</block>
 
-The columns slot uses the standard shared-blocks shape: child columns live in `block.blocks` and their order comes from `block.columns.items`. Each column is itself a container with its own `blocks_layout` for content.
+<block type="codeExample" slotId="rendering">
 
 ### React
 
-<!-- file: examples/react/ColumnsBlock.jsx -->
-```jsx
-function ColumnsBlock({ block }) {
-  const items = block.blocks_layout?.columns || [];
-  const blocks = block.blocks || {};
-
-  return (
-    <div data-block-uid={block['@uid']} className="columns-block">
-      <div style={{ display: 'flex', gap: '1rem' }}>
-        {items.map(id => (
-          <ColumnBlock key={id} block={{ ...blocks[id], '@uid': id }} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ColumnBlock({ block }) {
-  const items = block.blocks_layout?.items || [];
-  const blocks = block.blocks || {};
-
-  return (
-    <div data-block-uid={block['@uid']} style={{ flex: 1 }}>
-      {block.title && <h4 data-edit-text="title">{block.title}</h4>}
-      {items.map(id => (
-        <BlockRenderer key={id} block={{ ...blocks[id], '@uid': id }} />
-      ))}
-    </div>
-  );
-}
+```{literalinclude} examples/react/ColumnsBlock.jsx
+:language: jsx
 ```
 
 ### Vue
 
-<!-- file: examples/vue/ColumnsBlock.vue -->
-```vue
-<template>
-  <div :data-block-uid="block['@uid']" class="columns-block">
-    <div style="display: flex; gap: 1rem">
-      <ColumnBlock
-        v-for="id in block.blocks_layout?.columns || []"
-        :key="id"
-        :block="{ ...block.blocks?.[id], '@uid': id }"
-      />
-    </div>
-  </div>
-</template>
-
-<script setup>
-defineProps({ block: Object });
-</script>
+```{literalinclude} examples/vue/ColumnsBlock.vue
+:language: vue
 ```
 
 ### Svelte
 
-<!-- file: examples/svelte/ColumnsBlock.svelte -->
-```svelte
-<script>
-  import ColumnBlock from './ColumnBlock.svelte';
-  export let block;
-</script>
-
-<div data-block-uid={block['@uid']} class="columns-block">
-  <div style="display: flex; gap: 1rem">
-    {#each block.blocks_layout?.columns || [] as id (id)}
-      <ColumnBlock block={{ ...block.blocks?.[id], '@uid': id }} />
-    {/each}
-  </div>
-</div>
+```{literalinclude} examples/svelte/ColumnsBlock.svelte
+:language: svelte
 ```
 
-### Astro
+</block>
 
-<!-- file: examples/astro/ColumnsBlock.astro -->
-```astro
----
-/**
- * Columns container. Each column is a sub-block of @type "column" rendered
- * by ColumnBlock. The columns themselves get their own data-block-uid
- * wrapper from ColumnBlock — this outer container is just layout.
- */
-import ColumnBlock from './ColumnBlock.astro';
-const { block } = Astro.props;
-const items = block.blocks_layout?.columns || [];
-const subBlocks = block.blocks || {};
----
-<div class="columns-block">
-  <div style="display: flex; gap: 1rem">
-    {items.map((id: string) => (
-      <ColumnBlock block={{ ...subBlocks[id], '@uid': id }} />
-    ))}
-  </div>
-</div>
-```
+</fields>

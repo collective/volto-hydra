@@ -4,7 +4,7 @@
  * Run with: pnpm exec playwright test --project=screenshots
  *
  * Each test below opens the showcase fixture page, drives the editor into a
- * specific state, and saves an image into docs/editor-guide/_images/. The
+ * specific state, and saves an image into docs/images/. The
  * Editor Guide markdown pages reference those images by filename.
  *
  * Not part of normal test runs — gated to its own project (see
@@ -18,14 +18,14 @@ import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
-const OUT_DIR = path.join(SCRIPT_DIR, '..', '..', 'docs', 'what-editors-will-experience', '_images');
+const OUT_DIR = path.join(SCRIPT_DIR, '..', '..', 'docs', 'images');
 const SHOWCASE_PATH = '/showcase-page';
 
 // Make sure the output directory exists once at import time.
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
 /**
- * Save a viewport-sized screenshot under docs/editor-guide/_images/<name>.png.
+ * Save a viewport-sized screenshot under docs/images/<name>.png.
  */
 async function snap(page: import('@playwright/test').Page, name: string) {
   const file = path.join(OUT_DIR, `${name}.png`);
