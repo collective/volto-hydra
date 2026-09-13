@@ -158,10 +158,12 @@ test.describe('Navigation and URL Handling', () => {
     const iframe = helper.getIframe();
     await expect(iframe.locator('text=This is a test paragraph')).toBeVisible();
 
-    // Click "Test Data" in the nav to open the mega menu / show children
-    const testDataNav = iframe.locator('nav').getByText('Test Data', { exact: true });
-    await testDataNav.waitFor({ state: 'visible' });
-    await testDataNav.click();
+    // Open the "Test Data" mega menu to reveal its children.
+    // The top-level "Test Data" link navigates to the folder; its children
+    // are disclosed by the adjacent chevron button (aria-label from header.vue).
+    const testDataToggle = iframe.locator('nav').getByRole('button', { name: 'Show Test Data sections' });
+    await testDataToggle.waitFor({ state: 'visible' });
+    await testDataToggle.click();
 
     // Click "Another Page" under Test Data (filter by href to avoid matching
     // a different "Another Page" in another section like Content Types)
@@ -244,9 +246,11 @@ test.describe('Navigation and URL Handling', () => {
     // Try to navigate away by clicking a nav link in the iframe
     // First open the Test Data mega menu, then click a child link to trigger real navigation
     const iframe = helper.getIframe();
-    const testDataNav = iframe.locator('nav').getByText('Test Data', { exact: true });
-    await testDataNav.waitFor({ state: 'visible' });
-    await testDataNav.click();
+    // The top-level "Test Data" link navigates to the folder; its children
+    // are disclosed by the adjacent chevron button (aria-label from header.vue).
+    const testDataToggle = iframe.locator('nav').getByRole('button', { name: 'Show Test Data sections' });
+    await testDataToggle.waitFor({ state: 'visible' });
+    await testDataToggle.click();
     const navLink = iframe.locator('nav a[href*="_test_data"]').filter({ hasText: 'Accordion Test Page' }).first();
     await navLink.waitFor({ state: 'visible' });
     await navLink.click();
@@ -278,9 +282,11 @@ test.describe('Navigation and URL Handling', () => {
     });
 
     // Open Test Data mega menu, then click a child link to navigate away
-    const testDataNav = iframe.locator('nav').getByText('Test Data', { exact: true });
-    await testDataNav.waitFor({ state: 'visible' });
-    await testDataNav.click();
+    // The top-level "Test Data" link navigates to the folder; its children
+    // are disclosed by the adjacent chevron button (aria-label from header.vue).
+    const testDataToggle = iframe.locator('nav').getByRole('button', { name: 'Show Test Data sections' });
+    await testDataToggle.waitFor({ state: 'visible' });
+    await testDataToggle.click();
     const navLink = iframe.locator('nav a[href*="_test_data"]').filter({ hasText: 'Accordion Test Page' }).first();
     await navLink.waitFor({ state: 'visible' });
     await navLink.click();
@@ -337,9 +343,11 @@ test.describe('Navigation and URL Handling', () => {
     });
 
     // Open Test Data mega menu, then click Accordion Test Page to navigate
-    const testDataNav = iframe.locator('nav').getByText('Test Data', { exact: true });
-    await testDataNav.waitFor({ state: 'visible' });
-    await testDataNav.click();
+    // The top-level "Test Data" link navigates to the folder; its children
+    // are disclosed by the adjacent chevron button (aria-label from header.vue).
+    const testDataToggle = iframe.locator('nav').getByRole('button', { name: 'Show Test Data sections' });
+    await testDataToggle.waitFor({ state: 'visible' });
+    await testDataToggle.click();
     const navLink = iframe.locator('nav a[href*="_test_data"]').filter({ hasText: 'Accordion Test Page' }).first();
     await navLink.waitFor({ state: 'visible' });
     await navLink.click();
