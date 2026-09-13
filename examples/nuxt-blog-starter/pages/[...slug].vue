@@ -373,7 +373,12 @@ const preloadTemplates = [
 
 var path = [];
 var pages = {};
-for (var part of route.params.slug) {
+// `|| []` because at the site root the catch-all param is empty, and whether
+// vue-router hands back [] or undefined varies by version — on the nuxt 3.21.2
+// the lockfile pins, it is undefined and this threw "route.params.slug is not
+// iterable", failing the SSG prerender of / with a bare [500]. The reactive
+// `pages` computed below already guarded the same value; this one was missed.
+for (var part of route.params.slug || []) {
     if (part.startsWith("@pg_")) {
         const [_,bid,page] = part.split("_");
         pages[bid] = Number(page);

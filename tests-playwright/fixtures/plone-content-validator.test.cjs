@@ -121,6 +121,59 @@ describe('plone-content-validator validate()', () => {
     assert.ok(r.errors.some((e) => e.includes('remote URL')), r.errors.join('\n'));
   });
 
+  // A File's blob is just as shippable as an Image's, and just as easy to leave
+  // behind: git can hold a data.json promising a 374KB video with nothing at the
+  // blob_path. That is how the homepage hero video came to be referenced by a
+  // tracked data.json while the mp4 itself was git-ignored — validation passed,
+  // and the deployed page served a 404.
+  it('reports File with blob_path pointing at a missing file', () => {
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/page-a',
+        '@type': 'File',
+        id: 'page-a',
+        UID: 'pageauid1234567',
+        parent: { '@id': '/' },
+        file: {
+          blob_path: 'page-a/file/hero.mp4',
+          'content-type': 'video/mp4',
+          filename: 'hero.mp4',
+          size: 374638,
+        },
+      },
+    });
+    const r = validate(contentDir);
+    cleanup(root);
+    assert.ok(
+      r.errors.some((e) => e.includes('blob_path file missing')),
+      `expected a missing-blob error, got: ${r.errors.join('\n') || '(none)'}`,
+    );
+  });
+
+  it('accepts a File whose blob_path exists', () => {
+    const { root, contentDir } = buildFixture({
+      blobFiles: ['page-a/file/hero.mp4'],
+      pageA: {
+        '@id': '/page-a',
+        '@type': 'File',
+        id: 'page-a',
+        UID: 'pageauid1234567',
+        parent: { '@id': '/' },
+        file: {
+          blob_path: 'page-a/file/hero.mp4',
+          'content-type': 'video/mp4',
+          filename: 'hero.mp4',
+          size: 4,
+        },
+      },
+    });
+    fs.mkdirSync(path.join(contentDir, 'page-a', 'file'), { recursive: true });
+    fs.writeFileSync(path.join(contentDir, 'page-a', 'file', 'hero.mp4'), 'data');
+    const r = validate(contentDir);
+    cleanup(root);
+    assert.deepEqual(r.errors, []);
+  });
+
   it('reports child before parent in _data_files_ ordering', () => {
     const { root, contentDir } = buildFixture({
       dataFiles: [
@@ -365,6 +418,32 @@ describe('plone-content-validator checkIntegrity()', () => {
     cleanup(root);
     assert.ok(r.errors.some((e) => e.includes('broken resolveuid')), r.errors.join('\n'));
     assert.equal(r.stats.resolveuidBroken, 1);
+  });
+
+  it('FAILS on a multi-node slate value (must be a single top-level node)', () => {
+    // The editor makes one block per paragraph, and a paragraph boundary is a
+    // block boundary, so a slate value with >1 top-level node (a title + body
+    // packed into one block) has no bare-markdown spelling. lib/slate-normalize
+    // collapses it; a multi-block cell belongs in a `columns` block instead.
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/page-a', '@type': 'Document', id: 'page-a',
+        UID: 'pageauid1234567', parent: { '@id': '/' },
+        blocks: {
+          s: {
+            '@type': 'slate',
+            value: [
+              { type: 'p', children: [{ type: 'strong', children: [{ text: 'Title' }] }] },
+              { type: 'p', children: [{ text: 'Body paragraph.' }] },
+            ],
+          },
+        },
+        blocks_layout: { items: ['s'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.ok(r.errors.some((e) => e.includes('top-level nodes')), r.errors.join('\n'));
   });
 
   it('FAILS on a template block with no templateId', () => {

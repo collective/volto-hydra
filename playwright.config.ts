@@ -341,7 +341,7 @@ export default defineConfig({
       stderr: 'pipe' as const,
       env: {
         PORT: String(PORTS.mockApi),
-        CONTENT_MOUNTS: '/:docs/content/content/content,/_test_data:tests-playwright/fixtures/content',
+        CONTENT_MOUNTS: '/docs:docs,/_test_data:tests-playwright/fixtures/content,/:tests-playwright/fixtures/site-root',
       },
     },
     {

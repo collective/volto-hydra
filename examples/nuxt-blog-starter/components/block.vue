@@ -148,6 +148,23 @@
        container UX feature tests (wrap, unwrap, edge-drag, convert).
        Inner .section-body wrapper matches the vanilla test-frontend so
        cross-renderer tests can use the same selector. -->
+  <!-- Callout: a labelled admonition (note/tip/warning/important); the body is
+       the `items` region of child blocks, rendered recursively like section. -->
+  <aside v-else-if="block['@type'] == 'callout'" :data-block-uid="block_uid"
+         :class="`callout callout--${block.variation || 'note'}`"
+         style="border-left: 4px solid #2563eb; background: #eff6ff; padding: 12px 16px; border-radius: 4px; margin: 1em 0;">
+    <div class="callout__label" style="font-weight: 700; text-transform: uppercase; font-size: 0.8em; letter-spacing: 0.05em; margin-bottom: 4px;">
+      {{ block.variation || 'note' }}
+    </div>
+    <Block v-for="childId in (block.blocks_layout?.items || [])"
+           :key="childId"
+           :block_uid="childId"
+           :block="block.blocks?.[childId]"
+           :data="data"
+           :contained="true"
+           class="my-1" />
+  </aside>
+
   <div v-else-if="block['@type'] == 'section'" :data-block-uid="block_uid">
     <div class="section-body p-3 border border-dashed border-gray-500 rounded">
       <Block v-for="childId in (block.blocks_layout?.items || [])"
