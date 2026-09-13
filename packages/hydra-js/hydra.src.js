@@ -12411,6 +12411,15 @@ export class Bridge {
             addToFields(obj[fieldName], fieldDef.schema.properties);
             return;
           }
+          // object_list holds an ARRAY of sub-objects (e.g. slateTable's
+          // table.rows and rows[].cells). A slate field nested inside one —
+          // slateTable's cell `value` — is a real editable field per the
+          // schema, so descend into every item or selecting it trips the
+          // "missing data-node-id" warning (#value on slateTable).
+          if (fieldDef.widget === 'object_list' && fieldDef.schema?.properties && Array.isArray(obj[fieldName])) {
+            obj[fieldName].forEach((item) => addToFields(item, fieldDef.schema.properties));
+            return;
+          }
           if (isSlateFieldType(getFieldTypeString(fieldDef)) && obj[fieldName]) {
             obj[fieldName] = this.addNodeIds(obj[fieldName]);
             slateCalls++;
