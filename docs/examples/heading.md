@@ -82,71 +82,13 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 </block>
 
+<block type="heading" data-json='{"heading":"Getting Started","tag":"h2"}' />
+
 <fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-heading">
 
-<block type="codeExample" slotId="schema">
+<block type="codeExample" slotId="schema" source="heading" format="schema" />
 
-### Schema
-
-```javascript
-{
-  "heading": {
-    "blockSchema": {
-      "properties": {
-        "heading": {
-          "title": "Heading"
-        },
-        "tag": {
-          "title": "Tag",
-          "widget": "select",
-          "choices": [
-            [
-              "h1",
-              "h1"
-            ],
-            [
-              "h2",
-              "h2"
-            ],
-            [
-              "h3",
-              "h3"
-            ],
-            [
-              "h4",
-              "h4"
-            ],
-            [
-              "h5",
-              "h5"
-            ],
-            [
-              "h6",
-              "h6"
-            ]
-          ]
-        }
-      }
-    }
-  }
-}
-```
-
-</block>
-
-<block type="codeExample" slotId="json-data">
-
-### JSON Block Data
-
-```json
-{
-  "@type": "heading",
-  "heading": "Getting Started",
-  "tag": "h2"
-}
-```
-
-</block>
+<block type="codeExample" slotId="json-data" source="heading" format="json" />
 
 <block type="codeExample" slotId="rendering">
 

@@ -22,10 +22,16 @@
  */
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync, rmSync, cpSync, statSync } from 'fs';
 import { join, dirname, relative, basename } from 'path';
-import { folderExcludes } from '../lib/markdown-mount.mjs';
+import { folderExcludes, resolveCodeExampleSources, schemaRegistryFromBlockDefinitions } from '../lib/markdown-mount.mjs';
+import { decodePage } from '../lib/prototype-mapping.mjs';
+import { sharedBlocksConfig } from '../tests-playwright/fixtures/shared-block-schemas.js';
 
 const [SRC, OUT] = process.argv.slice(2);
 if (!SRC || !OUT) { console.error('usage: gen-myst.mjs <src> <out>'); process.exit(1); }
+
+// The SAME complete schema registry the mount + frontends use, so a resolved
+// `source=…/format="schema"` shows the schema that actually renders.
+const schemaFor = schemaRegistryFromBlockDefinitions(sharedBlocksConfig);
 
 // Honor the same per-folder `exclude:` manifest the mount uses, so the docs/ dir
 // (which also holds the JSON distribution, build output, and renderer sources)
@@ -52,8 +58,19 @@ function calloutToAdmonition(md) {
 // A self-closing block tag's attributes -> {name: value}
 const attrs = (tag) => Object.fromEntries([...tag.matchAll(/(\w[\w-]*)="([^"]*)"/g)].map((m) => [m[1], m[2]]));
 
-function transformBody(body) {
+function transformBody(body, sourceMap = new Map()) {
   let out = calloutToAdmonition(body);
+  // A selector codeExample (`source=`) -> the resolved JSON/schema fence, so the
+  // static Sphinx page shows the SAME real data/schema the mount serves (single
+  // source), not an empty self-closing tag. Must run before the generic
+  // self-closing drop below.
+  out = out.replace(/<block type="codeExample"([^>]*?)\/>/g, (m, rest) => {
+    const a = attrs('x' + rest);
+    if (!a.source) return m;
+    const hit = sourceMap.get(`${a.source}|${a.format}`);
+    if (!hit) return m; // resolver already threw on a bad selector; leave as-is
+    return `### ${hit.label}\n\n\`\`\`json\n${hit.code}\n\`\`\`\n`;
+  });
   // self-closing image blocks -> markdown image
   out = out.replace(/<block type="image"([^>]*?)\/>/g, (m, rest) => {
     const a = attrs('x' + rest); // prefix so the leading space parses
@@ -96,10 +113,24 @@ for (const f of walk(SRC)) {
 
   const title = titleOf(fm);
   const order = parseOrder(fm);
+  // Resolve any selector codeExamples against this page's own blocks + the
+  // registry, so transformBody can emit their fences.
+  const sourceMap = new Map();
+  if (fm) {
+    const page = decodePage(raw);
+    if (page.blocks) {
+      resolveCodeExampleSources(page, { schemaFor });
+      for (const b of Object.values(page.blocks)) {
+        if (b['@type'] === 'codeExample' && b.source && b.tabs && b.tabs[0]) {
+          sourceMap.set(`${b.source}|${b.format}`, { label: b.tabs[0].label, code: b.tabs[0].code });
+        }
+      }
+    }
+  }
   let out = '';
   // minimal frontmatter Sphinx cares about
   if (title) out += `---\ntitle: ${JSON.stringify(title)}\n---\n\n`;
-  out += transformBody(body);
+  out += transformBody(body, sourceMap);
 
   // a folder index (index.md with order:) gets a hidden toctree of its children.
   // Site content (templates, search, image folders) isn't docs — the parent

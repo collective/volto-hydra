@@ -41,67 +41,9 @@ Renders the current page's related items relation field (default relatedItems). 
 
 <fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-relatedItemsListing">
 
-<block type="codeExample" slotId="schema">
+<block type="codeExample" slotId="schema" source="relatedItemsListing" format="schema" />
 
-### Schema
-
-```javascript
-{
-  "relatedItemsListing": {
-    "id": "relatedItemsListing",
-    "title": "Related Items",
-    "blockSchema": {
-      "fieldsets": [
-        {
-          "id": "default",
-          "title": "Default",
-          "fields": [
-            "relationField",
-            "variation",
-            "fieldMapping"
-          ]
-        }
-      ],
-      "properties": {
-        "relationField": {
-          "title": "Relation field",
-          "widget": "schemaFieldSelect",
-          "fieldType": "relation"
-        },
-        "variation": {
-          "title": "Item Type",
-          "widget": "blockTypeSelect",
-          "filterConvertibleFrom": "@default",
-          "default": "summary"
-        }
-      }
-    },
-    "schemaEnhancer": {
-      "inheritSchemaFrom": {
-        "typeField": "variation",
-        "mappingField": "fieldMapping",
-        "defaultsField": "itemDefaults"
-      }
-    }
-  }
-}
-```
-
-</block>
-
-<block type="codeExample" slotId="json-data">
-
-### JSON Block Data
-
-```json
-{
-  "@type": "relatedItemsListing",
-  "variation": "summary",
-  "relationField": "relatedItems"
-}
-```
-
-</block>
+<block type="codeExample" slotId="json-data" source="relatedItemsListing" format="json" />
 
 <fields slotId="rendering">
 

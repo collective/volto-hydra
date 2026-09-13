@@ -97,49 +97,9 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 <fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-text">
 
-<block type="codeExample" slotId="schema">
+<block type="codeExample" slotId="schema" source="slate" format="schema" />
 
-### Schema
-
-```javascript
-{
-  "slate": {
-    "blockSchema": {
-      "properties": {
-        "value": {
-          "title": "Text",
-          "widget": "slate",
-          "type": "array"
-        }
-      }
-    }
-  }
-}
-```
-
-</block>
-
-<block type="codeExample" slotId="json-data">
-
-### JSON Block Data
-
-```json
-{
-  "@type": "slate",
-  "value": [
-    {
-      "type": "h2",
-      "children": [
-        {
-          "text": "Welcome"
-        }
-      ]
-    }
-  ]
-}
-```
-
-</block>
+<block type="codeExample" slotId="json-data" source="slate" format="json" />
 
 <block type="callout" variation="note">
 

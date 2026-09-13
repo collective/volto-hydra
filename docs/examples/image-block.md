@@ -87,60 +87,9 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 <fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-image">
 
-<block type="codeExample" slotId="schema">
+<block type="codeExample" slotId="schema" source="image" format="schema" />
 
-### Schema
-
-```javascript
-{
-  "image": {
-    "fieldMappings": {
-      "@default": {
-        "image": "url",
-        "@id": "href",
-        "title": "alt"
-      }
-    },
-    "blockSchema": {
-      "properties": {
-        "url": {
-          "title": "Image",
-          "widget": "image"
-        },
-        "alt": {
-          "title": "Alt Text"
-        },
-        "href": {
-          "title": "Link",
-          "widget": "object_browser",
-          "mode": "link"
-        }
-      }
-    }
-  }
-}
-```
-
-</block>
-
-<block type="codeExample" slotId="json-data">
-
-### JSON Block Data
-
-```json
-{
-  "@type": "image",
-  "url": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27600%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%2377aadd%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3ETest Image%3C/text%3E%3C/svg%3E",
-  "alt": "A description of the image",
-  "href": [
-    {
-      "@id": "/target-page"
-    }
-  ]
-}
-```
-
-</block>
+<block type="codeExample" slotId="json-data" source="image" format="json" />
 
 <block type="codeExample" slotId="rendering">
 

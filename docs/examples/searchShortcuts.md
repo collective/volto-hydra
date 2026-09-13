@@ -41,83 +41,9 @@ Renders a set of values as links into a faceted search — a "tag cloud" of shor
 
 <fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-searchShortcuts">
 
-<block type="codeExample" slotId="schema">
+<block type="codeExample" slotId="schema" source="searchShortcuts" format="schema" />
 
-### Schema
-
-```javascript
-{
-  "searchShortcuts": {
-    "id": "searchShortcuts",
-    "title": "Search Shortcuts",
-    "blockSchema": {
-      "fieldsets": [
-        {
-          "id": "default",
-          "title": "Default",
-          "fields": [
-            "index",
-            "pageField",
-            "searchUrl",
-            "variation",
-            "fieldMapping"
-          ]
-        }
-      ],
-      "properties": {
-        "index": {
-          "title": "Index",
-          "widget": "select_querystring_field",
-          "vocabulary": {
-            "@id": "plone.app.contenttypes.metadatafields"
-          },
-          "default": "Subject"
-        },
-        "pageField": {
-          "title": "This page field (optional)",
-          "widget": "schemaFieldSelect",
-          "fieldType": "keyword"
-        },
-        "searchUrl": {
-          "title": "Search page URL",
-          "widget": "url"
-        },
-        "variation": {
-          "title": "Item Type",
-          "widget": "blockTypeSelect",
-          "filterConvertibleFrom": "@default",
-          "default": "default"
-        }
-      }
-    },
-    "schemaEnhancer": {
-      "inheritSchemaFrom": {
-        "typeField": "variation",
-        "mappingField": "fieldMapping",
-        "defaultsField": "itemDefaults"
-      }
-    }
-  }
-}
-```
-
-</block>
-
-<block type="codeExample" slotId="json-data">
-
-### JSON Block Data
-
-```json
-{
-  "@type": "searchShortcuts",
-  "index": "Subject",
-  "pageField": "subjects",
-  "searchUrl": "/search",
-  "variation": "default"
-}
-```
-
-</block>
+<block type="codeExample" slotId="json-data" source="searchShortcuts" format="json" />
 
 <fields slotId="rendering">
 

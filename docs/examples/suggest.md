@@ -37,43 +37,9 @@ A question whose answer is completed from a vocabulary the author picked.
 
 <fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-suggest">
 
-<block type="codeExample" slotId="schema">
+<block type="codeExample" slotId="schema" source="suggest" format="schema" />
 
-### Schema
-
-```javascript
-{
-  "suggest": {
-    "blockSchema": {
-      "properties": {
-        "label": {
-          "title": "Question"
-        },
-        "suggestFrom": {
-          "title": "Suggest from",
-          "widget": "vocabularySelect",
-          "vocabularyFilter": "Keywords|Subject"
-        },
-        "value": {
-          "title": "Answer"
-        }
-      }
-    }
-  }
-}
-```
-
-</block>
-
-<block type="codeExample" slotId="json-data">
-
-### JSON Block Data
-
-```json
-
-```
-
-</block>
+<block type="codeExample" slotId="json-data" source="suggest" format="json" />
 
 <block type="codeExample" slotId="rendering">
 

@@ -115,40 +115,9 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-separator">
 
-<block type="codeExample" slotId="schema">
+<block type="codeExample" slotId="schema" source="separator" format="schema" />
 
-### Schema
-
-```javascript
-{
-  "separator": {
-    "blockSchema": {
-      "properties": {
-        "styles": {
-          "title": "Styles"
-        }
-      }
-    }
-  }
-}
-```
-
-</block>
-
-<block type="codeExample" slotId="json-data">
-
-### JSON Block Data
-
-```json
-{
-  "@type": "separator",
-  "styles": {
-    "align": "center"
-  }
-}
-```
-
-</block>
+<block type="codeExample" slotId="json-data" source="separator" format="json" />
 
 <block type="codeExample" slotId="rendering">
 

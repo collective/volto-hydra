@@ -88,44 +88,9 @@ blandit praesent luptatum zzril qui.
 
 <fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-maps">
 
-<block type="codeExample" slotId="schema">
+<block type="codeExample" slotId="schema" source="maps" format="schema" />
 
-### Schema
-
-```javascript
-{
-  "maps": {
-    "blockSchema": {
-      "properties": {
-        "url": {
-          "title": "Map Embed URL",
-          "widget": "url"
-        },
-        "title": {
-          "title": "Title",
-          "type": "string"
-        }
-      }
-    }
-  }
-}
-```
-
-</block>
-
-<block type="codeExample" slotId="json-data">
-
-### JSON Block Data
-
-```json
-{
-  "@type": "maps",
-  "url": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2468.496805908769!2d4.867355714504337!3d50.46334407876937!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x47c1996d6ee4733f%3A0x1e62003289f50ea5!2zVGjDqcOidHJlIGRlIE5hbXVy!5e1!3m2!1sde!2sde!4v1710240653269!5m2!1sde!2sde",
-  "title": "Ploneconf 2022 was in Namur, Belgium"
-}
-```
-
-</block>
+<block type="codeExample" slotId="json-data" source="maps" format="json" />
 
 <block type="codeExample" slotId="rendering">
 

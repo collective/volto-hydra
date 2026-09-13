@@ -88,58 +88,9 @@ Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod 
 
 <fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-video">
 
-<block type="codeExample" slotId="schema">
+<block type="codeExample" slotId="schema" source="video" format="schema" />
 
-### Schema
-
-```javascript
-{
-  "video": {
-    "blockSchema": {
-      "properties": {
-        "url": {
-          "title": "Video URL"
-        },
-        "controls": {
-          "title": "Show controls",
-          "type": "boolean",
-          "default": true
-        },
-        "autoplay": {
-          "title": "Autoplay",
-          "type": "boolean",
-          "default": false
-        },
-        "loop": {
-          "title": "Loop",
-          "type": "boolean",
-          "default": false
-        },
-        "muted": {
-          "title": "Muted (required for autoplay)",
-          "type": "boolean",
-          "default": false
-        }
-      }
-    }
-  }
-}
-```
-
-</block>
-
-<block type="codeExample" slotId="json-data">
-
-### JSON Block Data
-
-```json
-{
-  "@type": "video",
-  "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-}
-```
-
-</block>
+<block type="codeExample" slotId="json-data" source="video" format="json" />
 
 <block type="codeExample" slotId="rendering">
 

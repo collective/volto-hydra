@@ -100,82 +100,9 @@ Text can be **bold** or *italic*.
 
 <fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-toc">
 
-<block type="codeExample" slotId="schema">
+<block type="codeExample" slotId="schema" source="toc" format="schema" />
 
-### Schema
-
-```javascript
-{
-  "toc": {
-    "blockSchema": {
-      "properties": {
-        "title": {
-          "title": "Title"
-        },
-        "hide_title": {
-          "title": "Hide title",
-          "type": "boolean"
-        },
-        "ordered": {
-          "title": "Ordered",
-          "type": "boolean"
-        },
-        "levels": {
-          "title": "Entries",
-          "isMulti": true,
-          "choices": [
-            [
-              "h1",
-              "h1"
-            ],
-            [
-              "h2",
-              "h2"
-            ],
-            [
-              "h3",
-              "h3"
-            ],
-            [
-              "h4",
-              "h4"
-            ],
-            [
-              "h5",
-              "h5"
-            ],
-            [
-              "h6",
-              "h6"
-            ]
-          ]
-        }
-      }
-    }
-  }
-}
-```
-
-</block>
-
-<block type="codeExample" slotId="json-data">
-
-### JSON Block Data
-
-```json
-{
-  "@type": "toc",
-  "title": "On this page",
-  "hide_title": false,
-  "ordered": false,
-  "levels": [
-    "h2",
-    "h3"
-  ]
-}
-```
-
-</block>
+<block type="codeExample" slotId="json-data" source="toc" format="json" />
 
 <block type="codeExample" slotId="rendering">
 

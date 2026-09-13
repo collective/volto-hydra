@@ -1681,7 +1681,7 @@ function loadMarkdownMount(mount) {
   const { mountPath, dirPath } = mount;
   // Pass the mountPath as the link prefix so hand-authored .md cross-links resolve
   // to the served @ids (a /docs mount serves its tree under /docs, not at root).
-  const { items, blobFiles } = readTree(dirPath, { prefix: mountPath === '/' ? '' : mountPath });
+  const { items, blobFiles } = readTree(dirPath, { prefix: mountPath === '/' ? '' : mountPath, schemaFor: mdRuntime.schemaFor });
   const urlFor = (p) => (mountPath === '/' ? p : mountPath + (p === '/' ? '' : p));
   for (const [p, item] of items) {
     const urlPath = urlFor(p);
@@ -1736,12 +1736,18 @@ async function initEngine() {
 async function initMarkdownMounts() {
   const mounts = CONTENT_MOUNTS.filter(isMarkdownMount);
   if (!mounts.length) return;
-  const { readTree } = await import('../../lib/markdown-mount.mjs');
+  const { readTree, schemaRegistryFromBlockDefinitions } = await import('../../lib/markdown-mount.mjs');
   // One validator for both mounts: the JSON tree and the markdown tree decode to
   // the same content shape, so markdown validates through plone-content-validator
   // too (checkIntegrity accepts the in-memory [{rel, data}] form).
   const { checkIntegrity } = require('./plone-content-validator.cjs');
-  mdRuntime = { readTree, checkIntegrity };
+  // schemaFor lets a `<block type="codeExample" source= format="schema">` show the
+  // real block schema — from shared-block-schemas (the complete registry the
+  // frontends register from, every block type) — so a doc's schema view can't
+  // drift from what renders. ESM, so dynamic import from this CJS module.
+  const { sharedBlocksConfig } = await import('./shared-block-schemas.js');
+  const schemaFor = schemaRegistryFromBlockDefinitions(sharedBlocksConfig);
+  mdRuntime = { readTree, checkIntegrity, schemaFor };
   for (const mount of mounts) loadMarkdownMount(mount);
   validateMarkdownContent();
 }

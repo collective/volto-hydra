@@ -82,74 +82,9 @@ A content preview card that links to another page. Selecting a target page via t
 
 <fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-teaser">
 
-<block type="codeExample" slotId="schema">
+<block type="codeExample" slotId="schema" source="teaser" format="schema" />
 
-### Schema
-
-```javascript
-{
-  "teaser": {
-    "fieldMappings": {
-      "@default": {
-        "@id": "href",
-        "title": "title",
-        "description": "description",
-        "image": "preview_image"
-      }
-    },
-    "blockSchema": {
-      "properties": {
-        "href": {
-          "title": "Target",
-          "widget": "object_browser",
-          "mode": "link"
-        },
-        "title": {
-          "title": "Title"
-        },
-        "description": {
-          "title": "Description",
-          "widget": "textarea"
-        },
-        "preview_image": {
-          "title": "Preview Image",
-          "widget": "image"
-        },
-        "overwrite": {
-          "title": "Overwrite target content",
-          "type": "boolean"
-        }
-      }
-    }
-  }
-}
-```
-
-</block>
-
-<block type="codeExample" slotId="json-data">
-
-### JSON Block Data
-
-```json
-{
-  "@type": "teaser",
-  "href": [
-    {
-      "@id": "/news/my-article",
-      "title": "My Article",
-      "description": "A short summary of the article",
-      "hasPreviewImage": true
-    }
-  ],
-  "title": "Custom Title",
-  "description": "Custom description overriding the target",
-  "preview_image": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27400%27 height=%27300%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%2399bbdd%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2718%27%3ETeaser%3C/text%3E%3C/svg%3E",
-  "overwrite": true
-}
-```
-
-</block>
+<block type="codeExample" slotId="json-data" source="teaser" format="json" />
 
 <block type="codeExample" slotId="rendering">
 

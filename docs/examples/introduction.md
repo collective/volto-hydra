@@ -67,49 +67,9 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincid
 
 <fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-introduction">
 
-<block type="codeExample" slotId="schema">
+<block type="codeExample" slotId="schema" source="introduction" format="schema" />
 
-### Schema
-
-```javascript
-{
-  "introduction": {
-    "blockSchema": {
-      "properties": {
-        "value": {
-          "title": "Text",
-          "widget": "slate",
-          "type": "array"
-        }
-      }
-    }
-  }
-}
-```
-
-</block>
-
-<block type="codeExample" slotId="json-data">
-
-### JSON Block Data
-
-```json
-{
-  "@type": "introduction",
-  "value": [
-    {
-      "type": "p",
-      "children": [
-        {
-          "text": "A short introductory paragraph that sets the context for the page."
-        }
-      ]
-    }
-  ]
-}
-```
-
-</block>
+<block type="codeExample" slotId="json-data" source="introduction" format="json" />
 
 <block type="codeExample" slotId="rendering">
 

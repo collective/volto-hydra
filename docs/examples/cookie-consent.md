@@ -39,82 +39,9 @@ A consent banner and a preferences dialog, written by one block. It is the worke
 
 <fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-cookie-consent">
 
-<block type="codeExample" slotId="schema">
+<block type="codeExample" slotId="schema" source="cookieConsent" format="schema" />
 
-### Schema
-
-```javascript
-{
-  "cookieConsent": {
-    "id": "cookieConsent",
-    "title": "Cookie consent",
-    "blockSchema": {
-      "fieldsets": [
-        {
-          "id": "default",
-          "title": "Default",
-          "fields": [
-            "message",
-            "analyticsPurpose"
-          ]
-        }
-      ],
-      "properties": {
-        "message": {
-          "title": "Banner message",
-          "widget": "slate",
-          "description": "Shown in the consent banner, at the foot of every page, until a visitor chooses."
-        },
-        "analyticsPurpose": {
-          "title": "Analytics cookies \u2014 what they are for",
-          "widget": "textarea",
-          "description": "Shown beside the analytics tick box, inside the preferences dialog."
-        }
-      },
-      "required": []
-    }
-  }
-}
-```
-
-</block>
-
-<block type="codeExample" slotId="json-data">
-
-### JSON Block Data
-
-```json
-{
-  "@type": "cookieConsent",
-  "message": [
-    {
-      "type": "p",
-      "children": [
-        {
-          "text": "We use essential cookies to make this site work, and analytics cookies to see how it is used. You can "
-        },
-        {
-          "type": "link",
-          "data": {
-            "url": "/cookies"
-          },
-          "children": [
-            {
-              "text": "manage your cookie settings"
-            }
-          ]
-        },
-        {
-          "text": " at any time."
-        }
-      ]
-    }
-  ],
-  "analyticsPurpose": "Counts visits and pages, so we can see what is worth improving. Never used to identify you."
-}
-```
-
-</block>
+<block type="codeExample" slotId="json-data" source="cookieConsent" format="json" />
 
 <block type="codeExample" slotId="rendering">
 

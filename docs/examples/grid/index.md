@@ -54,64 +54,13 @@ A responsive grid that lays out child blocks in equal-width cells. The block use
 
 <block type="slate" data-json='{"value":[{"children":[{"text":""}],"type":"p"}]}' />
 
+<block type="gridBlock" data-json='{"blocks":{"cell-1":{"@type":"teaser","title":"Design","description":"We craft beautiful interfaces that users love.","href":[{"@id":"/docs/architecture"}]},"cell-2":{"@type":"image","url":"https://placehold.co/600x400","alt":"Placeholder"},"cell-3":{"@type":"teaser","title":"Learn More","description":"Explore the full documentation.","href":[{"@id":"/docs"}]}},"blocks_layout":{"items":["cell-1","cell-2","cell-3"]}}' />
+
 <fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-grid">
 
-<block type="codeExample" slotId="schema">
+<block type="codeExample" slotId="schema" source="gridBlock" format="schema" />
 
-### Schema
-
-```javascript
-{
-  "gridBlock": {
-    "allowedBlocks": ["teaser", "image", "slate"],
-    "blockSchema": {
-      "properties": {
-        "blocks_layout": {
-          "title": "Cells",
-          "widget": "blocks_layout",
-          "allowedBlocks": ["teaser", "image", "slate"]
-        }
-      }
-    }
-  }
-}
-```
-
-</block>
-
-<block type="codeExample" slotId="json-data">
-
-### JSON Block Data
-
-```json
-{
-  "@type": "gridBlock",
-  "blocks": {
-    "cell-1": {
-      "@type": "teaser",
-      "title": "Design",
-      "description": "We craft beautiful interfaces that users love.",
-      "href": [{"@id": "/design"}]
-    },
-    "cell-2": {
-      "@type": "image",
-      "url": "https://placehold.co/600x400",
-      "alt": "Placeholder"
-    },
-    "cell-3": {
-      "@type": "teaser",
-      "title": "Learn More",
-      "description": "Explore the full documentation.",
-      "href": [{"@id": "/docs"}]
-    }
-  },
-  "blocks_layout": {
-    "items": ["cell-1", "cell-2", "cell-3"]
-  }
-}
-```
-
-</block>
+<block type="codeExample" slotId="json-data" source="gridBlock" format="json" />
 
 <block type="codeExample" slotId="rendering">
 

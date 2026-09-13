@@ -40,73 +40,9 @@ Renders entries from an external RSS feed. Its items are fetched at render time 
 
 <fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-rssFeed">
 
-<block type="codeExample" slotId="schema">
+<block type="codeExample" slotId="schema" source="rssFeed" format="schema" />
 
-### Schema
-
-```javascript
-{
-  "rssFeed": {
-    "id": "rssFeed",
-    "title": "RSS Feed",
-    "blockSchema": {
-      "fieldsets": [
-        {
-          "id": "default",
-          "title": "Default",
-          "fields": [
-            "feedUrl",
-            "count",
-            "variation",
-            "fieldMapping"
-          ]
-        }
-      ],
-      "properties": {
-        "feedUrl": {
-          "title": "Feed URL",
-          "widget": "url"
-        },
-        "count": {
-          "title": "Max items",
-          "type": "number",
-          "default": 6
-        },
-        "variation": {
-          "title": "Item Type",
-          "widget": "blockTypeSelect",
-          "filterConvertibleFrom": "@default",
-          "default": "summary"
-        }
-      }
-    },
-    "schemaEnhancer": {
-      "inheritSchemaFrom": {
-        "typeField": "variation",
-        "mappingField": "fieldMapping",
-        "defaultsField": "itemDefaults"
-      }
-    }
-  }
-}
-```
-
-</block>
-
-<block type="codeExample" slotId="json-data">
-
-### JSON Block Data
-
-```json
-{
-  "@type": "rssFeed",
-  "feedUrl": "https://pypi.org/rss/project/plone/releases.xml",
-  "count": 6,
-  "variation": "summary"
-}
-```
-
-</block>
+<block type="codeExample" slotId="json-data" source="rssFeed" format="json" />
 
 <fields slotId="rendering">
 

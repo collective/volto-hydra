@@ -239,67 +239,9 @@ Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nib euismod tincidu
 
 <fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-button">
 
-<block type="codeExample" slotId="schema">
+<block type="codeExample" slotId="schema" source="button" format="schema" />
 
-### Schema
-
-```javascript
-{
-  "button": {
-    "blockSchema": {
-      "properties": {
-        "title": {
-          "title": "Label"
-        },
-        "href": {
-          "title": "Link",
-          "widget": "object_browser",
-          "mode": "link"
-        },
-        "inneralign": {
-          "title": "Alignment",
-          "widget": "select",
-          "choices": [
-            [
-              "left",
-              "Left"
-            ],
-            [
-              "center",
-              "Center"
-            ],
-            [
-              "right",
-              "Right"
-            ]
-          ],
-          "default": "left"
-        }
-      }
-    }
-  }
-}
-```
-
-</block>
-
-<block type="codeExample" slotId="json-data">
-
-### JSON Block Data
-
-```json
-{
-  "@type": "button",
-  "title": "Learn More",
-  "href": [
-    {
-      "@id": "/about-us"
-    }
-  ]
-}
-```
-
-</block>
+<block type="codeExample" slotId="json-data" source="button" format="json" />
 
 <block type="codeExample" slotId="rendering">
 

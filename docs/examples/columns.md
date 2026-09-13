@@ -35,122 +35,13 @@ blocks-matched: |
 
 A horizontal multi-column container. The block has one slot — columns — restricted to column children, capped at four. Each column is itself a container holding any of its allowed inner block types (slate, image, …).
 
+<block type="columns" data-json='{"title":"Our Services","blocks":{"col-1":{"@type":"column","title":"Design","blocks":{"text-1":{"@type":"slate","value":[{"type":"p","children":[{"text":"We craft beautiful interfaces."}]}]}},"blocks_layout":{"items":["text-1"]}},"col-2":{"@type":"column","title":"Engineering","blocks":{"text-2":{"@type":"slate","value":[{"type":"p","children":[{"text":"We build robust systems."}]}]}},"blocks_layout":{"items":["text-2"]}}},"blocks_layout":{"columns":["col-1","col-2"]}}' />
+
 <fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-columns">
 
-<block type="codeExample" slotId="schema">
+<block type="codeExample" slotId="schema" source="columns" format="schema" />
 
-### Schema
-
-```javascript
-{
-  "columns": {
-    "blockSchema": {
-      "properties": {
-        "title": {
-          "title": "Title"
-        },
-        "columns": {
-          "title": "Columns",
-          "widget": "blocks_layout",
-          "allowedBlocks": [
-            "column"
-          ],
-          "maxLength": 4
-        }
-      }
-    }
-  },
-  "column": {
-    "blockSchema": {
-      "properties": {
-        "title": {
-          "title": "Title"
-        },
-        "items": {
-          "title": "Content",
-          "widget": "blocks_layout",
-          "allowedBlocks": [
-            "slate",
-            "image"
-          ],
-          "defaultBlockType": "slate"
-        }
-      }
-    }
-  }
-}
-```
-
-</block>
-
-<block type="codeExample" slotId="json-data">
-
-### JSON Block Data
-
-```json
-{
-  "@type": "columns",
-  "title": "Our Services",
-  "blocks": {
-    "col-1": {
-      "@type": "column",
-      "title": "Design",
-      "blocks": {
-        "text-1": {
-          "@type": "slate",
-          "value": [
-            {
-              "type": "p",
-              "children": [
-                {
-                  "text": "We craft beautiful interfaces."
-                }
-              ]
-            }
-          ]
-        }
-      },
-      "blocks_layout": {
-        "items": [
-          "text-1"
-        ]
-      }
-    },
-    "col-2": {
-      "@type": "column",
-      "title": "Engineering",
-      "blocks": {
-        "text-2": {
-          "@type": "slate",
-          "value": [
-            {
-              "type": "p",
-              "children": [
-                {
-                  "text": "We build robust systems."
-                }
-              ]
-            }
-          ]
-        }
-      },
-      "blocks_layout": {
-        "items": [
-          "text-2"
-        ]
-      }
-    }
-  },
-  "blocks_layout": {
-    "columns": [
-      "col-1",
-      "col-2"
-    ]
-  }
-}
-```
-
-</block>
+<block type="codeExample" slotId="json-data" source="columns" format="json" />
 
 <block type="codeExample" slotId="rendering">
 

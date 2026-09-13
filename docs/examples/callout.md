@@ -70,48 +70,9 @@ This is an **important** — for a must-know gotcha.
 
 <fields templateId="/templates/block-reference-layout" templateInstanceId="tpl-inst-callout">
 
-<block type="codeExample" slotId="schema">
+<block type="codeExample" slotId="schema" source="callout" format="schema" />
 
-### Schema
-
-```json
-{
-  "callout": {
-    "blockSchema": {
-      "properties": {
-        "variation": {
-          "title": "Level",
-          "choices": [["note", "Note"], ["tip", "Tip"], ["warning", "Warning"], ["important", "Important"]],
-          "default": "note"
-        },
-        "items": { "widget": "blocks_layout", "allowedBlocks": ["slate"] }
-      }
-    }
-  }
-}
-```
-
-</block>
-
-<block type="codeExample" slotId="json-data">
-
-### JSON Block Data
-
-```json
-{
-  "@type": "callout",
-  "variation": "warning",
-  "blocks": {
-    "co-body-1": {
-      "@type": "slate",
-      "value": [{ "type": "p", "children": [{ "text": "Inka is a Work in Progress. Not for production yet." }] }]
-    }
-  },
-  "blocks_layout": { "items": ["co-body-1"] }
-}
-```
-
-</block>
+<block type="codeExample" slotId="json-data" source="callout" format="json" />
 
 <block type="codeExample" slotId="rendering">
 
