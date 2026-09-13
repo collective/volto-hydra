@@ -62,12 +62,10 @@ A table with rich text (Slate) content in each cell. Supports adding/removing ro
 
 <block type="slateTable" table.celled table.fixed>
 
-| Title Tablehead | Title Tablehead | Title Tablehead | Title Tablehead |
-| --- | --- | --- | --- |
-| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md)&#x20; | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) |
-| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) |
-| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) |
-| Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) | Heading H2Heading H3Text can be **bold** or *italic* or a [Link](./index.md) |
+| Feature | Supported |
+| --- | --- |
+| **Bold** and *italic* text | Yes |
+| A [link](./index.md) | Yes |
 
 </block>
 
