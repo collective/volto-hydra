@@ -409,7 +409,16 @@ describe('image blocks', () => {
   });
 });
 
-describe('/@export (tree export, json | markdown)', () => {
+// A deployable export must bundle every referenced blob's bytes; the docs mount
+// declares the generated screenshots/video (git-ignored, produced by
+// record-doc-assets / cache-restore). On a fresh checkout / cache miss they are
+// absent, so a full export legitimately fails on the missing bytes — skip then,
+// like export-markdown-mount. This runs where the assets exist (locally, and the
+// record job after `pnpm docs:assets`); the media gate is the presence check.
+const HAVE_ASSETS = fs.existsSync(path.resolve(__dirname, '../../docs/images/accordion-edit.png'))
+  && fs.existsSync(path.resolve(__dirname, '../../docs/static/hydra-demo.mp4'));
+
+describe('/@export (tree export, json | markdown)', { skip: HAVE_ASSETS ? false : 'generated doc assets absent — run `pnpm docs:assets` first' }, () => {
   it('exports json as a gzipped tar distribution that validates clean', async () => {
     const res = await fetch(`${baseUrl}/@export`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
