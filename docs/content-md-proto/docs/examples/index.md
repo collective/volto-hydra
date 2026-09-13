@@ -23,6 +23,7 @@ blocks-matched: |
 order:
   - accordion
   - button
+  - callout
   - columns
   - contextNavigation
   - cookie-consent
